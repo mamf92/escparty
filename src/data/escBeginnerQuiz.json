@@ -1,0 +1,119 @@
+[
+    {
+        "id": 1,
+        "question": "Which country has won Eurovision the most times?",
+        "options": [
+            "Sweden",
+            "Ireland",
+            "United Kingdom",
+            "France"
+        ],
+        "correctAnswer": "Ireland"
+    },
+    {
+        "id": 2,
+        "question": "What year did ABBA win Eurovision with 'Waterloo'?",
+        "options": [
+            "1969",
+            "1974",
+            "1982",
+            "1990"
+        ],
+        "correctAnswer": "1974"
+    },
+    {
+        "id": 3,
+        "question": "Which country hosted Eurovision in 2023?",
+        "options": [
+            "Italy",
+            "Sweden",
+            "United Kingdom",
+            "Ukraine"
+        ],
+        "correctAnswer": "United Kingdom",
+        "disabled": false
+    },
+    {
+        "id": 4,
+        "question": "Which Eurovision song became a global hit for ABBA?",
+        "options": [
+            "Dancing Queen",
+            "Mamma Mia",
+            "Waterloo",
+            "Fernando"
+        ],
+        "correctAnswer": "Waterloo"
+    },
+    {
+        "id": 5,
+        "question": "Which country won Eurovision 2021 with Måneskin’s 'Zitti e Buoni'?",
+        "options": [
+            "France",
+            "Sweden",
+            "Italy",
+            "Norway"
+        ],
+        "correctAnswer": "Italy",
+        "disabled": false
+    },
+    {
+        "id": 6,
+        "question": "Which country is known for sending unique and sometimes 'crazy' Eurovision acts like Lordi and Käärijä?",
+        "options": [
+            "Iceland",
+            "Finland",
+            "Ukraine",
+            "Portugal"
+        ],
+        "correctAnswer": "Finland",
+        "disabled": false
+    },
+    {
+        "id": 7,
+        "question": "What is the maximum number of people allowed on stage in a Eurovision performance?",
+        "options": [
+            "4",
+            "6",
+            "8",
+            "10"
+        ],
+        "correctAnswer": "6",
+        "disabled": false
+    },
+    {
+        "id": 8,
+        "question": "Which of these countries has **never** won Eurovision?",
+        "options": [
+            "Portugal",
+            "Norway",
+            "Cyprus",
+            "Serbia"
+        ],
+        "correctAnswer": "Cyprus",
+        "disabled": false
+    },
+    {
+        "id": 9,
+        "question": "Who represented Sweden and won Eurovision in 2012 with 'Euphoria'?",
+        "options": [
+            "Loreen",
+            "Måns Zelmerlöw",
+            "Eric Saade",
+            "Charlotte Perrelli"
+        ],
+        "correctAnswer": "Loreen",
+        "disabled": false
+    },
+    {
+        "id": 10,
+        "question": "Which country won the first-ever Eurovision Song Contest in 1956?",
+        "options": [
+            "France",
+            "Switzerland",
+            "Germany",
+            "Netherlands"
+        ],
+        "correctAnswer": "Switzerland",
+        "disabled": false
+    }
+]
