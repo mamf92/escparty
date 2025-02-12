@@ -16,9 +16,7 @@ const QuizResults = () => {
   const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
 
   useEffect(() => {
-    console.log("✅ useEffect is running!"); // Debugging log
     const storedScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-    console.log("Stored Scores from localStorage:", storedScores); // Debugging log
     setScoreHistory(storedScores);
   }, []);
 

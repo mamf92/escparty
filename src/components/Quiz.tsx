@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { FaHome } from "react-icons/fa";
+
 
 interface Question {
     id: number;
@@ -17,27 +20,37 @@ const Quiz = () => {
     const [score, setScore] = useState(0);
     const [quizCompleted, setQuizCompleted] = useState(false);
     const navigate = useNavigate();
+    const { difficulty } = useParams();
 
 
 
     useEffect(() => {
-        import("../data/escBeginnerQuiz.json").then((data) => {
-            const filteredQuestions = data.default.filter((q: any) => !q.disabled);
-            setQuestions(filteredQuestions);
-        });
-    }, []);
+
+        const quizFiles: Record<string, string> = {
+            easy: "../data/escBeginnerQuiz.json",
+            medium: "../data/escIntermediateQuiz.json",
+            hard: "../data/escAdvancedQuiz.json"
+        };
+
+        const selectedQuiz = quizFiles[difficulty ?? "easy"];
+
+        import(selectedQuiz)
+            .then((data) => {
+                const filteredQuestions = data.default.filter((q: any) => !q.disabled);
+                setQuestions(filteredQuestions);
+            })
+            .catch((error) => console.error("Error loading quiz data:", error));
+    }, [difficulty]);
 
 
     if (questions.length === 0) return <Loading>Loading quiz...</Loading>;
 
     const currentQuestion = questions[currentQuestionIndex];
 
-    // Handle answer selection (but don't check yet)
     const handleAnswer = (answer: string) => {
         setSelectedAnswer(answer);
     };
 
-    // Submit and check answer
     const submitAnswer = () => {
         if (selectedAnswer) {
             setIsSubmitted(true);
@@ -47,7 +60,6 @@ const Quiz = () => {
         }
     };
 
-    // Move to the next question
     const nextQuestion = () => {
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -103,6 +115,9 @@ const Quiz = () => {
             ) : (
                 <NextButton onClick={nextQuestion}>Next Question</NextButton>
             )}
+            <QuitButton onClick={() => navigate("/")}>
+                <FaHome size={20} />
+            </QuitButton>
         </Container>
     );
 };
@@ -192,4 +207,24 @@ const ScoreText = styled.p`
   font-weight: bold;
   color: ${({ theme }) => theme.colors.amethyst};
   margin-bottom: 20px;
+`;
+
+const QuitButton = styled.button`
+  position: relative;
+  margin-top: 20px; /* Creates space below other buttons */
+  background: ${({ theme }) => theme.colors.gray};
+  color: white;
+  border: none;
+  border-radius: 50%; 
+  width: 40px; 
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.3s;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.night};
+  }
 `;

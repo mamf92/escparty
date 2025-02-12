@@ -11,7 +11,7 @@ const Home = () => {
         <Title>Welcome to EuroParty 🎤</Title>
         <ButtonContainer>
           <QuizButton onClick={() => navigate("/quiz")}>Create Quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/quiz")}>Join Quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/select-difficulty")}>Take a Quiz</QuizButton>
         </ButtonContainer>
       </Overlay>
     </Container>

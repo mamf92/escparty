@@ -1,14 +1,14 @@
 [
     {
         "id": 1,
-        "question": "Which country has won Eurovision the most times?",
+        "question": "Which two countries are tied for the most Eurovision wins?",
         "options": [
-            "Sweden",
-            "Ireland",
-            "United Kingdom",
-            "France"
+            "Sweden and Ireland",
+            "United Kingdom and France",
+            "Sweden and Norway",
+            "Ireland and Netherlands"
         ],
-        "correctAnswer": "Ireland"
+        "correctAnswer": "Sweden and Ireland"
     },
     {
         "id": 2,
