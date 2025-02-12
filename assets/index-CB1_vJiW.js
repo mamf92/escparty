@@ -69,7 +69,7 @@ Please change the parent <Route path="${Y}"> to <Route path="${Y==="/"?"*":`${Y}
   position: absolute;
   width: 100%;
   height: 100%;
-  background: url('/src/assets/concert-bg.jpg') center/cover no-repeat;
+  background: url('/europarty/concert-bg.jpg') center/cover no-repeat;
   filter: brightness(50%);
 `,lp=Ct.div`
   position: relative;
