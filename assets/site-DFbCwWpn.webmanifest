@@ -1,0 +1,21 @@
+{
+    "name": "EuroParty",
+    "short_name": "EuroParty",
+    "description": "EuroParty is an interactive app for Eurovision fans, featuring quizzes, song discovery, and party tools.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#EEE8F0",
+    "theme_color": "#A56DC6",
+    "icons": [
+        {
+            "src": "/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
