@@ -1,22 +1,21 @@
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 const Home = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    return (
-        <Container>
-            <BackgroundImage />
-            <Overlay>
-                <Title>Welcome to EuroParty 🎤</Title>
-                <ButtonContainer>
-                    <QuizButton onClick={() => navigate("/quiz")}>Create Quiz</QuizButton>
-                    <QuizButton onClick={() => navigate("/quiz")}>Join Quiz</QuizButton>
-                </ButtonContainer>
-            </Overlay>
-        </Container>
-    );
+  return (
+    <Container>
+      <BackgroundImage />
+      <Overlay>
+        <Title>Welcome to EuroParty 🎤</Title>
+        <ButtonContainer>
+          <QuizButton onClick={() => navigate("/quiz")}>Create Quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/quiz")}>Join Quiz</QuizButton>
+        </ButtonContainer>
+      </Overlay>
+    </Container>
+  );
 };
 
 export default Home;

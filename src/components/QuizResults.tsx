@@ -1,60 +1,60 @@
-import React, { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom"; // ✅ Import useLocation
 console.log("🎤 QuizResults Component Mounted!");
 
 interface ScoreEntry {
-    score: number;
-    total: number;
-    date: string;
+  score: number;
+  total: number;
+  date: string;
 }
 
 const QuizResults = () => {
-    const location = useLocation(); // ✅ Get quiz results from navigation state
-    const navigate = useNavigate();
-    const { score, totalQuestions } = location.state || { score: 0, totalQuestions: 0 };
-    const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
+  const location = useLocation(); // ✅ Get quiz results from navigation state
+  const navigate = useNavigate();
+  const { score, totalQuestions } = location.state || { score: 0, totalQuestions: 0 };
+  const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
 
-    useEffect(() => {
-        console.log("✅ useEffect is running!"); // Debugging log
-        const storedScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-        console.log("Stored Scores from localStorage:", storedScores); // Debugging log
-        setScoreHistory(storedScores);
-    }, []);
+  useEffect(() => {
+    console.log("✅ useEffect is running!"); // Debugging log
+    const storedScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
+    console.log("Stored Scores from localStorage:", storedScores); // Debugging log
+    setScoreHistory(storedScores);
+  }, []);
 
-    return (
-        <Container>
-            <Title>🎉 Quiz Completed! 🎤</Title>
-            <Score>You scored {score} out of {totalQuestions}!</Score>
+  return (
+    <Container>
+      <Title>🎉 Quiz Completed! 🎤</Title>
+      <Score>You scored {score} out of {totalQuestions}!</Score>
 
-            <ButtonContainer>
-                <ActionButton onClick={() => navigate("/quiz")}>Restart Quiz</ActionButton>
-                <HomeButton onClick={() => navigate("/")}>Return to Home</HomeButton>
-            </ButtonContainer>
+      <ButtonContainer>
+        <ActionButton onClick={() => navigate("/quiz")}>Restart Quiz</ActionButton>
+        <HomeButton onClick={() => navigate("/")}>Return to Home</HomeButton>
+      </ButtonContainer>
 
-            {scoreHistory.length > 0 && (
-                <>
-                    <ScoreTitle>📊 Past Scores</ScoreTitle>
-                    <ScoreTable>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Score</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {scoreHistory.map((entry, index) => (
-                                <tr key={index}>
-                                    <td>{entry.date}</td>
-                                    <td>{entry.score} / {entry.total}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </ScoreTable>
-                </>
-            )}
-        </Container>
-    );
+      {scoreHistory.length > 0 && (
+        <>
+          <ScoreTitle>📊 Past Scores</ScoreTitle>
+          <ScoreTable>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scoreHistory.map((entry, index) => (
+                <tr key={index}>
+                  <td>{entry.date}</td>
+                  <td>{entry.score} / {entry.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </ScoreTable>
+        </>
+      )}
+    </Container>
+  );
 };
 
 export default QuizResults;
