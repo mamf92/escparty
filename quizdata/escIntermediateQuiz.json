@@ -1,0 +1,112 @@
+[
+    {
+        "id": 11,
+        "question": "In which year did Alexander Rybak win Eurovision with 'Fairytale'?",
+        "options": [
+            "2007",
+            "2009",
+            "2011",
+            "2013"
+        ],
+        "correctAnswer": "2009"
+    },
+    {
+        "id": 12,
+        "question": "Which country won Eurovision in 2010 with Lena's 'Satellite'?",
+        "options": [
+            "Germany",
+            "Denmark",
+            "Norway",
+            "Sweden"
+        ],
+        "correctAnswer": "Germany"
+    },
+    {
+        "id": 13,
+        "question": "What is the name of the trophy awarded to the Eurovision winner?",
+        "options": [
+            "Euro Cup",
+            "Glass Microphone",
+            "Golden Note",
+            "Crystal Microphone"
+        ],
+        "correctAnswer": "Glass Microphone"
+    },
+    {
+        "id": 14,
+        "question": "Which country holds the record for the most consecutive last-place finishes?",
+        "options": [
+            "Norway",
+            "Finland",
+            "Portugal",
+            "Austria"
+        ],
+        "correctAnswer": "Norway"
+    },
+    {
+        "id": 15,
+        "question": "Which country was the first to win Eurovision three times in a row?",
+        "options": [
+            "Ireland",
+            "Sweden",
+            "United Kingdom",
+            "Spain"
+        ],
+        "correctAnswer": "Ireland"
+    },
+    {
+        "id": 16,
+        "question": "Which country did Celine Dion represent when she won Eurovision in 1988?",
+        "options": [
+            "France",
+            "Canada",
+            "Switzerland",
+            "Belgium"
+        ],
+        "correctAnswer": "Switzerland"
+    },
+    {
+        "id": 17,
+        "question": "Which Eurovision song became a UK Christmas number one in 1981?",
+        "options": [
+            "Making Your Mind Up",
+            "Save Your Kisses for Me",
+            "What's Another Year",
+            "Johnny Blue"
+        ],
+        "correctAnswer": "Don't Let the Sun Go Down on Me"
+    },
+    {
+        "id": 18,
+        "question": "Which country withdrew from Eurovision in 1970 due to dissatisfaction with the voting system?",
+        "options": [
+            "Sweden",
+            "Finland",
+            "Norway",
+            "Portugal"
+        ],
+        "correctAnswer": "Finland"
+    },
+    {
+        "id": 19,
+        "question": "Which country won Eurovision in 2004 with Ruslana's 'Wild Dances'?",
+        "options": [
+            "Ukraine",
+            "Russia",
+            "Turkey",
+            "Greece"
+        ],
+        "correctAnswer": "Ukraine"
+    },
+    {
+        "id": 20,
+        "question": "Which country achieved its first Eurovision win in 2006 with the band Lordi?",
+        "options": [
+            "Finland",
+            "Estonia",
+            "Latvia",
+            "Lithuania"
+        ],
+        "correctAnswer": "Finland"
+    }
+]
