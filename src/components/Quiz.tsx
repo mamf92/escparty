@@ -6,120 +6,121 @@ import { FaHome } from "react-icons/fa";
 
 
 interface Question {
-    id: number;
-    question: string;
-    options: string[];
-    correctAnswer: string;
+  id: number;
+  question: string;
+  options: string[];
+  correctAnswer: string;
 }
 
 const Quiz = () => {
-    const [questions, setQuestions] = useState<Question[]>([]);
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-    const [isSubmitted, setIsSubmitted] = useState(false);
-    const [score, setScore] = useState(0);
-    const [quizCompleted, setQuizCompleted] = useState(false);
-    const navigate = useNavigate();
-    const { difficulty } = useParams();
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [score, setScore] = useState(0);
+  const [quizCompleted, setQuizCompleted] = useState(false);
+  const navigate = useNavigate();
+  const { difficulty } = useParams();
 
 
 
-    useEffect(() => {
-
-        const quizFiles: Record<string, string> = {
-            easy: "../data/escBeginnerQuiz.json",
-            medium: "../data/escIntermediateQuiz.json",
-            hard: "../data/escAdvancedQuiz.json"
-        };
-
-        const selectedQuiz = quizFiles[difficulty ?? "easy"];
-
-        import(selectedQuiz)
-            .then((data) => {
-                const filteredQuestions = data.default.filter((q: any) => !q.disabled);
-                setQuestions(filteredQuestions);
-            })
-            .catch((error) => console.error("Error loading quiz data:", error));
-    }, [difficulty]);
-
-
-    if (questions.length === 0) return <Loading>Loading quiz...</Loading>;
-
-    const currentQuestion = questions[currentQuestionIndex];
-
-    const handleAnswer = (answer: string) => {
-        setSelectedAnswer(answer);
+  useEffect(() => {
+    const quizFiles: Record<string, string> = {
+      easy: "/quizdata/escBeginnerQuiz.json",
+      medium: "/quizdata/escIntermediateQuiz.json",
+      hard: "/quizdata/escAdvancedQuiz.json"
     };
 
-    const submitAnswer = () => {
-        if (selectedAnswer) {
-            setIsSubmitted(true);
-            if (selectedAnswer === currentQuestion.correctAnswer) {
-                setScore(score + 1);
-            }
-        }
-    };
+    const selectedQuiz = quizFiles[difficulty ?? "easy"];
 
-    const nextQuestion = () => {
-        if (currentQuestionIndex < questions.length - 1) {
-            setCurrentQuestionIndex(currentQuestionIndex + 1);
-            setSelectedAnswer(null);
-            setIsSubmitted(false);
-        } else {
-            // Save score in localStorage
-            const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-            const newScore = { score, total: questions.length, date: new Date().toLocaleDateString() };
-            localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
+    fetch(selectedQuiz)
+      .then((response) => response.json())
+      .then((data) => {
+        const filteredQuestions = data.filter((q: any) => !q.disabled);
+        setQuestions(filteredQuestions);
+      })
+      .catch((error) => console.error("Error loading quiz data:", error));
+  }, [difficulty]);
 
-            // Navigate to results page
-            navigate("/results", { state: { score, totalQuestions: questions.length } });
-        }
-    };
 
-    const restartQuiz = () => {
-        setCurrentQuestionIndex(0);
-        setScore(0);
-        setQuizCompleted(false);
-        setSelectedAnswer(null);
-        setIsSubmitted(false);
-    };
 
-    return quizCompleted ? (
-        <Container>
-            <QuestionText>🎉 Quiz Completed! 🎤</QuestionText>
-            <ScoreText>You scored {score} out of {questions.length}!</ScoreText>
-            <SubmitButton onClick={restartQuiz}>Restart Quiz</SubmitButton>
-        </Container>
-    ) : (
-        <Container>
-            <QuestionText>{currentQuestion.question}</QuestionText>
-            <OptionsContainer>
-                {currentQuestion.options.map((option) => (
-                    <OptionButton
-                        key={option}
-                        onClick={() => handleAnswer(option)}
-                        disabled={isSubmitted}
-                        $isSelected={selectedAnswer === option}
-                        $isCorrect={isSubmitted && option === currentQuestion.correctAnswer}
-                        $isWrong={isSubmitted && option !== currentQuestion.correctAnswer && option === selectedAnswer}
-                    >
-                        {option}
-                    </OptionButton>
-                ))}
-            </OptionsContainer>
+  if (questions.length === 0) return <Loading>Loading quiz...</Loading>;
 
-            {!isSubmitted ? (
-                <SubmitButton onClick={submitAnswer} disabled={!selectedAnswer}>
-                    Submit Answer
-                </SubmitButton>
-            ) : (
-                <NextButton onClick={nextQuestion}>Next Question</NextButton>
-            )}
-            <QuitButton onClick={() => navigate("/")}>
-                <FaHome size={20} />
-            </QuitButton>
-        </Container>
-    );
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const handleAnswer = (answer: string) => {
+    setSelectedAnswer(answer);
+  };
+
+  const submitAnswer = () => {
+    if (selectedAnswer) {
+      setIsSubmitted(true);
+      if (selectedAnswer === currentQuestion.correctAnswer) {
+        setScore(score + 1);
+      }
+    }
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setSelectedAnswer(null);
+      setIsSubmitted(false);
+    } else {
+      // Save score in localStorage
+      const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
+      const newScore = { score, total: questions.length, date: new Date().toLocaleDateString() };
+      localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
+
+      // Navigate to results page
+      navigate("/results", { state: { score, totalQuestions: questions.length } });
+    }
+  };
+
+  const restartQuiz = () => {
+    setCurrentQuestionIndex(0);
+    setScore(0);
+    setQuizCompleted(false);
+    setSelectedAnswer(null);
+    setIsSubmitted(false);
+  };
+
+  return quizCompleted ? (
+    <Container>
+      <QuestionText>🎉 Quiz Completed! 🎤</QuestionText>
+      <ScoreText>You scored {score} out of {questions.length}!</ScoreText>
+      <SubmitButton onClick={restartQuiz}>Restart Quiz</SubmitButton>
+    </Container>
+  ) : (
+    <Container>
+      <QuestionText>{currentQuestion.question}</QuestionText>
+      <OptionsContainer>
+        {currentQuestion.options.map((option) => (
+          <OptionButton
+            key={option}
+            onClick={() => handleAnswer(option)}
+            disabled={isSubmitted}
+            $isSelected={selectedAnswer === option}
+            $isCorrect={isSubmitted && option === currentQuestion.correctAnswer}
+            $isWrong={isSubmitted && option !== currentQuestion.correctAnswer && option === selectedAnswer}
+          >
+            {option}
+          </OptionButton>
+        ))}
+      </OptionsContainer>
+
+      {!isSubmitted ? (
+        <SubmitButton onClick={submitAnswer} disabled={!selectedAnswer}>
+          Submit Answer
+        </SubmitButton>
+      ) : (
+        <NextButton onClick={nextQuestion}>Next Question</NextButton>
+      )}
+      <QuitButton onClick={() => navigate("/")}>
+        <FaHome size={20} />
+      </QuitButton>
+    </Container>
+  );
 };
 
 export default Quiz;
@@ -151,9 +152,9 @@ const OptionsContainer = styled.div`
 
 const OptionButton = styled.button<{ $isSelected: boolean; $isCorrect: boolean; $isWrong: boolean }>`
   background: ${({ $isSelected, $isCorrect, $isWrong, theme }) =>
-        $isCorrect ? theme.colors.correctGreen :
-            $isWrong ? theme.colors.incorrectRed :
-                $isSelected ? theme.colors.pinkLavender : theme.colors.gray};
+    $isCorrect ? theme.colors.correctGreen :
+      $isWrong ? theme.colors.incorrectRed :
+        $isSelected ? theme.colors.pinkLavender : theme.colors.gray};
   color: white;
   font-size: 1rem;
   padding: 10px;

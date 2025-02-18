@@ -1,0 +1,112 @@
+[
+    {
+        "id": 21,
+        "question": "In which city did Dana International win Eurovision with 'Diva' in 1998?",
+        "options": [
+            "Birmingham",
+            "Jerusalem",
+            "Dublin",
+            "Oslo"
+        ],
+        "correctAnswer": "Birmingham"
+    },
+    {
+        "id": 22,
+        "question": "Which countries were declared joint winners of the Eurovision Song Contest in 1969 due to a four-way tie?",
+        "options": [
+            "Spain, United Kingdom, Netherlands, and France",
+            "Spain, United Kingdom, Netherlands, and Germany",
+            "Spain, United Kingdom, France, and Italy",
+            "Spain, Netherlands, France, and Germany"
+        ],
+        "correctAnswer": "Spain, United Kingdom, Netherlands, and France"
+    },
+    {
+        "id": 23,
+        "question": "Which artist won Eurovision twice, in 1980 and 1987?",
+        "options": [
+            "Johnny Logan",
+            "Celine Dion",
+            "Loreen",
+            "Alexander Rybak"
+        ],
+        "correctAnswer": "Johnny Logan"
+    },
+    {
+        "id": 24,
+        "question": "What was the first year that Eurovision introduced a semi-final round?",
+        "options": [
+            "1993",
+            "1996",
+            "2004",
+            "2010"
+        ],
+        "correctAnswer": "2004"
+    },
+    {
+        "id": 25,
+        "question": "Which country holds the record for the longest gap between Eurovision wins?",
+        "options": [
+            "Austria",
+            "Switzerland",
+            "Italy",
+            "Portugal"
+        ],
+        "correctAnswer": "Austria"
+    },
+    {
+        "id": 26,
+        "question": "Which country's entry was disqualified in 2024 due to a backstage incident?",
+        "options": [
+            "Netherlands",
+            "Sweden",
+            "Ireland",
+            "France"
+        ],
+        "correctAnswer": "Netherlands"
+    },
+    {
+        "id": 27,
+        "question": "Which country achieved its first Eurovision win in 2007 with 'Molitva'?",
+        "options": [
+            "Serbia",
+            "Montenegro",
+            "Bosnia & Herzegovina",
+            "Croatia"
+        ],
+        "correctAnswer": "Serbia"
+    },
+    {
+        "id": 28,
+        "question": "Which artist won Eurovision in 2014 with the song 'Rise Like a Phoenix'?",
+        "options": [
+            "Conchita Wurst",
+            "Netta",
+            "Duncan Laurence",
+            "Jamala"
+        ],
+        "correctAnswer": "Conchita Wurst"
+    },
+    {
+        "id": 29,
+        "question": "Which country hosted Eurovision in 2001 after winning in 2000?",
+        "options": [
+            "Denmark",
+            "Sweden",
+            "Estonia",
+            "Latvia"
+        ],
+        "correctAnswer": "Denmark"
+    },
+    {
+        "id": 30,
+        "question": "Which song gave Finland its first Eurovision win in 2006?",
+        "options": [
+            "Hard Rock Hallelujah",
+            "Fairytale",
+            "Euphoria",
+            "Toy"
+        ],
+        "correctAnswer": "Hard Rock Hallelujah"
+    }
+]
