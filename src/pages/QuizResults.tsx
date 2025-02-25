@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom"; // ✅ Import useLocation
-console.log("🎤 QuizResults Component Mounted!");
 
 interface ScoreEntry {
   score: number;
@@ -27,6 +26,7 @@ const QuizResults = () => {
 
       <ButtonContainer>
         <ActionButton onClick={() => navigate("/quiz")}>Restart Quiz</ActionButton>
+        <ScoreboardButton onClick={() => navigate("/scoreboard")}>📊 View Scoreboard</ScoreboardButton>
         <HomeButton onClick={() => navigate("/")}>Return to Home</HomeButton>
       </ButtonContainer>
 
@@ -103,6 +103,13 @@ const ActionButton = styled.button`
     background: ${({ theme }) => theme.colors.pinkLavender};
   }
 `;
+
+const ScoreboardButton = styled(ActionButton)`
+  background: ${({ theme }) => theme.colors.pinkLavender};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.amethyst};
+  }`;
 
 const HomeButton = styled(ActionButton)`
   background: ${({ theme }) => theme.colors.gray};

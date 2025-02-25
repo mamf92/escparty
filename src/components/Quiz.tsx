@@ -25,22 +25,31 @@ const Quiz = () => {
 
 
   useEffect(() => {
+    const basePath = import.meta.env.BASE_URL; // Get the correct base path
+
     const quizFiles: Record<string, string> = {
-      easy: "/quizdata/escBeginnerQuiz.json",
-      medium: "/quizdata/escIntermediateQuiz.json",
-      hard: "/quizdata/escAdvancedQuiz.json"
+      easy: `${basePath}quizdata/escBeginnerQuiz.json`,
+      medium: `${basePath}quizdata/escIntermediateQuiz.json`,
+      hard: `${basePath}quizdata/escAdvancedQuiz.json`
     };
 
     const selectedQuiz = quizFiles[difficulty ?? "easy"];
 
     fetch(selectedQuiz)
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch quiz data: ${response.statusText}`);
+        }
+        return response.json();
+      })
       .then((data) => {
+        console.log("✅ Fetched Quiz Data:", data); // Debugging Log
         const filteredQuestions = data.filter((q: any) => !q.disabled);
         setQuestions(filteredQuestions);
       })
-      .catch((error) => console.error("Error loading quiz data:", error));
+      .catch((error) => console.error("❌ Error loading quiz data:", error));
   }, [difficulty]);
+
 
 
 
@@ -67,13 +76,21 @@ const Quiz = () => {
       setSelectedAnswer(null);
       setIsSubmitted(false);
     } else {
-      // Save score in localStorage
+
+      const difficultyLevel = difficulty ?? "easy";
+
       const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-      const newScore = { score, total: questions.length, date: new Date().toLocaleDateString() };
+
+      const newScore = {
+        score,
+        total: questions.length,
+        difficulty: difficultyLevel,
+        date: new Date().toISOString()
+      };
+
       localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
 
-      // Navigate to results page
-      navigate("/results", { state: { score, totalQuestions: questions.length } });
+      navigate("/results", { state: { score, totalQuestions: questions.length, difficulty } });
     }
   };
 

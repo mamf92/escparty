@@ -4,7 +4,10 @@ import { theme } from "./styles/theme";
 import Home from "./pages/Home";
 import SelectDifficulty from "./pages/SelectDifficulty";
 import Quiz from "./components/Quiz";
-import QuizResults from "./components/QuizResults";
+import QuizResults from "./pages/QuizResults";
+import Scoreboard from "./pages/Scoreboard";
+import MultiplayerLobby from "./pages/MultiplayerLobby";
+import Lobby from "./pages/Lobby";
 
 const App = () => {
   return (
@@ -15,6 +18,9 @@ const App = () => {
           <Route path="/select-difficulty" element={<SelectDifficulty />} />
           <Route path="/quiz/:difficulty" element={<Quiz />} />
           <Route path="/results" element={<QuizResults />} />
+          <Route path="/scoreboard" element={<Scoreboard />} />
+          <Route path="/multiplayer" element={<MultiplayerLobby />} />
+          <Route path="/lobby" element={<Lobby />} />
         </Routes>
       </Router>
     </ThemeProvider>

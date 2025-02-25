@@ -12,6 +12,7 @@ const Home = () => {
         <ButtonContainer>
           <QuizButton onClick={() => navigate("/quiz")}>Create Quiz</QuizButton>
           <QuizButton onClick={() => navigate("/select-difficulty")}>Take a Quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer Quiz</QuizButton>
         </ButtonContainer>
       </Overlay>
     </Container>
