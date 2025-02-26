@@ -23,18 +23,18 @@
     },
     {
         "id": 13,
-        "question": "What is the name of the trophy awarded to the Eurovision winner?",
+        "question": "What unique feature was introduced to Eurovision voting for the first time in 2016?",
         "options": [
-            "Euro Cup",
-            "Glass Microphone",
-            "Golden Note",
-            "Crystal Microphone"
+            "Online public voting",
+            "Separate jury and televote results",
+            "The ability to vote for your own country",
+            "Real-time voting updates"
         ],
-        "correctAnswer": "Glass Microphone"
+        "correctAnswer": "Separate jury and televote results"
     },
     {
         "id": 14,
-        "question": "Which country holds the record for the most consecutive last-place finishes?",
+        "question": "Which country has finished last the most times in Eurovision history?",
         "options": [
             "Norway",
             "Finland",
@@ -67,25 +67,25 @@
     },
     {
         "id": 17,
-        "question": "Which Eurovision song became a UK Christmas number one in 1981?",
+        "question": "Which Eurovision winning song reached #1 on the UK charts and stayed there for 6 weeks in 1976?",
         "options": [
             "Making Your Mind Up",
             "Save Your Kisses for Me",
-            "What's Another Year",
-            "Johnny Blue"
+            "Waterloo",
+            "Puppet on a String"
         ],
-        "correctAnswer": "Don't Let the Sun Go Down on Me"
+        "correctAnswer": "Save Your Kisses for Me"
     },
     {
         "id": 18,
-        "question": "Which country withdrew from Eurovision in 1970 due to dissatisfaction with the voting system?",
+        "question": "Which countries withdrew from Eurovision in 1970 in protest of the voting system?",
         "options": [
-            "Sweden",
-            "Finland",
-            "Norway",
-            "Portugal"
+            "Austria, Portugal and Italy",
+            "Finland, Sweden and Denmark",
+            "Austria, Finland, Norway, Portugal and Sweden",
+            "United Kingdom, France and Germany"
         ],
-        "correctAnswer": "Finland"
+        "correctAnswer": "Austria, Finland, Norway, Portugal and Sweden"
     },
     {
         "id": 19,
