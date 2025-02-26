@@ -3,65 +3,53 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 
 const ESC_WINNERS = [
-    "Loreen 🇸🇪", // Sweden
-    "Måneskin 🇮🇹", // Italy
-    "Conchita Wurst 🕊️", // Austria (Rise Like a Phoenix)
-    "Alexander Rybak 🎻", // Norway (Fairytale)
-    "ABBA 🇸🇪", // Sweden
-    "Duncan Laurence 🎹", // Netherlands (Arcade)
-    "Netta 🐔", // Israel (Toy)
-    "Dana International 🏳️‍🌈", // Israel (Diva)
-    "Céline Dion 🇨🇭", // Switzerland
-    "Johnny Logan 🇮🇪", // Ireland
-    "Ruslana 🔥", // Ukraine (Wild Dances)
-    "Lena 🇩🇪", // Germany
-    "Lordi 👹", // Finland (Hard Rock Hallelujah)
-    "Eleni Foureira 🔥", // Cyprus (Fuego)
-    "Helena Paparizou 🇬🇷", // Greece
-    "Marija Šerifović 🌈", // Serbia (Molitva)
-    "Emilie de Forest 🎤", // Denmark (Only Teardrops)
-    "Verka Serduchka 🌟" // Ukraine (Dancing Lasha Tumbai)
+    "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emilie de Forest 🎤", "Verka Serduchka 🌟"
 ];
 
 const MultiplayerLobby = () => {
     const [gameCode, setGameCode] = useState<string | null>(null);
     const [joinCode, setJoinCode] = useState("");
+    const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
     const navigate = useNavigate();
 
     // Function to generate a random game code
     const generateGameCode = () => {
-        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase(); // Example: ABX123
+        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         setGameCode(newCode);
-        console.log("Game Code:", newCode);
-
         localStorage.setItem("isHost", "true");
         localStorage.setItem("gameCode", newCode);
         localStorage.setItem("playerName", "👑 Host");
-
         const gameRooms = JSON.parse(localStorage.getItem("gameRooms") || "{}");
-        gameRooms[newCode] = { players: ["👑 Host"] };
-        console.log("Game Rooms:", gameRooms);
+        gameRooms[newCode] = { players: ["👑 Host"], difficulty: null };
         localStorage.setItem("gameRooms", JSON.stringify(gameRooms));
+    };
 
+    // Function for host to select difficulty
+    const selectDifficulty = (difficulty: string) => {
+        setSelectedDifficulty(difficulty);
+        const gameRooms = JSON.parse(localStorage.getItem("gameRooms") || "{}");
+        if (gameCode) {
+            gameRooms[gameCode].difficulty = difficulty;
+            localStorage.setItem("gameRooms", JSON.stringify(gameRooms));
+            localStorage.setItem("selectedDifficulty", difficulty);
+        }
         navigate("/lobby");
     };
 
     // Function to join an existing game
     const joinGame = () => {
         if (joinCode) {
-            const randomName = ESC_WINNERS[Math.floor(Math.random() * ESC_WINNERS.length)];
-
-            // Get existing rooms
             const gameRooms = JSON.parse(localStorage.getItem("gameRooms") || "{}");
-
-            // Check if the game code exists
             if (gameRooms[joinCode]) {
+                let randomName;
+                do {
+                    randomName = ESC_WINNERS[Math.floor(Math.random() * ESC_WINNERS.length)];
+                } while (gameRooms[joinCode].players.includes(randomName));
                 gameRooms[joinCode].players.push(randomName);
                 localStorage.setItem("gameRooms", JSON.stringify(gameRooms));
                 localStorage.setItem("isHost", "false");
                 localStorage.setItem("gameCode", joinCode);
                 localStorage.setItem("playerName", randomName);
-
                 navigate("/lobby");
             } else {
                 alert("Game not found!");
@@ -75,9 +63,20 @@ const MultiplayerLobby = () => {
         <Container>
             <h2>Multiplayer Quiz Lobby</h2>
 
-            {/* Host: Create Game */}
-            <Button onClick={generateGameCode}>Create Game</Button>
+            {!gameCode && <Button onClick={generateGameCode}>Create Game</Button>}
             {gameCode && <p>Game Code: <strong>{gameCode}</strong></p>}
+
+            {/* Host: Choose Difficulty */}
+            {gameCode && !selectedDifficulty && (
+                <div>
+                    <h3>Choose Quiz Difficulty:</h3>
+                    <Button onClick={() => selectDifficulty("easy")}>Easy</Button>
+                    <Button onClick={() => selectDifficulty("medium")}>Medium</Button>
+                    <Button onClick={() => selectDifficulty("hard")}>Hard</Button>
+                </div>
+            )}
+
+            {selectedDifficulty && <p>Selected Difficulty: <strong>{selectedDifficulty}</strong></p>}
 
             {/* Player: Join Game */}
             <Input
