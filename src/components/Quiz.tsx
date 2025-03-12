@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
 
-
 interface Question {
   id: number;
   question: string;
@@ -22,15 +21,21 @@ const Quiz = () => {
   const navigate = useNavigate();
   const { difficulty } = useParams();
 
-
-
   useEffect(() => {
-    const basePath = import.meta.env.BASE_URL; // Get the correct base path
+    // Check for a saved question index when component mounts
+    const savedIndex = parseInt(localStorage.getItem("currentQuestionIndex") || "0");
+    if (savedIndex > 0) {
+      setCurrentQuestionIndex(savedIndex);
+      // Clear the saved index after using it
+      localStorage.removeItem("currentQuestionIndex");
+    }
 
+    // Load quiz data
+    const basePath = import.meta.env.BASE_URL; // Get the correct base path
     const quizFiles: Record<string, string> = {
-      easy: `${basePath}quizdata/escBeginnerQuiz.json`,
-      medium: `${basePath}quizdata/escIntermediateQuiz.json`,
-      hard: `${basePath}quizdata/escAdvancedQuiz.json`
+      easy: `${basePath}public/quizdata/escBeginnerQuiz.json`,
+      medium: `${basePath}public/quizdata/escIntermediateQuiz.json`,
+      hard: `${basePath}public/quizdata/escAdvancedQuiz.json`
     };
 
     const selectedQuiz = quizFiles[difficulty ?? "easy"];
@@ -46,12 +51,16 @@ const Quiz = () => {
         console.log("✅ Fetched Quiz Data:", data); // Debugging Log
         const filteredQuestions = data.filter((q: any) => !q.disabled);
         setQuestions(filteredQuestions);
+
+        // Retrieve saved score if coming back to the quiz
+        const savedScore = parseInt(localStorage.getItem("currentScore") || "0");
+        if (savedScore > 0) {
+          setScore(savedScore);
+          localStorage.removeItem("currentScore");
+        }
       })
       .catch((error) => console.error("❌ Error loading quiz data:", error));
   }, [difficulty]);
-
-
-
 
   if (questions.length === 0) return <Loading>Loading quiz...</Loading>;
 
@@ -67,29 +76,51 @@ const Quiz = () => {
       if (selectedAnswer === currentQuestion.correctAnswer) {
         setScore(score + 1);
       }
-    }
-  };
-
-  const nextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setSelectedAnswer(null);
-      setIsSubmitted(false);
-    } else {
-
+      // Update score after every question
       const difficultyLevel = difficulty ?? "easy";
-
       const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-
       const newScore = {
         score,
         total: questions.length,
         difficulty: difficultyLevel,
         date: new Date().toISOString()
       };
-
       localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
+    }
+  };
 
+  const nextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      if ((currentQuestionIndex + 1) % 5 === 0) {
+        // Save current state before navigating
+        localStorage.setItem("currentQuestionIndex", String(currentQuestionIndex + 1));
+        localStorage.setItem("currentScore", String(score));
+
+        // Show temporary score board after every 5 questions
+        navigate("/mid-quiz-scoreboard", {
+          state: {
+            score,
+            totalQuestions: questions.length,
+            currentQuestionIndex,
+            difficulty,
+            players: [{ name: "Player 1", score }]
+          }
+        });
+      } else {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setSelectedAnswer(null);
+        setIsSubmitted(false);
+      }
+    } else {
+      const difficultyLevel = difficulty ?? "easy";
+      const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
+      const newScore = {
+        score,
+        total: questions.length,
+        difficulty: difficultyLevel,
+        date: new Date().toISOString()
+      };
+      localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
       navigate("/results", { state: { score, totalQuestions: questions.length, difficulty } });
     }
   };
@@ -125,7 +156,6 @@ const Quiz = () => {
           </OptionButton>
         ))}
       </OptionsContainer>
-
       {!isSubmitted ? (
         <SubmitButton onClick={submitAnswer} disabled={!selectedAnswer}>
           Submit Answer
