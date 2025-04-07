@@ -1,6 +1,6 @@
 # ESCParty 🎤✨
 
-EuroParty is an app designed for **Eurovision Song Contest (ESC) fans and party hosts**. It helps users organize Eurovision-themed events, engage with songs, and create **interactive quizzes and rating systems**.
+ESCParty is an app designed for **Eurovision Song Contest (ESC) fans and party hosts**. It helps users organize Eurovision-themed events, engage with songs, and create **interactive quizzes and rating systems**.
 
 ## 🎯 Features (MVP)
 - **Eurovision Quiz** – Fun and interactive quizzes about ESC.
