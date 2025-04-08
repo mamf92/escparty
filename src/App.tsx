@@ -8,6 +8,7 @@ import QuizResults from "./pages/QuizResults";
 import Scoreboard from "./pages/Scoreboard";
 import MultiplayerLobby from "./pages/MultiplayerLobby";
 import Lobby from "./pages/Lobby";
+import MidQuizScoreboard from "./pages/MidQuizScoreboard";
 
 const App = () => {
   return (
@@ -21,6 +22,7 @@ const App = () => {
           <Route path="/scoreboard" element={<Scoreboard />} />
           <Route path="/multiplayer" element={<MultiplayerLobby />} />
           <Route path="/lobby" element={<Lobby />} />
+          <Route path="/mid-quiz-scoreboard" element={<MidQuizScoreboard />} />
         </Routes>
       </Router>
     </ThemeProvider>

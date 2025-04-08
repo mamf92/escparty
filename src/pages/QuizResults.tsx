@@ -13,16 +13,25 @@ const QuizResults = () => {
   const navigate = useNavigate();
   const { score, totalQuestions } = location.state || { score: 0, totalQuestions: 0 };
   const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
+  const [winner, setWinner] = useState<string | null>(null);
 
   useEffect(() => {
     const storedScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
     setScoreHistory(storedScores);
+
+    // Determine the winner
+    const highestScore = Math.max(...storedScores.map((entry: ScoreEntry) => entry.score));
+    const winnerEntry = storedScores.find((entry: ScoreEntry) => entry.score === highestScore);
+    if (winnerEntry) {
+      setWinner(`Winner: ${winnerEntry.score} out of ${winnerEntry.total}`);
+    }
   }, []);
 
   return (
     <Container>
       <Title>🎉 Quiz Completed! 🎤</Title>
       <Score>You scored {score} out of {totalQuestions}!</Score>
+      {winner && <WinnerText>{winner}</WinnerText>}
 
       <ButtonContainer>
         <ActionButton onClick={() => navigate("/quiz")}>Restart Quiz</ActionButton>
@@ -54,6 +63,13 @@ const QuizResults = () => {
     </Container>
   );
 };
+
+const WinnerText = styled.p`
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: ${({ theme }) => theme.colors.correctGreen};
+  margin-bottom: 20px;
+`;
 
 export default QuizResults;
 
