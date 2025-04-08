@@ -10,20 +10,20 @@ interface Player {
 const MidQuizScoreboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { 
-    score, 
-    totalQuestions, 
-    currentQuestionIndex, 
-    difficulty, 
-    players: initialPlayers 
-  } = location.state || { 
-    score: 0, 
-    totalQuestions: 0, 
-    currentQuestionIndex: 0, 
-    difficulty: "easy", 
-    players: [] 
+  const {
+    score,
+    totalQuestions,
+    currentQuestionIndex,
+    difficulty,
+    players: initialPlayers
+  } = location.state || {
+    score: 0,
+    totalQuestions: 0,
+    currentQuestionIndex: 0,
+    difficulty: "easy",
+    players: []
   };
-  
+
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
 
   useEffect(() => {
@@ -39,9 +39,14 @@ const MidQuizScoreboard = () => {
   }, []);
 
   const continueQuiz = () => {
-    // We'll use the stored currentQuestionIndex in the Quiz component
-    // The difficulty is passed in the URL
-    navigate(`/quiz/${difficulty}`);
+    // Pass all the necessary state back to the Quiz component
+    navigate(`/quiz/${difficulty}`, {
+      state: {
+        currentQuestionIndex,
+        score,
+        players
+      }
+    });
   };
 
   return (

@@ -1,4 +1,10 @@
 # Changelog
+
+<!-- Add your changes at the top -->
+
+- Fixed state persistence in quiz flow by ensuring all required data is passed between MidQuizScoreboard and Quiz components
+- Fixed TypeScript error in MidQuizScoreboard component by properly using the currentQuestionIndex variable
+
 ## Sprint 6
 - Fixed issues in Mid-Quiz Scoreboard to update player list and scores dynamically.
 - Added setPlayers function to Mid-Quiz Scoreboard to update player list dynamically.
