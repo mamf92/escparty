@@ -519,14 +519,18 @@ Please change the parent <Route path="${U}"> to <Route path="${U==="/"?"*":`${U}
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  min-height: 100vh;
+  width: 100vw;
+  height: 100vh;
   padding: 20px;
   background-color: #f0f2f5;
+  position: fixed;
+  top: 0;
+  left: 0;
 
   @media (max-width: 768px) {
     padding: 0;
     background-color: transparent;
+    position: relative;
   }
 `,jS=$.div`
   position: relative;
@@ -568,8 +572,15 @@ Please change the parent <Route path="${U}"> to <Route path="${U==="/"?"*":`${U}
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  background-color: white;
+  overflow-x: hidden;
+  background-color: #242424;
   border-radius: 30px;
+
+  /* Force the content to fit within the screen width */
+  & > * {
+    max-width: 100%;
+    width: 100%;
+  }
 
   @media (max-width: 768px) {
     border-radius: 0;
@@ -585,4 +596,4 @@ Please change the parent <Route path="${U}"> to <Route path="${U==="/"?"*":`${U}
   @media (max-width: 768px) {
     display: none;
   }
-`,HS=()=>D.jsx(r1,{theme:s1,children:D.jsx(CS,{children:D.jsx(tp,{children:D.jsxs(Cv,{children:[D.jsx(Ke,{path:"/",element:D.jsx(d1,{})}),D.jsx(Ke,{path:"/select-difficulty",element:D.jsx(p1,{})}),D.jsx(Ke,{path:"/quiz",element:D.jsx(zS,{})}),D.jsx(Ke,{path:"/quiz/:difficulty",element:D.jsx(_1,{})}),D.jsx(Ke,{path:"/results",element:D.jsx(H1,{})}),D.jsx(Ke,{path:"/scoreboard",element:D.jsx($1,{})}),D.jsx(Ke,{path:"/multiplayer",element:D.jsx(P1,{})}),D.jsx(Ke,{path:"/lobby",element:D.jsx(eS,{})}),D.jsx(Ke,{path:"/mid-quiz-scoreboard",element:D.jsx(yS,{})})]})})})});Lg.createRoot(document.getElementById("root")).render(D.jsx(O.StrictMode,{children:D.jsx(HS,{})}));
+`,HS=()=>D.jsx(r1,{theme:s1,children:D.jsx(CS,{children:D.jsx("div",{className:"app-content",children:D.jsx(tp,{children:D.jsxs(Cv,{children:[D.jsx(Ke,{path:"/",element:D.jsx(d1,{})}),D.jsx(Ke,{path:"/select-difficulty",element:D.jsx(p1,{})}),D.jsx(Ke,{path:"/quiz",element:D.jsx(zS,{})}),D.jsx(Ke,{path:"/quiz/:difficulty",element:D.jsx(_1,{})}),D.jsx(Ke,{path:"/results",element:D.jsx(H1,{})}),D.jsx(Ke,{path:"/scoreboard",element:D.jsx($1,{})}),D.jsx(Ke,{path:"/multiplayer",element:D.jsx(P1,{})}),D.jsx(Ke,{path:"/lobby",element:D.jsx(eS,{})}),D.jsx(Ke,{path:"/mid-quiz-scoreboard",element:D.jsx(yS,{})})]})})})})});Lg.createRoot(document.getElementById("root")).render(D.jsx(O.StrictMode,{children:D.jsx(HS,{})}));
