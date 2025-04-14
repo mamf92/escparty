@@ -2,6 +2,11 @@
 
 <!-- Add your changes at the top -->
 
+- Fixed asset paths after repository name change from `/europarty/` to `/escparty/`
+- Fixed background image path in Home component
+- Fixed quiz data loading paths in Quiz component
+- Updated favicon and manifest paths in index.html
+
 - Fixed state persistence in quiz flow by ensuring all required data is passed between MidQuizScoreboard and Quiz components
 - Fixed TypeScript error in MidQuizScoreboard component by properly using the currentQuestionIndex variable
 

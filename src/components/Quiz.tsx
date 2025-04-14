@@ -33,9 +33,9 @@ const Quiz = () => {
     // Load quiz data
     const basePath = import.meta.env.BASE_URL; // Get the correct base path
     const quizFiles: Record<string, string> = {
-      easy: `${basePath}public/quizdata/escBeginnerQuiz.json`,
-      medium: `${basePath}public/quizdata/escIntermediateQuiz.json`,
-      hard: `${basePath}public/quizdata/escAdvancedQuiz.json`
+      easy: `${basePath}quizdata/escBeginnerQuiz.json`,
+      medium: `${basePath}quizdata/escIntermediateQuiz.json`,
+      hard: `${basePath}quizdata/escAdvancedQuiz.json`
     };
 
     const selectedQuiz = quizFiles[difficulty ?? "easy"];
