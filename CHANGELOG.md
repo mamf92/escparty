@@ -2,6 +2,12 @@
 
 <!-- Add your changes at the top -->
 
+- Added mobile phone frame for desktop users to showcase the mobile-first design
+- Improved responsive layout with a simulated phone UI on larger screens
+- Added UnderDevelopment page for the Create Quiz feature
+- Added route for /quiz to show "Feature Under Development" page
+- Fixed navigation issue when clicking "Create Quiz" button
+
 - Fixed asset paths after repository name change from `/europarty/` to `/escparty/`
 - Fixed background image path in Home component
 - Fixed quiz data loading paths in Quiz component
