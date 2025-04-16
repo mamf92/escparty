@@ -22,19 +22,31 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Prevent horizontal scrolling */
-body,
+/* Ensure all elements fill their containers properly */
 html {
   width: 100%;
   height: 100%;
-  overflow-x: hidden;
+  background-color: #f0f2f5;
 }
 
-/* Default body styling */
+/* Set background color and prevent overflow */
 body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #f0f2f5;
+}
+
+/* Style the root element to take full space */
+#root {
+  width: 100%;
+  height: 100%;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+}
+
+/* Remove the app-content class since we're using ContentConstraint in MobileFrame */
+.app-content {
+  width: 100%;
 }

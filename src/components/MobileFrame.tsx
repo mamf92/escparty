@@ -10,7 +10,11 @@ const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
     <FrameContainer>
       <PhoneFrame>
         <PhoneNotch />
-        <PhoneScreen>{children}</PhoneScreen>
+        <PhoneScreen>
+          <ContentConstraint>
+            {children}
+          </ContentConstraint>
+        </PhoneScreen>
         <PhoneButton />
       </PhoneFrame>
     </FrameContainer>
@@ -24,14 +28,20 @@ const FrameContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  min-height: 100vh;
+  width: 100vw;
+  height: 100vh;
   padding: 20px;
   background-color: #f0f2f5;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 
   @media (max-width: 768px) {
     padding: 0;
     background-color: transparent;
+    position: relative;
   }
 `;
 
@@ -79,11 +89,27 @@ const PhoneScreen = styled.div`
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  background-color: white;
+  overflow-x: hidden;
+  background-color: #242424;
   border-radius: 30px;
+  display: flex;
+  flex-direction: column;
 
   @media (max-width: 768px) {
     border-radius: 0;
+  }
+`;
+
+const ContentConstraint = styled.div`
+  width: 100%;
+  max-width: 355px;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  
+  @media (max-width: 768px) {
+    max-width: 100%;
   }
 `;
 

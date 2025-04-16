@@ -1,7 +1,11 @@
 # Changelog
 
 <!-- Add your changes at the top -->
-
+- Fixed content width constraint in mobile frame to prevent horizontal overflow
+- Fixed full-page background color for desktop view using absolute positioning
+- Added ContentConstraint component to properly contain page content within phone frame
+- Fixed mobile frame styling to prevent horizontal scrolling and ensure content fits properly inside frame
+- Fixed background coloring to cover the entire viewport for desktop view
 - Added mobile phone frame for desktop users to showcase the mobile-first design
 - Improved responsive layout with a simulated phone UI on larger screens
 - Added UnderDevelopment page for the Create Quiz feature
