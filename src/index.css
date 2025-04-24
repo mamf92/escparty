@@ -44,9 +44,31 @@ body {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
 }
 
-/* Remove the app-content class since we're using ContentConstraint in MobileFrame */
+/* Route content should fill available space inside MobileFrame */
 .app-content {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* All page components should fill their container */
+#root>div {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* Ensure all route pages take full height within their container */
+[role="main"],
+main,
+section,
+article,
+.page-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }

@@ -28,11 +28,11 @@ const FrameContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   padding: 20px;
   background-color: #f0f2f5;
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -42,6 +42,7 @@ const FrameContainer = styled.div`
     padding: 0;
     background-color: transparent;
     position: relative;
+    height: 100vh;
   }
 `;
 
@@ -94,6 +95,7 @@ const PhoneScreen = styled.div`
   border-radius: 30px;
   display: flex;
   flex-direction: column;
+  position: relative;
 
   @media (max-width: 768px) {
     border-radius: 0;
@@ -102,11 +104,14 @@ const PhoneScreen = styled.div`
 
 const ContentConstraint = styled.div`
   width: 100%;
+  height: 100%;
   max-width: 355px;
   margin: 0 auto;
   flex: 1;
   display: flex;
   flex-direction: column;
+  padding: 15px 10px;
+  overflow-y: auto;
   
   @media (max-width: 768px) {
     max-width: 100%;

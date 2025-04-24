@@ -1,6 +1,10 @@
 # Changelog
 
 <!-- Add your changes at the top -->
+- Fixed content sizing within MobileFrame to properly display pages inside the phone UI
+- Updated global styles to ensure all pages adapt to MobileFrame container dimensions
+- Enhanced ContentConstraint component with proper overflow handling and padding
+- Modified Home component sizing to use relative units instead of viewport units
 - Fixed content width constraint in mobile frame to prevent horizontal overflow
 - Fixed full-page background color for desktop view using absolute positioning
 - Added ContentConstraint component to properly contain page content within phone frame
