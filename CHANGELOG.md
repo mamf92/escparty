@@ -1,6 +1,9 @@
 # Changelog
 
 <!-- Add your changes at the top -->
+- Fixed horizontal scrollbar in quiz pages by changing container width from viewport units to percentage-based units
+- Improved button layout in SelectDifficulty component with proper text wrapping and responsive container
+- Enhanced quiz flow components to properly fit within the MobileFrame container
 - Fixed content sizing within MobileFrame to properly display pages inside the phone UI
 - Updated global styles to ensure all pages adapt to MobileFrame container dimensions
 - Enhanced ContentConstraint component with proper overflow handling and padding

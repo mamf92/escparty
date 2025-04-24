@@ -174,7 +174,7 @@ export default Quiz;
 
 // Styled Components
 const Container = styled.div`
-  width: 100vw;
+  width: 100%;
   max-width: 500px;
   margin: auto;
   text-align: center;
