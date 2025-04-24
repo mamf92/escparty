@@ -471,6 +471,8 @@ Please change the parent <Route path="${U}"> to <Route path="${U==="/"?"*":`${U}
 `,xb=V.li`
   font-size: 1.2rem;
   margin: 5px 0;
+    color: ${({theme:n})=>n.colors.pinkLavender};
+
 `,zb=V.button`
   margin-top: 20px;
   padding: 10px 20px;
