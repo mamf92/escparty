@@ -109,7 +109,7 @@ const PlayerList = styled.ul`
 const Player = styled.li`
   font-size: 1.2rem;
   margin: 5px 0;
-    color: ${({ theme }) => theme.colors.pinkLavender};
+  color: ${({ theme }) => theme.colors.pinkLavender};
 
 `;
 

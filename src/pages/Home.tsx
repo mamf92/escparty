@@ -8,7 +8,7 @@ const Home = () => {
     <Container>
       <BackgroundImage />
       <Overlay>
-        <Title>Welcome to EuroParty 🎤</Title>
+        <Title>Welcome to ESCParty 🎤</Title>
         <ButtonContainer>
           <QuizButton onClick={() => navigate("/quiz")}>Create Quiz</QuizButton>
           <QuizButton onClick={() => navigate("/select-difficulty")}>Take a Quiz</QuizButton>
