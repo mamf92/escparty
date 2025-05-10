@@ -1,6 +1,7 @@
 # Changelog
 
 <!-- Add your changes at the top -->
+- Fixed TypeScript error with Firebase configuration by moving firebase.ts to the src directory to properly access Vite environment variable types
 - Fixed horizontal scrollbar in quiz pages by changing container width from viewport units to percentage-based units
 - Improved button layout in SelectDifficulty component with proper text wrapping and responsive container
 - Enhanced quiz flow components to properly fit within the MobileFrame container
