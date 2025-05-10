@@ -1,12 +1,20 @@
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
+import { useState, useEffect } from "react";
+import { getAssetPath } from "../utils/pathUtils";
 
 const Home = () => {
   const navigate = useNavigate();
+  const [backgroundPath, setBackgroundPath] = useState('');
+
+  useEffect(() => {
+    // Use our utility to get the correct path
+    setBackgroundPath(getAssetPath('concert-bg.jpg'));
+  }, []);
 
   return (
     <Container>
-      <BackgroundImage />
+      <BackgroundImage $backgroundPath={backgroundPath} />
       <Overlay>
         <Title>Welcome to ESCParty 🎤</Title>
         <ButtonContainer>
@@ -32,11 +40,11 @@ const Container = styled.div`
   flex: 1;
 `;
 
-const BackgroundImage = styled.div`
+const BackgroundImage = styled.div<{ $backgroundPath: string }>`
   position: absolute;
   width: 100%;
   height: 100%;
-  background: url('/escparty/concert-bg.jpg') center/cover no-repeat;
+  background: ${props => props.$backgroundPath ? `url('${props.$backgroundPath}') center/cover no-repeat` : 'black'};
   filter: brightness(50%);
 `;
 
