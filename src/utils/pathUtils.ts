@@ -6,8 +6,19 @@
  * Determines if the app is running in a development environment
  */
 export const isDevelopmentEnvironment = (): boolean => {
-    return window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1';
+    // Check both the hostname and Vite's MODE environment variable
+    return (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1') &&
+        import.meta.env.MODE === 'development';
+};
+
+/**
+ * Determines if the app is running in a production preview mode (production build on localhost)
+ */
+export const isProductionPreview = (): boolean => {
+    return (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1') &&
+        import.meta.env.MODE === 'production';
 };
 
 /**

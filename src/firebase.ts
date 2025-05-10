@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { isDevelopmentEnvironment } from "./utils/pathUtils";
+import { isDevelopmentEnvironment, isProductionPreview } from "./utils/pathUtils";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -13,11 +13,13 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Log Firebase config (with sensitive parts redacted) for debugging
+// Log environment information and Firebase config for debugging
+console.log(`App environment: ${import.meta.env.MODE} (${window.location.hostname})`);
 console.log("Firebase initialization with config:", {
     ...firebaseConfig,
     apiKey: firebaseConfig.apiKey ? "[REDACTED]" : "MISSING",
-    appId: firebaseConfig.appId ? "[REDACTED]" : "MISSING"
+    appId: firebaseConfig.appId ? "[REDACTED]" : "MISSING",
+    projectId: firebaseConfig.projectId || "MISSING"
 });
 
 // Check if config seems valid
@@ -33,8 +35,8 @@ if (isMissingCriticalConfig) {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// In development, connect to emulator if environment variable is set
-// For local testing only - disable in production
+// Only connect to emulator in development mode (not in production preview)
+// For local testing only - disable in production and production preview
 if (isDevelopmentEnvironment() && import.meta.env.VITE_USE_FIREBASE_EMULATOR === "true") {
     try {
         connectFirestoreEmulator(db, "localhost", 8080);
@@ -42,6 +44,12 @@ if (isDevelopmentEnvironment() && import.meta.env.VITE_USE_FIREBASE_EMULATOR ===
     } catch (error) {
         console.error("Failed to connect to Firestore emulator:", error);
     }
+}
+
+// For production preview, ensure we're using the production Firebase instance
+if (isProductionPreview()) {
+    console.log("Running in production preview mode - using production Firebase configuration");
+    // No special action needed, just log for debugging
 }
 
 export { db };

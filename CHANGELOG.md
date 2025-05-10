@@ -1,6 +1,18 @@
 # Changelog
 
 <!-- Add your changes at the top -->
+- Fixed build error by removing unused Firestore collection import (10 May 2025)
+
+- Fixed TypeScript errors in production build by properly handling unused variables (10 May 2025)
+  - Added underscore prefixes to unused variables in Lobby and MultiplayerLobby components 
+  - Enhanced Firebase debugging to provide more detailed error information
+  - Added comprehensive logging to diagnose room creation issues in production build
+
+- Fixed Firebase room creation in production preview by improving environment detection logic (10 May 2025)
+  - Updated pathUtils.ts with proper environment detection using Vite's MODE variable
+  - Enhanced firebase.ts to handle production preview mode correctly
+  - Added debugging logs for easier environment identification
+
 - Fixed question continuity issue after midquiz scoreboard by properly handling the question index state (10 May 2025)
 - Fixed quiz loop issue that caused the quiz to restart from question 1 instead of continuing from question 6
 

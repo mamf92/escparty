@@ -1,5 +1,4 @@
 import {
-    collection,
     doc,
     getDoc,
     setDoc,
@@ -7,10 +6,7 @@ import {
     arrayUnion,
     onSnapshot,
     serverTimestamp,
-    Timestamp,
-    getDocs,
-    query,
-    limit
+    Timestamp
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -39,7 +35,10 @@ export const checkFirebaseInitialization = () => {
         console.error("Firebase Firestore instance not initialized!");
         return false;
     }
-    console.log("Firebase Firestore instance check passed:", !!db);
+
+    // Add more detailed db checking
+    console.log("Firebase DB object exists:", !!db);
+    console.log("Firebase app mode:", import.meta.env.MODE);
     return true;
 };
 
@@ -47,25 +46,23 @@ export const checkFirebaseInitialization = () => {
  * Create a new room with the given host
  */
 export const createRoom = async (roomCode: string, hostId: string, hostName: string): Promise<void> => {
-    console.log(`[ROOM CREATE] Attempting to create room ${roomCode} with host ${hostName} (${hostId})`);
-    console.log(`[ROOM CREATE] Environment: ${import.meta.env.MODE}, Base URL: ${import.meta.env.BASE_URL}`);
+    console.log(`Creating room ${roomCode} with host ${hostName} (${hostId})`);
+    console.log("Environment:", import.meta.env.MODE, "BASE_URL:", import.meta.env.BASE_URL);
 
     if (!checkFirebaseInitialization()) {
-        const errorMsg = "Firebase not initialized - cannot create room";
-        console.error(`[ROOM CREATE ERROR] ${errorMsg}`);
-        throw new Error(errorMsg);
+        const error = new Error("Firebase not initialized");
+        console.error(error);
+        throw error;
     }
 
     try {
-        console.log(`[ROOM CREATE] Checking if Firestore collection "rooms" is accessible...`);
-
         // Use a regular timestamp for player data instead of serverTimestamp()
         // because serverTimestamp() is not supported inside arrays
         const currentTime = Timestamp.now();
-        console.log(`[ROOM CREATE] Generated timestamp:`, currentTime);
+        console.log("Current timestamp created:", currentTime);
 
         const roomRef = doc(db, "rooms", roomCode);
-        console.log(`[ROOM CREATE] Room reference created for path: rooms/${roomCode}`);
+        console.log("Room reference created:", roomRef);
 
         const roomData: Room = {
             id: roomCode,
@@ -80,54 +77,22 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
             }]
         };
 
-        console.log(`[ROOM CREATE] Attempting to write room data:`, JSON.stringify(roomData));
+        console.log("About to create room with data:", JSON.stringify({
+            ...roomData,
+            createdAt: "SERVER_TIMESTAMP", // Cannot stringify the timestamp
+            players: [{
+                ...roomData.players[0],
+                joinedAt: currentTime.toDate().toISOString() // Convert to ISO string for logging
+            }]
+        }));
+
         await setDoc(roomRef, roomData);
-        console.log(`[ROOM CREATE SUCCESS] Room ${roomCode} created successfully`);
-
-        // Verify the room was created by trying to read it back
-        try {
-            const verifyDoc = await getDoc(roomRef);
-            if (verifyDoc.exists()) {
-                console.log(`[ROOM VERIFY SUCCESS] Room ${roomCode} verified to exist after creation`);
-            } else {
-                console.error(`[ROOM VERIFY ERROR] Room ${roomCode} not found immediately after creation!`);
-            }
-        } catch (verifyError) {
-            console.error(`[ROOM VERIFY ERROR] Could not verify room was created:`, verifyError);
-        }
+        console.log(`Room ${roomCode} created successfully`);
     } catch (error) {
-        console.error(`[ROOM CREATE ERROR] Creating room ${roomCode}:`, error);
-        // Show more details about the error
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : undefined;
-        console.error(`[ROOM CREATE ERROR] Message: ${errorMessage}`);
-        if (errorStack) console.error(`[ROOM CREATE ERROR] Stack: ${errorStack}`);
-
-        throw new Error(`Failed to create room: ${errorMessage}`);
-    }
-};
-
-/**
- * List all rooms in Firebase (for debugging)
- */
-export const listAllRooms = async (): Promise<string[]> => {
-    console.log(`[DEBUG] Attempting to list all rooms in Firestore`);
-
-    if (!checkFirebaseInitialization()) {
-        console.error("[DEBUG] Cannot list rooms - Firebase not initialized");
-        return [];
-    }
-
-    try {
-        const roomsQuery = query(collection(db, "rooms"), limit(20));
-        const snapshot = await getDocs(roomsQuery);
-
-        const roomIds = snapshot.docs.map(doc => doc.id);
-        console.log(`[DEBUG] Found ${roomIds.length} rooms: ${roomIds.join(", ")}`);
-        return roomIds;
-    } catch (error) {
-        console.error("[DEBUG] Error listing rooms:", error);
-        return [];
+        console.error("Error creating room:", error);
+        console.error("Error details:", (error as any)?.code, (error as any)?.message);
+        console.error("Stack:", (error as Error).stack);
+        throw new Error(`Failed to create room: ${(error as Error).message}`);
     }
 };
 
@@ -135,7 +100,7 @@ export const listAllRooms = async (): Promise<string[]> => {
  * Get room data by room code
  */
 export const getRoom = async (roomCode: string): Promise<Room | null> => {
-    console.log(`[ROOM GET] Getting room ${roomCode}`);
+    console.log(`Getting room ${roomCode}`);
 
     if (!checkFirebaseInitialization()) {
         throw new Error("Firebase not initialized");
@@ -146,15 +111,13 @@ export const getRoom = async (roomCode: string): Promise<Room | null> => {
         const roomDoc = await getDoc(roomRef);
 
         if (roomDoc.exists()) {
-            const roomData = roomDoc.data() as Room;
-            console.log(`[ROOM GET] Room ${roomCode} found:`, roomData);
-            return roomData;
+            return roomDoc.data() as Room;
         } else {
-            console.log(`[ROOM GET] Room ${roomCode} does not exist`);
+            console.log(`Room ${roomCode} does not exist`);
             return null;
         }
     } catch (error) {
-        console.error(`[ROOM GET ERROR] Getting room ${roomCode}:`, error);
+        console.error("Error getting room:", error);
         throw new Error(`Failed to get room: ${(error as Error).message}`);
     }
 };

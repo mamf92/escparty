@@ -8,7 +8,7 @@ const Lobby = () => {
     const [isHost, setIsHost] = useState<boolean>(false);
     const [gameCode, setGameCode] = useState<string | null>(null);
     const [playerName, setPlayerName] = useState<string | null>(null);
-    const [playerId, setPlayerId] = useState<string | null>(null);
+    const [_playerId, setPlayerId] = useState<string | null>(null); // Renamed to _playerId to indicate it's not used directly
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const navigate = useNavigate();
@@ -132,7 +132,7 @@ const Lobby = () => {
 
             <PlayerListTitle>Current players:</PlayerListTitle>
             <PlayerList>
-                {room?.players.map((player, index) => (
+                {room?.players.map((player, _index) => (
                     <Player key={player.id}>
                         {player.id === room.hostId ? "👑 " : ""}{player.name}
                     </Player>
