@@ -9,7 +9,7 @@ const ESC_WINNERS = [
 ];
 
 const MultiplayerLobby = () => {
-    const [gameCode, setGameCode] = useState<string | null>(null);
+    const [_gameCode, setGameCode] = useState<string | null>(null); // Renamed to _gameCode as it's not used directly
     const [joinCode, setJoinCode] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
