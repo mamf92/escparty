@@ -1,6 +1,16 @@
 # Changelog
 
 <!-- Add your changes at the top -->
+- Redid styling to look more like ESC News with square buttons, brighter colors and larger buttons
+- Redid most pages, but might have some smaller details left which is not fixed.
+- Worked on input validation on join game page, with some user feedback if code is wrong.  
+
+- Fixed input validation feedback in multiplayer game code entry form
+- Fixed MultiplayerLobby UI by cleaning up duplicate buttons and improving layout
+- Improved styling for multiplayer game options with descriptive cards
+- Added proper loading states for game creation and joining (11 May 2025)
+
+
 - Corrected favicon path references to work in both development and production environments (11 May 2025)
 
 - Fixed quiz loading issues in prod making quiz load properly both in dev and prod. (10 May 2025)

@@ -34,7 +34,6 @@ const Container = styled.div`
   text-align: center;
   padding: 20px;
   background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 10px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 `;
 
@@ -70,15 +69,14 @@ const HomeButton = styled.button`
   align-items: center;
   gap: 10px;
   padding: 12px 20px;
-  background: ${({ theme }) => theme.colors.amethyst};
+  background: ${({ theme }) => theme.colors.purple};
   color: white;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
   font-size: 1rem;
   transition: 0.3s;
   
   &:hover {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;

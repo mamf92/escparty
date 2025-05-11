@@ -337,7 +337,6 @@ const Container = styled.div`
   text-align: center;
   padding: 20px;
   background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 10px;
   overflow-x: hidden;
 `;
 
@@ -351,19 +350,19 @@ const QuestionText = styled.h2`
 const OptionsContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 1rem;
 `;
 
 const OptionButton = styled.button<{ $isSelected: boolean; $isCorrect: boolean; $isWrong: boolean }>`
   background: ${({ $isSelected, $isCorrect, $isWrong, theme }) =>
-    $isCorrect ? theme.colors.correctGreen :
+    $isCorrect ? theme.colors.accentgreen :
       $isWrong ? theme.colors.incorrectRed :
         $isSelected ? theme.colors.pinkLavender : theme.colors.gray};
   color: white;
   font-size: 1rem;
-  padding: 10px;
+  font-weight: bold;
+  padding: 1rem;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
   transition: 0.3s;
 
@@ -379,12 +378,12 @@ const OptionButton = styled.button<{ $isSelected: boolean; $isCorrect: boolean; 
 
 const SubmitButton = styled.button`
   margin-top: 20px;
-  background: ${({ theme }) => theme.colors.amethyst};
+  background: ${({ theme }) => theme.colors.purple};
   color: white;
   font-size: 1rem;
-  padding: 10px;
+  font-weight: bold;
+  padding: 1rem;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
   transition: 0.3s;
   width: 100%;
@@ -395,7 +394,7 @@ const SubmitButton = styled.button`
   }
 
   &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;
 
@@ -444,7 +443,7 @@ const ScoreText = styled.p`
 const QuitButton = styled.button`
   position: relative;
   margin-top: 20px;
-  background: ${({ theme }) => theme.colors.gray};
+  background: ${({ theme }) => theme.colors.darkpurple};
   color: white;
   border: none;
   border-radius: 50%; 
@@ -457,7 +456,7 @@ const QuitButton = styled.button`
   transition: background 0.3s;
 
   &:hover {
-    background: ${({ theme }) => theme.colors.night};
+    background: ${({ theme }) => theme.colors.purple};
   }
 `;
 

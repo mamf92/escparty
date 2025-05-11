@@ -18,9 +18,9 @@ const Home = () => {
       <Overlay>
         <Title>Welcome to ESCParty 🎤</Title>
         <ButtonContainer>
-          <QuizButton onClick={() => navigate("/quiz")}>Create Quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/select-difficulty")}>Take a Quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer Quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/select-difficulty")}>Single-player quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/quiz")}>Create quiz</QuizButton>
         </ButtonContainer>
       </Overlay>
     </Container>
@@ -56,7 +56,7 @@ const Overlay = styled.div`
 
 const Title = styled.h1`
   font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.magnolia};
+  color: ${({ theme }) => theme.colors.white};
   font-size: 2rem;
   margin-bottom: 20px;
 `;
@@ -70,17 +70,17 @@ const ButtonContainer = styled.div`
 `;
 
 const QuizButton = styled.button`
-  background: ${({ theme }) => theme.colors.amethyst};
+  background: ${({ theme }) => theme.colors.purple};
   color: white;
   font-family: ${({ theme }) => theme.fonts.body};
-  font-size: 1.2rem;
+  font-size: 1rem;
+  font-weight: bold;
   padding: 12px 24px;
   border: none;
-  border-radius: 2px;
   cursor: pointer;
   transition: 0.3s;
   
   &:hover {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;

@@ -91,7 +91,7 @@ const PhoneScreen = styled.div`
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  background-color: #242424;
+  background-color: ${({ theme }) => theme.colors.deepblue};
   border-radius: 30px;
   display: flex;
   flex-direction: column;
