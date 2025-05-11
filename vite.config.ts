@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       // Configure server for better development experience
       host: true, // Listen on all local IPs
       port: 5173,
-      open: true, // Auto-open browser
+      open: false, // Auto-open browser
     },
     build: {
       // Output directory - this should match your GitHub Pages settings

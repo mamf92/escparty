@@ -4,6 +4,7 @@ import styled from "styled-components";
 import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom, generateRoomCode } from "../utils/roomsFirestore";
 
+
 const ESC_WINNERS = [
     "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emilie de Forest 🎤", "Verka Serduchka 🌟"
 ];
@@ -12,6 +13,8 @@ const MultiplayerLobby = () => {
     const [_gameCode, setGameCode] = useState<string | null>(null); // Renamed to _gameCode as it's not used directly
     const [joinCode, setJoinCode] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showJoinForm, setShowJoinForm] = useState(false); // Added missing state variable
+    const [attempted, setAttempted] = useState(false);
     const navigate = useNavigate();
 
     // Function to generate a random game code and create room
@@ -47,8 +50,12 @@ const MultiplayerLobby = () => {
 
     // Function to join an existing game
     const joinGame = async () => {
+        setAttempted(true);
+
         if (!joinCode) {
-            alert("Please enter a game code.");
+            return;
+        }
+        if (joinCode.length !== 4 || !/^[A-Z]{4}$/.test(joinCode)) {
             return;
         }
 
@@ -83,26 +90,59 @@ const MultiplayerLobby = () => {
         }
     };
 
+    const handleShowJoinForm = () => {
+        setShowJoinForm(true);
+    };
+
+    // Added function to go back to options
+    const handleBackToOptions = () => {
+        setShowJoinForm(false);
+        setJoinCode("");
+    };
+
     return (
         <Container>
-            <h2>Multiplayer Quiz Lobby</h2>
+            <Title>Multiplayer Quiz</Title>
+            {!showJoinForm ? (
+                <OptionsContainer>
+                    <OptionCard onClick={loading ? undefined : handleCreateGame} disabled={loading}>
+                        <OptionTitle>Create game</OptionTitle>
+                        <OptionDescription>Host your own game and invite friends!</OptionDescription>
+                        {loading && <LoadingText>Creating...</LoadingText>}
+                    </OptionCard>
 
-            <Button onClick={handleCreateGame} disabled={loading}>
-                {loading ? "Creating..." : "Create Game"}
-            </Button>
+                    <OrDivider>OR</OrDivider>
 
-            <JoinContainer>
-                <Input
-                    type="text"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    placeholder="Enter game code"
-                    disabled={loading}
-                />
-                <Button onClick={joinGame} disabled={loading}>
-                    {loading ? "Joining..." : "Join Game"}
-                </Button>
-            </JoinContainer>
+                    <OptionCard onClick={loading ? undefined : handleShowJoinForm} disabled={loading}>
+                        <OptionTitle>Join game</OptionTitle>
+                        <OptionDescription>Enter a game code to join an existing game.</OptionDescription>
+                    </OptionCard>
+                </OptionsContainer>
+            ) : (
+                <JoinContainer>
+                    <JoinTitle>Enter Game Code</JoinTitle>
+                    <Input
+                        type="text"
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                        placeholder="code"
+                        disabled={loading}
+                        isInvalid={attempted && (!joinCode || joinCode.length < 4 || !/^[A-Z]{4}$/.test(joinCode))}
+                        autoFocus
+                        autoCapitalize="characters"
+                        maxLength={4}
+                    />
+                    {attempted && (!joinCode || joinCode.length < 4 || !/^[A-Z]{4}$/.test(joinCode)) && <InputHelperText>Please enter 4 letters.</InputHelperText>}
+                    <ButtonGroup>
+                        <Button onClick={handleBackToOptions} disabled={loading} secondary>
+                            Back
+                        </Button>
+                        <Button onClick={joinGame} disabled={loading}>
+                            {loading ? "Joining..." : "Join Game"}
+                        </Button>
+                    </ButtonGroup>
+                </JoinContainer>
+            )}
         </Container>
     );
 };
@@ -110,6 +150,18 @@ const MultiplayerLobby = () => {
 export default MultiplayerLobby;
 
 // Styled Components
+interface OptionCardProps {
+    disabled?: boolean;
+}
+interface ButtonProps {
+    secondary?: boolean;
+}
+
+interface InputProps {
+    isInvalid?: boolean;
+}
+
+
 const Container = styled.div`
   text-align: center;
   max-width: 400px;
@@ -117,17 +169,72 @@ const Container = styled.div`
   padding: 20px;
 `;
 
-const Button = styled.button`
-  margin: 10px;
-  padding: 10px;
-  background: ${({ theme }) => theme.colors.amethyst};
-  color: white;
-  border: none;
-  cursor: pointer;
+const Title = styled.h2`
+  font-family: ${({ theme }) => theme.fonts.heading};
+  color: ${({ theme }) => theme.colors.white};
+  font-size: 2rem;
+  margin-bottom: 20px;
+`;
+
+const OptionsContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+`;
+
+const OptionCard = styled.div<OptionCardProps>`
+  padding: 20px;
+  background: ${({ theme }) => theme.colors.purple};
+  border: 2px solid ${({ theme }) => theme.colors.purple};
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
   opacity: ${props => props.disabled ? 0.7 : 1};
+  transition: all 0.2s ease;
+  position: relative;
   
-  &:disabled {
-    cursor: not-allowed;
+  &:hover {
+    background: ${({ theme }) => theme.colors.darkpurple};
+    border-color: ${({ theme }) => theme.colors.darkpurple};
+  }
+`;
+
+const OptionTitle = styled.h3`
+  color: ${({ theme }) => theme.colors.white};
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+`;
+
+const OptionDescription = styled.p`
+  color: ${({ theme }) => theme.colors.white};
+  font-size: 1rem;
+`;
+
+const LoadingText = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-weight: bold;
+`;
+
+const OrDivider = styled.div`
+  display: flex;
+  align-items: center;
+  margin: 5px 0;
+  color: ${({ theme }) => theme.colors.white};
+  font-size: 0.9rem;
+  
+  &::before, &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: ${({ theme }) => theme.colors.deepblue};
+    margin: 0 10px;
   }
 `;
 
@@ -138,8 +245,65 @@ const JoinContainer = styled.div`
   align-items: center;
 `;
 
-const Input = styled.input`
-  padding: 10px;
-  margin: 10px;
-  width: 80%;
+const JoinTitle = styled.h3`
+  color: ${({ theme }) => theme.colors.white};
+  font-size: 1.4rem;
+  margin-bottom: 15px;
 `;
+
+const Input = styled.input<InputProps>`
+  padding: 12px;
+  margin: 10px 0;
+  width: 90%;
+  border: 3px solid ${({ isInvalid, theme }) => isInvalid ? theme.colors.accentorange : theme.colors.purple};
+  background: ${({ theme }) => theme.colors.white};
+  color: ${({ theme }) => theme.colors.black};
+  font-size: 1rem;
+   border-radius: 0; 
+  -webkit-appearance: none; 
+  -moz-appearance: none; 
+  appearance: none; 
+  text-transform: uppercase;
+  
+  &:focus {
+    outline: none;
+    border-width: 2px;
+  }
+`;
+
+const InputHelperText = styled.div`
+  color: ${({ theme }) => theme.colors.accentorange};
+  font-size: 0.9rem;
+  align-self: flex-start;
+  margin-left: 5%;
+  margin-top: 5px;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  width: 90%;
+  justify-content: space-between;
+`;
+
+const Button = styled.button<ButtonProps>`
+    padding: 12px 20px;
+    background: ${({ secondary, theme }) => secondary ? theme.colors.darkpurple : theme.colors.purple};
+    color: ${({ theme }) => theme.colors.white};
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    flex: ${props => props.secondary ? '0.4' : '0.6'};
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: ${({ secondary, theme }) => secondary ? theme.colors.purple : theme.colors.darkpurple};
+    }
+    
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+  `;

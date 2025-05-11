@@ -186,21 +186,20 @@ const Container = styled.div`
   margin: auto;
   text-align: center;
   padding: 20px;
-  background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 10px;
+  background: ${({ theme }) => theme.colors.white};
 `;
 
 const Title = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   margin-bottom: 20px;
 `;
 
 const Score = styled.p`
   font-size: 1.5rem;
   font-weight: bold;
-  color: ${({ theme }) => theme.colors.amethyst};
+  color: ${({ theme }) => theme.colors.purple};
   margin-bottom: 20px;
 `;
 
@@ -220,30 +219,30 @@ const ErrorText = styled.p`
 const ButtonContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 1rem;
 `;
 
 const ActionButton = styled.button`
-  background: ${({ theme }) => theme.colors.amethyst};
+  background: ${({ theme }) => theme.colors.purple};
   color: white;
   font-size: 1rem;
-  padding: 10px;
+  font-weight: bold;
+  padding: 1rem;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
   transition: 0.3s;
   width: 100%;
 
   &:hover {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;
 
 const ScoreboardButton = styled(ActionButton)`
-  background: ${({ theme }) => theme.colors.pinkLavender};
+  background: ${({ theme }) => theme.colors.darkpurple};
 
   &:hover {
-    background: ${({ theme }) => theme.colors.amethyst};
+    background: ${({ theme }) => theme.colors.purple};
   }`;
 
 const HomeButton = styled(ActionButton)`
@@ -270,11 +269,14 @@ const ScoreTable = styled.table`
     border: 1px solid ${({ theme }) => theme.colors.gray};
     padding: 8px;
     text-align: center;
-    color: ${({ theme }) => theme.colors.night};
   }
 
   th {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.nightblue};
+    color: white;
   }
+
+  td {
+  color: ${({ theme }) => theme.colors.black};
 `;
 

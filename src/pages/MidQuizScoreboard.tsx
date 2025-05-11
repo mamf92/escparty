@@ -140,14 +140,14 @@ const Container = styled.div`
 const Title = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   margin-bottom: 20px;
 `;
 
 const Score = styled.p`
   font-size: 1.5rem;
   font-weight: bold;
-  color: ${({ theme }) => theme.colors.amethyst};
+  color: ${({ theme }) => theme.colors.purple};
   margin-bottom: 20px;
 `;
 
@@ -156,7 +156,7 @@ const PlayerListTitle = styled.h3`
   margin-top: 1em;
   text-align: left;
   text-decoration: underline;
-  color: ${({ theme }) => theme.colors.pinkLavender};
+  color: ${({ theme }) => theme.colors.darkpurple};
 `;
 
 const PlayerList = styled.ul`
@@ -167,20 +167,21 @@ const PlayerList = styled.ul`
 `;
 
 const PlayerItem = styled.li`
-  font-size: 1.2rem;
+  font-size: 1rem;
+  font-weight: bold;
   margin: 5px 0;
-  color: ${({ theme }) => theme.colors.night};
+  color: ${({ theme }) => theme.colors.black};
 `;
 
 const NextButton = styled.button`
   margin-top: 20px;
-  padding: 10px 20px;
-  font-size: 1.2rem;
-  background-color: ${({ theme }) => theme.colors.amethyst};
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: bold;
+  background-color: ${({ theme }) => theme.colors.purple};
   color: white;
   border: none;
   cursor: pointer;
-  border-radius: 5px;
   transition: 0.3s;
   &:hover {
     background: ${({ theme }) => theme.colors.pinkLavender};
