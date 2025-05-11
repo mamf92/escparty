@@ -129,26 +129,26 @@ export default MidQuizScoreboard;
 // Styled Components
 const Container = styled.div`
   width: 100%;
-  max-width: 500px;
+  max-width: 31.25rem; /* 500px */
   margin: auto;
   text-align: center;
-  padding: 20px;
+  padding: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 10px;
+  border-radius: 0; /* Changed to match square design */
 `;
 
 const Title = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
   font-size: 1.5rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const Score = styled.p`
   font-size: 1.5rem;
   font-weight: bold;
   color: ${({ theme }) => theme.colors.purple};
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const PlayerListTitle = styled.h3`
@@ -163,19 +163,19 @@ const PlayerList = styled.ul`
   list-style: none;
   padding: 0;
   text-align: left;
-  margin: 20px 0;
+  margin: 1.25rem 0; /* 20px 0 */
 `;
 
 const PlayerItem = styled.li`
   font-size: 1rem;
   font-weight: bold;
-  margin: 5px 0;
+  margin: 0.3125rem 0; /* 5px 0 */
   color: ${({ theme }) => theme.colors.black};
 `;
 
 const NextButton = styled.button`
-  margin-top: 20px;
-  padding: 1rem 2rem;
+  margin-top: 1.25rem; /* 20px */
+  padding: 1rem 2rem; /* 16px 32px */
   font-size: 1rem;
   font-weight: bold;
   background-color: ${({ theme }) => theme.colors.purple};
@@ -184,12 +184,12 @@ const NextButton = styled.button`
   cursor: pointer;
   transition: 0.3s;
   &:hover {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;
 
 const ErrorMessage = styled.p`
   color: ${({ theme }) => theme.colors.incorrectRed};
   font-size: 1.2rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;

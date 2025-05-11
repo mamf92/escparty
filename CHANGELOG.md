@@ -1,6 +1,24 @@
 # Changelog
 
+## [Unreleased]
+### Removed
+- Removed multiplayer badge indicator from the Quiz component
+
 <!-- Add your changes at the top -->
+- Fixed multiplayer quiz difficulty validation issue when using capitalized difficulty levels (11 May 2025)
+- Fixed host name display consistency, now showing "👑 HOST 👑" in all UI locations (11 May 2025)
+- Fixed Lobby component width to be consistent with other cards (11 May 2025)
+- Improved button layout in Lobby with full-width styling for better visual consistency (11 May 2025)
+- Fixed Lobby component color scheme for better readability and consistency with other pages (11 May 2025)
+- Updated buttons in Lobby component with bold text and consistent purple color scheme (11 May 2025)
+- Changed text colors in Lobby to white with purple highlights for important elements (11 May 2025)
+
+- Standardized component styling across the entire application with consistent rem units (11 May 2025)
+- Converted all pixel measurements to rem units for better accessibility and scaling (11 May 2025)
+- Applied consistent square button styling throughout all pages (11 May 2025)
+- Unified container widths to 31.25rem (500px) across all components (11 May 2025)
+- Standardized typography with consistent font sizes and spacing (11 May 2025)
+
 - Redid styling to look more like ESC News with square buttons, brighter colors and larger buttons
 - Redid most pages, but might have some smaller details left which is not fixed.
 - Worked on input validation on join game page, with some user feedback if code is wrong.  

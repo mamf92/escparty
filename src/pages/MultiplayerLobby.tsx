@@ -23,7 +23,7 @@ const MultiplayerLobby = () => {
         try {
             // Generate a unique ID for the host
             const hostId = uuidv4();
-            const hostName = "👑 Host";
+            const hostName = "👑 HOST 👑";
 
             // Generate a room code
             const newGameCode = generateRoomCode();
@@ -164,28 +164,28 @@ interface InputProps {
 
 const Container = styled.div`
   text-align: center;
-  max-width: 400px;
+  max-width: 31.25rem; /* 500px - standardized width */
   margin: auto;
-  padding: 20px;
+  padding: 1.25rem; /* 20px */
 `;
 
 const Title = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.white};
   font-size: 2rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const OptionsContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 0.9375rem; /* 15px */
 `;
 
 const OptionCard = styled.div<OptionCardProps>`
-  padding: 20px;
+  padding: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.purple};
-  border: 2px solid ${({ theme }) => theme.colors.purple};
+  border: 0.125rem solid ${({ theme }) => theme.colors.purple}; /* 2px */
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
   opacity: ${props => props.disabled ? 0.7 : 1};
   transition: all 0.2s ease;
@@ -200,7 +200,7 @@ const OptionCard = styled.div<OptionCardProps>`
 const OptionTitle = styled.h3`
   color: ${({ theme }) => theme.colors.white};
   font-size: 1.5rem;
-  margin-bottom: 8px;
+  margin-bottom: 0.5rem; /* 8px */
 `;
 
 const OptionDescription = styled.p`
@@ -225,21 +225,21 @@ const LoadingText = styled.div`
 const OrDivider = styled.div`
   display: flex;
   align-items: center;
-  margin: 5px 0;
+  margin: 0.3125rem 0; /* 5px */
   color: ${({ theme }) => theme.colors.white};
   font-size: 0.9rem;
   
   &::before, &::after {
     content: '';
     flex: 1;
-    height: 1px;
+    height: 0.0625rem; /* 1px */
     background: ${({ theme }) => theme.colors.deepblue};
-    margin: 0 10px;
+    margin: 0 0.625rem; /* 10px */
   }
 `;
 
 const JoinContainer = styled.div`
-  margin-top: 20px;
+  margin-top: 1.25rem; /* 20px */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -248,18 +248,18 @@ const JoinContainer = styled.div`
 const JoinTitle = styled.h3`
   color: ${({ theme }) => theme.colors.white};
   font-size: 1.4rem;
-  margin-bottom: 15px;
+  margin-bottom: 0.9375rem; /* 15px */
 `;
 
 const Input = styled.input<InputProps>`
-  padding: 12px;
-  margin: 10px 0;
+  padding: 0.75rem; /* 12px */
+  margin: 0.625rem 0; /* 10px */
   width: 90%;
-  border: 3px solid ${({ isInvalid, theme }) => isInvalid ? theme.colors.accentorange : theme.colors.purple};
+  border: 0.1875rem solid ${({ isInvalid, theme }) => isInvalid ? theme.colors.accentorange : theme.colors.purple}; /* 3px */
   background: ${({ theme }) => theme.colors.white};
   color: ${({ theme }) => theme.colors.black};
   font-size: 1rem;
-   border-radius: 0; 
+  border-radius: 0; 
   -webkit-appearance: none; 
   -moz-appearance: none; 
   appearance: none; 
@@ -267,7 +267,7 @@ const Input = styled.input<InputProps>`
   
   &:focus {
     outline: none;
-    border-width: 2px;
+    border-width: 0.125rem; /* 2px */
   }
 `;
 
@@ -276,19 +276,19 @@ const InputHelperText = styled.div`
   font-size: 0.9rem;
   align-self: flex-start;
   margin-left: 5%;
-  margin-top: 5px;
+  margin-top: 0.3125rem; /* 5px */
 `;
 
 const ButtonGroup = styled.div`
   display: flex;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 0.625rem; /* 10px */
+  margin-top: 0.625rem; /* 10px */
   width: 90%;
   justify-content: space-between;
 `;
 
 const Button = styled.button<ButtonProps>`
-    padding: 12px 20px;
+    padding: 0.75rem 1.25rem; /* 12px 20px */
     background: ${({ secondary, theme }) => secondary ? theme.colors.darkpurple : theme.colors.purple};
     color: ${({ theme }) => theme.colors.white};
     font-size: 1rem;

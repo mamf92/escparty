@@ -182,10 +182,10 @@ export default QuizResults;
 // Styled Components
 const Container = styled.div`
   width: 100%;
-  max-width: 500px;
+  max-width: 31.25rem; /* 500px */
   margin: auto;
   text-align: center;
-  padding: 20px;
+  padding: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.white};
 `;
 
@@ -193,27 +193,27 @@ const Title = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
   font-size: 1.5rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const Score = styled.p`
   font-size: 1.5rem;
   font-weight: bold;
   color: ${({ theme }) => theme.colors.purple};
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const WinnerText = styled.p`
   font-size: 1.5rem;
   font-weight: bold;
   color: ${({ theme }) => theme.colors.correctGreen};
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const ErrorText = styled.p`
   font-size: 1rem;
   color: ${({ theme }) => theme.colors.incorrectRed};
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const ButtonContainer = styled.div`
@@ -256,18 +256,18 @@ const HomeButton = styled(ActionButton)`
 const ScoreTitle = styled.h3`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
-  margin-top: 20px;
+  margin-top: 1.25rem; /* 20px */
 `;
 
 const ScoreTable = styled.table`
   width: 100%;
-  margin-top: 10px;
+  margin-top: 0.625rem; /* 10px */
   border-collapse: collapse;
   font-size: 1rem;
   
   th, td {
-    border: 1px solid ${({ theme }) => theme.colors.gray};
-    padding: 8px;
+    border: 0.0625rem solid ${({ theme }) => theme.colors.gray}; /* 1px */
+    padding: 0.5rem; /* 8px */
     text-align: center;
   }
 
@@ -277,6 +277,7 @@ const ScoreTable = styled.table`
   }
 
   td {
-  color: ${({ theme }) => theme.colors.black};
+    color: ${({ theme }) => theme.colors.black};
+  }
 `;
 

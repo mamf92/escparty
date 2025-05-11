@@ -317,11 +317,6 @@ const Quiz = () => {
       <QuitButton onClick={() => navigate("/")}>
         <FaHome size={20} />
       </QuitButton>
-      {isMultiplayer && room &&
-        <MultiplayerBadge>
-          Multiplayer ({room.players.length} players)
-        </MultiplayerBadge>
-      }
     </Container>
   );
 };
@@ -332,10 +327,10 @@ export default Quiz;
 const Container = styled.div`
   position: relative;
   width: 100%;
-  max-width: 500px;
+  max-width: 31.25rem; /* 500px */
   margin: auto;
   text-align: center;
-  padding: 20px;
+  padding: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.magnolia};
   overflow-x: hidden;
 `;
@@ -344,7 +339,7 @@ const QuestionText = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
   font-size: 1.5rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const OptionsContainer = styled.div`
@@ -377,7 +372,7 @@ const OptionButton = styled.button<{ $isSelected: boolean; $isCorrect: boolean; 
 `;
 
 const SubmitButton = styled.button`
-  margin-top: 20px;
+  margin-top: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.purple};
   color: white;
   font-size: 1rem;
@@ -405,26 +400,26 @@ const LoadingContainer = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 2.5rem 1.25rem; /* 40px 20px */
   background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 10px;
+  border-radius: 0;
   margin: auto;
-  max-width: 500px;
+  max-width: 31.25rem; /* 500px */
 `;
 
 const Loading = styled.p`
   text-align: center;
   font-size: 1.2rem;
   color: ${({ theme }) => theme.colors.night};
-  margin-top: 20px;
+  margin-top: 1.25rem; /* 20px */
 `;
 
 const LoadingSpinner = styled.div`
-  border: 4px solid rgba(0, 0, 0, 0.1);
+  border: 0.25rem solid rgba(0, 0, 0, 0.1); /* 4px */
   border-radius: 50%;
-  border-top: 4px solid ${({ theme }) => theme.colors.amethyst};
-  width: 40px;
-  height: 40px;
+  border-top: 0.25rem solid ${({ theme }) => theme.colors.amethyst}; /* 4px */
+  width: 2.5rem; /* 40px */
+  height: 2.5rem; /* 40px */
   animation: spin 1s linear infinite;
 
   @keyframes spin {
@@ -437,18 +432,18 @@ const ScoreText = styled.p`
   font-size: 1.5rem;
   font-weight: bold;
   color: ${({ theme }) => theme.colors.amethyst};
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const QuitButton = styled.button`
   position: relative;
-  margin-top: 20px;
+  margin-top: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.darkpurple};
   color: white;
   border: none;
-  border-radius: 50%; 
-  width: 40px; 
-  height: 40px;
+  border-radius: 50%;
+  width: 2.5rem; /* 40px */
+  height: 2.5rem; /* 40px */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -462,34 +457,22 @@ const QuitButton = styled.button`
 
 const ErrorContainer = styled.div`
   width: 100%;
-  max-width: 500px;
+  max-width: 31.25rem; /* 500px */
   margin: auto;
   text-align: center;
-  padding: 40px 20px;
+  padding: 2.5rem 1.25rem; /* 40px 20px */
   background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 10px;
+  border-radius: 0; /* Changed from 10px to match square design */
 `;
 
 const ErrorMessage = styled.p`
   color: ${({ theme }) => theme.colors.incorrectRed};
   font-size: 1.2rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const RetryButton = styled(SubmitButton)`
-  max-width: 200px;
-  margin: 10px auto;
+  max-width: 12.5rem; /* 200px */
+  margin: 0.625rem auto; /* 10px auto */
   display: block;
-`;
-
-const MultiplayerBadge = styled.div`
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: ${({ theme }) => theme.colors.amethyst};
-  color: white;
-  font-size: 0.8rem;
-  padding: 3px 8px;
-  border-radius: 10px;
-  opacity: 0.8;
 `;
