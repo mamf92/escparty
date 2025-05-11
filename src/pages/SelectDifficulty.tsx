@@ -33,8 +33,9 @@ export default SelectDifficulty;
 // Styled Components
 const Container = styled.div`
   width: 100%;
+  max-width: 31.25rem; /* 500px - standardized container width */
   text-align: center;
-  padding: 20px;
+  padding: 1.25rem; /* 20px */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -45,24 +46,24 @@ const Title = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.white};
   font-size: 2rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const ButtonContainer = styled.div`
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 400px;
+  max-width: 31.25rem; /* 500px */
 `;
 
 const Button = styled.button`
   background: ${({ theme }) => theme.colors.purple};
   color: white;
   font-size: 1rem;
-  padding: 1.25rem;
+  padding: 1rem;
   border: none;
   cursor: pointer;
-  margin: 10px 0;
+  margin: 0.625rem 0; /* 10px */
   transition: 0.3s;
   width: 100%;
   word-wrap: break-word;
@@ -72,12 +73,14 @@ const Button = styled.button`
     background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;
+
 const DifficultyText = styled.span`
   font-size: 1.5rem;
   font-weight: bold;
 `;
+
 const DifficultyDescription = styled.span`
   font-size: 1rem;
   display: block;
-  margin-top: 5px;
+  margin-top: 0.3125rem; /* 5px */
 `;

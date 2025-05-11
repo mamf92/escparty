@@ -52,21 +52,23 @@ const Overlay = styled.div`
   position: relative;
   z-index: 2;
   text-align: center;
+  width: 100%;
+  max-width: 31.25rem; /* 500px - standardizing container width */
+  padding: 1.25rem; /* 20px */
 `;
 
 const Title = styled.h1`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.white};
   font-size: 2rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const ButtonContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  padding-left: 12px; 
-  padding-right: 12px; 
+  gap: 0.9375rem; /* 15px */
+  padding: 0 0.75rem; /* 0 12px */
 `;
 
 const QuizButton = styled.button`
@@ -75,7 +77,7 @@ const QuizButton = styled.button`
   font-family: ${({ theme }) => theme.fonts.body};
   font-size: 1rem;
   font-weight: bold;
-  padding: 12px 24px;
+  padding: 1rem; /* Standardized to 1rem */
   border: none;
   cursor: pointer;
   transition: 0.3s;

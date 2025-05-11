@@ -66,10 +66,10 @@ export default Scoreboard;
 // Styled Components
 const Container = styled.div`
     width: 100%;
-    max-width: 600px;
+    max-width: 31.25rem; /* 500px - standardizing width */
     margin: auto;
     text-align: center;
-    padding: 20px;
+    padding: 1.25rem; /* 20px */
     background: ${({ theme }) => theme.colors.white};
 `;
 
@@ -77,16 +77,17 @@ const Title = styled.h2`
     font-family: ${({ theme }) => theme.fonts.heading};
     color: ${({ theme }) => theme.colors.night};
     font-size: 1.5rem;
-    margin-bottom: 20px;
+    margin-bottom: 1.25rem; /* 20px */
 `;
 
 const SortContainer = styled.div`
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 15px;
+    gap: 0.625rem; /* 10px */
+    margin-bottom: 0.9375rem; /* 15px */
 `;
+
 const SortText = styled.p`
     font-size: 1rem;
     color: ${({ theme }) => theme.colors.black};
@@ -97,7 +98,7 @@ const SortButton = styled.button`
     background: ${({ theme }) => theme.colors.purple};
     color: white;
     font-size: 0.9rem;
-    padding: 0.5rem 0.5rem;
+    padding: 0.5rem;
     border: none;
     cursor: pointer;
     transition: 0.3s;
@@ -109,13 +110,13 @@ const SortButton = styled.button`
 
 const ScoreTable = styled.table`
     width: 100%;
-    margin-top: 10px;
+    margin-top: 0.625rem; /* 10px */
     border-collapse: collapse;
     font-size: 1rem;
 
     th, td {
-        border: 1px solid ${({ theme }) => theme.colors.gray};
-        padding: 8px;
+        border: 0.0625rem solid ${({ theme }) => theme.colors.gray}; /* 1px */
+        padding: 0.5rem; /* 8px */
         text-align: center;
     }
 
@@ -123,8 +124,10 @@ const ScoreTable = styled.table`
         background: ${({ theme }) => theme.colors.nightblue};
         color: white;
     }
-        td {
+    
+    td {
         color: ${({ theme }) => theme.colors.black};
+    }
 `;
 
 const BackButton = styled.button`
@@ -135,7 +138,7 @@ const BackButton = styled.button`
     padding: 1rem;
     border: none;
     cursor: pointer;
-    margin-top: 20px;
+    margin-top: 1.25rem; /* 20px */
     width: 100%;
 
     &:hover {
