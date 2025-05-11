@@ -1,6 +1,11 @@
 # Changelog
 
 <!-- Add your changes at the top -->
+- Corrected favicon path references to work in both development and production environments (11 May 2025)
+
+- Fixed quiz loading issues in prod making quiz load properly both in dev and prod. (10 May 2025)
+
+
 - Fixed build error by removing unused Firestore collection import (10 May 2025)
 
 - Fixed TypeScript errors in production build by properly handling unused variables (10 May 2025)
