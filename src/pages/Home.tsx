@@ -1,18 +1,26 @@
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
+import { useState, useEffect } from "react";
+import { getAssetPath } from "../utils/pathUtils";
 
 const Home = () => {
   const navigate = useNavigate();
+  const [backgroundPath, setBackgroundPath] = useState('');
+
+  useEffect(() => {
+    // Use our utility to get the correct path
+    setBackgroundPath(getAssetPath('concert-bg.jpg'));
+  }, []);
 
   return (
     <Container>
-      <BackgroundImage />
+      <BackgroundImage $backgroundPath={backgroundPath} />
       <Overlay>
         <Title>Welcome to ESCParty 🎤</Title>
         <ButtonContainer>
-          <QuizButton onClick={() => navigate("/quiz")}>Create Quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/select-difficulty")}>Take a Quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer Quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/select-difficulty")}>Single-player quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/quiz")}>Create quiz</QuizButton>
         </ButtonContainer>
       </Overlay>
     </Container>
@@ -32,11 +40,11 @@ const Container = styled.div`
   flex: 1;
 `;
 
-const BackgroundImage = styled.div`
+const BackgroundImage = styled.div<{ $backgroundPath: string }>`
   position: absolute;
   width: 100%;
   height: 100%;
-  background: url('/escparty/concert-bg.jpg') center/cover no-repeat;
+  background: ${props => props.$backgroundPath ? `url('${props.$backgroundPath}') center/cover no-repeat` : 'black'};
   filter: brightness(50%);
 `;
 
@@ -44,35 +52,37 @@ const Overlay = styled.div`
   position: relative;
   z-index: 2;
   text-align: center;
+  width: 100%;
+  max-width: 31.25rem; /* 500px - standardizing container width */
+  padding: 1.25rem; /* 20px */
 `;
 
 const Title = styled.h1`
   font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.magnolia};
+  color: ${({ theme }) => theme.colors.white};
   font-size: 2rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const ButtonContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  padding-left: 12px; 
-  padding-right: 12px; 
+  gap: 0.9375rem; /* 15px */
+  padding: 0 0.75rem; /* 0 12px */
 `;
 
 const QuizButton = styled.button`
-  background: ${({ theme }) => theme.colors.amethyst};
+  background: ${({ theme }) => theme.colors.purple};
   color: white;
   font-family: ${({ theme }) => theme.fonts.body};
-  font-size: 1.2rem;
-  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 1rem; /* Standardized to 1rem */
   border: none;
-  border-radius: 2px;
   cursor: pointer;
   transition: 0.3s;
   
   &:hover {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;

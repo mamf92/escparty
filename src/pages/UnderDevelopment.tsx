@@ -29,56 +29,54 @@ export default UnderDevelopment;
 // Styled Components
 const Container = styled.div`
   width: 100%;
-  max-width: 500px;
+  max-width: 31.25rem; /* 500px */
   margin: auto;
   text-align: center;
-  padding: 20px;
+  padding: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0.25rem 0.375rem rgba(0, 0, 0, 0.1); /* 4px 6px */
 `;
 
 const Title = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
   font-size: 1.8rem;
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* 20px */
 `;
 
 const Message = styled.p`
   font-size: 1.2rem;
   color: ${({ theme }) => theme.colors.night};
-  margin-bottom: 15px;
+  margin-bottom: 0.9375rem; /* 15px */
   line-height: 1.6;
 `;
 
 const SubMessage = styled.p`
   font-size: 1rem;
   color: ${({ theme }) => theme.colors.gray};
-  margin-bottom: 25px;
+  margin-bottom: 1.5625rem; /* 25px */
   font-style: italic;
 `;
 
 const ButtonContainer = styled.div`
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  margin-top: 1.25rem; /* 20px */
 `;
 
 const HomeButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 20px;
-  background: ${({ theme }) => theme.colors.amethyst};
+  gap: 0.625rem; /* 10px */
+  padding: 0.75rem 1.25rem; /* 12px 20px */
+  background: ${({ theme }) => theme.colors.purple};
   color: white;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
   font-size: 1rem;
   transition: 0.3s;
   
   &:hover {
-    background: ${({ theme }) => theme.colors.pinkLavender};
+    background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;

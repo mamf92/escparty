@@ -10,6 +10,16 @@ declare module "styled-components" {
             pinkLavender: string;
             correctGreen: string;
             incorrectRed: string;
+            white: string;
+            black: string;
+            darkpurple: string;
+            purple: string;
+            brightpurple: string;
+            deepblue: string;
+            nightblue: string;
+            accentmint: string;
+            accentgreen: string;
+            accentorange: string;
         };
         fonts: {
             body: string;
