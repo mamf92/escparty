@@ -1,8 +1,29 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Quiz timer functionality that automatically submits after 10 seconds and progresses to next question
+- Visual timer countdown with color change warning when time is running low
+- Auto-progression to next question after time expires
+- Synchronized quiz progression to ensure all participants move to the next question at the same time
+- Automatic question progression with feedback stage between questions
+- Visual feedback for correct/incorrect answers with 5-second display
+- Added timer visibility toggle that hides timer when answer is submitted (13 May 2025)
+
 ### Removed
 - Removed multiplayer badge indicator from the Quiz component
+
+### Fixed
+- Resolved issues with timer effect dependencies causing unexpected behavior
+- Fixed Promise handling in score update function to prevent runtime errors
+- Enhanced submit button to switch to "Next Question" with countdown after answer submission (12 May 2025)
+- Removed redundant question counter and status messages for cleaner UI (12 May 2025)
+- Fixed auto-progression after time expiration and improved timer handling with separate question/feedback timers (12 May 2025)
+- Removed text feedback messages for cleaner UI, relying on color coding for answer feedback (12 May 2025)
+- Fixed timer calculation to properly combine remaining question time with feedback time when answer submitted early (12 May 2025)
+- Fixed quiz progression by properly resetting question state when moving to new questions (12 May 2025)
+- Fixed timer and button state when transitioning between questions to ensure a clean reset (12 May 2025)
+- Enforced synchronized quiz progression by preventing manual advancement during feedback phase (12 May 2025)
 
 <!-- Add your changes at the top -->
 - Fixed multiplayer quiz difficulty validation issue when using capitalized difficulty levels (11 May 2025)
