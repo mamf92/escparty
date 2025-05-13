@@ -11,6 +11,9 @@
 - Added timer visibility toggle that hides timer when answer is submitted (13 May 2025)
 - Added proper loading and error states with UI components (13 May 2025)
 
+### Fixed
+- Fixed bug where multiple participants could get the same name when joining a room (13 May 2025)
+
 ### Removed
 - Removed multiplayer badge indicator from the Quiz component
 
