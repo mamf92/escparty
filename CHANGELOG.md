@@ -9,9 +9,15 @@
 - Automatic question progression with feedback stage between questions
 - Visual feedback for correct/incorrect answers with 5-second display
 - Added timer visibility toggle that hides timer when answer is submitted (13 May 2025)
+- Added proper loading and error states with UI components (13 May 2025)
 
 ### Removed
 - Removed multiplayer badge indicator from the Quiz component
+
+### Fixed
+- Fixed TypeScript errors related to unused variables in Quiz component (13 May 2025)
+- Removed redundant timer state variables for cleaner code (13 May 2025)
+- Optimized Quiz component rendering logic with proper loading and error states (13 May 2025)
 
 ### Fixed
 - Resolved issues with timer effect dependencies causing unexpected behavior

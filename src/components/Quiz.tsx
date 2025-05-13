@@ -34,14 +34,11 @@ const Quiz = () => {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing...");
+  const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
+  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing..."); // Used in loading state display
   const [timeLeft, setTimeLeft] = useState(10); // 10 second timer
-  const [timerActive, setTimerActive] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackTimer, setFeedbackTimer] = useState<NodeJS.Timeout | null>(null);
   const [isTimerVisible, setIsTimerVisible] = useState(true);
-  const [showTimer, setShowTimer] = useState(true); // State to control timer visibility
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
@@ -190,7 +187,6 @@ const Quiz = () => {
     if (!showFeedback) {
       console.log("Setting up new question timer");
       setTimeLeft(10);
-      setTimerActive(true);
 
       const timer = setInterval(() => {
         setTimeLeft(prev => {
@@ -209,13 +205,10 @@ const Quiz = () => {
   useEffect(() => {
     if (showFeedback) {
       // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
-      setTimerActive(true);
-
       const feedbackTimer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
             clearInterval(feedbackTimer);
-            setTimerActive(false);
             moveToNextQuestion(); // Automatically move to next question when feedback time ends
             return 0;
           }
@@ -273,7 +266,6 @@ const Quiz = () => {
         });
       } else {
         // Reset all question-related states
-        setTimerActive(false); // Stop any running timers first
         setShowFeedback(false); // Must be reset before setting new question
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
@@ -351,6 +343,28 @@ const Quiz = () => {
     setIsSubmitted(false);
     setIsTimerVisible(true); // Show timer when restarting the quiz
   };
+
+  // Render loading state
+  if (loading) {
+    return (
+      <LoadingContainer>
+        <LoadingSpinner />
+        <Loading>{loadingStatus}</Loading>
+      </LoadingContainer>
+    );
+  }
+
+  // Render error state
+  if (error) {
+    return (
+      <ErrorContainer>
+        <ErrorMessage>{error}</ErrorMessage>
+        <RetryButton onClick={() => navigate("/")}>
+          Back to Home
+        </RetryButton>
+      </ErrorContainer>
+    );
+  }
 
   return quizCompleted ? (
     <Container>
@@ -432,7 +446,7 @@ const TimerContainer = styled.div<{ $timeRunningOut: boolean; $isFeedback: boole
     $isFeedback ? theme.colors.amethyst :
       $timeRunningOut ? theme.colors.incorrectRed : theme.colors.purple};
   transition: background-color 0.3s ease;
-  animation: ${({ $timeRunningOut, $isFeedback }) =>
+  animation: ${({ $timeRunningOut }) =>
     $timeRunningOut ? 'pulse 1s infinite' : 'none'};
   
   @keyframes pulse {
