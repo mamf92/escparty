@@ -77,7 +77,7 @@ const QuizResults = () => {
         const highestScore = Math.max(...storedScores.map((entry: ScoreEntry) => entry.score));
         const winnerEntry = storedScores.find((entry: ScoreEntry) => entry.score === highestScore);
         if (winnerEntry) {
-          setWinner(`Best Score: ${winnerEntry.score} out of ${winnerEntry.total}`);
+          setWinner(`Best Score: ${winnerEntry.score}`);
         }
       }
     }
@@ -116,7 +116,7 @@ const QuizResults = () => {
   return (
     <Container>
       <Title>🎉 Quiz Completed! 🎤</Title>
-      <Score>You scored {gameData.score} out of {gameData.totalQuestions}!</Score>
+      <Score>You scored {gameData.score}!</Score>
       {winner && <WinnerText>{winner}</WinnerText>}
       {error && <ErrorText>{error}</ErrorText>}
 
