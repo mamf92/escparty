@@ -110,15 +110,23 @@ const MidQuizScoreboard = () => {
     <Container>
       <Title>📊 Mid-Quiz Scoreboard</Title>
       <Score>You scored {gameData.score} so far!</Score>
-      <PlayerListTitle>Current players:</PlayerListTitle>
-      <PlayerList>
-        {players.map((player: Player, index: number) => (
-          <PlayerItem key={player.id || index}>
-            {player.name}: {player.score}
-            {player.id === gameData.playerId ? " (You)" : ""}
-          </PlayerItem>
-        ))}
-      </PlayerList>
+      <ScoreTitle>🏆 Current Standings</ScoreTitle>
+      <ScoreTable>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {players.sort((a: Player, b: Player) => b.score - a.score).map((player: Player) => (
+            <tr key={player.id}>
+              <td>{player.name}{player.id === gameData.playerId ? " (You)" : ""}</td>
+              <td>{player.score}</td>
+            </tr>
+          ))}
+        </tbody>
+      </ScoreTable>
       <NextButton onClick={continueQuiz}>Continue Quiz</NextButton>
     </Container>
   );
@@ -151,26 +159,32 @@ const Score = styled.p`
   margin-bottom: 1.25rem; /* 20px */
 `;
 
-const PlayerListTitle = styled.h3`
-  font-size: 1.2rem;
-  margin-top: 1em;
-  text-align: left;
-  text-decoration: underline;
-  color: ${({ theme }) => theme.colors.darkpurple};
+const ScoreTitle = styled.h3`
+  font-family: ${({ theme }) => theme.fonts.heading};
+  color: ${({ theme }) => theme.colors.night};
+  margin-top: 1.25rem; /* 20px */
 `;
 
-const PlayerList = styled.ul`
-  list-style: none;
-  padding: 0;
-  text-align: left;
-  margin: 1.25rem 0; /* 20px 0 */
-`;
-
-const PlayerItem = styled.li`
+const ScoreTable = styled.table`
+  width: 100%;
+  margin-top: 0.625rem; /* 10px */
+  border-collapse: collapse;
   font-size: 1rem;
-  font-weight: bold;
-  margin: 0.3125rem 0; /* 5px 0 */
-  color: ${({ theme }) => theme.colors.black};
+  
+  th, td {
+    border: 0.0625rem solid ${({ theme }) => theme.colors.gray}; /* 1px */
+    padding: 0.5rem; /* 8px */
+    text-align: center;
+  }
+
+  th {
+    background: ${({ theme }) => theme.colors.nightblue};
+    color: white;
+  }
+
+  td {
+    color: ${({ theme }) => theme.colors.black};
+  }
 `;
 
 const NextButton = styled.button`
