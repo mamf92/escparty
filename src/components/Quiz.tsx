@@ -34,8 +34,11 @@ const Quiz = () => {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing...");
+  const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
+  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing..."); // Used in loading state display
+  const [timeLeft, setTimeLeft] = useState(10); // 10 second timer
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [isTimerVisible, setIsTimerVisible] = useState(true);
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
@@ -171,26 +174,43 @@ const Quiz = () => {
       unsubscribeRoom();
       console.log("🧹 Quiz component unmounting, cleaned up listeners");
     };
-  }, [difficulty, navigate, location, currentQuestionIndex, score]);
+  }, [difficulty, navigate, location, currentQuestionIndex, score]);  // Timer effect for question countdown
+  useEffect(() => {
+    if (quizCompleted || loading) return;
 
-  if (loading) {
-    return (
-      <LoadingContainer>
-        <LoadingSpinner />
-        <Loading>{loadingStatus}</Loading>
-      </LoadingContainer>
-    );
-  }
+    // Only start a new timer if we're in question mode (not feedback mode)
+    if (!showFeedback) {
+      console.log("Setting up new question timer");
+      setTimeLeft(10);
 
-  if (error) {
-    return (
-      <ErrorContainer>
-        <ErrorMessage>{error}</ErrorMessage>
-        <RetryButton onClick={() => window.location.reload()}>Retry</RetryButton>
-        <RetryButton onClick={() => navigate("/")}>Back to Home</RetryButton>
-      </ErrorContainer>
-    );
-  }
+      const timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleTimeUp(); // When question time is up, show feedback
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [currentQuestionIndex, quizCompleted, loading, showFeedback]);  // Separate effect for feedback timer that automatically moves to next question
+  useEffect(() => {
+    if (showFeedback) {
+      // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
+      const feedbackTimer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(feedbackTimer);
+            moveToNextQuestion(); // Automatically move to next question when feedback time ends
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
 
   if (questions.length === 0) {
     return (
@@ -244,6 +264,9 @@ const Quiz = () => {
           }
         });
       } else {
+        // Reset all question-related states
+        setShowFeedback(false); // Must be reset before setting new question
+
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
         setIsSubmitted(false);
@@ -283,6 +306,28 @@ const Quiz = () => {
     setSelectedAnswer(null);
     setIsSubmitted(false);
   };
+
+  // Render loading state
+  if (loading) {
+    return (
+      <LoadingContainer>
+        <LoadingSpinner />
+        <Loading>{loadingStatus}</Loading>
+      </LoadingContainer>
+    );
+  }
+
+  // Render error state
+  if (error) {
+    return (
+      <ErrorContainer>
+        <ErrorMessage>{error}</ErrorMessage>
+        <RetryButton onClick={() => navigate("/")}>
+          Back to Home
+        </RetryButton>
+      </ErrorContainer>
+    );
+  }
 
   return quizCompleted ? (
     <Container>
@@ -333,6 +378,43 @@ const Container = styled.div`
   padding: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.magnolia};
   overflow-x: hidden;
+`;
+
+const QuizHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  width: 100%;
+`;
+
+
+
+const TimerContainer = styled.div<{ $timeRunningOut: boolean; $isFeedback: boolean; $isVisible?: boolean }>`
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: ${props => props.$isVisible === false ? 'none' : 'flex'};
+  align-items: center;
+  justify-content: center;
+  background-color: ${({ $timeRunningOut, $isFeedback, theme }) =>
+    $isFeedback ? theme.colors.amethyst :
+      $timeRunningOut ? theme.colors.incorrectRed : theme.colors.purple};
+  transition: background-color 0.3s ease;
+  animation: ${({ $timeRunningOut }) =>
+    $timeRunningOut ? 'pulse 1s infinite' : 'none'};
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+`;
+
+const TimerText = styled.span`
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
 `;
 
 const QuestionText = styled.h2`
