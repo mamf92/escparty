@@ -15,6 +15,7 @@ interface MultiplayerGameData {
   roomCode: string;
   playerId: string;
   difficulty?: string;
+  hostIsObserver?: boolean;
 }
 
 const QuizResults = () => {
@@ -86,11 +87,16 @@ const QuizResults = () => {
       // Set up one final listen to get the final scores
       const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
         if (room) {
-          setPlayers(room.players);
+          // Filter out host from players list if host is in observer mode
+          const filteredPlayers = room.hostIsObserver
+            ? room.players.filter(player => player.id !== room.hostId)
+            : room.players;
 
-          // Calculate winner
-          if (room.players.length > 0) {
-            const sortedPlayers = [...room.players].sort((a, b) => b.score - a.score);
+          setPlayers(filteredPlayers);
+
+          // Calculate winner from filtered players list
+          if (filteredPlayers.length > 0) {
+            const sortedPlayers = [...filteredPlayers].sort((a, b) => b.score - a.score);
             const highestScore = sortedPlayers[0].score;
 
             // Check for a tie

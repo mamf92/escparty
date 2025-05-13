@@ -8,6 +8,7 @@ interface MultiplayerGameData {
   roomCode: string;
   playerId: string;
   difficulty?: string;
+  hostIsObserver?: boolean;
 }
 
 const MidQuizScoreboard = () => {
@@ -23,7 +24,8 @@ const MidQuizScoreboard = () => {
     players: [],
     multiplayer: false,
     roomCode: null,
-    playerId: null
+    playerId: null,
+    hostIsObserver: false
   };
 
   // Use state from location, or try to recover from sessionStorage
@@ -35,11 +37,14 @@ const MidQuizScoreboard = () => {
     players: locationState.players || [],
     multiplayer: locationState.multiplayer || false,
     roomCode: locationState.roomCode || null,
-    playerId: locationState.playerId || null
+    playerId: locationState.playerId || null,
+    hostIsObserver: locationState.hostIsObserver || false
   });
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
+  const [hostIsObserver, setHostIsObserver] = useState(gameData.hostIsObserver);
 
   useEffect(() => {
     // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -53,8 +58,10 @@ const MidQuizScoreboard = () => {
             multiplayer: true,
             roomCode: multiplayerData.roomCode,
             playerId: multiplayerData.playerId,
-            difficulty: multiplayerData.difficulty || prev.difficulty
+            difficulty: multiplayerData.difficulty || prev.difficulty,
+            hostIsObserver: multiplayerData.hostIsObserver || false
           }));
+          setHostIsObserver(multiplayerData.hostIsObserver || false);
         } catch (e) {
           console.error("Error parsing multiplayer data from sessionStorage:", e);
           setError("Unable to retrieve game data. Please return to the lobby.");
@@ -62,11 +69,29 @@ const MidQuizScoreboard = () => {
       }
     }
 
+    // Check if current user is the host
+    const isUserHost = localStorage.getItem("isHost") === "true";
+    setIsHost(isUserHost);
+    if (isUserHost) {
+      const observerStatus = localStorage.getItem("hostIsObserver") === "true";
+      setHostIsObserver(observerStatus);
+    }
+
     // Set up real-time listener if we have multiplayer details
     if (gameData.multiplayer && gameData.roomCode) {
       const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
         if (room) {
-          setPlayers(room.players);
+          // Filter out host from players list if host is in observer mode
+          const filteredPlayers = room.hostIsObserver
+            ? room.players.filter(player => player.id !== room.hostId)
+            : room.players;
+
+          setPlayers(filteredPlayers);
+
+          // Update hostIsObserver if it exists in the room data
+          if (room.hostIsObserver !== undefined && isHost) {
+            setHostIsObserver(room.hostIsObserver);
+          }
         } else {
           setError("Game room no longer exists");
           setTimeout(() => navigate("/multiplayer"), 2000);
@@ -83,6 +108,13 @@ const MidQuizScoreboard = () => {
       return;
     }
 
+    // If host is observer, they stay on the scoreboard and don't participate in quiz
+    if (isHost && hostIsObserver) {
+      // Let's just refresh the current view to get updated scores
+      setError(null); // Clear any errors
+      return;
+    }
+
     // Pass all the necessary state back to the Quiz component
     navigate(`/quiz/${gameData.difficulty}`, {
       state: {
@@ -91,7 +123,8 @@ const MidQuizScoreboard = () => {
         players,
         multiplayer: gameData.multiplayer,
         roomCode: gameData.roomCode,
-        playerId: gameData.playerId
+        playerId: gameData.playerId,
+        hostIsObserver: hostIsObserver
       }
     });
   };
@@ -109,7 +142,11 @@ const MidQuizScoreboard = () => {
   return (
     <Container>
       <Title>📊 Mid-Quiz Scoreboard</Title>
-      <Score>You scored {gameData.score} so far!</Score>
+      {isHost && hostIsObserver ? (
+        <Score>You are monitoring the quiz as host</Score>
+      ) : (
+        <Score>You scored {gameData.score} so far!</Score>
+      )}
       <ScoreTitle>🏆 Current Standings</ScoreTitle>
       <ScoreTable>
         <thead>
@@ -119,15 +156,19 @@ const MidQuizScoreboard = () => {
           </tr>
         </thead>
         <tbody>
-          {players.sort((a: Player, b: Player) => b.score - a.score).map((player: Player) => (
-            <tr key={player.id}>
-              <td>{player.name}{player.id === gameData.playerId ? " (You)" : ""}</td>
-              <td>{player.score}</td>
-            </tr>
-          ))}
+          {players
+            .sort((a: Player, b: Player) => b.score - a.score)
+            .map((player: Player) => (
+              <tr key={player.id}>
+                <td>{player.name}{player.id === gameData.playerId ? " (You)" : ""}</td>
+                <td>{player.score}</td>
+              </tr>
+            ))}
         </tbody>
       </ScoreTable>
-      <NextButton onClick={continueQuiz}>Continue Quiz</NextButton>
+      <NextButton onClick={continueQuiz}>
+        {isHost && hostIsObserver ? "Refresh Scores" : "Continue Quiz"}
+      </NextButton>
     </Container>
   );
 };

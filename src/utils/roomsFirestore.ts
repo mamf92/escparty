@@ -25,6 +25,7 @@ export interface Room {
     difficulty?: string;
     createdAt: any; // Firestore timestamp
     players: Player[];
+    hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
 }
 
 /**
@@ -45,8 +46,8 @@ export const checkFirebaseInitialization = () => {
 /**
  * Create a new room with the given host
  */
-export const createRoom = async (roomCode: string, hostId: string, hostName: string): Promise<void> => {
-    console.log(`Creating room ${roomCode} with host ${hostName} (${hostId})`);
+export const createRoom = async (roomCode: string, hostId: string, hostName: string, hostIsObserver: boolean = false): Promise<void> => {
+    console.log(`Creating room ${roomCode} with host ${hostName} (${hostId}), hostIsObserver: ${hostIsObserver}`);
     console.log("Environment:", import.meta.env.MODE, "BASE_URL:", import.meta.env.BASE_URL);
 
     if (!checkFirebaseInitialization()) {
@@ -68,6 +69,7 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
             id: roomCode,
             hostId,
             started: false,
+            hostIsObserver,
             createdAt: serverTimestamp(), // This is fine outside of the array
             players: [{
                 id: hostId,

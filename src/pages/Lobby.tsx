@@ -40,18 +40,23 @@ const Lobby = () => {
                 // Check if game has started
                 if (roomData.started) {
                     // Save essentials to sessionStorage to persist through page refresh 
+                    // Only pass hostIsObserver=true if the current user is the host and host is observer
+                    const isCurrentUserObserver = storedIsHost && roomData.hostIsObserver || false;
+
                     sessionStorage.setItem("multiplayerGame", JSON.stringify({
                         multiplayer: true,
                         roomCode: storedGameCode,
                         playerId: storedPlayerId,
-                        difficulty: roomData.difficulty
+                        difficulty: roomData.difficulty,
+                        hostIsObserver: isCurrentUserObserver
                     }));
 
                     navigate(`/quiz/${roomData.difficulty}`, {
                         state: {
                             multiplayer: true,
                             roomCode: storedGameCode,
-                            playerId: storedPlayerId
+                            playerId: storedPlayerId,
+                            hostIsObserver: isCurrentUserObserver
                         }
                     });
                 }
@@ -134,11 +139,13 @@ const Lobby = () => {
 
             <PlayerListTitle>Current players:</PlayerListTitle>
             <PlayerList>
-                {room?.players.map((player, _index) => (
-                    <Player key={player.id}>
-                        {player.name}
-                    </Player>
-                ))}
+                {room?.players
+                    .filter(player => !(room.hostIsObserver && player.id === room.hostId))
+                    .map((player, _index) => (
+                        <Player key={player.id}>
+                            {player.name}
+                        </Player>
+                    ))}
             </PlayerList>
 
             {isHost && room?.difficulty && <StartButton onClick={handleStartGame}>Start Game</StartButton>}

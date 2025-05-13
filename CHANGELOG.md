@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 ### Added
+- Added host observer mode allowing quiz hosts to monitor players without participating (13 May 2025)
+
+### Fixed
+- Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)
 - Quiz timer functionality that automatically submits after 10 seconds and progresses to next question
 - Visual timer countdown with color change warning when time is running low
 - Auto-progression to next question after time expires
@@ -17,6 +21,8 @@
 - Added sorted leaderboard to mid-quiz scoreboard with table layout (13 May 2025)
 
 ### Fixed
+- Fixed bug where observing hosts appeared in player lists and leaderboards (13 May 2025)
+- Fixed bug where quiz participants were incorrectly redirected to the scoreboard instead of the quiz (13 May 2025)
 - Fixed bug where multiple participants could get the same name when joining a room (13 May 2025)
 
 ### Removed

@@ -4,7 +4,6 @@ import styled from "styled-components";
 import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom, generateRoomCode, getRoom } from "../utils/roomsFirestore";
 
-
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
 ];
@@ -40,11 +39,12 @@ const MultiplayerLobby = () => {
   const [joinCode, setJoinCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false); // Added missing state variable
+  const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const navigate = useNavigate();
 
-  // Function to generate a random game code and create room
-  const handleCreateGame = async () => {
+  // Function to create game with host as observer
+  const createGame = async (hostIsObserver: boolean) => {
     setLoading(true);
     try {
       // Generate a unique ID for the host
@@ -55,13 +55,14 @@ const MultiplayerLobby = () => {
       const newGameCode = generateRoomCode();
 
       // Create the room in Firestore
-      await createRoom(newGameCode, hostId, hostName);
+      await createRoom(newGameCode, hostId, hostName, hostIsObserver);
 
       // Save user info in local storage
       localStorage.setItem("playerId", hostId);
       localStorage.setItem("playerName", hostName);
       localStorage.setItem("gameCode", newGameCode);
       localStorage.setItem("isHost", "true");
+      localStorage.setItem("hostIsObserver", String(hostIsObserver));
 
       // Update state and navigate
       setGameCode(newGameCode);
@@ -72,6 +73,21 @@ const MultiplayerLobby = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to handle showing create game options
+  const handleShowCreateOptions = () => {
+    setShowCreateOptions(true);
+  };
+
+  // Function to handle creating a game where host participates
+  const handleCreateGameAsParticipant = () => {
+    createGame(false);
+  };
+
+  // Function to handle creating a game where host observes
+  const handleCreateGameAsObserver = () => {
+    createGame(true);
   };
 
   // Function to join an existing game
@@ -129,9 +145,9 @@ const MultiplayerLobby = () => {
   return (
     <Container>
       <Title>Multiplayer Quiz</Title>
-      {!showJoinForm ? (
+      {!showJoinForm && !showCreateOptions ? (
         <OptionsContainer>
-          <OptionCard onClick={loading ? undefined : handleCreateGame} disabled={loading}>
+          <OptionCard onClick={loading ? undefined : handleShowCreateOptions} disabled={loading}>
             <OptionTitle>Create game</OptionTitle>
             <OptionDescription>Host your own game and invite friends!</OptionDescription>
             {loading && <LoadingText>Creating...</LoadingText>}
@@ -143,6 +159,26 @@ const MultiplayerLobby = () => {
             <OptionTitle>Join game</OptionTitle>
             <OptionDescription>Enter a game code to join an existing game.</OptionDescription>
           </OptionCard>
+        </OptionsContainer>
+      ) : showCreateOptions ? (
+        <OptionsContainer>
+          <OptionCard onClick={loading ? undefined : () => createGame(false)} disabled={loading}>
+            <OptionTitle>Host & Play</OptionTitle>
+            <OptionDescription>Host the game and participate in the quiz</OptionDescription>
+            {loading && <LoadingText>Creating...</LoadingText>}
+          </OptionCard>
+
+          <OrDivider>OR</OrDivider>
+
+          <OptionCard onClick={loading ? undefined : () => createGame(true)} disabled={loading}>
+            <OptionTitle>Host Only</OptionTitle>
+            <OptionDescription>Host the game and observe the players' progress</OptionDescription>
+            {loading && <LoadingText>Creating...</LoadingText>}
+          </OptionCard>
+
+          <Button onClick={() => setShowCreateOptions(false)} disabled={loading} secondary style={{ marginTop: '1rem' }}>
+            Back
+          </Button>
         </OptionsContainer>
       ) : (
         <JoinContainer>
@@ -186,7 +222,6 @@ interface ButtonProps {
 interface InputProps {
   isInvalid?: boolean;
 }
-
 
 const Container = styled.div`
   text-align: center;
