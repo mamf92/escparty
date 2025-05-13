@@ -37,8 +37,10 @@ const Quiz = () => {
   const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
   const [loadingStatus, setLoadingStatus] = useState<string>("Initializing..."); // Used in loading state display
   const [timeLeft, setTimeLeft] = useState(10); // 10 second timer
+  const [timeLeftMs, setTimeLeftMs] = useState(10000); // More precise millisecond timer for scoring
   const [showFeedback, setShowFeedback] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(true);
+  const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
@@ -187,19 +189,42 @@ const Quiz = () => {
     if (!showFeedback) {
       console.log("Setting up new question timer");
       setTimeLeft(10);
+      setTimeLeftMs(10000);
 
-      const timer = setInterval(() => {
+      // Use a more precise interval for millisecond timer (100ms)
+      const msTimer = setInterval(() => {
+        setTimeLeftMs(prev => {
+          if (prev <= 100) { // When 0.1 seconds left
+            clearInterval(msTimer);
+            handleTimeUp();
+            return 0;
+          }
+          return prev - 100; // Decrease by 100ms each time
+        });
+      }, 100);
+
+      // Regular timer for visible UI updates (every second)
+      const uiTimer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
-            clearInterval(timer);
-            handleTimeUp(); // When question time is up, show feedback
+            clearInterval(uiTimer);
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
 
-      return () => clearInterval(timer);
+      // Return cleanup function for both timers
+      return () => {
+        clearInterval(msTimer);
+        clearInterval(uiTimer);
+      };
+
+      // Return cleanup function for both timers
+      return () => {
+        clearInterval(msTimer);
+        clearInterval(uiTimer);
+      };
     }
   }, [currentQuestionIndex, quizCompleted, loading, showFeedback]);  // Separate effect for feedback timer that automatically moves to next question
   useEffect(() => {
@@ -230,6 +255,9 @@ const Quiz = () => {
 
     // Hide timer after time is up
     setIsTimerVisible(false);
+
+    // Set points to 0 for unanswered question
+    setCurrentQuestionPoints(0);
 
     // Show answer feedback for 5 seconds
     setShowFeedback(true);
@@ -271,7 +299,9 @@ const Quiz = () => {
         setSelectedAnswer(null);
         setIsSubmitted(false);
         setTimeLeft(10); // Reset timer for new question
+        setTimeLeftMs(10000); // Reset precise timer for new question
         setIsTimerVisible(true); // Show timer again for the next question
+        setCurrentQuestionPoints(0); // Reset points for new question
       }
     } else {
       const difficultyLevel = difficulty ?? "easy";
@@ -313,9 +343,19 @@ const Quiz = () => {
     setIsSubmitted(true);
     setIsTimerVisible(false); // Hide timer when answer is submitted
 
-    // Check if answer is correct and increment score
+    // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
-      const newScore = score + 1;
+      // Calculate time-based score with millisecond precision
+      // Base score of 500 + up to 500 more based on time remaining
+      const timeBonus = Math.floor((timeLeftMs / 10000) * 500);
+      // Using timeLeftMs (milliseconds) for more precise scoring
+      const pointsForAnswer = 500 + timeBonus;
+      console.log(`Correct answer! Time left: ${timeLeftMs / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
+
+      // Set points for current question to display in the UI
+      setCurrentQuestionPoints(pointsForAnswer);
+
+      const newScore = score + pointsForAnswer;
       setScore(newScore);
 
       // If multiplayer, update score in Firestore
@@ -326,6 +366,9 @@ const Quiz = () => {
           console.error("Failed to update score:", error);
         }
       }
+    } else {
+      // If answer is incorrect, set points to 0
+      setCurrentQuestionPoints(0);
     }
 
     // Show feedback after submission
@@ -369,20 +412,27 @@ const Quiz = () => {
   return quizCompleted ? (
     <Container>
       <QuestionText>🎉 Quiz Completed! 🎤</QuestionText>
-      <ScoreText>You scored {score} out of {questions.length}!</ScoreText>
+      <ScoreText>You scored {score}!</ScoreText>
       <SubmitButton onClick={restartQuiz}>Restart Quiz</SubmitButton>
     </Container>
   ) : (
     <Container>
-      <QuizHeader>
-        <TimerContainer
-          $timeRunningOut={timeLeft <= 3 && !showFeedback}
-          $isFeedback={showFeedback}
-          $isVisible={isTimerVisible}
-        >
-          <TimerText>{timeLeft}s</TimerText>
-        </TimerContainer>
-      </QuizHeader>
+      {isTimerVisible ? (
+        <QuizHeader>
+          <TimerContainer
+            $timeRunningOut={timeLeft <= 3 && !showFeedback}
+            $isFeedback={showFeedback}
+            $isVisible={true}
+          >
+            <TimerText>{timeLeft}s</TimerText>
+          </TimerContainer>
+        </QuizHeader>
+      ) : (
+        <PointsDisplay>
+          <span className="points-value">{currentQuestionPoints}</span>
+          points!
+        </PointsDisplay>
+      )}
       <QuestionText>{currentQuestion.question}</QuestionText>
       <OptionsContainer>
         {currentQuestion.options.map((option) => (
@@ -433,13 +483,26 @@ const QuizHeader = styled.div`
   width: 100%;
 `;
 
-
+const PointsDisplay = styled.div`
+  width: 100%;
+  text-align: center;
+  padding: 0.5rem 0;
+  font-weight: bold;
+  font-size: 1.5rem;
+  color: ${({ theme }) => theme.colors.purple};
+  margin-bottom: 1rem;
+  
+  .points-value {
+    font-size: 1.8rem;
+    margin-right: 0.5rem;
+  }
+`;
 
 const TimerContainer = styled.div<{ $timeRunningOut: boolean; $isFeedback: boolean; $isVisible?: boolean }>`
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  display: ${props => props.$isVisible === false ? 'none' : 'flex'};
+  display: flex; /* Always display the container to maintain layout */
   align-items: center;
   justify-content: center;
   background-color: ${({ $timeRunningOut, $isFeedback, theme }) =>

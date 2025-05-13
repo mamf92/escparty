@@ -109,7 +109,7 @@ const MidQuizScoreboard = () => {
   return (
     <Container>
       <Title>📊 Mid-Quiz Scoreboard</Title>
-      <Score>You scored {gameData.score} out of {gameData.totalQuestions} so far!</Score>
+      <Score>You scored {gameData.score} so far!</Score>
       <PlayerListTitle>Current players:</PlayerListTitle>
       <PlayerList>
         {players.map((player: Player, index: number) => (

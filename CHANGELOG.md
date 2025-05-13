@@ -10,6 +10,10 @@
 - Visual feedback for correct/incorrect answers with 5-second display
 - Added timer visibility toggle that hides timer when answer is submitted (13 May 2025)
 - Added proper loading and error states with UI components (13 May 2025)
+- Added high-precision time-based scoring system for multiplayer quizzes (13 May 2025)
+- Added millisecond precision timer for more accurate scoring calculation (13 May 2025)
+- Added points display that shows earned points after answering a question (13 May 2025)
+- Improved points display UI showing as centered text at the top of quiz card (13 May 2025)
 
 ### Fixed
 - Fixed bug where multiple participants could get the same name when joining a room (13 May 2025)
