@@ -36,9 +36,20 @@ const Quiz = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState<string>("Initializing...");
+  const [timeLeft, setTimeLeft] = useState(10); // 10 second timer
+  const [timerActive, setTimerActive] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackTimer, setFeedbackTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isTimerVisible, setIsTimerVisible] = useState(true);
+  const [showTimer, setShowTimer] = useState(true); // State to control timer visibility
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
+
+  // Calculate current question based on currentQuestionIndex and questions array
+  const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
+    ? questions[currentQuestionIndex]
+    : { question: "", options: [], correctAnswer: "" };
 
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes
@@ -171,64 +182,81 @@ const Quiz = () => {
       unsubscribeRoom();
       console.log("🧹 Quiz component unmounting, cleaned up listeners");
     };
-  }, [difficulty, navigate, location, currentQuestionIndex, score]);
+  }, [difficulty, navigate, location, currentQuestionIndex, score]);  // Timer effect for question countdown
+  useEffect(() => {
+    if (quizCompleted || loading) return;
 
-  if (loading) {
-    return (
-      <LoadingContainer>
-        <LoadingSpinner />
-        <Loading>{loadingStatus}</Loading>
-      </LoadingContainer>
-    );
-  }
+    // Only start a new timer if we're in question mode (not feedback mode)
+    if (!showFeedback) {
+      console.log("Setting up new question timer");
+      setTimeLeft(10);
+      setTimerActive(true);
 
-  if (error) {
-    return (
-      <ErrorContainer>
-        <ErrorMessage>{error}</ErrorMessage>
-        <RetryButton onClick={() => window.location.reload()}>Retry</RetryButton>
-        <RetryButton onClick={() => navigate("/")}>Back to Home</RetryButton>
-      </ErrorContainer>
-    );
-  }
-
-  if (questions.length === 0) {
-    return (
-      <ErrorContainer>
-        <ErrorMessage>No questions available for this quiz.</ErrorMessage>
-        <RetryButton onClick={() => navigate("/")}>Back to Home</RetryButton>
-      </ErrorContainer>
-    );
-  }
-
-  const currentQuestion = questions[currentQuestionIndex];
-
-  const handleAnswer = (answer: string) => {
-    setSelectedAnswer(answer);
-  };
-
-  const submitAnswer = async () => {
-    if (selectedAnswer) {
-      setIsSubmitted(true);
-
-      // Check if answer is correct and increment score
-      if (selectedAnswer === currentQuestion.correctAnswer) {
-        const newScore = score + 1;
-        setScore(newScore);
-
-        // If multiplayer, update score in Firestore
-        if (isMultiplayer && roomCode && playerId) {
-          try {
-            await updatePlayerScore(roomCode, playerId, newScore);
-          } catch (error) {
-            console.error("Failed to update score:", error);
+      const timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleTimeUp(); // When question time is up, show feedback
+            return 0;
           }
-        }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [currentQuestionIndex, quizCompleted, loading, showFeedback]);  // Separate effect for feedback timer that automatically moves to next question
+  useEffect(() => {
+    if (showFeedback) {
+      // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
+      setTimerActive(true);
+
+      const feedbackTimer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(feedbackTimer);
+            setTimerActive(false);
+            moveToNextQuestion(); // Automatically move to next question when feedback time ends
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        clearInterval(feedbackTimer);
+      };
+    }
+  }, [showFeedback]);
+
+  // Function to handle when the time is up but before showing feedback
+  const handleTimeUp = () => {
+    if (!isSubmitted) {
+      setIsSubmitted(true);
+    }
+
+    // Hide timer after time is up
+    setIsTimerVisible(false);
+
+    // Show answer feedback for 5 seconds
+    setShowFeedback(true);
+    setTimeLeft(5);
+
+    // If multiplayer, update score
+    if (isMultiplayer && roomCode && playerId) {
+      try {
+        // Using void to ignore the promise result
+        void updatePlayerScore(roomCode, playerId, score).catch(error => {
+          console.error("Failed to update score:", error);
+        });
+      } catch (error) {
+        console.error("Failed to update score:", error);
       }
     }
   };
 
-  const nextQuestion = () => {
+  // Function to automatically move to the next question
+  const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       if ((currentQuestionIndex + 1) % 5 === 0) {
         navigate("/mid-quiz-scoreboard", {
@@ -244,9 +272,14 @@ const Quiz = () => {
           }
         });
       } else {
+        // Reset all question-related states
+        setTimerActive(false); // Stop any running timers first
+        setShowFeedback(false); // Must be reset before setting new question
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
         setIsSubmitted(false);
+        setTimeLeft(10); // Reset timer for new question
+        setIsTimerVisible(true); // Show timer again for the next question
       }
     } else {
       const difficultyLevel = difficulty ?? "easy";
@@ -276,12 +309,47 @@ const Quiz = () => {
     }
   };
 
+  const handleAnswer = (answer: string) => {
+    if (!isSubmitted) {
+      setSelectedAnswer(answer);
+    }
+  };
+
+  const submitAnswer = async (answer: string) => {
+    if (!answer) return;
+
+    setIsSubmitted(true);
+    setIsTimerVisible(false); // Hide timer when answer is submitted
+
+    // Check if answer is correct and increment score
+    if (answer === currentQuestion.correctAnswer) {
+      const newScore = score + 1;
+      setScore(newScore);
+
+      // If multiplayer, update score in Firestore
+      if (isMultiplayer && roomCode && playerId) {
+        try {
+          await updatePlayerScore(roomCode, playerId, newScore);
+        } catch (error) {
+          console.error("Failed to update score:", error);
+        }
+      }
+    }
+
+    // Show feedback after submission
+    // Add remaining question time PLUS 5 seconds for feedback
+    const feedbackTime = Math.min(timeLeft, 10) + 5;
+    setShowFeedback(true);
+    setTimeLeft(feedbackTime);
+  };
+
   const restartQuiz = () => {
     setCurrentQuestionIndex(0);
     setScore(0);
     setQuizCompleted(false);
     setSelectedAnswer(null);
     setIsSubmitted(false);
+    setIsTimerVisible(true); // Show timer when restarting the quiz
   };
 
   return quizCompleted ? (
@@ -292,6 +360,15 @@ const Quiz = () => {
     </Container>
   ) : (
     <Container>
+      <QuizHeader>
+        <TimerContainer
+          $timeRunningOut={timeLeft <= 3 && !showFeedback}
+          $isFeedback={showFeedback}
+          $isVisible={isTimerVisible}
+        >
+          <TimerText>{timeLeft}s</TimerText>
+        </TimerContainer>
+      </QuizHeader>
       <QuestionText>{currentQuestion.question}</QuestionText>
       <OptionsContainer>
         {currentQuestion.options.map((option) => (
@@ -307,13 +384,12 @@ const Quiz = () => {
           </OptionButton>
         ))}
       </OptionsContainer>
-      {!isSubmitted ? (
-        <SubmitButton onClick={submitAnswer} disabled={!selectedAnswer}>
-          Submit Answer
-        </SubmitButton>
-      ) : (
-        <NextButton onClick={nextQuestion}>Next Question</NextButton>
-      )}
+      <SubmitButton
+        onClick={() => !showFeedback ? submitAnswer(selectedAnswer || "") : undefined}
+        disabled={(!showFeedback && !selectedAnswer) || (isSubmitted && !showFeedback) || showFeedback}
+      >
+        {showFeedback ? `Next Question in ${timeLeft}s...` : "Submit Answer"}
+      </SubmitButton>
       <QuitButton onClick={() => navigate("/")}>
         <FaHome size={20} />
       </QuitButton>
@@ -333,6 +409,43 @@ const Container = styled.div`
   padding: 1.25rem; /* 20px */
   background: ${({ theme }) => theme.colors.magnolia};
   overflow-x: hidden;
+`;
+
+const QuizHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  width: 100%;
+`;
+
+
+
+const TimerContainer = styled.div<{ $timeRunningOut: boolean; $isFeedback: boolean; $isVisible?: boolean }>`
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: ${props => props.$isVisible === false ? 'none' : 'flex'};
+  align-items: center;
+  justify-content: center;
+  background-color: ${({ $timeRunningOut, $isFeedback, theme }) =>
+    $isFeedback ? theme.colors.amethyst :
+      $timeRunningOut ? theme.colors.incorrectRed : theme.colors.purple};
+  transition: background-color 0.3s ease;
+  animation: ${({ $timeRunningOut, $isFeedback }) =>
+    $timeRunningOut ? 'pulse 1s infinite' : 'none'};
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+`;
+
+const TimerText = styled.span`
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
 `;
 
 const QuestionText = styled.h2`
@@ -392,8 +505,6 @@ const SubmitButton = styled.button`
     background: ${({ theme }) => theme.colors.darkpurple};
   }
 `;
-
-const NextButton = styled(SubmitButton)``;
 
 const LoadingContainer = styled.div`
   display: flex;
@@ -476,3 +587,6 @@ const RetryButton = styled(SubmitButton)`
   margin: 0.625rem auto; /* 10px auto */
   display: block;
 `;
+
+
+
