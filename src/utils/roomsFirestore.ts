@@ -305,6 +305,9 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
             return false;
         }
 
+        // Check for name uniqueness is now handled before calling this function
+        // by the getUniquePlayerName helper function
+
         // Add player to the room
         await addPlayerToRoom(roomCode, playerId, playerName);
         console.log(`Successfully joined room ${roomCode}`);
