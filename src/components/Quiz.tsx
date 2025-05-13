@@ -43,6 +43,11 @@ const Quiz = () => {
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
 
+  // Calculate current question based on currentQuestionIndex and questions array
+  const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
+    ? questions[currentQuestionIndex]
+    : { question: "", options: [], correctAnswer: "" };
+
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes
     setError(null);
@@ -211,44 +216,40 @@ const Quiz = () => {
         });
       }, 1000);
 
+      return () => {
+        clearInterval(feedbackTimer);
+      };
+    }
+  }, [showFeedback]);
 
-  if (questions.length === 0) {
-    return (
-      <ErrorContainer>
-        <ErrorMessage>No questions available for this quiz.</ErrorMessage>
-        <RetryButton onClick={() => navigate("/")}>Back to Home</RetryButton>
-      </ErrorContainer>
-    );
-  }
-
-  const currentQuestion = questions[currentQuestionIndex];
-
-  const handleAnswer = (answer: string) => {
-    setSelectedAnswer(answer);
-  };
-
-  const submitAnswer = async () => {
-    if (selectedAnswer) {
+  // Function to handle when the time is up but before showing feedback
+  const handleTimeUp = () => {
+    if (!isSubmitted) {
       setIsSubmitted(true);
+    }
 
-      // Check if answer is correct and increment score
-      if (selectedAnswer === currentQuestion.correctAnswer) {
-        const newScore = score + 1;
-        setScore(newScore);
+    // Hide timer after time is up
+    setIsTimerVisible(false);
 
-        // If multiplayer, update score in Firestore
-        if (isMultiplayer && roomCode && playerId) {
-          try {
-            await updatePlayerScore(roomCode, playerId, newScore);
-          } catch (error) {
-            console.error("Failed to update score:", error);
-          }
-        }
+    // Show answer feedback for 5 seconds
+    setShowFeedback(true);
+    setTimeLeft(5);
+
+    // If multiplayer, update score
+    if (isMultiplayer && roomCode && playerId) {
+      try {
+        // Using void to ignore the promise result
+        void updatePlayerScore(roomCode, playerId, score).catch(error => {
+          console.error("Failed to update score:", error);
+        });
+      } catch (error) {
+        console.error("Failed to update score:", error);
       }
     }
   };
 
-  const nextQuestion = () => {
+  // Function to automatically move to the next question
+  const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       if ((currentQuestionIndex + 1) % 5 === 0) {
         navigate("/mid-quiz-scoreboard", {
@@ -266,10 +267,11 @@ const Quiz = () => {
       } else {
         // Reset all question-related states
         setShowFeedback(false); // Must be reset before setting new question
-
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
         setIsSubmitted(false);
+        setTimeLeft(10); // Reset timer for new question
+        setIsTimerVisible(true); // Show timer again for the next question
       }
     } else {
       const difficultyLevel = difficulty ?? "easy";
@@ -299,12 +301,47 @@ const Quiz = () => {
     }
   };
 
+  const handleAnswer = (answer: string) => {
+    if (!isSubmitted) {
+      setSelectedAnswer(answer);
+    }
+  };
+
+  const submitAnswer = async (answer: string) => {
+    if (!answer) return;
+
+    setIsSubmitted(true);
+    setIsTimerVisible(false); // Hide timer when answer is submitted
+
+    // Check if answer is correct and increment score
+    if (answer === currentQuestion.correctAnswer) {
+      const newScore = score + 1;
+      setScore(newScore);
+
+      // If multiplayer, update score in Firestore
+      if (isMultiplayer && roomCode && playerId) {
+        try {
+          await updatePlayerScore(roomCode, playerId, newScore);
+        } catch (error) {
+          console.error("Failed to update score:", error);
+        }
+      }
+    }
+
+    // Show feedback after submission
+    // Add remaining question time PLUS 5 seconds for feedback
+    const feedbackTime = Math.min(timeLeft, 10) + 5;
+    setShowFeedback(true);
+    setTimeLeft(feedbackTime);
+  };
+
   const restartQuiz = () => {
     setCurrentQuestionIndex(0);
     setScore(0);
     setQuizCompleted(false);
     setSelectedAnswer(null);
     setIsSubmitted(false);
+    setIsTimerVisible(true); // Show timer when restarting the quiz
   };
 
   // Render loading state
@@ -337,6 +374,15 @@ const Quiz = () => {
     </Container>
   ) : (
     <Container>
+      <QuizHeader>
+        <TimerContainer
+          $timeRunningOut={timeLeft <= 3 && !showFeedback}
+          $isFeedback={showFeedback}
+          $isVisible={isTimerVisible}
+        >
+          <TimerText>{timeLeft}s</TimerText>
+        </TimerContainer>
+      </QuizHeader>
       <QuestionText>{currentQuestion.question}</QuestionText>
       <OptionsContainer>
         {currentQuestion.options.map((option) => (
@@ -352,13 +398,12 @@ const Quiz = () => {
           </OptionButton>
         ))}
       </OptionsContainer>
-      {!isSubmitted ? (
-        <SubmitButton onClick={submitAnswer} disabled={!selectedAnswer}>
-          Submit Answer
-        </SubmitButton>
-      ) : (
-        <NextButton onClick={nextQuestion}>Next Question</NextButton>
-      )}
+      <SubmitButton
+        onClick={() => !showFeedback ? submitAnswer(selectedAnswer || "") : undefined}
+        disabled={(!showFeedback && !selectedAnswer) || (isSubmitted && !showFeedback) || showFeedback}
+      >
+        {showFeedback ? `Next Question in ${timeLeft}s...` : "Submit Answer"}
+      </SubmitButton>
       <QuitButton onClick={() => navigate("/")}>
         <FaHome size={20} />
       </QuitButton>
@@ -475,8 +520,6 @@ const SubmitButton = styled.button`
   }
 `;
 
-const NextButton = styled(SubmitButton)``;
-
 const LoadingContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -558,3 +601,6 @@ const RetryButton = styled(SubmitButton)`
   margin: 0.625rem auto; /* 10px auto */
   display: block;
 `;
+
+
+
