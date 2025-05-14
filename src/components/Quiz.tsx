@@ -11,6 +11,7 @@ interface MultiplayerGameData {
   roomCode: string;
   playerId: string;
   difficulty?: string;
+  hostIsObserver?: boolean;
 }
 
 const Quiz = () => {
@@ -22,6 +23,7 @@ const Quiz = () => {
     multiplayer?: boolean;
     roomCode?: string;
     playerId?: string;
+    hostIsObserver?: boolean;
   } | null;
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(locationState?.currentQuestionIndex || 0);
@@ -29,9 +31,9 @@ const Quiz = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(locationState?.score || 0);
   const [quizCompleted, setQuizCompleted] = useState(false);
-  const [isMultiplayer, setIsMultiplayer] = useState(false);
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [playerId, setPlayerId] = useState<string | null>(null);
+  const [isMultiplayer, setIsMultiplayer] = useState(locationState?.multiplayer || false);
+  const [roomCode, setRoomCode] = useState<string | null>(locationState?.roomCode || null);
+  const [playerId, setPlayerId] = useState<string | null>(locationState?.playerId || null);
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
@@ -49,6 +51,69 @@ const Quiz = () => {
   const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
     ? questions[currentQuestionIndex]
     : { question: "", options: [], correctAnswer: "" };
+
+  const hostIsObserverFromLocation = locationState?.hostIsObserver;
+
+  useEffect(() => {
+    // This effect handles redirection for an observing host.
+    // It depends on data being loaded and relevant states being set.
+    if (
+      hostIsObserverFromLocation &&
+      localStorage.getItem("isHost") === "true" &&
+      isMultiplayer &&
+      !loading &&
+      roomCode &&
+      playerId &&
+      difficulty &&
+      room &&
+      room.players &&
+      questions &&
+      questions.length > 0
+    ) {
+      navigate("/mid-quiz-scoreboard", {
+        state: {
+          score,
+          totalQuestions: questions.length,
+          currentQuestionIndex,
+          difficulty,
+          players: room.players,
+          multiplayer: true,
+          roomCode,
+          playerId,
+          hostIsObserver: true,
+        },
+        replace: true, // Replace history to prevent back navigation to the quiz page
+      });
+    }
+  }, [
+    hostIsObserverFromLocation,
+    isMultiplayer,
+    loading,
+    roomCode,
+    playerId,
+    difficulty,
+    room,
+    questions,
+    score,
+    currentQuestionIndex,
+    navigate,
+  ]);
+
+  useEffect(() => {
+    // If the current user is a host in observer mode, redirect to the mid-quiz scoreboard
+    if (locationState?.hostIsObserver && localStorage.getItem("isHost") === "true" && roomCode && playerId && difficulty) {
+      navigate("/mid-quiz-scoreboard", {
+        state: {
+          multiplayer: true, // Host observer implies a multiplayer context
+          roomCode: roomCode,
+          playerId: playerId,
+          difficulty: difficulty,
+          hostIsObserver: true, // Explicitly set for the scoreboard
+        },
+        replace: true // Replace the current entry in history
+      });
+    }
+  }, [locationState, roomCode, playerId, difficulty, navigate]);
 
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes
@@ -213,12 +278,6 @@ const Quiz = () => {
           return prev - 1;
         });
       }, 1000);
-
-      // Return cleanup function for both timers
-      return () => {
-        clearInterval(msTimer);
-        clearInterval(uiTimer);
-      };
 
       // Return cleanup function for both timers
       return () => {

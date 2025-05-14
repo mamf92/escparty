@@ -9,6 +9,7 @@ import Scoreboard from "./pages/Scoreboard";
 import MultiplayerLobby from "./pages/MultiplayerLobby";
 import Lobby from "./pages/Lobby";
 import MidQuizScoreboard from "./pages/MidQuizScoreboard";
+import HostObserverView from "./pages/HostObserverView";
 import UnderDevelopment from "./pages/UnderDevelopment";
 import MobileFrame from "./components/MobileFrame";
 
@@ -27,6 +28,7 @@ const App = () => {
             <Route path="/multiplayer" element={<MultiplayerLobby />} />
             <Route path="/lobby" element={<Lobby />} />
             <Route path="/mid-quiz-scoreboard" element={<MidQuizScoreboard />} />
+            <Route path="/host-observer" element={<HostObserverView />} />
           </Routes>
         </Router>
       </MobileFrame>
