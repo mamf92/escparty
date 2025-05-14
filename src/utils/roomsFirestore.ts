@@ -27,6 +27,7 @@ export interface Room {
     players: Player[];
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
     continueReady?: boolean; // Flag to indicate if host has signaled to continue to next question
+    playersAtMidQuiz?: string[]; // Array of playerIds that have reached the mid-quiz scoreboard
 }
 
 /**
@@ -304,6 +305,64 @@ export const setContinueReady = async (roomCode: string, continueReady: boolean)
     } catch (error) {
         console.error("Error setting continue ready state:", error);
         throw new Error(`Failed to set continue ready state: ${(error as Error).message}`);
+    }
+};
+
+/**
+ * Mark a player as ready at mid-quiz scoreboard
+ */
+export const markPlayerAtMidQuiz = async (roomCode: string, playerId: string): Promise<void> => {
+    console.log(`Marking player ${playerId} as ready at mid-quiz in room ${roomCode}`);
+
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+
+    try {
+        const roomRef = doc(db, "rooms", roomCode);
+        const roomDoc = await getDoc(roomRef);
+
+        if (!roomDoc.exists()) {
+            throw new Error(`Room ${roomCode} does not exist`);
+        }
+
+        const room = roomDoc.data() as Room;
+
+        // Initialize the array if it doesn't exist
+        const playersAtMidQuiz = room.playersAtMidQuiz || [];
+
+        // Only add the player if not already in the list
+        if (!playersAtMidQuiz.includes(playerId)) {
+            await updateDoc(roomRef, {
+                playersAtMidQuiz: [...playersAtMidQuiz, playerId]
+            });
+            console.log(`Player ${playerId} marked as ready at mid-quiz in room ${roomCode}`);
+        } else {
+            console.log(`Player ${playerId} was already marked as ready at mid-quiz`);
+        }
+    } catch (error) {
+        console.error("Error marking player as ready at mid-quiz:", error);
+        throw new Error(`Failed to mark player as ready: ${(error as Error).message}`);
+    }
+};
+
+/**
+ * Reset the players at mid-quiz array
+ */
+export const resetPlayersAtMidQuiz = async (roomCode: string): Promise<void> => {
+    console.log(`Resetting players at mid-quiz for room ${roomCode}`);
+
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+
+    try {
+        const roomRef = doc(db, "rooms", roomCode);
+        await updateDoc(roomRef, { playersAtMidQuiz: [] });
+        console.log(`Players at mid-quiz reset for room ${roomCode}`);
+    } catch (error) {
+        console.error("Error resetting players at mid-quiz:", error);
+        throw new Error(`Failed to reset players at mid-quiz: ${(error as Error).message}`);
     }
 };
 

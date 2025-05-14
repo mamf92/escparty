@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady } from "../utils/roomsFirestore";
+import { Player, listenToRoom, setContinueReady, markPlayerAtMidQuiz } from "../utils/roomsFirestore";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -47,6 +47,22 @@ const MidQuizScoreboard = () => {
   const [hostIsObserver, setHostIsObserver] = useState(gameData.hostIsObserver);
   const [, setContinueReadyState] = useState(false);
 
+  // Check if host is observer and redirect if needed
+  useEffect(() => {
+    // Check if current user is the host and is an observer
+    if (isHost && hostIsObserver) {
+      // Redirect to dedicated HostObserverView
+      navigate("/host-observer", {
+        state: {
+          currentQuestionIndex: gameData.currentQuestionIndex,
+          difficulty: gameData.difficulty,
+          players: players,
+          roomCode: gameData.roomCode
+        }
+      });
+    }
+  }, [isHost, hostIsObserver, navigate, gameData, players]);
+
   const continueQuiz = useCallback(async () => {
     if (error) {
       navigate("/multiplayer");
@@ -58,22 +74,7 @@ const MidQuizScoreboard = () => {
     // Case 1: Host in a multiplayer game
     if (isHost && gameData.multiplayer && gameData.roomCode) {
       try {
-        if (hostIsObserver) {
-          // Observer host signals continue but doesn't navigate themselves to quiz
-          await setContinueReady(gameData.roomCode, true);
-          // Reset the continue flag after a short delay
-          setTimeout(async () => {
-            try {
-              await setContinueReady(gameData.roomCode, false);
-            } catch (err) {
-              console.error("Error resetting continue flag for observer host:", err);
-            }
-          }, 3000);
-          setError(null); // Clear any local errors
-          return;
-        }
-
-        // Active host signals and navigates
+        // Active host signals and navigates (observer hosts are redirected elsewhere)
         await setContinueReady(gameData.roomCode, true);
         navigate(`/quiz/${gameData.difficulty}`, {
           state: {
@@ -157,6 +158,19 @@ const MidQuizScoreboard = () => {
       }
     }
 
+    // Mark player as ready at mid-quiz if in multiplayer
+    const markPlayerReady = async () => {
+      if (gameData.multiplayer && gameData.roomCode && gameData.playerId) {
+        try {
+          await markPlayerAtMidQuiz(gameData.roomCode, gameData.playerId);
+        } catch (err) {
+          console.error("Error marking player as ready at mid-quiz:", err);
+        }
+      }
+    };
+
+    markPlayerReady();
+
     // Check if current user is the host
     const isUserHost = localStorage.getItem("isHost") === "true";
     setIsHost(isUserHost);
@@ -214,11 +228,7 @@ const MidQuizScoreboard = () => {
   return (
     <Container>
       <Title>📊 Mid-Quiz Scoreboard</Title>
-      {isHost && hostIsObserver ? (
-        <Score>You are monitoring the quiz as host</Score>
-      ) : (
-        <Score>You scored {gameData.score} so far!</Score>
-      )}
+      <Score>You scored {gameData.score} so far!</Score>
       <ScoreTitle>🏆 Current Standings</ScoreTitle>
       <ScoreTable>
         <thead>

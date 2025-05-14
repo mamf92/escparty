@@ -14,10 +14,18 @@
 ## [Unreleased]
 ### Added
 - Added host observer mode allowing quiz hosts to monitor players without participating (13 May 2025)
+- Added dedicated HostObserverView component for better separation of concerns (14 May 2025)
+- Added player readiness tracking at mid-quiz scoreboard to ensure all participants are ready before continuing (14 May 2025)
+
+### Changed
+- Simplified the host observer view UI by removing redundant status information (14 May 2025)
+- Improved player readiness indicator with checkmarks and simplified helper text (14 May 2025)
+- Standardized button styling across components for better UI consistency (14 May 2025)
 
 ### Fixed
 - Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
 - Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)
+- Removed unused interface definition in HostObserverView component (14 May 2025)
 - Quiz timer functionality that automatically submits after 10 seconds and progresses to next question
 - Visual timer countdown with color change warning when time is running low
 - Auto-progression to next question after time expires
