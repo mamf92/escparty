@@ -1,10 +1,22 @@
 # Changelog
 
+## [0.1.0] - 2025-05-13
+### Added
+- Added multiplayer quiz mode
+
+### Fixed
+- Fixed hydration issue in HeroBanner
+- Fixed Mid-Quiz Scoreboard not updating scores for host in real-time
+
+### Changed
+- Optimized API calls using caching
+
 ## [Unreleased]
 ### Added
 - Added host observer mode allowing quiz hosts to monitor players without participating (13 May 2025)
 
 ### Fixed
+- Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
 - Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)
 - Quiz timer functionality that automatically submits after 10 seconds and progresses to next question
 - Visual timer countdown with color change warning when time is running low

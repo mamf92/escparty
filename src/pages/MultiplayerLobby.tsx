@@ -80,16 +80,6 @@ const MultiplayerLobby = () => {
     setShowCreateOptions(true);
   };
 
-  // Function to handle creating a game where host participates
-  const handleCreateGameAsParticipant = () => {
-    createGame(false);
-  };
-
-  // Function to handle creating a game where host observes
-  const handleCreateGameAsObserver = () => {
-    createGame(true);
-  };
-
   // Function to join an existing game
   const joinGame = async () => {
     setAttempted(true);

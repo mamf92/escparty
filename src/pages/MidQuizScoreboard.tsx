@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom } from "../utils/roomsFirestore";
+import { Player, listenToRoom, setContinueReady } from "../utils/roomsFirestore";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -45,6 +45,94 @@ const MidQuizScoreboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [hostIsObserver, setHostIsObserver] = useState(gameData.hostIsObserver);
+  const [, setContinueReadyState] = useState(false);
+
+  const continueQuiz = useCallback(async () => {
+    if (error) {
+      navigate("/multiplayer");
+      return;
+    }
+
+    const nextQuestionIndex = gameData.currentQuestionIndex + 1;
+
+    // Case 1: Host in a multiplayer game
+    if (isHost && gameData.multiplayer && gameData.roomCode) {
+      try {
+        if (hostIsObserver) {
+          // Observer host signals continue but doesn't navigate themselves to quiz
+          await setContinueReady(gameData.roomCode, true);
+          // Reset the continue flag after a short delay
+          setTimeout(async () => {
+            try {
+              await setContinueReady(gameData.roomCode, false);
+            } catch (err) {
+              console.error("Error resetting continue flag for observer host:", err);
+            }
+          }, 3000);
+          setError(null); // Clear any local errors
+          return;
+        }
+
+        // Active host signals and navigates
+        await setContinueReady(gameData.roomCode, true);
+        navigate(`/quiz/${gameData.difficulty}`, {
+          state: {
+            currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+            score: gameData.score, // Host's score (might be 0 if not playing)
+            players, // Live players list from Firestore
+            multiplayer: gameData.multiplayer,
+            roomCode: gameData.roomCode,
+            playerId: gameData.playerId, // Host's ID
+            hostIsObserver: hostIsObserver // Current host's observer status
+          }
+        });
+        // Reset the continue flag after a short delay (host has navigated)
+        setTimeout(async () => {
+          try {
+            await setContinueReady(gameData.roomCode, false);
+          } catch (err) {
+            console.error("Error resetting continue flag after host navigation:", err);
+          }
+        }, 3000);
+      } catch (err) {
+        console.error("Error in host continue logic:", err);
+        setError("Failed to signal or navigate for continue");
+      }
+    }
+    // Case 2: Participant in a multiplayer game (called via listener when continueReady is true)
+    else if (!isHost && gameData.multiplayer && gameData.roomCode) {
+      navigate(`/quiz/${gameData.difficulty}`, {
+        state: {
+          currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+          score: gameData.score, // Participant's current score from gameData
+          players, // Live players list from Firestore
+          multiplayer: gameData.multiplayer,
+          roomCode: gameData.roomCode,
+          playerId: gameData.playerId, // Participant's ID
+          hostIsObserver: gameData.hostIsObserver // Overall room's host observer status
+        }
+      });
+    }
+    // Case 3: Single-player game
+    else if (!gameData.multiplayer) {
+      navigate(`/quiz/${gameData.difficulty}`, {
+        state: {
+          currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+          score: gameData.score,
+          players: gameData.players, // Initial players list for single player
+          multiplayer: false,
+          roomCode: null,
+          playerId: gameData.playerId,
+          hostIsObserver: false
+        }
+      });
+    }
+  }, [gameData, hostIsObserver, isHost, navigate, players, error, setError]);
+
+  const continueQuizRef = useRef(continueQuiz);
+  useEffect(() => {
+    continueQuizRef.current = continueQuiz;
+  }, [continueQuiz]);
 
   useEffect(() => {
     // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -86,11 +174,22 @@ const MidQuizScoreboard = () => {
             ? room.players.filter(player => player.id !== room.hostId)
             : room.players;
 
+          // Always update players array to ensure real-time score updates
           setPlayers(filteredPlayers);
 
           // Update hostIsObserver if it exists in the room data
           if (room.hostIsObserver !== undefined && isHost) {
             setHostIsObserver(room.hostIsObserver);
+          }
+
+          // Check if continue is ready
+          if (room.continueReady) {
+            setContinueReadyState(true);
+
+            // If not host, continue automatically when host signals
+            if (!isHost && room.continueReady) {
+              continueQuizRef.current();
+            }
           }
         } else {
           setError("Game room no longer exists");
@@ -100,34 +199,7 @@ const MidQuizScoreboard = () => {
 
       return () => unsubscribe();
     }
-  }, [gameData.multiplayer, gameData.roomCode, location.state, navigate]);
-
-  const continueQuiz = () => {
-    if (error) {
-      navigate("/multiplayer");
-      return;
-    }
-
-    // If host is observer, they stay on the scoreboard and don't participate in quiz
-    if (isHost && hostIsObserver) {
-      // Let's just refresh the current view to get updated scores
-      setError(null); // Clear any errors
-      return;
-    }
-
-    // Pass all the necessary state back to the Quiz component
-    navigate(`/quiz/${gameData.difficulty}`, {
-      state: {
-        currentQuestionIndex: gameData.currentQuestionIndex,
-        score: gameData.score,
-        players,
-        multiplayer: gameData.multiplayer,
-        roomCode: gameData.roomCode,
-        playerId: gameData.playerId,
-        hostIsObserver: hostIsObserver
-      }
-    });
-  };
+  }, [gameData.multiplayer, gameData.roomCode, location.state, navigate, isHost]);
 
   if (error) {
     return (
@@ -166,9 +238,15 @@ const MidQuizScoreboard = () => {
             ))}
         </tbody>
       </ScoreTable>
-      <NextButton onClick={continueQuiz}>
-        {isHost && hostIsObserver ? "Refresh Scores" : "Continue Quiz"}
-      </NextButton>
+
+      {/* Only show continue button for the host in multiplayer mode, or for anyone in single-player */}
+      {(isHost || !gameData.multiplayer) ? (
+        <NextButton onClick={continueQuiz}>
+          {"Continue Quiz"}
+        </NextButton>
+      ) : (
+        <WaitingMessage>Waiting for the host to continue...</WaitingMessage>
+      )}
     </Container>
   );
 };
@@ -247,4 +325,14 @@ const ErrorMessage = styled.p`
   color: ${({ theme }) => theme.colors.incorrectRed};
   font-size: 1.2rem;
   margin-bottom: 1.25rem; /* 20px */
+`;
+
+const WaitingMessage = styled.p`
+  color: ${({ theme }) => theme.colors.purple};
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-top: 1.25rem; /* 20px */
+  padding: 1rem;
+  border: 1px solid ${({ theme }) => theme.colors.pinkLavender};
+  background-color: ${({ theme }) => theme.colors.magnolia};
 `;

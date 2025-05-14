@@ -26,6 +26,7 @@ export interface Room {
     createdAt: any; // Firestore timestamp
     players: Player[];
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
+    continueReady?: boolean; // Flag to indicate if host has signaled to continue to next question
 }
 
 /**
@@ -286,6 +287,26 @@ export const generateRoomCode = (): string => {
  * Join a room by room code
  * @returns boolean indicating if joining was successful
  */
+/**
+ * Signal to continue to the next question
+ */
+export const setContinueReady = async (roomCode: string, continueReady: boolean): Promise<void> => {
+    console.log(`Setting continue ready state for room ${roomCode} to ${continueReady}`);
+
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+
+    try {
+        const roomRef = doc(db, "rooms", roomCode);
+        await updateDoc(roomRef, { continueReady });
+        console.log(`Continue ready state set to ${continueReady} for room ${roomCode}`);
+    } catch (error) {
+        console.error("Error setting continue ready state:", error);
+        throw new Error(`Failed to set continue ready state: ${(error as Error).message}`);
+    }
+};
+
 export const joinRoom = async (roomCode: string, playerId: string, playerName: string): Promise<boolean> => {
     console.log(`Attempting to join room ${roomCode} as ${playerName} (${playerId})`);
 
