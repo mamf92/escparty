@@ -16,7 +16,7 @@ const Home = () => {
     <Container>
       <BackgroundImage $backgroundPath={backgroundPath} />
       <Overlay>
-        <Title>Welcome to ESCParty 🎤</Title>
+        <Title>ESCParty 🎤</Title>
         <ButtonContainer>
           <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer quiz</QuizButton>
           <QuizButton onClick={() => navigate("/select-difficulty")}>Single-player quiz</QuizButton>
