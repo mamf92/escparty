@@ -76,7 +76,11 @@ Check out the deployed app here:
 
 ## 📄 License
 
-This project is licensed under the MIT License 
+© 2025 Martin Fischer. All rights reserved.
+
+This project and its source code are protected under copyright law.  
+You may not reproduce, distribute, modify, or use any part of this project or its content without explicit written permission from the author.
+
 ---
 
 ## 🙏 Acknowledgments
