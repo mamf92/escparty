@@ -35,13 +35,9 @@ export interface Room {
  */
 export const checkFirebaseInitialization = () => {
     if (!db) {
-        console.error("Firebase Firestore instance not initialized!");
+        console.error("Firebase database not initialized");
         return false;
     }
-
-    // Add more detailed db checking
-    console.log("Firebase DB object exists:", !!db);
-    console.log("Firebase app mode:", import.meta.env.MODE);
     return true;
 };
 
@@ -130,29 +126,50 @@ export const getRoom = async (roomCode: string): Promise<Room | null> => {
  * Add a player to a room
  */
 export const addPlayerToRoom = async (roomCode: string, playerId: string, playerName: string): Promise<void> => {
-    console.log(`Adding player ${playerName} (${playerId}) to room ${roomCode}`);
-
     if (!checkFirebaseInitialization()) {
         throw new Error("Firebase not initialized");
     }
 
     try {
-        // Use Timestamp.now() instead of serverTimestamp() for player data
-        const currentTime = Timestamp.now();
+        // Get current room data to validate
+        const currentRoom = await getRoom(roomCode);
+        
+        if (!currentRoom) {
+            throw new Error("Room not found");
+        }
+        
+        if (currentRoom.started) {
+            throw new Error("Game has already started");
+        }
+
+        // Check if player already exists
+        const existingPlayer = currentRoom.players.find(p => p.id === playerId || p.name === playerName);
+        if (existingPlayer) {
+            return; // Player already exists, skip adding
+        }
 
         const roomRef = doc(db, "rooms", roomCode);
+        const currentTime = Timestamp.now();
+        
+        const newPlayer = {
+            id: playerId,
+            name: playerName,
+            score: 0,
+            joinedAt: currentTime
+        };
+        
         await updateDoc(roomRef, {
-            players: arrayUnion({
-                id: playerId,
-                name: playerName,
-                score: 0,
-                joinedAt: currentTime // Use regular timestamp object
-            })
+            players: arrayUnion(newPlayer)
         });
-        console.log(`Player ${playerName} added to room ${roomCode}`);
-    } catch (error) {
+        
+    } catch (error: any) {
         console.error("Error adding player to room:", error);
-        throw new Error(`Failed to add player: ${(error as Error).message}`);
+        
+        if (error.code === 'permission-denied') {
+            throw new Error("Security rules prevented joining the room");
+        }
+        
+        throw error;
     }
 };
 
@@ -366,36 +383,40 @@ export const resetPlayersAtMidQuiz = async (roomCode: string): Promise<void> => 
     }
 };
 
-export const joinRoom = async (roomCode: string, playerId: string, playerName: string): Promise<boolean> => {
-    console.log(`Attempting to join room ${roomCode} as ${playerName} (${playerId})`);
+// Update the joinRoom function with better error handling
 
+export const joinRoom = async (roomCode: string, playerId: string, playerName: string): Promise<boolean> => {
     if (!checkFirebaseInitialization()) {
         throw new Error("Firebase not initialized");
     }
 
     try {
-        // First, check if room exists
+        // First check if room exists and game hasn't started
         const room = await getRoom(roomCode);
         if (!room) {
-            console.log(`Cannot join room ${roomCode} - room does not exist`);
             return false;
         }
 
-        // Check if game has already started
         if (room.started) {
-            console.log(`Cannot join room ${roomCode} - game already started`);
             return false;
         }
 
-        // Check for name uniqueness is now handled before calling this function
-        // by the getUniquePlayerName helper function
+        // Check if player is already in the room
+        const existingPlayer = room.players.find(p => p.id === playerId || p.name === playerName);
+        if (existingPlayer) {
+            return true; // Consider this a success
+        }
 
-        // Add player to the room
+        // Add player to room
         await addPlayerToRoom(roomCode, playerId, playerName);
-        console.log(`Successfully joined room ${roomCode}`);
         return true;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error joining room:", error);
-        throw new Error(`Failed to join room: ${(error as Error).message}`);
+        
+        if (error.code === 'permission-denied' || error.message.includes('Security rules')) {
+            throw new Error("Failed to join room: Security rules prevented access");
+        }
+        
+        throw new Error(`Failed to join room: ${error.message}`);
     }
 };

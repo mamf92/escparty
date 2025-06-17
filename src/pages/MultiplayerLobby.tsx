@@ -112,11 +112,21 @@ const MultiplayerLobby = () => {
         // Navigate to lobby
         navigate("/lobby");
       } else {
-        alert("Game not found!");
+        alert("Game not found or already started!");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error joining game:", error);
-      alert("Failed to join game. Please try again.");
+      
+      // Specific error messages
+      if (error.message.includes('Security rules')) {
+        alert("Unable to join game due to security restrictions. Please try again.");
+      } else if (error.message.includes('not found')) {
+        alert("Game not found! Please check the code and try again.");
+      } else if (error.message.includes('already started')) {
+        alert("This game has already started!");
+      } else {
+        alert("Failed to join game. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
