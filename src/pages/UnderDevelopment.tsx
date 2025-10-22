@@ -9,11 +9,10 @@ const UnderDevelopment = () => {
     <Container>
       <Title>🚧 Feature Under Development 🚧</Title>
       <Message>
-        The Create Quiz feature is coming soon! Our team is working hard to bring you
-        the ability to create your own Eurovision quizzes.
+        This feature is coming soon!.
       </Message>
       <SubMessage>
-        Check back later for updates or try our existing quiz modes.
+        Check back later for updates or try our existing multiplayer quiz modes.
       </SubMessage>
       <ButtonContainer>
         <HomeButton onClick={() => navigate("/")}>
