@@ -2860,7 +2860,7 @@ This typically indicates that your device does not have a healthy Internet conne
   color: ${({theme:n})=>n.colors.correctGreen};
   margin-left: 0.5rem;
   font-weight: bold;
-`,$O=()=>{const n=rr();return N.jsxs(HO,{children:[N.jsx(FO,{children:"🚧 Feature Under Development 🚧"}),N.jsx(GO,{children:"The Create Quiz feature is coming soon! Our team is working hard to bring you the ability to create your own Eurovision quizzes."}),N.jsx(QO,{children:"Check back later for updates or try our existing quiz modes."}),N.jsx(YO,{children:N.jsxs(KO,{onClick:()=>n("/"),children:[N.jsx(FE,{size:20})," Return to Home"]})})]})},HO=tt.div`
+`,$O=()=>{const n=rr();return N.jsxs(HO,{children:[N.jsx(FO,{children:"🚧 Feature Under Development 🚧"}),N.jsx(GO,{children:"This feature is coming soon!."}),N.jsx(QO,{children:"Check back later for updates or try our existing multiplayer quiz modes."}),N.jsx(YO,{children:N.jsxs(KO,{onClick:()=>n("/"),children:[N.jsx(FE,{size:20})," Return to Home"]})})]})},HO=tt.div`
   width: 100%;
   max-width: 31.25rem; /* 500px */
   margin: auto;
