@@ -14,22 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Persist middleware for automatic localStorage synchronization (`europarty:session`)
 
 ### Changed
-- **Lobby component now reads all session state from Zustand instead of localStorage**
-- **Difficulty selection writes to both Firestore (multiplayer sync) and Zustand (local state)**
 - MultiplayerLobby now writes session data to Zustand when creating/joining rooms
-- Replaced fragile navigation state dependencies with centralized store
+- Session state written to both Zustand and localStorage during migration period
 
 ### Fixed
-- Fixed styled-components warning for boolean `secondary` prop in MultiplayerLobby
-- Multiplayer lobby state now persists reliably across page refreshes
-- Players no longer lose room context when refreshing during lobby
-- Removed unused `_playerId` and `_index` variables
+- Fixed styled-components warning for boolean `secondary` prop by prefixing with `$`
+- Fixed TypeScript linting errors (unused variables, `any` types)
+- Removed unused `_gameCode` state variable from MultiplayerLobby
 
 ### Technical
-- **Completed Issue #1: Zustand now manages full session lifecycle (write + read + persist)**
-- Lobby.tsx migration removes all direct localStorage reads for session data
-- Store uses `europarty:session` localStorage key with version 0
-- No TypeScript `any` types in store implementation
+- MultiplayerLobby writes to Zustand store on room creation and join
+- Backward compatibility maintained with localStorage during migration
 
 ---
 
