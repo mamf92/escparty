@@ -125,12 +125,11 @@ const MultiplayerLobby = () => {
       const joined = await joinRoom(joinCode.toUpperCase(), playerId, randomName);
 
       if (joined) {
-        // Write to Zustand
         setMultiplayer(true);
         setPlayerIdentity(playerId, randomName, false);
         setRoomInfo(joinCode.toUpperCase(), false);
 
-        // Keep old localStorage for backward compatibility (temporary)
+        // Keep old localStorage for backward compatibility (temporary) TODO: remove later
         localStorage.setItem("playerId", playerId);
         localStorage.setItem("playerName", randomName);
         localStorage.setItem("gameCode", joinCode.toUpperCase());
