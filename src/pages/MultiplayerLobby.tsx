@@ -3,69 +3,91 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom, generateRoomCode, getRoom } from "../utils/roomsFirestore";
+import { useGameSession } from "../store/gameSession"; 
 
+/**
+ * List of Eurovision Song Contest winners used for random player name assignment.
+ * Prevents duplicate names in the same room by selecting available winners.
+ */
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
 ];
 
-// Helper function to find a unique player name
+/**
+ * Generates a unique player name from the provided list, ensuring no duplicates in the room.
+ * If all names are taken, appends a random number to a random name.
+ * 
+ * @param roomCode - The 4-letter room code to check for existing players
+ * @param namesList - Array of available names to choose from
+ * @returns A unique player name
+ * 
+ * @example
+ * const name = await getUniquePlayerName("ABCD", ESC_WINNERS);
+ * // Returns: "Loreen 🇸🇪" or "Måneskin 🇮🇹 #42" if all names taken
+ */
 const getUniquePlayerName = async (roomCode: string, namesList: string[]): Promise<string> => {
-  // Get the current room data
   const room = await getRoom(roomCode);
 
   if (!room) {
-    // If room doesn't exist, any name is fine
     return namesList[Math.floor(Math.random() * namesList.length)];
   }
 
-  // Get all names currently in use
   const usedNames = room.players.map(player => player.name);
-
-  // Filter out names that are already used
   const availableNames = namesList.filter(name => !usedNames.includes(name));
 
   if (availableNames.length === 0) {
-    // If all names are taken, add a number suffix to a random name
     const baseName = namesList[Math.floor(Math.random() * namesList.length)];
     return `${baseName} #${Math.floor(Math.random() * 1000)}`;
   }
 
-  // Return a random available name
   return availableNames[Math.floor(Math.random() * availableNames.length)];
 };
 
+/**
+ * Multiplayer lobby component for creating or joining quiz games.
+ * Allows users to either host a new game (as player or observer) or join an existing game with a code.
+ * 
+ * @component
+ * @returns The multiplayer lobby interface
+ */
 const MultiplayerLobby = () => {
-  const [_gameCode, setGameCode] = useState<string | null>(null); // Renamed to _gameCode as it's not used directly
+  const setMultiplayer = useGameSession((state) => state.setMultiplayerMode);
+  const setPlayerIdentity = useGameSession((state) => state.setPlayerIdentity);
+  const setRoomInfo = useGameSession((state) => state.setRoomInfo);
+  
   const [joinCode, setJoinCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showJoinForm, setShowJoinForm] = useState(false); // Added missing state variable
+  const [showJoinForm, setShowJoinForm] = useState(false);
   const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const navigate = useNavigate();
 
-  // Function to create game with host as observer
+  /**
+   * Creates a new multiplayer game room with a unique code.
+   * Sets up the host player identity and navigates to the lobby.
+   * 
+   * @param hostIsObserver - Whether the host should join as an observer (non-playing role)
+   */
   const createGame = async (hostIsObserver: boolean) => {
     setLoading(true);
     try {
-      // Generate a unique ID for the host
       const hostId = uuidv4();
       const hostName = "👑 HOST 👑";
-
-      // Generate a room code
       const newGameCode = generateRoomCode();
 
-      // Create the room in Firestore
       await createRoom(newGameCode, hostId, hostName, hostIsObserver);
 
-      // Save user info in local storage
+      setMultiplayer(true);
+      setPlayerIdentity(hostId, hostName, true);
+      setRoomInfo(newGameCode, hostIsObserver);
+
+      // Keep old localStorage for backward compatibility (temporary) TODO: remove later
       localStorage.setItem("playerId", hostId);
       localStorage.setItem("playerName", hostName);
       localStorage.setItem("gameCode", newGameCode);
       localStorage.setItem("isHost", "true");
       localStorage.setItem("hostIsObserver", String(hostIsObserver));
 
-      // Update state and navigate
-      setGameCode(newGameCode);
       navigate("/lobby");
     } catch (error) {
       console.error("Error creating game:", error);
@@ -75,12 +97,17 @@ const MultiplayerLobby = () => {
     }
   };
 
-  // Function to handle showing create game options
+  /**
+   * Displays the create game options (Host & Play vs Host Only).
+   */
   const handleShowCreateOptions = () => {
     setShowCreateOptions(true);
   };
 
-  // Function to join an existing game
+  /**
+   * Joins an existing multiplayer game using a room code.
+   * Validates the code format and assigns a random player name.
+   */
   const joinGame = async () => {
     setAttempted(true);
 
@@ -93,36 +120,35 @@ const MultiplayerLobby = () => {
 
     setLoading(true);
     try {
-      // Generate a unique ID for the player
       const playerId = uuidv4();
-
-      // Get a unique name for the player
-      let randomName = await getUniquePlayerName(joinCode.toUpperCase(), ESC_WINNERS);
-
-      // Join the room in Firestore
+      const randomName = await getUniquePlayerName(joinCode.toUpperCase(), ESC_WINNERS);
       const joined = await joinRoom(joinCode.toUpperCase(), playerId, randomName);
 
       if (joined) {
-        // Save user info in local storage
+        setMultiplayer(true);
+        setPlayerIdentity(playerId, randomName, false);
+        setRoomInfo(joinCode.toUpperCase(), false);
+
+        // Keep old localStorage for backward compatibility (temporary) TODO: remove later
         localStorage.setItem("playerId", playerId);
         localStorage.setItem("playerName", randomName);
         localStorage.setItem("gameCode", joinCode.toUpperCase());
         localStorage.setItem("isHost", "false");
 
-        // Navigate to lobby
         navigate("/lobby");
       } else {
         alert("Game not found or already started!");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error joining game:", error);
       
-      // Specific error messages
-      if (error.message.includes('Security rules')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('Security rules')) {
         alert("Unable to join game due to security restrictions. Please try again.");
-      } else if (error.message.includes('not found')) {
+      } else if (errorMessage.includes('not found')) {
         alert("Game not found! Please check the code and try again.");
-      } else if (error.message.includes('already started')) {
+      } else if (errorMessage.includes('already started')) {
         alert("This game has already started!");
       } else {
         alert("Failed to join game. Please try again.");
@@ -132,11 +158,16 @@ const MultiplayerLobby = () => {
     }
   };
 
+  /**
+   * Displays the join game form.
+   */
   const handleShowJoinForm = () => {
     setShowJoinForm(true);
   };
 
-  // Added function to go back to options
+  /**
+   * Returns to the initial create/join options screen.
+   */
   const handleBackToOptions = () => {
     setShowJoinForm(false);
     setJoinCode("");
@@ -176,7 +207,7 @@ const MultiplayerLobby = () => {
             {loading && <LoadingText>Creating...</LoadingText>}
           </OptionCard>
 
-          <Button onClick={() => setShowCreateOptions(false)} disabled={loading} secondary style={{ marginTop: '1rem' }}>
+          <Button onClick={() => setShowCreateOptions(false)} disabled={loading} $secondary style={{ marginTop: '1rem' }}>
             Back
           </Button>
         </OptionsContainer>
@@ -196,7 +227,7 @@ const MultiplayerLobby = () => {
           />
           {attempted && (!joinCode || joinCode.length < 4 || !/^[A-Z]{4}$/.test(joinCode)) && <InputHelperText>Please enter 4 letters.</InputHelperText>}
           <ButtonGroup>
-            <Button onClick={handleBackToOptions} disabled={loading} secondary>
+            <Button onClick={handleBackToOptions} disabled={loading} $secondary>
               Back
             </Button>
             <Button onClick={joinGame} disabled={loading}>
@@ -212,13 +243,18 @@ const MultiplayerLobby = () => {
 export default MultiplayerLobby;
 
 // Styled Components
+
+/** Props for OptionCard component */
 interface OptionCardProps {
   disabled?: boolean;
 }
+
+/** Props for Button component */
 interface ButtonProps {
-  secondary?: boolean;
+  $secondary?: boolean;
 }
 
+/** Props for Input component */
 interface InputProps {
   isInvalid?: boolean;
 }
@@ -350,17 +386,17 @@ const ButtonGroup = styled.div`
 
 const Button = styled.button<ButtonProps>`
     padding: 0.75rem 1.25rem; /* 12px 20px */
-    background: ${({ secondary, theme }) => secondary ? theme.colors.darkpurple : theme.colors.purple};
+    background: ${({ $secondary, theme }) => $secondary ? theme.colors.darkpurple : theme.colors.purple};
     color: ${({ theme }) => theme.colors.white};
     font-size: 1rem;
     font-weight: bold;
     border: none;
     cursor: pointer;
-    flex: ${props => props.secondary ? '0.4' : '0.6'};
+    flex: ${props => props.$secondary ? '0.4' : '0.6'};
     transition: all 0.2s ease;
 
     &:hover {
-      background: ${({ secondary, theme }) => secondary ? theme.colors.purple : theme.colors.darkpurple};
+       background: ${({ $secondary, theme }) => $secondary ? theme.colors.purple : theme.colors.darkpurple};
     }
     
     &:disabled {
