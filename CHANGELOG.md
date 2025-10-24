@@ -12,10 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Zustand state management for client-side session persistence
 - Centralized game session store (`useGameSession`) with full TypeScript typing
 - Persist middleware for automatic localStorage synchronization (`europarty:session`)
+- JSDocs documentation to MultiplayerLobby.tsx, Lobby.tsx and Quiz.tsx 
 
 ### Changed
 - MultiplayerLobby now writes session data to Zustand when creating/joining rooms
 - Session state written to both Zustand and localStorage during migration period
+- Removed comments from MultiplayerLobby.tsx, Lobby.tsx and Quiz.tsx
 
 ### Fixed
 - Fixed styled-components warning for boolean `secondary` prop by prefixing with `$`

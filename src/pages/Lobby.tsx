@@ -4,24 +4,28 @@ import styled, { keyframes } from "styled-components";
 import { listenToRoom, Room, setRoomDifficulty, startGame } from "../utils/roomsFirestore";
 import { useGameSession } from "../store/gameSession";
 
+/**
+ * Multiplayer game lobby where players wait for the host to start the game.
+ * Displays connected players, allows host to select difficulty, and manages game state transitions.
+ * 
+ * @component
+ * @returns The lobby interface with player list and game controls
+ */
 const Lobby = () => {
     const navigate = useNavigate();
 
-    // Read from Zustand store
     const roomCode = useGameSession((state) => state.roomCode);
     const playerId = useGameSession((state) => state.playerId);
     const playerName = useGameSession((state) => state.playerName);
     const isHost = useGameSession((state) => state.isHost);
-    const hostIsObserver = useGameSession((state) => state.hostIsObserver); // ← Remove underscore
+    const hostIsObserver = useGameSession((state) => state.hostIsObserver);
     const setDifficulty = useGameSession((state) => state.setDifficulty);
 
-    // Local component state
     const [room, setRoom] = useState<Room | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        // Safety check
         if (!roomCode || !playerId) {
             console.error("Missing roomCode or playerId, redirecting to multiplayer");
             setError("Missing game data. Returning to multiplayer lobby.");
@@ -29,26 +33,18 @@ const Lobby = () => {
             return;
         }
 
-        // Set up real-time listener
         const unsubscribe = listenToRoom(roomCode, (roomData) => {
             if (roomData) {
                 setRoom(roomData);
                 setLoading(false);
 
-                // Check if game started
                 if (roomData.started) {
-                    // === CHANGE THIS LINE ===
-                    // const isCurrentUserObserver = isHost && roomData.hostIsObserver;
-                    
-                    // === TO THIS (use Zustand as source of truth) ===
                     const isCurrentUserObserver = isHost && hostIsObserver;
 
-                    // Write difficulty to Zustand
                     if (roomData.difficulty) {
                         setDifficulty(roomData.difficulty as 'easy' | 'medium' | 'hard');
                     }
 
-                    // Keep sessionStorage for backward compatibility (temporary)
                     sessionStorage.setItem("multiplayerGame", JSON.stringify({
                         multiplayer: true,
                         roomCode: roomCode,
@@ -73,8 +69,14 @@ const Lobby = () => {
         });
 
         return () => unsubscribe();
-    }, [roomCode, playerId, isHost, hostIsObserver, navigate, setDifficulty]); // ← Add hostIsObserver
+    }, [roomCode, playerId, isHost, hostIsObserver, navigate, setDifficulty]);
 
+    /**
+     * Handles difficulty selection by the host.
+     * Updates both Firestore and local Zustand store with the selected difficulty.
+     * 
+     * @param displayDifficulty - The difficulty level to set ('Easy', 'Medium', or 'Hard')
+     */
     const handleSelectDifficulty = async (displayDifficulty: string) => {
         if (isHost && roomCode) {
             const difficulty = displayDifficulty.toLowerCase();
@@ -88,6 +90,11 @@ const Lobby = () => {
         }
     };
 
+    /**
+     * Initiates the game start process.
+     * Only available to the host after difficulty has been selected.
+     * Updates Firestore to signal all players to navigate to the quiz.
+     */
     const handleStartGame = async () => {
         if (isHost && roomCode) {
             try {
@@ -103,7 +110,6 @@ const Lobby = () => {
         }
     };
 
-    // Safety check
     if (!roomCode || !playerId) {
         return (
             <Container>
@@ -168,7 +174,6 @@ const Lobby = () => {
 
 export default Lobby;
 
-// Styled Components (unchanged)
 const Container = styled.div`
     text-align: center;
     padding: 1.25rem;

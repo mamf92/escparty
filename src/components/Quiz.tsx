@@ -6,6 +6,9 @@ import { updatePlayerScore, listenToRoom, Room } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 
+/**
+ * Multiplayer game data structure stored in sessionStorage for persistence across page refreshes.
+ */
 interface MultiplayerGameData {
   multiplayer: boolean;
   roomCode: string;
@@ -14,6 +17,13 @@ interface MultiplayerGameData {
   hostIsObserver?: boolean;
 }
 
+/**
+ * Main quiz component that handles both single-player and multiplayer quiz gameplay.
+ * Features time-based scoring, real-time multiplayer updates, and automatic progression.
+ * 
+ * @component
+ * @returns The interactive quiz interface with questions, timer, and scoring
+ */
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const location = useLocation();
@@ -36,18 +46,17 @@ const Quiz = () => {
   const [playerId, setPlayerId] = useState<string | null>(locationState?.playerId || null);
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
-  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing..."); // Used in loading state display
-  const [timeLeft, setTimeLeft] = useState(10); // 10 second timer
-  const [timeLeftMs, setTimeLeftMs] = useState(10000); // More precise millisecond timer for scoring
+  const [error, setError] = useState<string | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing...");
+  const [timeLeft, setTimeLeft] = useState(10);
+  const [timeLeftMs, setTimeLeftMs] = useState(10000);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(true);
-  const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
+  const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0);
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
 
-  // Calculate current question based on currentQuestionIndex and questions array
   const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
     ? questions[currentQuestionIndex]
     : { question: "", options: [], correctAnswer: "" };
@@ -55,8 +64,6 @@ const Quiz = () => {
   const hostIsObserverFromLocation = locationState?.hostIsObserver;
 
   useEffect(() => {
-    // This effect handles redirection for an observing host.
-    // It depends on data being loaded and relevant states being set.
     if (
       hostIsObserverFromLocation &&
       localStorage.getItem("isHost") === "true" &&
@@ -82,7 +89,7 @@ const Quiz = () => {
           playerId,
           hostIsObserver: true,
         },
-        replace: true, // Replace history to prevent back navigation to the quiz page
+        replace: true,
       });
     }
   }, [
@@ -100,28 +107,25 @@ const Quiz = () => {
   ]);
 
   useEffect(() => {
-    // If the current user is a host in observer mode, redirect to the mid-quiz scoreboard
     if (locationState?.hostIsObserver && localStorage.getItem("isHost") === "true" && roomCode && playerId && difficulty) {
       navigate("/mid-quiz-scoreboard", {
         state: {
-          multiplayer: true, // Host observer implies a multiplayer context
+          multiplayer: true,
           roomCode: roomCode,
           playerId: playerId,
           difficulty: difficulty,
-          hostIsObserver: true, // Explicitly set for the scoreboard
+          hostIsObserver: true,
         },
-        replace: true // Replace the current entry in history
+        replace: true
       });
     }
   }, [locationState, roomCode, playerId, difficulty, navigate]);
 
   useEffect(() => {
-    // Clear any previous errors when component mounts or difficulty changes
     setError(null);
     setLoading(true);
     setLoadingStatus("Initializing quiz...");
 
-    // Track component mounting for debug purposes
     console.log("🚀 Quiz component mounted", {
       mode: import.meta.env.MODE,
       baseUrl: import.meta.env.BASE_URL,
@@ -131,7 +135,6 @@ const Quiz = () => {
       currentQuestionIndex
     });
 
-    // Handle case when difficulty is undefined or invalid
     if (!difficulty || !['easy', 'medium', 'hard'].includes(difficulty)) {
       console.error(`❌ Invalid difficulty parameter: ${difficulty}`);
       setError(`Invalid difficulty level: ${difficulty}`);
@@ -139,10 +142,8 @@ const Quiz = () => {
       return;
     }
 
-    // Process multiplayer data
     let multiplayerData: MultiplayerGameData | null = null;
 
-    // First try to get multiplayer data from location state
     if (locationState?.multiplayer) {
       console.log("📱 Multiplayer data found in location state:", locationState);
       multiplayerData = {
@@ -151,7 +152,6 @@ const Quiz = () => {
         playerId: locationState.playerId || ''
       };
     } else {
-      // If not in location state, check sessionStorage (for page refreshes or direct navigation)
       const storedData = sessionStorage.getItem('multiplayerGame');
       if (storedData) {
         try {
@@ -163,7 +163,6 @@ const Quiz = () => {
       }
     }
 
-    // Set multiplayer state if we have valid data
     let unsubscribeRoom: () => void = () => { };
     if (multiplayerData?.multiplayer && multiplayerData.roomCode && multiplayerData.playerId) {
       console.log("🔄 Setting up multiplayer mode...");
@@ -172,37 +171,30 @@ const Quiz = () => {
       setPlayerId(multiplayerData.playerId);
       setLoadingStatus("Connecting to game room...");
 
-      // Store multiplayer info in session storage (for page refresh recovery)
       sessionStorage.setItem('multiplayerGame', JSON.stringify(multiplayerData));
 
-      // Set up listener for room changes in multiplayer
       unsubscribeRoom = listenToRoom(multiplayerData.roomCode, (roomData) => {
         if (roomData) {
           console.log("🎮 Room data updated:", roomData);
           setRoom(roomData);
 
-          // If we get room data with difficulty, use it as backup
           if (!difficulty && roomData.difficulty) {
             console.log(`Using room difficulty: ${roomData.difficulty}`);
           }
         } else {
           console.error("❌ Game room not found");
-          // Room doesn't exist, go back to multiplayer lobby
           setError("Game room no longer exists");
           setTimeout(() => navigate("/multiplayer"), 2000);
         }
       });
     }
 
-    // Enhanced debugging
     console.log(`🌐 Environment: ${isDevelopmentEnvironment() ? 'Development' : 'Production'}`);
     console.log(`📂 Base URL: ${import.meta.env.BASE_URL}`);
     console.log(`🎮 Difficulty parameter: ${difficulty}`);
 
-    // Load quiz data using our QuizDataProvider
     setLoadingStatus("Loading quiz data...");
 
-    // Use Promise.race with a timeout to prevent infinite loading
     const quizLoaderPromise = loadQuizData(difficulty as QuizDifficulty);
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Quiz loading timed out after 10 seconds')), 10000);
@@ -230,8 +222,6 @@ const Quiz = () => {
         setQuestions(filteredQuestions);
         setLoading(false);
 
-        // We now use the state initialized at the component level
-        // instead of trying to retrieve it from localStorage
         console.log(`Using question index: ${currentQuestionIndex}, score: ${score}`);
       })
       .catch((error) => {
@@ -240,35 +230,31 @@ const Quiz = () => {
         setLoading(false);
       });
 
-    // Cleanup function
     return () => {
-      // Clean up room listener if it was set
       unsubscribeRoom();
       console.log("🧹 Quiz component unmounting, cleaned up listeners");
     };
-  }, [difficulty, navigate, location, currentQuestionIndex, score]);  // Timer effect for question countdown
+  }, [difficulty, navigate, location, currentQuestionIndex, score]);
+
   useEffect(() => {
     if (quizCompleted || loading) return;
 
-    // Only start a new timer if we're in question mode (not feedback mode)
     if (!showFeedback) {
       console.log("Setting up new question timer");
       setTimeLeft(10);
       setTimeLeftMs(10000);
 
-      // Use a more precise interval for millisecond timer (100ms)
       const msTimer = setInterval(() => {
         setTimeLeftMs(prev => {
-          if (prev <= 100) { // When 0.1 seconds left
+          if (prev <= 100) {
             clearInterval(msTimer);
             handleTimeUp();
             return 0;
           }
-          return prev - 100; // Decrease by 100ms each time
+          return prev - 100;
         });
       }, 100);
 
-      // Regular timer for visible UI updates (every second)
       const uiTimer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
@@ -279,21 +265,20 @@ const Quiz = () => {
         });
       }, 1000);
 
-      // Return cleanup function for both timers
       return () => {
         clearInterval(msTimer);
         clearInterval(uiTimer);
       };
     }
-  }, [currentQuestionIndex, quizCompleted, loading, showFeedback]);  // Separate effect for feedback timer that automatically moves to next question
+  }, [currentQuestionIndex, quizCompleted, loading, showFeedback]);
+
   useEffect(() => {
     if (showFeedback) {
-      // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
       const feedbackTimer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
             clearInterval(feedbackTimer);
-            moveToNextQuestion(); // Automatically move to next question when feedback time ends
+            moveToNextQuestion();
             return 0;
           }
           return prev - 1;
@@ -306,26 +291,22 @@ const Quiz = () => {
     }
   }, [showFeedback]);
 
-  // Function to handle when the time is up but before showing feedback
+  /**
+   * Handles the timer expiration when a question times out.
+   * Marks the question as submitted, hides the timer, awards 0 points, and shows feedback.
+   */
   const handleTimeUp = () => {
     if (!isSubmitted) {
       setIsSubmitted(true);
     }
 
-    // Hide timer after time is up
     setIsTimerVisible(false);
-
-    // Set points to 0 for unanswered question
     setCurrentQuestionPoints(0);
-
-    // Show answer feedback for 5 seconds
     setShowFeedback(true);
     setTimeLeft(5);
 
-    // If multiplayer, update score
     if (isMultiplayer && roomCode && playerId) {
       try {
-        // Using void to ignore the promise result
         void updatePlayerScore(roomCode, playerId, score).catch(error => {
           console.error("Failed to update score:", error);
         });
@@ -335,7 +316,11 @@ const Quiz = () => {
     }
   };
 
-  // Function to automatically move to the next question
+  /**
+   * Advances to the next question or shows the scoreboard/results.
+   * After every 5 questions, navigates to mid-quiz scoreboard.
+   * After all questions, saves scores and navigates to final results.
+   */
   const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       if ((currentQuestionIndex + 1) % 5 === 0) {
@@ -352,15 +337,14 @@ const Quiz = () => {
           }
         });
       } else {
-        // Reset all question-related states
-        setShowFeedback(false); // Must be reset before setting new question
+        setShowFeedback(false);
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
         setIsSubmitted(false);
-        setTimeLeft(10); // Reset timer for new question
-        setTimeLeftMs(10000); // Reset precise timer for new question
-        setIsTimerVisible(true); // Show timer again for the next question
-        setCurrentQuestionPoints(0); // Reset points for new question
+        setTimeLeft(10);
+        setTimeLeftMs(10000);
+        setIsTimerVisible(true);
+        setCurrentQuestionPoints(0);
       }
     } else {
       const difficultyLevel = difficulty ?? "easy";
@@ -390,34 +374,41 @@ const Quiz = () => {
     }
   };
 
+  /**
+   * Handles answer selection by the user.
+   * Only allows selection if the question hasn't been submitted yet.
+   * 
+   * @param answer - The selected answer option
+   */
   const handleAnswer = (answer: string) => {
     if (!isSubmitted) {
       setSelectedAnswer(answer);
     }
   };
 
+  /**
+   * Submits the selected answer and calculates the score.
+   * Awards base 500 points + time bonus (up to 500 points) for correct answers.
+   * Updates multiplayer scores in real-time via Firestore.
+   * 
+   * @param answer - The answer to submit
+   */
   const submitAnswer = async (answer: string) => {
     if (!answer) return;
 
     setIsSubmitted(true);
-    setIsTimerVisible(false); // Hide timer when answer is submitted
+    setIsTimerVisible(false);
 
-    // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
-      // Calculate time-based score with millisecond precision
-      // Base score of 500 + up to 500 more based on time remaining
       const timeBonus = Math.floor((timeLeftMs / 10000) * 500);
-      // Using timeLeftMs (milliseconds) for more precise scoring
       const pointsForAnswer = 500 + timeBonus;
       console.log(`Correct answer! Time left: ${timeLeftMs / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
 
-      // Set points for current question to display in the UI
       setCurrentQuestionPoints(pointsForAnswer);
 
       const newScore = score + pointsForAnswer;
       setScore(newScore);
 
-      // If multiplayer, update score in Firestore
       if (isMultiplayer && roomCode && playerId) {
         try {
           await updatePlayerScore(roomCode, playerId, newScore);
@@ -426,24 +417,24 @@ const Quiz = () => {
         }
       }
     } else {
-      // If answer is incorrect, set points to 0
       setCurrentQuestionPoints(0);
     }
 
-    // Show feedback after submission
-    // Add remaining question time PLUS 5 seconds for feedback
     const feedbackTime = Math.min(timeLeft, 10) + 5;
     setShowFeedback(true);
     setTimeLeft(feedbackTime);
   };
 
+  /**
+   * Resets the quiz to its initial state for replay.
+   */
   const restartQuiz = () => {
     setCurrentQuestionIndex(0);
     setScore(0);
     setQuizCompleted(false);
     setSelectedAnswer(null);
     setIsSubmitted(false);
-    setIsTimerVisible(true); // Show timer when restarting the quiz
+    setIsTimerVisible(true);
   };
 
   // Render loading state
@@ -522,14 +513,13 @@ const Quiz = () => {
 
 export default Quiz;
 
-// Styled Components
 const Container = styled.div`
   position: relative;
   width: 100%;
-  max-width: 31.25rem; /* 500px */
+  max-width: 31.25rem;
   margin: auto;
   text-align: center;
-  padding: 1.25rem; /* 20px */
+  padding: 1.25rem;
   background: ${({ theme }) => theme.colors.magnolia};
   overflow-x: hidden;
 `;
@@ -561,7 +551,7 @@ const TimerContainer = styled.div<{ $timeRunningOut: boolean; $isFeedback: boole
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  display: flex; /* Always display the container to maintain layout */
+  display: flex;
   align-items: center;
   justify-content: center;
   background-color: ${({ $timeRunningOut, $isFeedback, theme }) =>
@@ -588,7 +578,7 @@ const QuestionText = styled.h2`
   font-family: ${({ theme }) => theme.fonts.heading};
   color: ${({ theme }) => theme.colors.night};
   font-size: 1.5rem;
-  margin-bottom: 1.25rem; /* 20px */
+  margin-bottom: 1.25rem;
 `;
 
 const OptionsContainer = styled.div`
@@ -621,7 +611,7 @@ const OptionButton = styled.button<{ $isSelected: boolean; $isCorrect: boolean; 
 `;
 
 const SubmitButton = styled.button`
-  margin-top: 1.25rem; /* 20px */
+  margin-top: 1.25rem;
   background: ${({ theme }) => theme.colors.purple};
   color: white;
   font-size: 1rem;
@@ -647,26 +637,26 @@ const LoadingContainer = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2.5rem 1.25rem; /* 40px 20px */
+  padding: 2.5rem 1.25rem;
   background: ${({ theme }) => theme.colors.magnolia};
   border-radius: 0;
   margin: auto;
-  max-width: 31.25rem; /* 500px */
+  max-width: 31.25rem;
 `;
 
 const Loading = styled.p`
   text-align: center;
   font-size: 1.2rem;
   color: ${({ theme }) => theme.colors.night};
-  margin-top: 1.25rem; /* 20px */
+  margin-top: 1.25rem;
 `;
 
 const LoadingSpinner = styled.div`
-  border: 0.25rem solid rgba(0, 0, 0, 0.1); /* 4px */
+  border: 0.25rem solid rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border-top: 0.25rem solid ${({ theme }) => theme.colors.amethyst}; /* 4px */
-  width: 2.5rem; /* 40px */
-  height: 2.5rem; /* 40px */
+  border-top: 0.25rem solid ${({ theme }) => theme.colors.amethyst};
+  width: 2.5rem;
+  height: 2.5rem;
   animation: spin 1s linear infinite;
 
   @keyframes spin {
@@ -679,18 +669,18 @@ const ScoreText = styled.p`
   font-size: 1.5rem;
   font-weight: bold;
   color: ${({ theme }) => theme.colors.amethyst};
-  margin-bottom: 1.25rem; /* 20px */
+  margin-bottom: 1.25rem;
 `;
 
 const QuitButton = styled.button`
   position: relative;
-  margin-top: 1.25rem; /* 20px */
+  margin-top: 1.25rem;
   background: ${({ theme }) => theme.colors.darkpurple};
   color: white;
   border: none;
   border-radius: 50%;
-  width: 2.5rem; /* 40px */
-  height: 2.5rem; /* 40px */
+  width: 2.5rem;
+  height: 2.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -704,23 +694,23 @@ const QuitButton = styled.button`
 
 const ErrorContainer = styled.div`
   width: 100%;
-  max-width: 31.25rem; /* 500px */
+  max-width: 31.25rem;
   margin: auto;
   text-align: center;
-  padding: 2.5rem 1.25rem; /* 40px 20px */
+  padding: 2.5rem 1.25rem;
   background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 0; /* Changed from 10px to match square design */
+  border-radius: 0;
 `;
 
 const ErrorMessage = styled.p`
   color: ${({ theme }) => theme.colors.incorrectRed};
   font-size: 1.2rem;
-  margin-bottom: 1.25rem; /* 20px */
+  margin-bottom: 1.25rem;
 `;
 
 const RetryButton = styled(SubmitButton)`
-  max-width: 12.5rem; /* 200px */
-  margin: 0.625rem auto; /* 10px auto */
+  max-width: 12.5rem;
+  margin: 0.625rem auto;
   display: block;
 `;
 

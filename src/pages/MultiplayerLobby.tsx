@@ -5,11 +5,26 @@ import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom, generateRoomCode, getRoom } from "../utils/roomsFirestore";
 import { useGameSession } from "../store/gameSession"; 
 
-// List of Eurovision Song Contest winners for random name assignment
+/**
+ * List of Eurovision Song Contest winners used for random player name assignment.
+ * Prevents duplicate names in the same room by selecting available winners.
+ */
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
 ];
 
+/**
+ * Generates a unique player name from the provided list, ensuring no duplicates in the room.
+ * If all names are taken, appends a random number to a random name.
+ * 
+ * @param roomCode - The 4-letter room code to check for existing players
+ * @param namesList - Array of available names to choose from
+ * @returns A unique player name
+ * 
+ * @example
+ * const name = await getUniquePlayerName("ABCD", ESC_WINNERS);
+ * // Returns: "Loreen 🇸🇪" or "Måneskin 🇮🇹 #42" if all names taken
+ */
 const getUniquePlayerName = async (roomCode: string, namesList: string[]): Promise<string> => {
   const room = await getRoom(roomCode);
 
@@ -28,12 +43,18 @@ const getUniquePlayerName = async (roomCode: string, namesList: string[]): Promi
   return availableNames[Math.floor(Math.random() * availableNames.length)];
 };
 
+/**
+ * Multiplayer lobby component for creating or joining quiz games.
+ * Allows users to either host a new game (as player or observer) or join an existing game with a code.
+ * 
+ * @component
+ * @returns The multiplayer lobby interface
+ */
 const MultiplayerLobby = () => {
   const setMultiplayer = useGameSession((state) => state.setMultiplayerMode);
   const setPlayerIdentity = useGameSession((state) => state.setPlayerIdentity);
   const setRoomInfo = useGameSession((state) => state.setRoomInfo);
   
-  // Local component state
   const [joinCode, setJoinCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -41,6 +62,12 @@ const MultiplayerLobby = () => {
   const [attempted, setAttempted] = useState(false);
   const navigate = useNavigate();
 
+  /**
+   * Creates a new multiplayer game room with a unique code.
+   * Sets up the host player identity and navigates to the lobby.
+   * 
+   * @param hostIsObserver - Whether the host should join as an observer (non-playing role)
+   */
   const createGame = async (hostIsObserver: boolean) => {
     setLoading(true);
     try {
@@ -50,12 +77,11 @@ const MultiplayerLobby = () => {
 
       await createRoom(newGameCode, hostId, hostName, hostIsObserver);
 
-      // Write to Zustand
       setMultiplayer(true);
       setPlayerIdentity(hostId, hostName, true);
       setRoomInfo(newGameCode, hostIsObserver);
 
-      // Keep old localStorage for backward compatibility (temporary)
+      // Keep old localStorage for backward compatibility (temporary) TODO: remove later
       localStorage.setItem("playerId", hostId);
       localStorage.setItem("playerName", hostName);
       localStorage.setItem("gameCode", newGameCode);
@@ -71,10 +97,17 @@ const MultiplayerLobby = () => {
     }
   };
 
+  /**
+   * Displays the create game options (Host & Play vs Host Only).
+   */
   const handleShowCreateOptions = () => {
     setShowCreateOptions(true);
   };
 
+  /**
+   * Joins an existing multiplayer game using a room code.
+   * Validates the code format and assigns a random player name.
+   */
   const joinGame = async () => {
     setAttempted(true);
 
@@ -126,10 +159,16 @@ const MultiplayerLobby = () => {
     }
   };
 
+  /**
+   * Displays the join game form.
+   */
   const handleShowJoinForm = () => {
     setShowJoinForm(true);
   };
 
+  /**
+   * Returns to the initial create/join options screen.
+   */
   const handleBackToOptions = () => {
     setShowJoinForm(false);
     setJoinCode("");
@@ -205,13 +244,18 @@ const MultiplayerLobby = () => {
 export default MultiplayerLobby;
 
 // Styled Components
+
+/** Props for OptionCard component */
 interface OptionCardProps {
   disabled?: boolean;
 }
+
+/** Props for Button component */
 interface ButtonProps {
   $secondary?: boolean;
 }
 
+/** Props for Input component */
 interface InputProps {
   isInvalid?: boolean;
 }
