@@ -5,6 +5,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "live-server --port=5500",
     "dev": "vite --host",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -13,10 +14,15 @@
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "test": "vitest",
+    "playwright:ui": "npx playwright test --ui",
+    "playwright:headed": "npx playwright test --headed",
+    "playwright:report": "npx playwright show-report"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
+    "dotenv": "^17.2.3",
     "firebase": "^11.7.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -24,10 +30,13 @@
     "react-router-dom": "^7.1.5",
     "styled-components": "^6.1.15",
     "uuid": "^11.1.0",
+    "vitest": "^4.0.4",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^24.9.2",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@types/react-router-dom": "^5.3.3",
