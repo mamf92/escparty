@@ -1,3 +1,30 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Colors */
+  --color-magnolia: #eee8f0;
+  --color-night: #141516;
+  --color-gray: #59595d;
+  --color-amethyst: #a56dc6;
+  --color-pinkLavender: #d5b8e6;
+  --color-correctGreen: #28a745;
+  --color-incorrectRed: #dc3545;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-darkpurple: #73168c;
+  --color-purple: #9f2cbf;
+  --color-brightpurple: #c04bf2;
+  --color-deepblue: #281259;
+  --color-nightblue: #070926;
+  --color-accentmint: #7af5bf;
+  --color-accentgreen: #007542;
+  --color-accentorange: #ff9f1d;
+
+  /* Typography */
+  --font-body: "'Open Sans', sans-serif";
+  --font-heading: "'Montserrat', sans-serif";
+}
+
 /* Reset default browser styles */
 *,
 *::before,
@@ -5,7 +32,6 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* Ensures padding is included in width calculations */
 }
 
 /* Root styles */
@@ -56,14 +82,14 @@ body {
 }
 
 /* All page components should fill their container */
-#root>div {
+#root > div {
   display: flex;
   flex-direction: column;
   flex: 1;
 }
 
 /* Ensure all route pages take full height within their container */
-[role="main"],
+[role='main'],
 main,
 section,
 article,
