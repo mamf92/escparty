@@ -7,14 +7,14 @@
 
 ## 0) TL;DR — Critical Rules (Read First)
 
-- **State:** Client session lives in **Zustand (persisted)**.  
-- **Firestore:** Use **services** (`src/services/rooms/*`) for all reads/writes/listeners — **never** call the SDK in components.  
-- **Routing:** **No** `location.state` for carrying app state.  
-- **Storage:** No direct `localStorage`/`sessionStorage` for app state (see transitional rules).  
-- **UI:** Keep components **< 150 LOC**; containers **< 250 LOC**.  
-- **Styling:** New UI uses **Tailwind**. `styled-components` is legacy (modify only if already there).  
-- **Assets / GH Pages:** Always use `getAssetPath()` due to `/escparty/` base path.  
-- **Timers:** Use a single `useQuestionTimer()` (rAF + visibility handling), not `setInterval`.  
+- **State:** Client session lives in **Zustand (persisted)**.
+- **Firestore:** Use **services** (`src/services/rooms/*`) for all reads/writes/listeners — **never** call the SDK in components.
+- **Routing:** **No** `location.state` for carrying app state.
+- **Storage:** No direct `localStorage`/`sessionStorage` for app state (see transitional rules).
+- **UI:** Keep components **< 150 LOC**; containers **< 250 LOC**.
+- **Styling:** New UI uses **Tailwind**. `styled-components` is legacy (modify only if already there).
+- **Assets / GH Pages:** Always use `getAssetPath()` due to `/escparty/` base path.
+- **Timers:** Use a single `useQuestionTimer()` (rAF + visibility handling), not `setInterval`.
 - **Types/Docs:** Explicit TS types. JSDoc only for non-trivial logic (timers, scoring, sync).
 
 ---
@@ -30,14 +30,15 @@
 
 ```ts
 // Minimal API preferred
-const score = useGameSession(s => s.score);
-const setSession = useGameSession(s => s.setSession);
+const score = useGameSession((s) => s.score);
+const setSession = useGameSession((s) => s.setSession);
 setSession({ score: score + 100 });
 ```
 
 ### 1.2 Firestore via Services
 
 Encapsulate Firestore in `src/services/rooms/*`:
+
 - `roomLifecycle.ts` (create/close/start)
 - `playerMutations.ts` (join/leave/score)
 - `listeners.ts` (room subscription)
@@ -58,6 +59,7 @@ Split `Quiz.tsx` into small focused components in `src/components/quiz/`:
 `QuizHeader`, `QuizQuestion`, `QuizOptions`, `QuizFooter`, `FeedbackPanel`.
 
 **Scoring System:**
+
 - **Base**: 500 points for correct answer
 - **Time bonus**: Up to 500 points (linear decay over 10 seconds)
 - **Formula**: `points = 500 + Math.floor((msRemaining / 10000) * 500)`
@@ -67,7 +69,7 @@ Split `Quiz.tsx` into small focused components in `src/components/quiz/`:
 /**
  * Calculates time-based score bonus.
  * Base: 500 points + time bonus (0-500 based on milliseconds remaining).
- * 
+ *
  * @param timeLeftMs - Milliseconds remaining on timer
  * @returns Total points awarded (500-1000)
  */
@@ -81,17 +83,18 @@ const calculateScore = (timeLeftMs: number): number => {
 ```
 
 **Mid-Quiz Scoreboard Pattern:**
+
 ```ts
 // Every 5 questions (indices 4, 9, 14, 19...)
 if ((currentQuestionIndex + 1) % 5 === 0) {
-  navigate("/mid-quiz-scoreboard");
+  navigate('/mid-quiz-scoreboard');
   // State comes from Zustand, not location.state
 }
 ```
 
 ### 1.4 Styling
 
-- **Tailwind for all new UI**.  
+- **Tailwind for all new UI**.
 - `styled-components` only where it already exists; do not add new styled files unless strictly necessary.
 - Existing styled-components: Use `$` prefix for transient boolean props to avoid DOM warnings.
 
@@ -102,8 +105,8 @@ if ((currentQuestionIndex + 1) % 5 === 0) {
 
 ### 1.5 Data Loading
 
-- Single quiz data source: **`public/quizdata/*`**.  
-- Loader is simple (< 80 LOC). No env-specific branches.  
+- Single quiz data source: **`public/quizdata/*`**.
+- Loader is simple (< 80 LOC). No env-specific branches.
 - Always resolve public assets with `getAssetPath()`.
 
 ```ts
@@ -118,7 +121,7 @@ const imageSrc = getAssetPath('/images/eurovision.png');
 
 ## 2) Transitional (Allowed Temporarily for Backward Compatibility)
 
-> **Ends when Milestone:** *Phase 1 – Stabilize Core* is merged.
+> **Ends when Milestone:** _Phase 1 – Stabilize Core_ is merged.
 
 - **Dual-write session identity** while migrating: write to Zustand **and** legacy storage **only if needed** to avoid breaking existing flows.
   ```ts
@@ -133,10 +136,10 @@ const imageSrc = getAssetPath('/images/eurovision.png');
 
 ## 3) Deprecated (No New Usage)
 
-- `location.state` as an app state carrier.  
-- New `sessionStorage` or direct `localStorage` writes for app state (Zustand persist instead).  
-- New `styled-components` usage (prefer Tailwind).  
-- `setInterval`/`setTimeout`-based countdowns for quiz timing.  
+- `location.state` as an app state carrier.
+- New `sessionStorage` or direct `localStorage` writes for app state (Zustand persist instead).
+- New `styled-components` usage (prefer Tailwind).
+- `setInterval`/`setTimeout`-based countdowns for quiz timing.
 - New quiz data copies under `src/data/*` (single source is `public/quizdata/*`).
 
 ---
@@ -144,6 +147,7 @@ const imageSrc = getAssetPath('/images/eurovision.png');
 ## 4) Firestore Patterns (Gotchas)
 
 ### Timestamp Handling (Critical)
+
 ```ts
 // ❌ Wrong - causes errors
 players: [{ joinedAt: serverTimestamp() }]
@@ -156,6 +160,7 @@ players: [{ joinedAt: Timestamp.now() }]
 ```
 
 ### Listeners & Cleanup
+
 Services set up subscriptions and return clean unsubscribe functions. Components don't own Firestore lifecycles.
 
 ```ts
@@ -166,6 +171,7 @@ useEffect(() => {
 ```
 
 ### Race Conditions
+
 Batch/transaction score updates when simultaneous writes are possible (implement in `playerMutations.ts`).
 
 ---
@@ -180,8 +186,8 @@ One timing source of truth across the quiz; no duplicate interval logic in compo
 
 ## 6) Deployment Constraints (GitHub Pages)
 
-- **Base path**: `/escparty/` in production, `/` in dev (configured in `vite.config.ts`).  
-- **Router**: `HashRouter` (required for GitHub Pages).  
+- **Base path**: `/escparty/` in production, `/` in dev (configured in `vite.config.ts`).
+- **Router**: `HashRouter` (required for GitHub Pages).
 - **Always use `getAssetPath()`** for public assets.
 
 ```ts
@@ -247,6 +253,7 @@ Paste these above functions to steer code generation:
 ## 9) Migration Roadmap
 
 ### Phase 1 — Stabilize Core (Current)
+
 - [x] Add Zustand with persist middleware
 - [x] JSDoc documentation for complex logic
 - [ ] Remove dual-write (Zustand only)
@@ -256,6 +263,7 @@ Paste these above functions to steer code generation:
 - [ ] Unify quiz data source (`public/quizdata/*` only)
 
 ### Phase 2 — UI & Testing
+
 - [ ] Tailwind CSS migration
 - [ ] Minimal UI kit (Button, Card, Table, Banner)
 - [ ] Vitest unit tests + React Testing Library
@@ -263,6 +271,7 @@ Paste these above functions to steer code generation:
 - [ ] Component size enforcement (< 150 LOC)
 
 ### Phase 3 — Portfolio Polish
+
 - [ ] README with architecture diagram
 - [ ] Demo GIF + "What I learned" section
 - [ ] Accessibility audit
@@ -286,8 +295,9 @@ npm run deploy     # Build + deploy to gh-pages branch
 
 **Vitest** (unit, jsdom) and **Playwright** (e2e) are being introduced.  
 Once merged, follow:
-- Unit tests colocated as `*.test.ts[x]` or in `__tests__`.  
-- Minimal "happy path" Playwright tests for singleplayer and multiplayer join.  
+
+- Unit tests colocated as `*.test.ts[x]` or in `__tests__`.
+- Minimal "happy path" Playwright tests for singleplayer and multiplayer join.
 - A `TESTING.md` will define patterns in Phase 2.
 
 ---
@@ -303,4 +313,3 @@ Once merged, follow:
 ## One-Line Summary
 
 **Use Zustand (persisted) for session; Firestore (via services) for shared multiplayer; avoid new storage/navigation state; prefer Tailwind; keep components small; use `getAssetPath()`; use rAF timer hook.**
-

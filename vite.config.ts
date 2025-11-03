@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
@@ -6,7 +7,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base,
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     server: {
       // Configure server for better development experience
       host: true, // Listen on all local IPs
@@ -21,9 +22,9 @@ export default defineConfig(({ mode }) => {
           // Get better cache handling with content hashes
           entryFileNames: 'assets/[name]-[hash].js',
           chunkFileNames: 'assets/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash].[ext]'
-        }
-      }
-    }
+          assetFileNames: 'assets/[name]-[hash].[ext]',
+        },
+      },
+    },
   };
 });
