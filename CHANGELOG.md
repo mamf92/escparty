@@ -14,6 +14,12 @@
 ## [Unreleased]
 ### Added
 - Added host observer mode allowing quiz hosts to monitor players without participating (13 May 2025)
+- Added initial Zustand client store sketch for session and multiplayer state management (2026-05-16)
+- Added GitHub Actions CI workflow to run build and lint on PRs (2026-05-16)
+### Changed
+- Updated Home navigation: Single-player button now routes to `/select-difficulty` (2026-05-16)
+### Updated
+- Expanded repository Copilot instructions to document tech stack, env vars, CI guidance, and dev recommendations (2026-05-16)
 - Added dedicated HostObserverView component for better separation of concerns (14 May 2025)
 - Added player readiness tracking at mid-quiz scoreboard to ensure all participants are ready before continuing (14 May 2025)
 
@@ -23,6 +29,7 @@
 - Standardized button styling across components for better UI consistency (14 May 2025)
 
 ### Fixed
+- Fixed Zustand setup by adding the missing dependency and updating `useGameStore` typings/imports for strict TypeScript builds (2026-05-16)
 - Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
 - Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)
 - Removed unused interface definition in HostObserverView component (14 May 2025)
