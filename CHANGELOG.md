@@ -15,12 +15,9 @@
 - Added GitHub Actions CI workflow to run build and lint on PRs (2026-05-16)
 ### Changed
 - Updated Home navigation: Single-player button now routes to `/select-difficulty` (2026-05-16)
-### Updated
 - Expanded repository Copilot instructions to document tech stack, env vars, CI guidance, and dev recommendations (2026-05-16)
 - Added dedicated HostObserverView component for better separation of concerns (14 May 2025)
 - Added player readiness tracking at mid-quiz scoreboard to ensure all participants are ready before continuing (14 May 2025)
-
-### Changed
 - Simplified the host observer view UI by removing redundant status information (14 May 2025)
 - Improved player readiness indicator with checkmarks and simplified helper text (14 May 2025)
 - Standardized button styling across components for better UI consistency (14 May 2025)
@@ -30,12 +27,12 @@
 - Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
 - Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)
 - Removed unused interface definition in HostObserverView component (14 May 2025)
-- Quiz timer functionality that automatically submits after 10 seconds and progresses to next question
-- Visual timer countdown with color change warning when time is running low
-- Auto-progression to next question after time expires
-- Synchronized quiz progression to ensure all participants move to the next question at the same time
-- Automatic question progression with feedback stage between questions
-- Visual feedback for correct/incorrect answers with 5-second display
+- Fixed quiz timer functionality to automatically submit after 10 seconds and progress to the next question (13 May 2025)
+- Fixed visual timer countdown to warn with color changes when time is running low (13 May 2025)
+- Fixed question auto-progression after time expires (13 May 2025)
+- Fixed quiz progression synchronization so all participants move to the next question at the same time (13 May 2025)
+- Fixed automatic question progression with a feedback stage between questions (13 May 2025)
+- Fixed visual feedback behavior for correct/incorrect answers with a 5-second display (13 May 2025)
 - Added timer visibility toggle that hides timer when answer is submitted (13 May 2025)
 - Added proper loading and error states with UI components (13 May 2025)
 - Added high-precision time-based scoring system for multiplayer quizzes (13 May 2025)
