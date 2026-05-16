@@ -58,6 +58,27 @@ npm run dev
 ```
 Open your browser and follow the link provided in your terminal.
 
+### 🔑 Environment variables
+
+Copy `.env.example` to `.env.local` and fill in your Firebase project values. Vite exposes env vars that start with `VITE_`, and this project expects the following keys:
+
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_MEASUREMENT_ID` (optional)
+
+To use the local Firestore emulator during development, set `VITE_USE_FIREBASE_EMULATOR=true` in your `.env.local` and run the Firebase emulator suite. Do not commit `.env.local` to version control.
+
+Note: the Firestore emulator requires a working Java runtime on your system. If you see the error "Unable to locate a Java Runtime" install a JDK (e.g., from https://adoptium.net/) and ensure `java -version` works. Also authenticate the Firebase CLI with `firebase login` before starting emulators.
+
+Quick emulator start:
+```
+npm run emulators
+```
+
 ---
 
 ### 🌐 Live Demo

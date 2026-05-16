@@ -10,8 +10,34 @@
 
 ## [Unreleased]
 ### Added
+- Added host observer mode allowing quiz hosts to monitor players without participating (13 May 2025)
+- Added initial Zustand client store sketch for session and multiplayer state management (2026-05-16)
+- Added GitHub Actions CI workflow to run build and lint on PRs (2026-05-16)
+### Changed
+- Updated Home navigation: Single-player button now routes to `/select-difficulty` (2026-05-16)
+### Updated
+- Expanded repository Copilot instructions to document tech stack, env vars, CI guidance, and dev recommendations (2026-05-16)
+- Added dedicated HostObserverView component for better separation of concerns (14 May 2025)
+- Added player readiness tracking at mid-quiz scoreboard to ensure all participants are ready before continuing (14 May 2025)
 
 ### Changed
+- Simplified the host observer view UI by removing redundant status information (14 May 2025)
+- Improved player readiness indicator with checkmarks and simplified helper text (14 May 2025)
+- Standardized button styling across components for better UI consistency (14 May 2025)
+
+### Fixed
+- Fixed Zustand setup by adding the missing dependency and updating `useGameStore` typings/imports for strict TypeScript builds (2026-05-16)
+- Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
+- Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)
+- Removed unused interface definition in HostObserverView component (14 May 2025)
+- Quiz timer functionality that automatically submits after 10 seconds and progresses to next question
+- Visual timer countdown with color change warning when time is running low
+- Auto-progression to next question after time expires
+- Synchronized quiz progression to ensure all participants move to the next question at the same time
+- Automatic question progression with feedback stage between questions
+- Visual feedback for correct/incorrect answers with 5-second display
+- Added timer visibility toggle that hides timer when answer is submitted (13 May 2025)
+- Added proper loading and error states with UI components (13 May 2025)
 - Added high-precision time-based scoring system for multiplayer quizzes (13 May 2025)
 - Added millisecond precision timer for more accurate scoring calculation (13 May 2025)
 - Fixed Vercel deployment asset paths by switching Vite to use the root base path on Vercel builds (2026-05-16)
