@@ -1,4 +1,4 @@
-import create from 'zustand';
+import { create } from 'zustand';
 
 type Player = {
   id: string;
@@ -25,7 +25,7 @@ type GameState = {
   reset: () => void;
 };
 
-export const useGameStore = create<GameState>((set, get) => ({
+export const useGameStore = create<GameState>((set) => ({
   playerId: undefined,
   playerName: undefined,
   isHost: false,
@@ -36,16 +36,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       sessionStorage.setItem('playerId', id);
       sessionStorage.setItem('playerName', name);
       sessionStorage.setItem('isHost', JSON.stringify(isHost));
-    } catch (e) {
+    } catch {
       // ignore sessionStorage errors
     }
   },
-  setRoom: (room) => set((state) => ({ room: { ...state.room, ...room } })),
-  updatePlayerScore: (id, delta) =>
+  setRoom: (room: Partial<RoomState>) => set((state: GameState) => ({ room: { ...state.room, ...room } })),
+  updatePlayerScore: (id: string, delta: number) =>
     set((state) => ({
       room: {
         ...state.room,
-        players: state.room.players.map((p) => (p.id === id ? { ...p, score: (p.score || 0) + delta } : p)),
+        players: state.room.players.map((p: Player) => (p.id === id ? { ...p, score: (p.score || 0) + delta } : p)),
       },
     })),
   reset: () => {
@@ -55,7 +55,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       sessionStorage.removeItem('playerName');
       sessionStorage.removeItem('isHost');
       sessionStorage.removeItem('multiplayerGame');
-    } catch (e) {}
+    } catch {}
   },
 }));
 
@@ -67,7 +67,7 @@ try {
   if (playerId && playerName) {
     useGameStore.getState().setPlayer(playerId, playerName, JSON.parse(isHost || 'false'));
   }
-} catch (e) {
+} catch {
   // ignore
 }
 

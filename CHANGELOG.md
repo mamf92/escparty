@@ -29,6 +29,7 @@
 - Standardized button styling across components for better UI consistency (14 May 2025)
 
 ### Fixed
+- Fixed Zustand setup by adding the missing dependency and updating `useGameStore` typings/imports for strict TypeScript builds (2026-05-16)
 - Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
 - Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)
 - Removed unused interface definition in HostObserverView component (14 May 2025)
