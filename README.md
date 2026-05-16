@@ -86,6 +86,10 @@ npm run emulators
 Check out the deployed app here:  
 👉 [https://mamf92.github.io/escparty/](https://mamf92.github.io/escparty/)
 
+### 🌐 Vercel deploy note
+
+This app keeps the `/escparty/` base path for GitHub Pages, but automatically switches to `/` when Vercel builds it so the deployed assets load correctly there. That means the suggested `npx plugins add vercel/vercel-plugin` step is not necessary for this repo.
+
 ---
 
 ## 👤 Contact
