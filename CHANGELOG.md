@@ -10,11 +10,16 @@
 
 ## [Unreleased]
 ### Added
+- Added product manager custom agent for planning and progress tracking (2026-05-21)
+- Added short-term plan and long-term roadmap docs under plans/ (2026-05-21)
+- Added Project Board Cleanup prompt for GitHub Project backlog refresh (2026-05-21)
 - Added host observer mode allowing quiz hosts to monitor players without participating (13 May 2025)
 - Added initial Zustand client store sketch for session and multiplayer state management (2026-05-16)
 - Added GitHub Actions CI workflow to run build and lint on PRs (2026-05-16)
 ### Changed
 - Updated Home navigation: Single-player button now routes to `/select-difficulty` (2026-05-16)
+### Updated
+- Refreshed the long-term roadmap milestones and README to reflect the 2026-2027 product goals (2026-05-21)
 - Expanded repository Copilot instructions to document tech stack, env vars, CI guidance, and dev recommendations (2026-05-16)
 - Added dedicated HostObserverView component for better separation of concerns (14 May 2025)
 - Added player readiness tracking at mid-quiz scoreboard to ensure all participants are ready before continuing (14 May 2025)

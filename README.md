@@ -17,8 +17,12 @@ ESCParty brings the Eurovision hype to your fingertips. Whether you’re hosting
   - Test your own knowledge in a single player quiz
 
 **Upcoming Milestones:**
-- 🎶 *Song Discovery* – Explore national final entries and Eurovision finalists – Feature ready by **January 2025**
-- 📝 *Score Sheets* for rating songs live during the show – Functionality ready before the **Eurovision final (May 2026)**
+- Summer 2026: reliable single and multiplayer quiz live sync so everyone receives questions and answers at the same time
+- Fall 2026: host-led multiplayer quizzes plus single-player quiz selection by country, difficulty, and ESC-only sets with local content
+- Fall 2026: host-created quizzes by entering questions or selecting from existing banks, with the same filters (country, difficulty, ESC)
+- Winter 2026/2027: participating countries view with songs as available, sortable from most liked to least liked
+- Winter 2027: classic score sheets with shared live ratings and configurable categories (costume, staging, voice, show) or presets
+- Spring 2027: post-event analysis showing alignment and differences between participants
 
 ---
 
