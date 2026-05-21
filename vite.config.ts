@@ -2,7 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-  const base = mode === 'production' ? '/escparty/' : '/';
+  const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+  const base = isVercel ? '/' : mode === 'production' ? '/escparty/' : '/';
 
   return {
     base,
