@@ -6,6 +6,20 @@ The sheet shows tension ridges sloping from each shape's edge down to a flat bas
 
 This is a prototype, not a production component library.
 
+## Three screens
+
+The demo carries three ESCParty screens, switchable from the tab strip.
+
+| Screen | Source | What it shows off |
+| --- | --- | --- |
+| `difficulty` | `src/pages/SelectDifficulty.tsx` | Controls carrying a label and a blurb, with the real copy. |
+| `quiz` | `src/components/Quiz.tsx` | The full interaction state range and the correctness markers. |
+| `results` | `src/pages/QuizResults.tsx` | A ranked list where **elevation encodes rank**. |
+
+The results screen is the best argument for the whole idea.
+First place literally stands highest out of the sheet and last place is nearly flush with it, so the ranking is readable before you have read a single number.
+A flat list cannot do that.
+
 ## What it reimplements
 
 The **answer option list** from the ESCParty quiz: `OptionsContainer` and `OptionButton` in `src/components/Quiz.tsx`.
@@ -165,6 +179,24 @@ Making `pressed` the deepest point and `selected` shallower did the opposite, si
 - **The option rows are never tinted, in any state.**
   See below.
 
+## Sparkle is opt in
+
+Two modes, switched from the toolbar.
+
+| | Calm | Sparkle |
+| --- | --- | --- |
+| Material | felt | sequin |
+| Parallax | off | on, at full strength |
+| Camera | fixed modest tilt and yaw | dead on, motion supplies the depth |
+| Spring damping | 0.78, settles flat | 0.47, settles with a bounce |
+
+Calm is what everyone lands on, and that is a deliberate default rather than a modest one.
+Parallax is viewport coupled motion, which is exactly the thing that makes motion sensitive people ill, and the operating system already publishes that preference through `prefers-reduced-motion`.
+A system level reduced motion setting outranks the switch entirely: flipping to sparkle still swaps the material, but the parallax stays off.
+
+Calm is not a stripped down mode.
+Felt at a fixed tilt reads as depth without any motion at all, which is the point: the affordance survives turning every effect off.
+
 ## Materials
 
 Four presets, all deriving their colours from the app's token set.
@@ -189,15 +221,18 @@ Everything here stays procedural so that it can respond to the height field's ow
 
 ## Surfaces you cannot press
 
-Elevation means interactive.
+A control carries a **darker plate on its flat top**, and nothing else does.
 
-- **Raised** is something you can press.
-- **Debossed** is a label pressed into the material, like the question card.
+- **Raised with a plate** is something you can press.
+- **Raised and plain** is information, like the question panel.
+- **Pressed in** is chosen.
 - **Flat** is the ground.
 
+The plate stops exactly where the slope begins, using the same top face window as the marker tint, so it never smears down the side and never reads as a shadow.
+
 The alternative was to give non interactive surfaces a flat theme coloured cap, the same treatment as the marker glyphs.
-That was rejected on purpose: if every non interactive surface carries a colour, colour stops meaning "result" and the check and cross lose their punch.
-Shape carries the distinction instead, the same way it carries pressed versus raised.
+That was rejected: if every non interactive surface carries a colour, colour stops meaning "result" and the check and cross lose their punch.
+The plate costs no colour at all, which is why it can carry this without competing.
 
 ## Feedback without colour
 

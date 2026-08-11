@@ -1,28 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Leva } from 'leva';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import * as THREE from 'three';
 import { Link } from 'react-router-dom';
 import { loadQuizData, type QuizQuestion } from '../utils/QuizDataProvider';
 import CameraRig from './CameraRig';
-import FabricSurface, { type PointerState } from './FabricSurface';
-import {
-    CARD_ELEVATION_RATIO,
-    COLUMN_X,
-    DESIGN_HALF_WIDTH,
-    LAYOUT,
-    MARKER,
-    MAX_FEATURES,
-    OPTION_COUNT,
-    POINTER_DIMPLE_RADIUS,
-    POINTER_DIMPLE_RATIO,
-    SLOT,
-    STATE_ELEVATION,
-    TRAY_ELEVATION_RATIO,
-} from './constants';
+import FabricSurface from './FabricSurface';
+import { OPTION_COUNT } from './constants';
 import { createOverlayBridge } from './overlayBridge';
-import type { FabricFeature, OptionState } from './types';
+import {
+    DIFFICULTIES,
+    buildDifficultyScreen,
+    buildQuizScreen,
+    buildResultsScreen,
+    type OverlayItem,
+    type ScreenId,
+    type ScreenStyle,
+} from './screens';
+import type { OptionState } from './types';
 import { useFabricControls } from './useFabricControls';
 import { useParallax } from './useParallax';
 
@@ -34,29 +30,37 @@ function toLinear(hex: string): [number, number, number] {
     return [colorScratch.r, colorScratch.g, colorScratch.b];
 }
 
-const NO_TINT: [number, number, number] = [0, 0, 0];
+const SCREENS: ScreenId[] = ['difficulty', 'quiz', 'results'];
+
+/** Stand in leaderboard, in the shape src/pages/QuizResults.tsx renders. */
+const LEADERBOARD = [
+    { name: 'Martin', score: 4 },
+    { name: 'Ingrid', score: 3 },
+    { name: 'Johan', score: 2 },
+    { name: 'Elin', score: 1 },
+];
 
 export default function FabricQuizDemo() {
-    const controls = useFabricControls();
+    const { values: controls, setSparkle } = useFabricControls();
     const { offset: parallax, needsPermission, requestMotion } = useParallax(
         controls.parallax,
         controls.parallaxStrength,
     );
 
+    const [screen, setScreen] = useState<ScreenId>('quiz');
     const [questions, setQuestions] = useState<QuizQuestion[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [index, setIndex] = useState(0);
     const [selected, setSelected] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState(false);
-    const [hovered, setHovered] = useState<number | null>(null);
-    const [focused, setFocused] = useState<number | null>(null);
-    const [pressed, setPressed] = useState<number | null>(null);
-    const [submitPressed, setSubmitPressed] = useState(false);
-    const [submitActive, setSubmitActive] = useState(false);
     const [score, setScore] = useState(0);
+    const [difficulty, setDifficulty] = useState<number | null>(null);
+
+    // Pointer and keyboard state, shared by every screen's controls.
+    const [hovered, setHovered] = useState<string | null>(null);
+    const [pressed, setPressed] = useState<string | null>(null);
 
     const bridge = useMemo(() => createOverlayBridge(), []);
-    const pointer = useRef<PointerState>({ inside: false, down: false, px: 0, py: 0 });
     const stageRef = useRef<HTMLDivElement>(null);
 
     // Real content, loaded through the app's own provider rather than copied.
@@ -82,21 +86,29 @@ export default function FabricQuizDemo() {
         [question],
     );
 
-    const optionStates = useMemo<OptionState[]>(() => {
-        return Array.from({ length: OPTION_COUNT }, (_, i) => {
-            const option = options[i];
-            if (option === undefined) return 'idle';
-            if (submitted) {
-                if (option === question?.correctAnswer) return 'correct';
-                if (option === selected) return 'incorrect';
-                return 'idle';
-            }
-            if (pressed === i) return 'pressed';
-            if (selected === option) return 'selected';
-            if (hovered === i || focused === i) return 'hover';
+    const style: ScreenStyle = useMemo(
+        () => ({
+            elevation: controls.elevation,
+            shapeWidth: controls.shapeWidth,
+            shapeHeight: controls.shapeHeight,
+            cornerRadius: controls.cornerRadius,
+            falloff: controls.falloff,
+            tension: controls.tension,
+            topShade: controls.topShade,
+        }),
+        [controls],
+    );
+
+    /** Shared state resolver, so every control on every screen behaves alike. */
+    const controlState = useCallback(
+        (key: string, isSelected: boolean): OptionState => {
+            if (pressed === key) return 'pressed';
+            if (isSelected) return 'selected';
+            if (hovered === key) return 'hover';
             return 'idle';
-        });
-    }, [options, submitted, question, selected, pressed, hovered, focused]);
+        },
+        [pressed, hovered],
+    );
 
     const markerTints = useMemo(
         () => ({
@@ -106,142 +118,89 @@ export default function FabricQuizDemo() {
         [controls.accentColor, controls.wrongColor],
     );
 
-    const correctIndex = options.findIndex((o) => o === question?.correctAnswer);
-    const wrongIndex = options.findIndex((o) => o === selected && o !== question?.correctAnswer);
-
-    const features = useMemo<FabricFeature[]>(() => {
-        const {
-            elevation,
-            shapeWidth,
-            shapeHeight,
-            cornerRadius,
-            falloff,
-            tension,
-            showTray,
-        } = controls;
-
-        const shared = { falloff, tension, cornerRadius };
-        const list: FabricFeature[] = new Array(MAX_FEATURES);
-
-        list[SLOT.questionCard] = {
-            ...shared,
-            active: true,
-            shape: 'rect',
-            center: [...LAYOUT.questionCard.center],
-            halfSize: [...LAYOUT.questionCard.halfSize],
-            cornerRadius: LAYOUT.questionCard.radius,
-            elevation: elevation * CARD_ELEVATION_RATIO,
-            tint: NO_TINT,
-            tintStrength: 0,
-        };
-
-        list[SLOT.tray] = {
-            ...shared,
-            active: showTray,
-            shape: 'rect',
-            center: [...LAYOUT.tray.center],
-            halfSize: [...LAYOUT.tray.halfSize],
-            cornerRadius: LAYOUT.tray.radius,
-            elevation: elevation * TRAY_ELEVATION_RATIO,
-            tint: NO_TINT,
-            tintStrength: 0,
-        };
-
-        // No tint on an option, in any state. Whether it is raised or pressed is
-        // the only thing its surface says, and a colour shift competes with
-        // that: a lighter patch reads as nearer, which fights the press.
-        for (let i = 0; i < OPTION_COUNT; i++) {
-            list[SLOT.option + i] = {
-                ...shared,
-                active: i < options.length,
-                shape: 'rect',
-                center: [COLUMN_X, LAYOUT.optionRowY[i]],
-                halfSize: [shapeWidth, shapeHeight],
-                elevation: elevation * STATE_ELEVATION[optionStates[i]],
-                tint: NO_TINT,
-                tintStrength: 0,
-            };
+    const build = useMemo(() => {
+        if (screen === 'difficulty') {
+            return buildDifficultyScreen({
+                style,
+                states: DIFFICULTIES.map((d, i) => controlState(`difficulty-${d.id}`, difficulty === i)),
+                onSelect: (i) => {
+                    setDifficulty(i);
+                    setScreen('quiz');
+                },
+                onHover: (i, on) => setHovered(on ? `difficulty-${DIFFICULTIES[i].id}` : null),
+                onPress: (i, on) => setPressed(on ? `difficulty-${DIFFICULTIES[i].id}` : null),
+            });
         }
 
-        const submitState: OptionState = submitPressed
-            ? 'pressed'
-            : submitActive
-                ? 'hover'
-                : 'idle';
+        if (screen === 'results') {
+            return buildResultsScreen({
+                style,
+                score,
+                total: questions.length || 10,
+                rows: LEADERBOARD,
+                againState: controlState('again', false),
+                onAgain: () => {
+                    setScore(0);
+                    setIndex(0);
+                    setSelected(null);
+                    setSubmitted(false);
+                    setScreen('difficulty');
+                },
+                onHoverAgain: (on) => setHovered(on ? 'again' : null),
+                onPressAgain: (on) => setPressed(on ? 'again' : null),
+            });
+        }
 
-        list[SLOT.submit] = {
-            ...shared,
-            active: true,
-            shape: 'rect',
-            center: [...LAYOUT.submit.center],
-            halfSize: [...LAYOUT.submit.halfSize],
-            cornerRadius: LAYOUT.submit.radius,
-            elevation: elevation * STATE_ELEVATION[submitState],
-            tint: NO_TINT,
-            tintStrength: 0,
-        };
+        const optionStates: OptionState[] = Array.from({ length: OPTION_COUNT }, (_, i) => {
+            const option = options[i];
+            if (option === undefined) return 'idle';
+            if (submitted) {
+                if (option === question?.correctAnswer) return 'correct';
+                if (option === selected) return 'incorrect';
+                return 'idle';
+            }
+            return controlState(`option-${option}`, selected === option);
+        });
 
-        list[SLOT.pointer] = {
-            ...shared,
-            active: true,
-            shape: 'circle',
-            additive: true,
-            center: [0, 0],
-            halfSize: [POINTER_DIMPLE_RADIUS, POINTER_DIMPLE_RADIUS],
-            cornerRadius: 0,
-            elevation: elevation * POINTER_DIMPLE_RATIO,
-            falloff: falloff * 1.6,
-            tint: NO_TINT,
-            tintStrength: 0,
-        };
-
-        // Marker glyphs. Hard edged, untextured and standing proud of the
-        // options, in the gutter the content column leaves free. Their x tracks
-        // the option width so widening the options never collides with them.
-        const markerX = Math.max(
-            COLUMN_X - shapeWidth - MARKER.gap - MARKER.halfSize[0],
-            -(DESIGN_HALF_WIDTH - MARKER.halfSize[0] - 0.04),
-        );
-        const marker = {
-            ...shared,
-            shape: 'check' as const,
-            halfSize: [...MARKER.halfSize] as [number, number],
-            // For a glyph this carries the stroke half thickness, which is also
-            // the radius of its round caps.
-            cornerRadius: MARKER.halfSize[1] * MARKER.strokeRatio,
-            elevation: elevation * MARKER.elevationRatio,
-            falloff: falloff * MARKER.falloffRatio,
-            tension: 1,
-            tintStrength: 1,
-            matte: true,
-        };
-
-        list[SLOT.correctMarker] = {
-            ...marker,
-            active: submitted && correctIndex >= 0,
-            center: [markerX, LAYOUT.optionRowY[Math.max(correctIndex, 0)]],
-            tint: markerTints.correct,
-        };
-
-        list[SLOT.wrongMarker] = {
-            ...marker,
-            shape: 'cross',
-            active: submitted && wrongIndex >= 0,
-            center: [markerX, LAYOUT.optionRowY[Math.max(wrongIndex, 0)]],
-            tint: markerTints.wrong,
-        };
-
-        return list;
+        return buildQuizScreen({
+            style,
+            question: question?.question ?? 'Loading quiz...',
+            options,
+            optionStates,
+            submitState: controlState('submit', false),
+            submitLabel: submitted ? 'Next question' : 'Submit answer',
+            submitDisabled: !submitted && !selected,
+            correctIndex: options.findIndex((o) => o === question?.correctAnswer),
+            wrongIndex: options.findIndex((o) => o === selected && o !== question?.correctAnswer),
+            submitted,
+            correctTint: markerTints.correct,
+            wrongTint: markerTints.wrong,
+            onSelectOption: (i) => {
+                if (!submitted) setSelected(options[i]);
+            },
+            onHoverOption: (i, on) => setHovered(on ? `option-${options[i]}` : null),
+            onPressOption: (i, on) => setPressed(on ? `option-${options[i]}` : null),
+            onSubmit: () => {
+                if (submitted) {
+                    setSubmitted(false);
+                    setSelected(null);
+                    if (index + 1 >= questions.length) {
+                        setScreen('results');
+                    } else {
+                        setIndex(index + 1);
+                    }
+                    return;
+                }
+                if (!selected) return;
+                if (selected === question?.correctAnswer) setScore((prev) => prev + 1);
+                setSubmitted(true);
+            },
+            onHoverSubmit: (on) => setHovered(on ? 'submit' : null),
+            onPressSubmit: (on) => setPressed(on ? 'submit' : null),
+        });
     }, [
-        controls,
-        optionStates,
-        options.length,
-        submitPressed,
-        submitActive,
-        markerTints,
-        submitted,
-        correctIndex,
-        wrongIndex,
+        screen, style, controlState, difficulty, score, questions.length,
+        options, submitted, question, selected, markerTints, index,
     ]);
 
     const registerElement = useCallback(
@@ -251,39 +210,14 @@ export default function FabricQuizDemo() {
         [bridge],
     );
 
-    const updatePointer = useCallback((event: React.PointerEvent) => {
-        const stage = stageRef.current;
-        if (!stage) return;
-        const rect = stage.getBoundingClientRect();
-        pointer.current.px = event.clientX - rect.left;
-        pointer.current.py = event.clientY - rect.top;
-        pointer.current.inside = true;
-    }, []);
-
-    const handleSelect = useCallback(
-        (option: string) => {
-            if (submitted) return;
-            setSelected(option);
-        },
-        [submitted],
-    );
-
-    const handleSubmit = useCallback(() => {
-        if (submitted) {
-            setSubmitted(false);
-            setSelected(null);
-            setPressed(null);
-            setIndex((prev) => (questions.length ? (prev + 1) % questions.length : 0));
-            return;
-        }
-        if (!selected) return;
-        if (selected === question?.correctAnswer) setScore((prev) => prev + 1);
-        setSubmitted(true);
-    }, [submitted, selected, question, questions.length]);
-
-    const optionKeyDown = useCallback((i: number) => (event: React.KeyboardEvent) => {
-        if (event.key === ' ' || event.key === 'Enter') setPressed(i);
-    }, []);
+    // Slots not used by the current screen must not keep a stale element, or the
+    // surface would go on writing transforms onto something that has unmounted.
+    useEffect(() => {
+        const used = new Set(build.items.map((item) => item.slot));
+        bridge.elements.forEach((_, i) => {
+            if (!used.has(i)) bridge.elements[i] = null;
+        });
+    }, [build, bridge]);
 
     if (loadError) {
         return (
@@ -298,102 +232,67 @@ export default function FabricQuizDemo() {
 
     return (
         <Page>
-            <Leva titleBar={{ title: 'Fabric UI' }} collapsed={false} />
+            <Leva titleBar={{ title: 'Fabric UI' }} collapsed />
 
             <Header>
                 <Title>Fabric UI</Title>
                 <Subtitle>
-                    The answer option list from the ESCParty quiz, rebuilt as shapes pushing
-                    through a stretched membrane. Question {index + 1} of {questions.length || '...'},
-                    score {score}.
+                    Three ESCParty screens rebuilt as shapes pushing through a stretched
+                    membrane. Elevation is the affordance: raised with a darker plate is a
+                    control, raised and plain is information, pressed in is chosen.
                 </Subtitle>
             </Header>
 
-            <Stage
-                ref={stageRef}
-                onPointerMove={updatePointer}
-                onPointerDown={(event) => {
-                    updatePointer(event);
-                    pointer.current.down = true;
-                }}
-                onPointerUp={() => {
-                    pointer.current.down = false;
-                }}
-                onPointerLeave={() => {
-                    pointer.current.inside = false;
-                    pointer.current.down = false;
-                    setHovered(null);
-                }}
-            >
+            <Toolbar>
+                <ScreenTabs role="tablist" aria-label="Demo screen">
+                    {SCREENS.map((id) => (
+                        <Tab
+                            key={id}
+                            type="button"
+                            role="tab"
+                            aria-selected={screen === id}
+                            $active={screen === id}
+                            onClick={() => setScreen(id)}
+                        >
+                            {id}
+                        </Tab>
+                    ))}
+                </ScreenTabs>
+
+                <SparkleToggle
+                    type="button"
+                    role="switch"
+                    aria-checked={controls.sparkle}
+                    $on={controls.sparkle}
+                    onClick={() => setSparkle(!controls.sparkle)}
+                >
+                    {controls.sparkle ? 'Calm it down' : 'Make it sparkle'}
+                </SparkleToggle>
+            </Toolbar>
+
+            <Stage ref={stageRef}>
                 <Canvas
                     orthographic
                     dpr={[1, 1.75]}
                     gl={{ antialias: true }}
                     camera={{ position: [0, 3, 7], zoom: 140, near: 0.1, far: 40 }}
                 >
-                    <CameraRig tilt={controls.cameraTilt} yaw={controls.cameraYaw} parallax={parallax} />
-                    <FabricSurface
-                        features={features}
-                        optionStates={optionStates}
-                        controls={controls}
-                        bridge={bridge}
-                        pointer={pointer}
+                    <CameraRig
+                        tilt={controls.cameraTilt}
+                        yaw={controls.cameraYaw}
+                        parallax={parallax}
                     />
+                    <FabricSurface features={build.features} controls={controls} bridge={bridge} />
                 </Canvas>
 
                 <Overlay>
-                    <QuestionLabel ref={registerElement(SLOT.questionCard)}>
-                        {question?.question ?? 'Loading quiz...'}
-                    </QuestionLabel>
-
-                    <div role="group" aria-labelledby="fabric-question-text">
-                        {options.map((option, i) => (
-                            <OptionButton
-                                key={option}
-                                ref={registerElement(SLOT.option + i)}
-                                type="button"
-                                disabled={submitted}
-                                aria-pressed={selected === option}
-                                onClick={() => handleSelect(option)}
-                                onPointerEnter={() => setHovered(i)}
-                                onPointerLeave={() => {
-                                    setHovered((prev) => (prev === i ? null : prev));
-                                    setPressed((prev) => (prev === i ? null : prev));
-                                }}
-                                onPointerDown={() => setPressed(i)}
-                                onPointerUp={() => setPressed(null)}
-                                onPointerCancel={() => setPressed(null)}
-                                onFocus={() => setFocused(i)}
-                                onBlur={() => setFocused((prev) => (prev === i ? null : prev))}
-                                onKeyDown={optionKeyDown(i)}
-                                onKeyUp={() => setPressed(null)}
-                            >
-                                {option}
-                            </OptionButton>
-                        ))}
-                    </div>
-
-                    <SubmitButton
-                        ref={registerElement(SLOT.submit)}
-                        type="button"
-                        disabled={!submitted && !selected}
-                        onClick={handleSubmit}
-                        onPointerEnter={() => setSubmitActive(true)}
-                        onPointerLeave={() => {
-                            setSubmitActive(false);
-                            setSubmitPressed(false);
-                        }}
-                        onPointerDown={() => setSubmitPressed(true)}
-                        onPointerUp={() => setSubmitPressed(false)}
-                        onFocus={() => setSubmitActive(true)}
-                        onBlur={() => setSubmitActive(false)}
-                        onKeyDown={(event) => {
-                            if (event.key === ' ' || event.key === 'Enter') setSubmitPressed(true);
-                        }}
-                        onKeyUp={() => setSubmitPressed(false)}
-                    >
-                        {submitted ? 'Next question' : 'Submit answer'}
-                    </SubmitButton>
+                    {build.items.map((item) => (
+                        <OverlayElement
+                            key={item.key}
+                            item={item}
+                            register={registerElement(item.slot)}
+                        />
+                    ))}
                 </Overlay>
             </Stage>
 
@@ -403,16 +302,51 @@ export default function FabricQuizDemo() {
                         Enable motion parallax
                     </MotionButton>
                 )}
-                <StateRow aria-live="polite">
-                    {optionStates.slice(0, options.length).map((state, i) => (
-                        <StateChip key={options[i]} $state={state}>
-                            {state}
-                        </StateChip>
-                    ))}
-                </StateRow>
                 <BackLink to="/">Back to ESCParty</BackLink>
             </Footer>
         </Page>
+    );
+}
+
+interface OverlayElementProps {
+    item: OverlayItem;
+    register: (el: HTMLElement | null) => void;
+}
+
+function OverlayElement({ item, register }: OverlayElementProps) {
+    if (!item.interactive) {
+        return (
+            <PlateauLabel ref={register} $lead={item.scale === 'lead'}>
+                <span>{item.text}</span>
+                {item.sub && <Sub>{item.sub}</Sub>}
+            </PlateauLabel>
+        );
+    }
+    return (
+        <PlateauButton
+            ref={register}
+            type="button"
+            disabled={item.disabled}
+            aria-pressed={item.selected}
+            onClick={item.onSelect}
+            onPointerEnter={() => item.onHover?.(true)}
+            onPointerLeave={() => {
+                item.onHover?.(false);
+                item.onPress?.(false);
+            }}
+            onPointerDown={() => item.onPress?.(true)}
+            onPointerUp={() => item.onPress?.(false)}
+            onPointerCancel={() => item.onPress?.(false)}
+            onFocus={() => item.onHover?.(true)}
+            onBlur={() => item.onHover?.(false)}
+            onKeyDown={(event) => {
+                if (event.key === ' ' || event.key === 'Enter') item.onPress?.(true);
+            }}
+            onKeyUp={() => item.onPress?.(false)}
+        >
+            <span>{item.text}</span>
+            {item.sub && <Sub>{item.sub}</Sub>}
+        </PlateauButton>
     );
 }
 
@@ -431,7 +365,7 @@ const Page = styled.div`
 `;
 
 const Header = styled.header`
-  max-width: 36rem;
+  max-width: 38rem;
   text-align: center;
 `;
 
@@ -448,6 +382,48 @@ const Subtitle = styled.p`
   font-size: 0.85rem;
   line-height: 1.5;
   opacity: 0.75;
+`;
+
+const Toolbar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+`;
+
+const ScreenTabs = styled.div`
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(213, 184, 230, 0.12);
+`;
+
+const Tab = styled.button<{ $active: boolean }>`
+  font-family: ${({ theme }) => theme.fonts.body};
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.85rem;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  background: ${({ $active, theme }) => ($active ? theme.colors.amethyst : 'transparent')};
+  color: ${({ $active, theme }) => ($active ? theme.colors.nightblue : theme.colors.pinkLavender)};
+`;
+
+const SparkleToggle = styled.button<{ $on: boolean }>`
+  font-family: ${({ theme }) => theme.fonts.heading};
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 0.0625rem solid ${({ theme }) => theme.colors.accentorange}; /* 1px */
+  background: ${({ $on, theme }) => ($on ? theme.colors.accentorange : 'transparent')};
+  color: ${({ $on, theme }) => ($on ? theme.colors.nightblue : theme.colors.accentorange)};
 `;
 
 const Stage = styled.div`
@@ -469,78 +445,62 @@ const Overlay = styled.div`
 `;
 
 /**
- * Every overlay element is placed by the surface each frame, so it starts at
- * the stage origin and is moved purely by transform.
+ * Every overlay element is placed by the surface each frame with a full affine
+ * matrix, so it starts at the stage origin with its own top left as the
+ * transform origin and is moved entirely by that matrix.
  */
-const Plateau = styled.div`
+const plateau = css`
   position: absolute;
   left: 0;
   top: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  padding: 0 0.75rem;
-  transform-origin: 0 0;
-  will-change: transform;
-`;
-
-const QuestionLabel = styled(Plateau).attrs({ id: 'fabric-question-text', role: 'heading', 'aria-level': 2 })`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1.3;
-  color: ${({ theme }) => theme.colors.white};
-  text-shadow: 0 1px 3px rgba(7, 9, 38, 0.55);
-`;
-
-const fabricButton = `
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  gap: 0.15rem;
   text-align: center;
   padding: 0 0.9rem;
+  transform-origin: 0 0;
+  will-change: transform;
+  color: ${({ theme }) => theme.colors.white};
+  text-shadow: 0 0.0625rem 0.1875rem rgba(7, 9, 38, 0.65); /* 1px 3px */
+`;
+
+const PlateauLabel = styled.div<{ $lead: boolean }>`
+  ${plateau}
+  font-family: ${({ theme, $lead }) => ($lead ? theme.fonts.heading : theme.fonts.body)};
+  font-size: ${({ $lead }) => ($lead ? '0.95rem' : '0.85rem')};
+  font-weight: 700;
+  line-height: 1.25;
+`;
+
+const PlateauButton = styled.button`
+  ${plateau}
   pointer-events: auto;
   background: transparent;
   border: none;
   cursor: pointer;
-  transform-origin: 0 0;
-  will-change: transform;
-  font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(7, 9, 38, 0.6);
-
-  &:focus-visible {
-    outline: 0.1875rem solid #7af5bf; /* 3px */
-    outline-offset: 0.25rem;
-    border-radius: 0.5rem;
-  }
-`;
-
-const OptionButton = styled.button`
-  ${fabricButton}
   font-family: ${({ theme }) => theme.fonts.body};
   font-size: 0.85rem;
+  font-weight: 700;
   line-height: 1.2;
 
   &:disabled {
     cursor: default;
   }
+
+  &:focus-visible {
+    outline: 0.1875rem solid ${({ theme }) => theme.colors.accentmint}; /* 3px */
+    outline-offset: 0.25rem;
+    border-radius: 0.5rem;
+  }
 `;
 
-const SubmitButton = styled.button`
-  ${fabricButton}
-  font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 0.9rem;
-  letter-spacing: 0.04em;
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-  }
+const Sub = styled.span`
+  font-family: ${({ theme }) => theme.fonts.body};
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.8;
 `;
 
 const Footer = styled.footer`
@@ -548,32 +508,6 @@ const Footer = styled.footer`
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-`;
-
-const StateRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  justify-content: center;
-`;
-
-const STATE_CHIP_COLOR: Record<OptionState, string> = {
-    idle: '#59595D',
-    hover: '#A56DC6',
-    pressed: '#73168C',
-    selected: '#D5B8E6',
-    correct: '#7AF5BF',
-    incorrect: '#dc3545',
-};
-
-const StateChip = styled.span<{ $state: OptionState }>`
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  color: ${({ theme }) => theme.colors.nightblue};
-  background: ${({ $state }) => STATE_CHIP_COLOR[$state]};
 `;
 
 const MotionButton = styled.button`

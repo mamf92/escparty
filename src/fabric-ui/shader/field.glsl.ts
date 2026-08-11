@@ -34,6 +34,15 @@ uniform float uAdditive[MAX_FEATURES];
  * solid object sitting in the fabric rather than as more fabric.
  */
 uniform float uMatte[MAX_FEATURES];
+/**
+ * Darkens a feature's flat top only, leaving its sloped sides alone.
+ *
+ * This is what marks a surface as pressable. A raised panel with a plain top is
+ * information, a raised panel with a darker plate on it is a control, and the
+ * distinction costs no colour, so it never competes with the correct and wrong
+ * markers.
+ */
+uniform float uTopShade[MAX_FEATURES];
 
 /** Blend width of the smooth maximum used where features overlap. */
 uniform float uBlend;
@@ -43,6 +52,7 @@ struct Field {
   vec3  tint;   // influence weighted feature colour
   float tintW;  // how strongly that colour applies, 0 on the bare sheet
   float matte;  // how much to suppress the woven surface detail
+  float shade;  // darkening applied to the flat top only
 };
 
 float sdRoundRect(vec2 p, vec2 b, float r) {
@@ -139,6 +149,7 @@ Field fieldAt(vec2 p) {
   vec3  tintAcc = vec3(0.0);
   float tintW = 0.0;
   float matte = 0.0;
+  float shade = 0.0;
 
   for (int i = 0; i < MAX_FEATURES; i++) {
     if (uActive[i] < 0.5) continue;
@@ -170,6 +181,9 @@ Field fieldAt(vec2 p) {
     // The matte flag is the opposite case. It covers the sides too, since the
     // whole glyph is one hard object, and fades the weave back in at the toe.
     matte = max(matte, w * uMatte[i]);
+    // Same top face window as the tint, so the plate stops where the slope
+    // begins rather than smearing down the side.
+    shade = max(shade, smoothstep(0.62, 0.95, w) * uTopShade[i]);
   }
 
   Field f;
@@ -177,6 +191,7 @@ Field fieldAt(vec2 p) {
   f.tint = tintW > 1e-4 ? tintAcc / tintW : vec3(0.0);
   f.tintW = clamp(tintW, 0.0, 1.0);
   f.matte = clamp(matte, 0.0, 1.0);
+  f.shade = clamp(shade, 0.0, 1.0);
   return f;
 }
 `;

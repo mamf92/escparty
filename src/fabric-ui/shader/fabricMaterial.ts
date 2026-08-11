@@ -236,6 +236,7 @@ void main() {
 
   vec3 base = mix(uBaseColor, f.tint, f.tintW);
   base += thin * 0.055;
+  base *= 1.0 - f.shade;
 
   // Cheap contact shading so the sunken tray reads as a well rather than a
   // flat darker patch.

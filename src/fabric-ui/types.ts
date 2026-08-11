@@ -40,6 +40,10 @@ export interface FabricFeature {
      * ridges across this feature's plateau and tightens its highlight.
      */
     matte?: boolean;
+    /** Darkens the flat top only. Marks a surface as pressable. */
+    topShade?: number;
+    /** Set true for one frame's worth of state change to fire the shake. */
+    shake?: boolean;
 }
 
 /**

@@ -9,17 +9,6 @@
 /** Uniform array size in the shader. Fixed so the feature loop can be unrolled. */
 export const MAX_FEATURES = 10;
 
-/** Fixed slot per feature so uniform writes never need to reorder. */
-export const SLOT = {
-    questionCard: 0,
-    tray: 1,
-    option: 2, // occupies slots 2, 3, 4, 5
-    submit: 6,
-    pointer: 7,
-    correctMarker: 8,
-    wrongMarker: 9,
-} as const;
-
 export const OPTION_COUNT = 4;
 
 /**
@@ -57,7 +46,6 @@ export const COLUMN_X = 0.24;
 /** Static layout of the quiz surface, in plane units. */
 export const LAYOUT = {
     questionCard: { center: [COLUMN_X, 1.4] as [number, number], halfSize: [1.54, 0.34] as [number, number], radius: 0.14 },
-    tray: { center: [COLUMN_X, 0] as [number, number], halfSize: [1.62, 0.99] as [number, number], radius: 0.2 },
     /** Option row centres, top to bottom. */
     optionRowY: [0.66, 0.22, -0.22, -0.66],
     submit: { center: [COLUMN_X, -1.44] as [number, number], halfSize: [1.24, 0.26] as [number, number], radius: 0.13 },
@@ -106,28 +94,6 @@ export const STATE_ELEVATION = {
     incorrect: -1.05,
 } as const;
 
-/**
- * Depth of the optional sunken tray the options sit inside.
- *
- * Must stay shallower than the shallowest sunken state, which is `selected` at
- * -0.2667. Negative contributions combine with a smooth minimum, so a tray
- * deeper than a selected option swallows it flush into the tray floor and it
- * loses all of its relief.
- */
-export const TRAY_ELEVATION_RATIO = -0.18;
-/**
- * The question card is debossed, not raised.
- *
- * The rule the demo settles on is that elevation means interactive: raised is
- * something you can press, debossed is a label pressed into the material, and
- * flat is the ground. Giving a non interactive surface a coloured cap like the
- * marker glyphs was the other option, but then colour stops meaning "result"
- * and the check and cross lose their punch.
- */
-export const CARD_ELEVATION_RATIO = -0.32;
-/** Local dimple that follows the pointer while an option is held down. */
-export const POINTER_DIMPLE_RATIO = -0.6;
-export const POINTER_DIMPLE_RADIUS = 0.16;
 
 /** Horizontal shake applied to an incorrect option, in plane units. */
 export const SHAKE_AMPLITUDE = 0.055;
