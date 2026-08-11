@@ -62,7 +62,10 @@ The knee width is what `tension` drives: wide knees give a soft rubbery S curve,
 Positive and negative contributions accumulate separately, so a raised option inside a sunken tray rests on the tray floor instead of cancelling against it.
 Within each sign a smooth maximum stops two adjacent options from stacking into one tall mound.
 
-The camera sits at negative Y, so the near edge of the sheet is the bottom of the screen.
+The camera sits at negative Y and swings a little to the left, so the near edge of the sheet is the bottom of the screen and each shape shows two side faces rather than one.
+Being off both axes is what carries the depth; shading on its own is ambiguous.
+
+The negative Y in particular is load bearing.
 This is what makes a raised element read as raised: each shape's near slope expands down the screen into a visible band while its far slope hides behind the plateau, which is what a protrusion looks like.
 From positive Y the reverse happens, the visible band sits above every element, and the eye reads the result as a dent.
 It also decouples elevation from tilt, since from positive Y the near slope folds under itself once `tan(tilt)` exceeds `falloff / elevation`.
@@ -77,6 +80,11 @@ This gives crisp type, a working tab order, screen reader support, and no raycas
 
 Per feature, an independent critically underdamped spring drives current elevation toward target elevation.
 Release is never tweened, since an ease-out lands dead and reads as a plastic button.
+
+`selected` is the resting pushed in depth, and `pressed` sits deeper than it.
+Holding an option therefore drives it past where it will end up, and letting go settles it back onto the full depth with one small bounce.
+Measured on the overlay's screen position: idle to held is 21px, and release settles at 18px after overshooting to 17px.
+Making `pressed` the deepest point and `selected` shallower did the opposite, sinking the option on click and then raising it to a half depth, which read as the press failing to take.
 
 ### Files
 
@@ -133,7 +141,8 @@ Release is never tweened, since an ease-out lands dead and reads as a plastic bu
 | Control | What it does |
 | --- | --- |
 | `lightPosition` | World position of the key light. Keep the Z component well below X and Y. A light close to head-on darkens every slope regardless of which way it faces, which removes the difference between an up facing and a down facing slope and makes shapes read as dents. Moving it toward one axis makes that thread direction dominate the weave. |
-| `cameraTilt` | Degrees away from looking straight down the sheet's normal. At 0 the slopes are hard to read. It no longer trades against `elevation`. Capped at 35, which is the widest tilt the plane still fills. |
+| `cameraTilt` | Degrees the camera drops below the sheet's normal. At 0 the slopes are hard to read. It no longer trades against `elevation`. Capped at 35, which is the widest angle the plane still fills. |
+| `cameraYaw` | Degrees the camera swings left of the sheet's normal. Positive is left. Off both axes each shape shows two side faces instead of one, which reads as depth far more strongly than shading alone. |
 | `showTray` | Whether the options sit inside a sunken well. Off by default. |
 
 ## Deliberate deviations from the brief
@@ -163,10 +172,15 @@ Correctness is called out separately, by a marker glyph in the left gutter:
   `incorrectRed`.
 
 The glyphs are `matte` features. The weave and the tension ridges are suppressed
-across their plateau and their highlight tightens, so they read as hard objects
-sitting in the fabric rather than as more fabric.
-They stand proud of the options, and their x position tracks the option width so
-the gutter never collides.
+across them and their highlight tightens, so they read as hard objects sitting in
+the fabric rather than as more fabric.
+Their corners are rounded to match the rest of the UI, and their x position
+tracks the option width so the gutter never collides.
+
+Colour is confined to the top face. A broader mask lets it run down the extruded
+sides, which reads as a glow bleeding off the glyph instead of a flat coloured
+cap. The transition window is a few pixels wide, enough to stay antialiased
+without smearing.
 
 `correctGreen` was already in the theme and unused by the app, which reaches for
 the much darker `accentgreen`.
@@ -188,6 +202,8 @@ Inactive feature slots take a uniform branch, which is coherent across the whole
 
 Plane subdivision is the one number worth being careful with.
 The membrane is happy at 192, but the marker glyphs are small and hard edged, and at 192 their slope band was narrower than a single quad, which tore the silhouette into spikes.
-288 is the balance point.
-Past roughly 320 the quads fall below two pixels and quad overshading during rasterisation costs more than the extra detail is worth.
-Measured here: 192 segments and 8 features at 120fps, 288 segments and 10 features at 80fps, 384 segments at 74fps.
+At 288 the diagonal edges still stair stepped under magnification, so it sits at 384.
+
+Measure this with vsync disabled, or the numbers are meaningless.
+On a 120Hz display every configuration reads as 120fps right up until it falls off a cliff, and a single contended run reads as a regression that is not there.
+Uncapped, on a 560px canvas: 288 segments at 182fps, 384 at 143fps.

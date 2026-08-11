@@ -6,8 +6,10 @@ import { DESIGN_HALF_HEIGHT, DESIGN_HALF_WIDTH } from './constants';
 const DISTANCE = 8;
 
 interface CameraRigProps {
-    /** Degrees away from looking straight down the sheet's normal. */
+    /** Degrees the camera drops below the sheet's normal. */
     tilt: number;
+    /** Degrees the camera swings to the left of the sheet's normal. */
+    yaw: number;
 }
 
 /**
@@ -18,13 +20,14 @@ interface CameraRigProps {
  * overlay sit exactly on top of each plateau with one projection per frame and
  * no perspective correction.
  */
-export default function CameraRig({ tilt }: CameraRigProps) {
+export default function CameraRig({ tilt, yaw }: CameraRigProps) {
     const { camera, size } = useThree();
 
     useEffect(() => {
         if (!(camera instanceof THREE.OrthographicCamera)) return;
 
         const t = THREE.MathUtils.degToRad(tilt);
+        const y = THREE.MathUtils.degToRad(yaw);
         // Negative Y, so the near edge of the sheet is the bottom of the screen.
         //
         // This is what makes a raised element read as raised. From here each
@@ -37,13 +40,21 @@ export default function CameraRig({ tilt }: CameraRigProps) {
         // under itself once tan(tilt) exceeds falloff / elevation, so raising
         // one control forced you to lower the other. From -Y the near slope
         // widens monotonically at every tilt.
-        camera.position.set(0, -Math.sin(t) * DISTANCE, Math.cos(t) * DISTANCE);
+        //
+        // Yaw swings the camera left in the same way tilt drops it below. Off
+        // both axes each shape shows two side faces instead of one, which reads
+        // as depth far more strongly than shading alone.
+        camera.position.set(
+            -Math.sin(y) * Math.cos(t) * DISTANCE,
+            -Math.sin(t) * DISTANCE,
+            Math.cos(y) * Math.cos(t) * DISTANCE,
+        );
         camera.up.set(0, 1, 0);
         camera.lookAt(0, 0, 0);
 
-        // Fit the design area. Vertical extent is foreshortened by the tilt, so
-        // the height term is divided by cos(tilt).
-        const zoomX = size.width / (2 * DESIGN_HALF_WIDTH);
+        // Fit the design area. Each axis is foreshortened by the angle that
+        // rotates around the other one.
+        const zoomX = size.width / (2 * DESIGN_HALF_WIDTH * Math.cos(y));
         const zoomY = size.height / (2 * DESIGN_HALF_HEIGHT * Math.cos(t));
         camera.zoom = Math.min(zoomX, zoomY);
 
@@ -51,7 +62,7 @@ export default function CameraRig({ tilt }: CameraRigProps) {
         camera.far = DISTANCE * 3;
         camera.updateProjectionMatrix();
         camera.updateMatrixWorld();
-    }, [camera, size.width, size.height, tilt]);
+    }, [camera, size.width, size.height, tilt, yaw]);
 
     return null;
 }

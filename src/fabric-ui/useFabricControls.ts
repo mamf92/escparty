@@ -46,6 +46,7 @@ export function useFabricControls() {
         Scene: folder({
             lightPosition: { value: [-4.6, 4.4, 2.6] as [number, number, number], step: 0.1 },
             cameraTilt: { value: 15, min: 0, max: 35, step: 1 },
+            cameraYaw: { value: 14, min: -35, max: 35, step: 1 },
             showTray: false,
         }),
     }));

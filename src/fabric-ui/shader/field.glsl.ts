@@ -50,19 +50,28 @@ float sdRoundRect(vec2 p, vec2 b, float r) {
   return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
 }
 
-/** Arrow pointing along +x: a triangular head on a square shaft. */
-float sdArrow(vec2 p, vec2 b) {
-  // Both proportions key off the half height. The shaft in particular has to
-  // stay thicker than the slope band, or it never reaches the plateau and
-  // renders as a separate lower blob behind the head instead of joining it.
-  float headLen = min(1.5 * b.y, 0.85 * b.x);
-  float shaftHalfH = b.y * 0.48;
-  float baseX = b.x - headLen;
+/**
+ * Arrow pointing along +x, with rounded corners.
+ *
+ * Rounding is the usual shrink then subtract: build the glyph inset by r, then
+ * offset the distance by r. That grows it back to the requested half extents
+ * with every corner filleted, and it conveniently thickens the shaft, which
+ * has to stay clear of the slope band.
+ */
+float sdArrow(vec2 p, vec2 b, float r) {
+  r = min(r, 0.4 * min(b.x, b.y));
+  vec2 bi = max(b - r, vec2(1e-3));
+
+  // Both proportions key off the half height, so the glyph keeps arrow
+  // proportions instead of turning into a triangle with a stub on the back.
+  float headLen = min(1.5 * bi.y, 0.85 * bi.x);
+  float shaftHalfH = bi.y * 0.52;
+  float baseX = bi.x - headLen;
 
   // Head. Symmetric in y, so one slanted half plane covers both edges.
   vec2 q = vec2(p.x, abs(p.y));
-  vec2 n = normalize(vec2(b.y, headLen));
-  float head = max(baseX - q.x, dot(q - vec2(baseX, b.y), n));
+  vec2 n = normalize(vec2(bi.y, headLen));
+  float head = max(baseX - q.x, dot(q - vec2(baseX, bi.y), n));
 
   // The shaft runs well into the head rather than butting against it. Two
   // primitives whose edges merely touch leave the union's distance at exactly
@@ -70,22 +79,23 @@ float sdArrow(vec2 p, vec2 b) {
   // slices a slot clean through the glyph.
   float shaftRight = baseX + headLen * 0.45;
   float shaft = sdRoundRect(
-    p - vec2((shaftRight - b.x) * 0.5, 0.0),
-    vec2((shaftRight + b.x) * 0.5, shaftHalfH),
+    p - vec2((shaftRight - bi.x) * 0.5, 0.0),
+    vec2((shaftRight + bi.x) * 0.5, shaftHalfH),
     0.0
   );
-  return min(head, shaft);
+  return min(head, shaft) - r;
 }
 
-/** Diagonal cross. Two axis aligned bars in a frame rotated by 45 degrees. */
-float sdCross(vec2 p, vec2 b) {
+/** Diagonal cross. Two rounded bars in a frame rotated by 45 degrees. */
+float sdCross(vec2 p, vec2 b, float r) {
   vec2 q = vec2(p.x + p.y, p.x - p.y) * 0.70710678;
   float m = min(b.x, b.y);
-  float t = m * 0.40;
+  float t = m * 0.46;
   float arm = m * 1.35;
+  float rr = min(r, t * 0.9);
   return min(
-    sdRoundRect(q, vec2(arm, t), t * 0.6),
-    sdRoundRect(q, vec2(t, arm), t * 0.6)
+    sdRoundRect(q, vec2(arm, t), rr),
+    sdRoundRect(q, vec2(t, arm), rr)
   );
 }
 
@@ -125,9 +135,9 @@ float featureProfile(int i, vec2 p) {
   } else if (uShape[i] < 1.5) {
     d = length(rel) - uHalfSize[i].x;
   } else if (uShape[i] < 2.5) {
-    d = sdArrow(rel, uHalfSize[i]);
+    d = sdArrow(rel, uHalfSize[i], uRadius[i]);
   } else {
-    d = sdCross(rel, uHalfSize[i]);
+    d = sdCross(rel, uHalfSize[i], uRadius[i]);
   }
   float k = mix(0.85, 0.02, clamp(uTension[i], 0.0, 1.0));
   float t = -d / max(uFalloff[i], 1e-4);
@@ -161,12 +171,17 @@ Field fieldAt(vec2 p) {
       hNeg = sminK(hNeg, c, uBlend);
     }
 
-    // Squared, so the state colour stays on the plateau instead of bleeding
-    // down the slope and flattening the relief that sells the shape.
-    float tw = w * w * uTintStrength[i];
+    // Colour belongs to the top face only. A broader mask lets it run down the
+    // extruded sides, which reads as a glow bleeding off the glyph rather than
+    // as a flat coloured cap. The window is a few pixels wide, enough to stay
+    // antialiased without smearing.
+    float tw = smoothstep(0.62, 0.95, w) * uTintStrength[i];
     tintAcc += uTint[i] * tw;
     tintW += tw;
-    matte = max(matte, w * w * uMatte[i]);
+
+    // The matte flag is the opposite case. It covers the sides too, since the
+    // whole glyph is one hard object, and fades the weave back in at the toe.
+    matte = max(matte, w * uMatte[i]);
   }
 
   Field f;

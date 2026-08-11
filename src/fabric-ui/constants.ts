@@ -35,13 +35,14 @@ export const PLANE_HEIGHT = 5.2;
  *
  * The membrane itself is happy at 192. The marker glyphs are not: they are
  * small, hard edged and tall, so at 192 their slope band was narrower than a
- * single quad and the displacement tore the silhouette into spikes.
+ * single quad and the displacement tore the silhouette into spikes, and at 288
+ * their diagonal edges still stair stepped under magnification.
  *
- * 288 is the balance point. Past roughly 320 the quads fall below two pixels
- * and quad overshading during rasterisation costs more than the extra detail
- * is worth: 384 measured 74fps against 120fps here.
+ * Measured with vsync disabled on a 560px canvas: 288 segments at 182fps, 384
+ * at 143fps. Both are far enough above the target that the cleaner glyph edges
+ * are worth the frame budget.
  */
-export const PLANE_SEGMENTS = 288;
+export const PLANE_SEGMENTS = 384;
 
 /** Half extents of the area the camera frames. */
 export const DESIGN_HALF_WIDTH = 2.0;
@@ -70,27 +71,33 @@ export const LAYOUT = {
  * pressed. Position tracks the option width so the gutter never collides.
  */
 export const MARKER = {
-    halfSize: [0.28, 0.2] as [number, number],
+    halfSize: [0.23, 0.16] as [number, number],
     /** Clearance between the marker and the left edge of an option. */
     gap: 0.05,
     /** Multiple of `elevation`. Above 1 so a marker stands proud of an option. */
-    elevationRatio: 1.7,
+    elevationRatio: 1.15,
     /** Multiple of `falloff`. Tight, so the glyph reads as a hard edged object. */
-    falloffRatio: 0.85,
+    falloffRatio: 0.72,
 } as const;
 
 /**
  * Elevation targets per interaction state, as multiples of the leva `elevation`
- * control. Ratios come from the design table: idle 0.15, hover 0.19,
- * pressed -0.08, selected -0.04, correct 0.24, incorrect -0.12.
+ * control.
+ *
+ * `selected` is the resting pushed in depth, and `pressed` sits deeper than it.
+ * Holding an option therefore drives it past where it will end up, and letting
+ * go settles it back onto the full depth with one small bounce. Making
+ * `pressed` the deepest point and `selected` shallower did the opposite: the
+ * option sank on click and then rose to a half depth, which read as the press
+ * failing to take.
  */
 export const STATE_ELEVATION = {
     idle: 1,
     hover: 1.2667,
-    pressed: -0.5333,
-    selected: -0.2667,
+    pressed: -0.85,
+    selected: -0.5333,
     correct: 1.6,
-    incorrect: -0.8,
+    incorrect: -1.05,
 } as const;
 
 /**

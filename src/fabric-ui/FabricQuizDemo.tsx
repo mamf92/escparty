@@ -201,7 +201,9 @@ export default function FabricQuizDemo() {
             ...shared,
             shape: 'arrow' as const,
             halfSize: [...MARKER.halfSize] as [number, number],
-            cornerRadius: 0,
+            // Rounded to match the rest of the UI, but never more than the glyph
+            // can carry without its strokes closing up.
+            cornerRadius: Math.min(cornerRadius, MARKER.halfSize[1] * 0.3),
             elevation: elevation * MARKER.elevationRatio,
             falloff: falloff * MARKER.falloffRatio,
             tension: 1,
@@ -324,7 +326,7 @@ export default function FabricQuizDemo() {
                     gl={{ antialias: true }}
                     camera={{ position: [0, 3, 7], zoom: 140, near: 0.1, far: 40 }}
                 >
-                    <CameraRig tilt={controls.cameraTilt} />
+                    <CameraRig tilt={controls.cameraTilt} yaw={controls.cameraYaw} />
                     <FabricSurface
                         features={features}
                         optionStates={optionStates}
