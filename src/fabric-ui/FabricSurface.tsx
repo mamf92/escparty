@@ -48,7 +48,7 @@ function plateauHeight(own: number, floor: number): number {
 }
 
 /** Must match the shape dispatch order in the shader's featureProfile. */
-const SHAPE_INDEX: Record<FabricShape, number> = { rect: 0, circle: 1, arrow: 2, cross: 3 };
+const SHAPE_INDEX: Record<FabricShape, number> = { rect: 0, circle: 1, check: 2, cross: 3 };
 
 const SHAKE_DURATION = 0.8;
 

@@ -7,7 +7,7 @@ export type OptionState =
     | 'correct'
     | 'incorrect';
 
-export type FabricShape = 'rect' | 'circle' | 'arrow' | 'cross';
+export type FabricShape = 'rect' | 'circle' | 'check' | 'cross';
 
 /**
  * One element on the sheet. This is the only description the shader gets: the
@@ -20,6 +20,7 @@ export interface FabricFeature {
     center: [number, number];
     /** Half extents in plane units. For a circle only x is read, as the radius. */
     halfSize: [number, number];
+    /** Corner radius for `rect`. For `check` and `cross`, the stroke half thickness. */
     cornerRadius: number;
     /** Signed. Positive raises a protrusion, negative sinks an indent. */
     elevation: number;

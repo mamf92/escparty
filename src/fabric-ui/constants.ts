@@ -35,14 +35,14 @@ export const PLANE_HEIGHT = 5.2;
  *
  * The membrane itself is happy at 192. The marker glyphs are not: they are
  * small, hard edged and tall, so at 192 their slope band was narrower than a
- * single quad and the displacement tore the silhouette into spikes, and at 288
- * their diagonal edges still stair stepped under magnification.
+ * single quad and the displacement tore the silhouette into spikes.
  *
- * Measured with vsync disabled on a 560px canvas: 288 segments at 182fps, 384
- * at 143fps. Both are far enough above the target that the cleaner glyph edges
- * are worth the frame budget.
+ * 384 gives visibly cleaner glyph edges under magnification, but measured a
+ * consistent 20 percent slower in paired runs, and its worst reading was close
+ * enough to 60fps to be uncomfortable. At 1:1 the difference does not show, so
+ * 288 is the better trade.
  */
-export const PLANE_SEGMENTS = 384;
+export const PLANE_SEGMENTS = 288;
 
 /** Half extents of the area the camera frames. */
 export const DESIGN_HALF_WIDTH = 2.0;
@@ -71,13 +71,19 @@ export const LAYOUT = {
  * pressed. Position tracks the option width so the gutter never collides.
  */
 export const MARKER = {
-    halfSize: [0.23, 0.16] as [number, number],
+    halfSize: [0.21, 0.175] as [number, number],
     /** Clearance between the marker and the left edge of an option. */
     gap: 0.05,
     /** Multiple of `elevation`. Above 1 so a marker stands proud of an option. */
     elevationRatio: 1.15,
+    /**
+     * Stroke half thickness, as a multiple of the smaller half extent, and also
+     * the radius of the round caps. Has to stay well clear of the slope band or
+     * the stroke is all slope with no flat top for the colour to sit on.
+     */
+    strokeRatio: 0.38,
     /** Multiple of `falloff`. Tight, so the glyph reads as a hard edged object. */
-    falloffRatio: 0.72,
+    falloffRatio: 0.63,
 } as const;
 
 /**

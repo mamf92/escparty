@@ -199,11 +199,11 @@ export default function FabricQuizDemo() {
         );
         const marker = {
             ...shared,
-            shape: 'arrow' as const,
+            shape: 'check' as const,
             halfSize: [...MARKER.halfSize] as [number, number],
-            // Rounded to match the rest of the UI, but never more than the glyph
-            // can carry without its strokes closing up.
-            cornerRadius: Math.min(cornerRadius, MARKER.halfSize[1] * 0.3),
+            // For a glyph this carries the stroke half thickness, which is also
+            // the radius of its round caps.
+            cornerRadius: MARKER.halfSize[1] * MARKER.strokeRatio,
             elevation: elevation * MARKER.elevationRatio,
             falloff: falloff * MARKER.falloffRatio,
             tension: 1,

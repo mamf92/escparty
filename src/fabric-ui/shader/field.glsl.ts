@@ -50,53 +50,40 @@ float sdRoundRect(vec2 p, vec2 b, float r) {
   return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
 }
 
-/**
- * Arrow pointing along +x, with rounded corners.
- *
- * Rounding is the usual shrink then subtract: build the glyph inset by r, then
- * offset the distance by r. That grows it back to the requested half extents
- * with every corner filleted, and it conveniently thickens the shaft, which
- * has to stay clear of the slope band.
- */
-float sdArrow(vec2 p, vec2 b, float r) {
-  r = min(r, 0.4 * min(b.x, b.y));
-  vec2 bi = max(b - r, vec2(1e-3));
-
-  // Both proportions key off the half height, so the glyph keeps arrow
-  // proportions instead of turning into a triangle with a stub on the back.
-  float headLen = min(1.5 * bi.y, 0.85 * bi.x);
-  float shaftHalfH = bi.y * 0.52;
-  float baseX = bi.x - headLen;
-
-  // Head. Symmetric in y, so one slanted half plane covers both edges.
-  vec2 q = vec2(p.x, abs(p.y));
-  vec2 n = normalize(vec2(bi.y, headLen));
-  float head = max(baseX - q.x, dot(q - vec2(baseX, bi.y), n));
-
-  // The shaft runs well into the head rather than butting against it. Two
-  // primitives whose edges merely touch leave the union's distance at exactly
-  // zero along the seam, and the profile maps that to the base plane, which
-  // slices a slot clean through the glyph.
-  float shaftRight = baseX + headLen * 0.45;
-  float shaft = sdRoundRect(
-    p - vec2((shaftRight - bi.x) * 0.5, 0.0),
-    vec2((shaftRight + bi.x) * 0.5, shaftHalfH),
-    0.0
-  );
-  return min(head, shaft) - r;
+/** Distance to a line segment. The building block for a round capped stroke. */
+float sdSegment(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a;
+  vec2 ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h);
 }
 
-/** Diagonal cross. Two rounded bars in a frame rotated by 45 degrees. */
-float sdCross(vec2 p, vec2 b, float r) {
-  vec2 q = vec2(p.x + p.y, p.x - p.y) * 0.70710678;
-  float m = min(b.x, b.y);
-  float t = m * 0.46;
-  float arm = m * 1.35;
-  float rr = min(r, t * 0.9);
+/**
+ * Check mark, drawn as a two segment polyline of capsules.
+ *
+ * Capsules rather than rounded boxes, because the roundness of a Material style
+ * icon is in its stroke: semicircular caps and a naturally filleted join where
+ * the two strokes meet. Filleting the corners of a box does not get there.
+ *
+ * The t argument is the stroke half thickness, and also the cap radius. It has
+ * to stay clear of the slope band, or the stroke is all slope with no flat top
+ * left for the colour to sit on.
+ */
+float sdCheck(vec2 p, vec2 b, float t) {
+  vec2 s = max(b - t, vec2(1e-3));
+  vec2 a1 = vec2(-s.x, s.y * 0.05);
+  vec2 a2 = vec2(-s.x * 0.28, -s.y);
+  vec2 a3 = vec2(s.x, s.y * 0.85);
+  return min(sdSegment(p, a1, a2), sdSegment(p, a2, a3)) - t;
+}
+
+/** Cross, two crossed capsules. Same round cap treatment as the check. */
+float sdCross(vec2 p, vec2 b, float t) {
+  vec2 s = max(b - t, vec2(1e-3));
   return min(
-    sdRoundRect(q, vec2(arm, t), rr),
-    sdRoundRect(q, vec2(t, arm), rr)
-  );
+    sdSegment(p, vec2(-s.x, -s.y), vec2(s.x, s.y)),
+    sdSegment(p, vec2(-s.x, s.y), vec2(s.x, -s.y))
+  ) - t;
 }
 
 /**
@@ -135,7 +122,8 @@ float featureProfile(int i, vec2 p) {
   } else if (uShape[i] < 1.5) {
     d = length(rel) - uHalfSize[i].x;
   } else if (uShape[i] < 2.5) {
-    d = sdArrow(rel, uHalfSize[i], uRadius[i]);
+    // For glyph shapes uRadius carries the stroke half thickness.
+    d = sdCheck(rel, uHalfSize[i], uRadius[i]);
   } else {
     d = sdCross(rel, uHalfSize[i], uRadius[i]);
   }

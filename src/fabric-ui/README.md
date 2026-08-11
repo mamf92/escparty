@@ -167,15 +167,18 @@ press it is supposed to be showing.
 
 Correctness is called out separately, by a marker glyph in the left gutter:
 
-- An **arrow** beside the correct answer, in `correctGreen`.
+- A **check mark** beside the correct answer, in `correctGreen`.
 - A **cross** beside the answer the player picked, if it was wrong, in
   `incorrectRed`.
 
 The glyphs are `matte` features. The weave and the tension ridges are suppressed
 across them and their highlight tightens, so they read as hard objects sitting in
 the fabric rather than as more fabric.
-Their corners are rounded to match the rest of the UI, and their x position
-tracks the option width so the gutter never collides.
+Both are drawn as capsules, not as rounded boxes.
+The roundness of a Material style icon lives in its stroke: semicircular caps and
+a naturally filleted join where two strokes meet.
+Filleting the corners of a box does not get there.
+Their x position tracks the option width so the gutter never collides.
 
 Colour is confined to the top face. A broader mask lets it run down the extruded
 sides, which reads as a glow bleeding off the glyph instead of a flat coloured
@@ -187,12 +190,15 @@ the much darker `accentgreen`.
 
 Two things about glyph SDFs are worth knowing before adding more:
 
-- A primitive union needs real overlap.
-  The arrow's shaft originally butted exactly against its head, which leaves the
-  union's distance at zero along the seam, and the profile maps zero to the base
-  plane, so a slot was cut clean through the glyph.
-- Every part of a glyph has to stay thicker than the slope band, or it never
-  reaches the plateau and renders as a separate lower blob.
+- A primitive union needs real overlap, not a shared edge.
+  Two shapes whose boundaries touch leave the union's distance at exactly zero
+  along the seam, and the profile maps zero to the base plane, so a slot gets cut
+  clean through the glyph.
+  This is why the strokes of a polyline are capsules sharing an endpoint rather
+  than segments meeting end to end.
+- Every stroke has to stay thicker than the slope band.
+  Below that it is all slope with no plateau, so it never reaches full height and
+  there is no flat top left for the colour to sit on.
 
 ## Performance
 
@@ -202,8 +208,11 @@ Inactive feature slots take a uniform branch, which is coherent across the whole
 
 Plane subdivision is the one number worth being careful with.
 The membrane is happy at 192, but the marker glyphs are small and hard edged, and at 192 their slope band was narrower than a single quad, which tore the silhouette into spikes.
-At 288 the diagonal edges still stair stepped under magnification, so it sits at 384.
+288 clears that.
+384 gives visibly cleaner glyph edges under magnification, but it measured a consistent 20 percent slower and the difference does not show at 1:1.
 
-Measure this with vsync disabled, or the numbers are meaningless.
-On a 120Hz display every configuration reads as 120fps right up until it falls off a cliff, and a single contended run reads as a regression that is not there.
-Uncapped, on a 560px canvas: 288 segments at 182fps, 384 at 143fps.
+Be careful measuring this.
+On a 120Hz display every healthy configuration reads as exactly 120fps, so run with vsync disabled or the number tells you nothing.
+Even then, absolute figures on this machine drifted between roughly 60 and 180fps for the same build depending on thermal state and what else was running, so single readings are worthless.
+Paired alternating runs are reproducible: 384 came out slower than 288 in every pair, by about 20 percent.
+Trust the ratio, not the number.
