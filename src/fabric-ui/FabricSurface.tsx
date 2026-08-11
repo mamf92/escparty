@@ -16,7 +16,7 @@ import { FABRIC_FRAGMENT, FABRIC_VERTEX } from './shader/fabricMaterial';
 import { createSpring, shakeOffset, stepSpring, type Spring } from './springs';
 import { applyRect, type OverlayBridge } from './overlayBridge';
 import { PRESETS } from './presets';
-import type { FabricFeature, OptionState } from './types';
+import type { FabricFeature, FabricShape, OptionState } from './types';
 import type { FabricControls } from './useFabricControls';
 
 export interface PointerState {
@@ -46,6 +46,9 @@ interface FabricSurfaceProps {
 function plateauHeight(own: number, floor: number): number {
     return Math.max(own, 0) + Math.min(own < 0 ? own : 0, floor);
 }
+
+/** Must match the shape dispatch order in the shader's featureProfile. */
+const SHAPE_INDEX: Record<FabricShape, number> = { rect: 0, circle: 1, arrow: 2, cross: 3 };
 
 const SHAKE_DURATION = 0.8;
 
@@ -79,6 +82,7 @@ export default function FabricSurface({
             uTint: { value: new Float32Array(MAX_FEATURES * 3) },
             uTintStrength: { value: new Float32Array(MAX_FEATURES) },
             uAdditive: { value: new Float32Array(MAX_FEATURES) },
+            uMatte: { value: new Float32Array(MAX_FEATURES) },
             uBlend: { value: 0.03 },
 
             uModelMat3: { value: new THREE.Matrix3() },
@@ -187,6 +191,7 @@ export default function FabricSurface({
         const tintArr = u.uTint.value as Float32Array;
         const tintWArr = u.uTintStrength.value as Float32Array;
         const additiveArr = u.uAdditive.value as Float32Array;
+        const matteArr = u.uMatte.value as Float32Array;
 
         for (let i = 0; i < MAX_FEATURES; i++) {
             const feature: FabricFeature | undefined = features[i];
@@ -228,7 +233,7 @@ export default function FabricSurface({
             halfArr[i * 2] = feature.halfSize[0];
             halfArr[i * 2 + 1] = feature.halfSize[1];
             radiusArr[i] = feature.cornerRadius;
-            shapeArr[i] = feature.shape === 'circle' ? 1 : 0;
+            shapeArr[i] = SHAPE_INDEX[feature.shape];
             elevArr[i] = spring.value;
             falloffArr[i] = feature.falloff;
             tensionArr[i] = feature.tension;
@@ -237,6 +242,7 @@ export default function FabricSurface({
             tintArr[i * 3 + 2] = feature.tint[2];
             tintWArr[i] = feature.tintStrength;
             additiveArr[i] = feature.additive ? 1 : 0;
+            matteArr[i] = feature.matte ? 1 : 0;
         }
 
         // Material uniforms.

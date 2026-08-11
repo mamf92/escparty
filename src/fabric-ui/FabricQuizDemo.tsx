@@ -9,7 +9,10 @@ import CameraRig from './CameraRig';
 import FabricSurface, { type PointerState } from './FabricSurface';
 import {
     CARD_ELEVATION_RATIO,
+    COLUMN_X,
+    DESIGN_HALF_WIDTH,
     LAYOUT,
+    MARKER,
     MAX_FEATURES,
     OPTION_COUNT,
     POINTER_DIMPLE_RADIUS,
@@ -19,7 +22,6 @@ import {
     TRAY_ELEVATION_RATIO,
 } from './constants';
 import { createOverlayBridge } from './overlayBridge';
-import { STATE_TINT } from './presets';
 import type { FabricFeature, OptionState } from './types';
 import { useFabricControls } from './useFabricControls';
 
@@ -91,14 +93,16 @@ export default function FabricQuizDemo() {
         });
     }, [options, submitted, question, selected, pressed, hovered, focused]);
 
-    const tints = useMemo(
+    const markerTints = useMemo(
         () => ({
-            selected: toLinear(STATE_TINT.selected),
             correct: toLinear(controls.accentColor),
-            incorrect: toLinear(STATE_TINT.incorrect),
+            wrong: toLinear(controls.wrongColor),
         }),
-        [controls.accentColor],
+        [controls.accentColor, controls.wrongColor],
     );
+
+    const correctIndex = options.findIndex((o) => o === question?.correctAnswer);
+    const wrongIndex = options.findIndex((o) => o === selected && o !== question?.correctAnswer);
 
     const features = useMemo<FabricFeature[]>(() => {
         const {
@@ -138,30 +142,19 @@ export default function FabricQuizDemo() {
             tintStrength: 0,
         };
 
+        // No tint on an option, in any state. Whether it is raised or pressed is
+        // the only thing its surface says, and a colour shift competes with
+        // that: a lighter patch reads as nearer, which fights the press.
         for (let i = 0; i < OPTION_COUNT; i++) {
-            const state = optionStates[i];
-            let tint = NO_TINT;
-            let tintStrength = 0;
-            if (state === 'selected' || state === 'pressed') {
-                tint = tints.selected;
-                tintStrength = state === 'selected' ? 0.75 : 0.45;
-            } else if (state === 'correct') {
-                tint = tints.correct;
-                tintStrength = 0.85;
-            } else if (state === 'incorrect') {
-                tint = tints.incorrect;
-                tintStrength = 0.85;
-            }
-
             list[SLOT.option + i] = {
                 ...shared,
                 active: i < options.length,
                 shape: 'rect',
-                center: [0, LAYOUT.optionRowY[i]],
+                center: [COLUMN_X, LAYOUT.optionRowY[i]],
                 halfSize: [shapeWidth, shapeHeight],
-                elevation: elevation * STATE_ELEVATION[state],
-                tint,
-                tintStrength,
+                elevation: elevation * STATE_ELEVATION[optionStates[i]],
+                tint: NO_TINT,
+                tintStrength: 0,
             };
         }
 
@@ -197,8 +190,52 @@ export default function FabricQuizDemo() {
             tintStrength: 0,
         };
 
+        // Marker glyphs. Hard edged, untextured and standing proud of the
+        // options, in the gutter the content column leaves free. Their x tracks
+        // the option width so widening the options never collides with them.
+        const markerX = Math.max(
+            COLUMN_X - shapeWidth - MARKER.gap - MARKER.halfSize[0],
+            -(DESIGN_HALF_WIDTH - MARKER.halfSize[0] - 0.04),
+        );
+        const marker = {
+            ...shared,
+            shape: 'arrow' as const,
+            halfSize: [...MARKER.halfSize] as [number, number],
+            cornerRadius: 0,
+            elevation: elevation * MARKER.elevationRatio,
+            falloff: falloff * MARKER.falloffRatio,
+            tension: 1,
+            tintStrength: 1,
+            matte: true,
+        };
+
+        list[SLOT.correctMarker] = {
+            ...marker,
+            active: submitted && correctIndex >= 0,
+            center: [markerX, LAYOUT.optionRowY[Math.max(correctIndex, 0)]],
+            tint: markerTints.correct,
+        };
+
+        list[SLOT.wrongMarker] = {
+            ...marker,
+            shape: 'cross',
+            active: submitted && wrongIndex >= 0,
+            center: [markerX, LAYOUT.optionRowY[Math.max(wrongIndex, 0)]],
+            tint: markerTints.wrong,
+        };
+
         return list;
-    }, [controls, optionStates, options.length, submitPressed, submitActive, tints]);
+    }, [
+        controls,
+        optionStates,
+        options.length,
+        submitPressed,
+        submitActive,
+        markerTints,
+        submitted,
+        correctIndex,
+        wrongIndex,
+    ]);
 
     const registerElement = useCallback(
         (slot: number) => (el: HTMLElement | null) => {

@@ -65,16 +65,17 @@ export const PRESETS: Record<'spandex' | 'carbon', MaterialPreset> = {
 };
 
 /**
- * State colours, matching the existing OptionButton in src/components/Quiz.tsx.
+ * Marker colours.
  *
- * The one substitution is the correct state. The app uses accentgreen
- * (#007542), which is dark enough that it loses the slope shading entirely on a
- * lit membrane, so the demo uses the token set's bright accent instead.
+ * The option rows themselves are never tinted. Everything about an option's
+ * state is carried by its shape: raised at rest, pressed into the sheet when
+ * held. Correctness is called out by a separate glyph in the left gutter, so
+ * the two signals never compete.
+ *
+ * correctGreen was already defined in the theme and unused by the app, which
+ * uses the much darker accentgreen. It is the cleaner of the two here.
  */
-export const STATE_TINT = {
-    selected: theme.colors.pinkLavender, // #D5B8E6, as in the app
-    correct: theme.colors.accentmint, // #7AF5BF
-    incorrect: theme.colors.incorrectRed, // #dc3545
+export const MARKER_COLOR = {
+    correct: theme.colors.correctGreen, // #28a745
+    wrong: theme.colors.incorrectRed, // #dc3545
 } as const;
-
-export const DEFAULT_ACCENT = STATE_TINT.correct;

@@ -28,6 +28,12 @@ uniform float uTintStrength[MAX_FEATURES];
  * minimum it would simply lose to any deeper indent it sits inside.
  */
 uniform float uAdditive[MAX_FEATURES];
+/**
+ * Features rendered as a hard untextured surface. The weave and the tension
+ * ridges are suppressed across their plateau, so a marker glyph reads as a
+ * solid object sitting in the fabric rather than as more fabric.
+ */
+uniform float uMatte[MAX_FEATURES];
 
 /** Blend width of the smooth maximum used where features overlap. */
 uniform float uBlend;
@@ -36,11 +42,51 @@ struct Field {
   float h;      // sheet height
   vec3  tint;   // influence weighted feature colour
   float tintW;  // how strongly that colour applies, 0 on the bare sheet
+  float matte;  // how much to suppress the woven surface detail
 };
 
 float sdRoundRect(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
   return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+
+/** Arrow pointing along +x: a triangular head on a square shaft. */
+float sdArrow(vec2 p, vec2 b) {
+  // Both proportions key off the half height. The shaft in particular has to
+  // stay thicker than the slope band, or it never reaches the plateau and
+  // renders as a separate lower blob behind the head instead of joining it.
+  float headLen = min(1.5 * b.y, 0.85 * b.x);
+  float shaftHalfH = b.y * 0.48;
+  float baseX = b.x - headLen;
+
+  // Head. Symmetric in y, so one slanted half plane covers both edges.
+  vec2 q = vec2(p.x, abs(p.y));
+  vec2 n = normalize(vec2(b.y, headLen));
+  float head = max(baseX - q.x, dot(q - vec2(baseX, b.y), n));
+
+  // The shaft runs well into the head rather than butting against it. Two
+  // primitives whose edges merely touch leave the union's distance at exactly
+  // zero along the seam, and the profile maps that to the base plane, which
+  // slices a slot clean through the glyph.
+  float shaftRight = baseX + headLen * 0.45;
+  float shaft = sdRoundRect(
+    p - vec2((shaftRight - b.x) * 0.5, 0.0),
+    vec2((shaftRight + b.x) * 0.5, shaftHalfH),
+    0.0
+  );
+  return min(head, shaft);
+}
+
+/** Diagonal cross. Two axis aligned bars in a frame rotated by 45 degrees. */
+float sdCross(vec2 p, vec2 b) {
+  vec2 q = vec2(p.x + p.y, p.x - p.y) * 0.70710678;
+  float m = min(b.x, b.y);
+  float t = m * 0.40;
+  float arm = m * 1.35;
+  return min(
+    sdRoundRect(q, vec2(arm, t), t * 0.6),
+    sdRoundRect(q, vec2(t, arm), t * 0.6)
+  );
 }
 
 /**
@@ -74,10 +120,14 @@ float tautRamp(float t, float k) {
 float featureProfile(int i, vec2 p) {
   vec2 rel = p - uCenter[i];
   float d;
-  if (uShape[i] > 0.5) {
-    d = length(rel) - uHalfSize[i].x;
-  } else {
+  if (uShape[i] < 0.5) {
     d = sdRoundRect(rel, uHalfSize[i], min(uRadius[i], min(uHalfSize[i].x, uHalfSize[i].y)));
+  } else if (uShape[i] < 1.5) {
+    d = length(rel) - uHalfSize[i].x;
+  } else if (uShape[i] < 2.5) {
+    d = sdArrow(rel, uHalfSize[i]);
+  } else {
+    d = sdCross(rel, uHalfSize[i]);
   }
   float k = mix(0.85, 0.02, clamp(uTension[i], 0.0, 1.0));
   float t = -d / max(uFalloff[i], 1e-4);
@@ -90,6 +140,7 @@ Field fieldAt(vec2 p) {
   float hAdd = 0.0;
   vec3  tintAcc = vec3(0.0);
   float tintW = 0.0;
+  float matte = 0.0;
 
   for (int i = 0; i < MAX_FEATURES; i++) {
     if (uActive[i] < 0.5) continue;
@@ -115,12 +166,14 @@ Field fieldAt(vec2 p) {
     float tw = w * w * uTintStrength[i];
     tintAcc += uTint[i] * tw;
     tintW += tw;
+    matte = max(matte, w * w * uMatte[i]);
   }
 
   Field f;
   f.h = hPos + hNeg + hAdd;
   f.tint = tintW > 1e-4 ? tintAcc / tintW : vec3(0.0);
   f.tintW = clamp(tintW, 0.0, 1.0);
+  f.matte = clamp(matte, 0.0, 1.0);
   return f;
 }
 `;

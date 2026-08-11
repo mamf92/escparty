@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { folder, useControls } from 'leva';
-import { DEFAULT_ACCENT, PRESETS } from './presets';
+import { MARKER_COLOR, PRESETS } from './presets';
 
 const spandex = PRESETS.spandex;
 
@@ -16,7 +16,8 @@ export function useFabricControls() {
         Material: folder({
             preset: { value: 'spandex', options: ['spandex', 'carbon'] },
             baseColor: spandex.baseColor,
-            accentColor: DEFAULT_ACCENT,
+            accentColor: MARKER_COLOR.correct,
+            wrongColor: MARKER_COLOR.wrong,
             weaveScale: { value: spandex.weaveScale, min: 4, max: 140, step: 0.5 },
             weaveIntensity: { value: spandex.weaveIntensity, min: 0, max: 0.8, step: 0.005 },
             stretchAnisotropy: { value: spandex.stretchAniso, min: 0, max: 0.95, step: 0.01 },
@@ -44,7 +45,7 @@ export function useFabricControls() {
 
         Scene: folder({
             lightPosition: { value: [-4.6, 4.4, 2.6] as [number, number, number], step: 0.1 },
-            cameraTilt: { value: 15, min: 0, max: 50, step: 1 },
+            cameraTilt: { value: 15, min: 0, max: 35, step: 1 },
             showTray: false,
         }),
     }));

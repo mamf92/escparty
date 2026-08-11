@@ -7,7 +7,7 @@ export type OptionState =
     | 'correct'
     | 'incorrect';
 
-export type FabricShape = 'rect' | 'circle';
+export type FabricShape = 'rect' | 'circle' | 'arrow' | 'cross';
 
 /**
  * One element on the sheet. This is the only description the shader gets: the
@@ -34,6 +34,11 @@ export interface FabricFeature {
     /** Linear space colour blended over the base colour across the plateau. */
     tint: [number, number, number];
     tintStrength: number;
+    /**
+     * Render as a hard untextured surface. Suppresses the weave and the tension
+     * ridges across this feature's plateau and tightens its highlight.
+     */
+    matte?: boolean;
 }
 
 /** Screen space rectangle of a feature plateau, used to place the DOM overlay. */

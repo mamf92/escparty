@@ -122,7 +122,9 @@ void main() {
 
   // Threads pulled apart cover less area, so the weave relief shallows out
   // exactly where the sheet is stretched thinnest.
-  float weaveAmp = uWeaveIntensity * (1.0 - 0.4 * thin);
+  // Matte features drop the weave entirely, so a marker glyph reads as a hard
+  // untextured surface rather than as more fabric.
+  float weaveAmp = uWeaveIntensity * (1.0 - 0.4 * thin) * (1.0 - f.matte);
   vec2 weave = weaveGradient(weaveUv, uWeaveTwill) * weaveAmp;
 
   // Tension ridges run down the slope, so their phase advances across the
@@ -133,7 +135,7 @@ void main() {
   // moment falloff got tight, since the slope's own gradient swamped them.
   float ridgeMask = smoothstep(0.12, 0.55, stretchAmount);
   float ridge = ridgeDerivative(dot(vPlane, perp) * uRidgeFrequency)
-              * uRidgeIntensity * ridgeMask * uGradRef;
+              * uRidgeIntensity * ridgeMask * uGradRef * (1.0 - f.matte);
 
   vec2 micro = weave + perp * ridge;
   vec3 nLocal = normalize(vec3(-(grad.x + micro.x), -(grad.y + micro.y), 1.0));
@@ -155,8 +157,11 @@ void main() {
   vec3 fillDir = normalize(vec3(0.45, 0.2, 1.0));
   float fill = max((dot(N, fillDir) + 0.7) / 1.7, 0.0) * uFillIntensity;
 
-  float specIntensity = uSpecIntensity * (1.0 + 0.7 * thin);
-  float specIso = pow(max(dot(N, H), 0.0), uSpecPower);
+  // A matte feature is not dull, it is smooth. Tighter and brighter highlight,
+  // which is what separates a moulded plastic marker from woven cloth.
+  float specPower = mix(uSpecPower, uSpecPower * 2.2, f.matte);
+  float specIntensity = uSpecIntensity * (1.0 + 0.7 * thin) * mix(1.0, 2.0, f.matte);
+  float specIso = pow(max(dot(N, H), 0.0), specPower);
 
   // Kajiya Kay style lobe for the twill, tight and aligned to the warp. The
   // thread direction has to be projected onto the tangent plane, otherwise it is
@@ -165,7 +170,7 @@ void main() {
   vec3 warpDir = normalize(uModelMat3 * vec3(ca, sa, 0.0));
   vec3 T = normalize(warpDir - N * dot(N, warpDir));
   float dotTH = dot(T, H);
-  float specAni = pow(sqrt(max(1.0 - dotTH * dotTH, 0.0)), uSpecPower * 2.0);
+  float specAni = pow(sqrt(max(1.0 - dotTH * dotTH, 0.0)), specPower * 2.0);
   float spec = mix(specIso, specAni, uSpecAniso) * specIntensity;
 
   vec3 base = mix(uBaseColor, f.tint, f.tintW);

@@ -7,7 +7,7 @@
  */
 
 /** Uniform array size in the shader. Fixed so the feature loop can be unrolled. */
-export const MAX_FEATURES = 8;
+export const MAX_FEATURES = 10;
 
 /** Fixed slot per feature so uniform writes never need to reorder. */
 export const SLOT = {
@@ -16,6 +16,8 @@ export const SLOT = {
     option: 2, // occupies slots 2, 3, 4, 5
     submit: 6,
     pointer: 7,
+    correctMarker: 8,
+    wrongMarker: 9,
 } as const;
 
 export const OPTION_COUNT = 4;
@@ -24,26 +26,57 @@ export const OPTION_COUNT = 4;
  * The plane overfills the visible frame so its edges never enter shot when the
  * camera is tilted.
  */
-export const PLANE_WIDTH = 5.6;
-export const PLANE_HEIGHT = 5.4;
+export const PLANE_WIDTH = 5.2;
+export const PLANE_HEIGHT = 5.2;
 
 /**
  * Tessellation. Only the silhouette needs geometry, since fragment normals are
- * derived analytically, so this is deliberately modest.
+ * derived analytically.
+ *
+ * The membrane itself is happy at 192. The marker glyphs are not: they are
+ * small, hard edged and tall, so at 192 their slope band was narrower than a
+ * single quad and the displacement tore the silhouette into spikes.
+ *
+ * 288 is the balance point. Past roughly 320 the quads fall below two pixels
+ * and quad overshading during rasterisation costs more than the extra detail
+ * is worth: 384 measured 74fps against 120fps here.
  */
-export const PLANE_SEGMENTS = 192;
+export const PLANE_SEGMENTS = 288;
 
 /** Half extents of the area the camera frames. */
 export const DESIGN_HALF_WIDTH = 2.0;
 export const DESIGN_HALF_HEIGHT = 1.98;
 
+/**
+ * The content column is offset to the right of centre, which leaves a gutter on
+ * the left for the correct and wrong marker glyphs.
+ */
+export const COLUMN_X = 0.24;
+
 /** Static layout of the quiz surface, in plane units. */
 export const LAYOUT = {
-    questionCard: { center: [0, 1.4] as [number, number], halfSize: [1.62, 0.34] as [number, number], radius: 0.14 },
-    tray: { center: [0, 0] as [number, number], halfSize: [1.72, 0.99] as [number, number], radius: 0.2 },
+    questionCard: { center: [COLUMN_X, 1.4] as [number, number], halfSize: [1.54, 0.34] as [number, number], radius: 0.14 },
+    tray: { center: [COLUMN_X, 0] as [number, number], halfSize: [1.62, 0.99] as [number, number], radius: 0.2 },
     /** Option row centres, top to bottom. */
     optionRowY: [0.66, 0.22, -0.22, -0.66],
-    submit: { center: [0, -1.44] as [number, number], halfSize: [1.3, 0.26] as [number, number], radius: 0.13 },
+    submit: { center: [COLUMN_X, -1.44] as [number, number], halfSize: [1.24, 0.26] as [number, number], radius: 0.13 },
+} as const;
+
+/**
+ * Marker glyphs that call out the correct and the wrong answer.
+ *
+ * They sit in the left gutter rather than colouring the option itself, so the
+ * option's own shape stays the only thing saying whether it is raised or
+ * pressed. Position tracks the option width so the gutter never collides.
+ */
+export const MARKER = {
+    halfSize: [0.28, 0.2] as [number, number],
+    /** Clearance between the marker and the left edge of an option. */
+    gap: 0.05,
+    /** Multiple of `elevation`. Above 1 so a marker stands proud of an option. */
+    elevationRatio: 1.7,
+    /** Multiple of `falloff`. Tight, so the glyph reads as a hard edged object. */
+    falloffRatio: 0.85,
 } as const;
 
 /**

@@ -99,7 +99,8 @@ Release is never tweened, since an ease-out lands dead and reads as a plastic bu
 | --- | --- |
 | `preset` | Switches between spandex and carbon fibre. Pushes a whole set of values back into the panel rather than hiding them, so everything stays tweakable after the switch. |
 | `baseColor` | Colour of the undisturbed sheet. |
-| `accentColor` | Colour of a correct answer's plateau. |
+| `accentColor` | Colour of the correct marker glyph. |
+| `wrongColor` | Colour of the wrong marker glyph. |
 | `weaveScale` | Thread crossings per plane unit. Higher is a finer knit. Above roughly 40 the weave starts to alias on a 560px canvas. |
 | `weaveIntensity` | Depth of the weave's normal perturbation. |
 | `stretchAnisotropy` | How much the weave spreads along the direction of stretch. Roughly, thread spacing in the slope band grows by `1 / (1 - stretchAnisotropy)`, so values below about 0.4 are hard to see, and none of it is visible unless the weave itself is visible. Turn `weaveIntensity` up before judging this one. |
@@ -132,7 +133,7 @@ Release is never tweened, since an ease-out lands dead and reads as a plastic bu
 | Control | What it does |
 | --- | --- |
 | `lightPosition` | World position of the key light. Keep the Z component well below X and Y. A light close to head-on darkens every slope regardless of which way it faces, which removes the difference between an up facing and a down facing slope and makes shapes read as dents. Moving it toward one axis makes that thread direction dominate the weave. |
-| `cameraTilt` | Degrees away from looking straight down the sheet's normal. At 0 the slopes are hard to read. It no longer trades against `elevation`. |
+| `cameraTilt` | Degrees away from looking straight down the sheet's normal. At 0 the slopes are hard to read. It no longer trades against `elevation`. Capped at 35, which is the widest tilt the plane still fills. |
 | `showTray` | Whether the options sit inside a sunken well. Off by default. |
 
 ## Deliberate deviations from the brief
@@ -144,11 +145,49 @@ Release is never tweened, since an ease-out lands dead and reads as a plastic bu
 - **Lights are shader uniforms, not r3f light nodes.**
   A raw `ShaderMaterial` does not consume three's light uniforms.
   `lightPosition` is still exposed in leva.
-- **The correct state uses `accentmint` rather than the app's `accentgreen`.**
-  `#007542` is dark enough that a lit membrane loses all its slope shading under it.
+- **The option rows are never tinted, in any state.**
+  See below.
+
+## Feedback without colour
+
+An option's surface says one thing and one thing only: whether it is raised or
+pressed.
+No state tints the row, because a colour shift competes with that reading.
+A lighter patch reads as nearer, so tinting a pressed option actively fights the
+press it is supposed to be showing.
+
+Correctness is called out separately, by a marker glyph in the left gutter:
+
+- An **arrow** beside the correct answer, in `correctGreen`.
+- A **cross** beside the answer the player picked, if it was wrong, in
+  `incorrectRed`.
+
+The glyphs are `matte` features. The weave and the tension ridges are suppressed
+across their plateau and their highlight tightens, so they read as hard objects
+sitting in the fabric rather than as more fabric.
+They stand proud of the options, and their x position tracks the option width so
+the gutter never collides.
+
+`correctGreen` was already in the theme and unused by the app, which reaches for
+the much darker `accentgreen`.
+
+Two things about glyph SDFs are worth knowing before adding more:
+
+- A primitive union needs real overlap.
+  The arrow's shaft originally butted exactly against its head, which leaves the
+  union's distance at zero along the seam, and the profile maps zero to the base
+  plane, so a slot was cut clean through the glyph.
+- Every part of a glyph has to stay thicker than the slope band, or it never
+  reaches the plateau and renders as a separate lower blob.
 
 ## Performance
 
-The fragment shader evaluates the height function five times per pixel, over a bounded loop of 8 features.
-Device pixel ratio is capped at 1.75 and the plane subdivision is kept to what smooth displacement actually needs.
-Inactive feature slots take a uniform branch, which is coherent across the whole draw.
+The fragment shader evaluates the height function five times per pixel, over a bounded loop of 10 features.
+Device pixel ratio is capped at 1.75.
+Inactive feature slots take a uniform branch, which is coherent across the whole draw, so the two marker slots cost nothing until an answer is submitted.
+
+Plane subdivision is the one number worth being careful with.
+The membrane is happy at 192, but the marker glyphs are small and hard edged, and at 192 their slope band was narrower than a single quad, which tore the silhouette into spikes.
+288 is the balance point.
+Past roughly 320 the quads fall below two pixels and quad overshading during rasterisation costs more than the extra detail is worth.
+Measured here: 192 segments and 8 features at 120fps, 288 segments and 10 features at 80fps, 384 segments at 74fps.
