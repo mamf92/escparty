@@ -62,6 +62,14 @@ The knee width is what `tension` drives: wide knees give a soft rubbery S curve,
 Positive and negative contributions accumulate separately, so a raised option inside a sunken tray rests on the tray floor instead of cancelling against it.
 Within each sign a smooth maximum stops two adjacent options from stacking into one tall mound.
 
+The camera sits at negative Y, so the near edge of the sheet is the bottom of the screen.
+This is what makes a raised element read as raised: each shape's near slope expands down the screen into a visible band while its far slope hides behind the plateau, which is what a protrusion looks like.
+From positive Y the reverse happens, the visible band sits above every element, and the eye reads the result as a dent.
+It also decouples elevation from tilt, since from positive Y the near slope folds under itself once `tan(tilt)` exceeds `falloff / elevation`.
+
+Lighting follows from that.
+The key light must be well off the view axis, and the fill comes from the front rather than from below, because a fill with a negative Y lifts exactly the down facing slopes that carry the contact shadow.
+
 Text is never rendered into the surface.
 A DOM overlay of real `<button>` elements sits above the canvas, positioned each frame from the orthographic camera's projection of each plateau.
 The DOM layer owns interaction and state, and the shader renders that state.
@@ -94,9 +102,9 @@ Release is never tweened, since an ease-out lands dead and reads as a plastic bu
 | `accentColor` | Colour of a correct answer's plateau. |
 | `weaveScale` | Thread crossings per plane unit. Higher is a finer knit. Above roughly 40 the weave starts to alias on a 560px canvas. |
 | `weaveIntensity` | Depth of the weave's normal perturbation. |
-| `stretchAnisotropy` | How much the weave spreads along the direction of stretch. At 0 the threads keep an even grid across the slope, which reads as printed fabric rather than woven. Roughly, thread spacing in the slope band grows by `1 / (1 - stretchAnisotropy)`. |
-| `ridgeIntensity` | Strength of the tension ridges that run down the slope. |
-| `ridgeFrequency` | How many ridges per plane unit. |
+| `stretchAnisotropy` | How much the weave spreads along the direction of stretch. Roughly, thread spacing in the slope band grows by `1 / (1 - stretchAnisotropy)`, so values below about 0.4 are hard to see, and none of it is visible unless the weave itself is visible. Turn `weaveIntensity` up before judging this one. |
+| `ridgeIntensity` | Strength of the tension ridges that run down the slope. Scaled internally by the slope's own steepness, so it keeps working when `falloff` is tight. As an absolute perturbation it disappeared at narrow falloffs, because the slope's gradient swamped it. |
+| `ridgeFrequency` | How many ridges per plane unit. Above roughly 20 it reads as noise rather than as ridges once `falloff` is narrow, since the slope band is only a few pixels wide. |
 | `thinning` | How much the sheet lightens, brightens its specular, and shallows its weave at maximum stretch. Subtle by design. |
 | `specPower` | Tightness of the specular lobe. Low is a broad soft sheen, high is a narrow glint. |
 | `specIntensity` | Strength of the specular. |
@@ -123,9 +131,9 @@ Release is never tweened, since an ease-out lands dead and reads as a plastic bu
 
 | Control | What it does |
 | --- | --- |
-| `lightPosition` | World position of the key light. Moving it toward one axis makes that thread direction dominate the weave. |
-| `cameraTilt` | Degrees away from looking straight down the sheet's normal. At 0 the slopes are hard to read. |
-| `showTray` | Whether the options sit inside a permanently sunken well. |
+| `lightPosition` | World position of the key light. Keep the Z component well below X and Y. A light close to head-on darkens every slope regardless of which way it faces, which removes the difference between an up facing and a down facing slope and makes shapes read as dents. Moving it toward one axis makes that thread direction dominate the weave. |
+| `cameraTilt` | Degrees away from looking straight down the sheet's normal. At 0 the slopes are hard to read. It no longer trades against `elevation`. |
+| `showTray` | Whether the options sit inside a sunken well. Off by default. |
 
 ## Deliberate deviations from the brief
 

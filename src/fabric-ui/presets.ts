@@ -12,24 +12,24 @@ export const PRESETS: Record<'spandex' | 'carbon', MaterialPreset> = {
      */
     spandex: {
         baseColor: theme.colors.amethyst, // #A56DC6
-        weaveScale: 22,
-        weaveIntensity: 0.26,
+        weaveScale: 60,
+        weaveIntensity: 0.08,
         twill: 0,
         weaveAngle: 0,
-        stretchAniso: 0.6,
-        falloff: 0.1,
+        stretchAniso: 0.17,
+        falloff: 0.065,
         tension: 0.78,
-        specPower: 22,
-        specIntensity: 0.22,
+        specPower: 30,
+        specIntensity: 0.18,
         specAniso: 0,
         specColor: theme.colors.magnolia, // #EEE8F0
         diffuseWrap: 0.5,
         ambient: 0.2,
         keyIntensity: 0.62,
         fillIntensity: 0.18,
-        thinning: 0.6,
-        ridgeIntensity: 0.45,
-        ridgeFrequency: 30,
+        thinning: 0,
+        ridgeIntensity: 0.2,
+        ridgeFrequency: 4,
     },
 
     /**
@@ -48,7 +48,7 @@ export const PRESETS: Record<'spandex' | 'carbon', MaterialPreset> = {
         twill: 1,
         weaveAngle: Math.PI / 4,
         stretchAniso: 0.16,
-        falloff: 0.06,
+        falloff: 0.045,
         tension: 0.96,
         specPower: 40,
         specIntensity: 0.5,

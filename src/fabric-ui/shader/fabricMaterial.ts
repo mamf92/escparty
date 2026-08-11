@@ -128,9 +128,12 @@ void main() {
   // Tension ridges run down the slope, so their phase advances across the
   // contour. Masking on gradient magnitude fades them out on both the plateau
   // and the base plane with no extra bookkeeping.
+  // Scaled by the reference gradient, so the ridges stay proportional to how
+  // steep the slope actually is. As an absolute perturbation they vanished the
+  // moment falloff got tight, since the slope's own gradient swamped them.
   float ridgeMask = smoothstep(0.12, 0.55, stretchAmount);
   float ridge = ridgeDerivative(dot(vPlane, perp) * uRidgeFrequency)
-              * uRidgeIntensity * ridgeMask;
+              * uRidgeIntensity * ridgeMask * uGradRef;
 
   vec2 micro = weave + perp * ridge;
   vec3 nLocal = normalize(vec3(-(grad.x + micro.x), -(grad.y + micro.y), 1.0));
@@ -146,7 +149,10 @@ void main() {
   float ndl = max((dot(N, L) + wrap) / (1.0 + wrap), 0.0);
   float diffuse = pow(ndl, 1.35) * uKeyIntensity;
 
-  vec3 fillDir = normalize(vec3(-0.55, -0.35, 0.75));
+  // Fill comes from the front and slightly opposite the key, never from below.
+  // A fill with a negative Y lifts exactly the down facing slopes that carry the
+  // contact shadow, which cancels the cue that makes a shape read as raised.
+  vec3 fillDir = normalize(vec3(0.45, 0.2, 1.0));
   float fill = max((dot(N, fillDir) + 0.7) / 1.7, 0.0) * uFillIntensity;
 
   float specIntensity = uSpecIntensity * (1.0 + 0.7 * thin);

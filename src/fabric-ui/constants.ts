@@ -60,8 +60,15 @@ export const STATE_ELEVATION = {
     incorrect: -0.8,
 } as const;
 
-/** Depth of the permanently sunken tray the options sit inside. */
-export const TRAY_ELEVATION_RATIO = -0.4;
+/**
+ * Depth of the optional sunken tray the options sit inside.
+ *
+ * Must stay shallower than the shallowest sunken state, which is `selected` at
+ * -0.2667. Negative contributions combine with a smooth minimum, so a tray
+ * deeper than a selected option swallows it flush into the tray floor and it
+ * loses all of its relief.
+ */
+export const TRAY_ELEVATION_RATIO = -0.18;
 /** Resting height of the question card, lower than an option so it reads as backdrop. */
 export const CARD_ELEVATION_RATIO = 0.6667;
 /** Local dimple that follows the pointer while an option is held down. */

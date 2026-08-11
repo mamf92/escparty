@@ -25,7 +25,19 @@ export default function CameraRig({ tilt }: CameraRigProps) {
         if (!(camera instanceof THREE.OrthographicCamera)) return;
 
         const t = THREE.MathUtils.degToRad(tilt);
-        camera.position.set(0, Math.sin(t) * DISTANCE, Math.cos(t) * DISTANCE);
+        // Negative Y, so the near edge of the sheet is the bottom of the screen.
+        //
+        // This is what makes a raised element read as raised. From here each
+        // shape's near slope expands down the screen into a visible band while
+        // its far slope hides behind the plateau, which is what a protrusion
+        // looks like. From +Y the reverse happens, and the visible band sits
+        // above every element, which the eye reads as a dent.
+        //
+        // It also decouples elevation from tilt. From +Y the near slope folds
+        // under itself once tan(tilt) exceeds falloff / elevation, so raising
+        // one control forced you to lower the other. From -Y the near slope
+        // widens monotonically at every tilt.
+        camera.position.set(0, -Math.sin(t) * DISTANCE, Math.cos(t) * DISTANCE);
         camera.up.set(0, 1, 0);
         camera.lookAt(0, 0, 0);
 

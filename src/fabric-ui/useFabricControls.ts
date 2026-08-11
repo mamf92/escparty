@@ -17,7 +17,7 @@ export function useFabricControls() {
             preset: { value: 'spandex', options: ['spandex', 'carbon'] },
             baseColor: spandex.baseColor,
             accentColor: DEFAULT_ACCENT,
-            weaveScale: { value: spandex.weaveScale, min: 4, max: 60, step: 0.5 },
+            weaveScale: { value: spandex.weaveScale, min: 4, max: 140, step: 0.5 },
             weaveIntensity: { value: spandex.weaveIntensity, min: 0, max: 0.8, step: 0.005 },
             stretchAnisotropy: { value: spandex.stretchAniso, min: 0, max: 0.95, step: 0.01 },
             ridgeIntensity: { value: spandex.ridgeIntensity, min: 0, max: 1.2, step: 0.01 },
@@ -28,24 +28,24 @@ export function useFabricControls() {
         }),
 
         Shape: folder({
-            elevation: { value: 0.15, min: 0.02, max: 0.4, step: 0.005 },
-            shapeWidth: { value: 1.52, min: 0.4, max: 1.7, step: 0.01 },
-            shapeHeight: { value: 0.19, min: 0.06, max: 0.32, step: 0.005 },
-            cornerRadius: { value: 0.1, min: 0, max: 0.32, step: 0.005 },
+            elevation: { value: 0.32, min: 0.02, max: 0.6, step: 0.005 },
+            shapeWidth: { value: 1.51, min: 0.4, max: 1.7, step: 0.01 },
+            shapeHeight: { value: 0.16, min: 0.06, max: 0.32, step: 0.005 },
+            cornerRadius: { value: 0.08, min: 0, max: 0.32, step: 0.005 },
             falloff: { value: spandex.falloff, min: 0.02, max: 0.3, step: 0.005 },
             tension: { value: spandex.tension, min: 0, max: 1, step: 0.01 },
         }),
 
         Motion: folder({
-            springFrequency: { value: 14, min: 3, max: 40, step: 0.5 },
-            springDamping: { value: 0.55, min: 0.15, max: 1.2, step: 0.01 },
+            springFrequency: { value: 18.5, min: 3, max: 40, step: 0.5 },
+            springDamping: { value: 0.47, min: 0.15, max: 1.2, step: 0.01 },
             pointerDimple: true,
         }),
 
         Scene: folder({
-            lightPosition: { value: [-2.3, 1.9, 2.2] as [number, number, number], step: 0.1 },
-            cameraTilt: { value: 24, min: 0, max: 50, step: 1 },
-            showTray: true,
+            lightPosition: { value: [-4.6, 4.4, 2.6] as [number, number, number], step: 0.1 },
+            cameraTilt: { value: 15, min: 0, max: 50, step: 1 },
+            showTray: false,
         }),
     }));
 
