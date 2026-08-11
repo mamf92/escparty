@@ -115,8 +115,16 @@ export const STATE_ELEVATION = {
  * loses all of its relief.
  */
 export const TRAY_ELEVATION_RATIO = -0.18;
-/** Resting height of the question card, lower than an option so it reads as backdrop. */
-export const CARD_ELEVATION_RATIO = 0.6667;
+/**
+ * The question card is debossed, not raised.
+ *
+ * The rule the demo settles on is that elevation means interactive: raised is
+ * something you can press, debossed is a label pressed into the material, and
+ * flat is the ground. Giving a non interactive surface a coloured cap like the
+ * marker glyphs was the other option, but then colour stops meaning "result"
+ * and the check and cross lose their punch.
+ */
+export const CARD_ELEVATION_RATIO = -0.32;
 /** Local dimple that follows the pointer while an option is held down. */
 export const POINTER_DIMPLE_RATIO = -0.6;
 export const POINTER_DIMPLE_RADIUS = 0.16;

@@ -53,6 +53,14 @@ uniform float uThinning;
 uniform float uGradRef;        // gradient magnitude that counts as full stretch
 uniform float uNormalEps;
 
+// 0 woven, 1 felt, 2 sequin
+uniform float uSurfaceMode;
+uniform float uSheenIntensity;
+uniform float uSheenPower;
+uniform vec3  uSheenColor;
+uniform float uSequinTilt;
+uniform float uSequinDome;
+
 const float TAU = 6.28318530718;
 
 /**
@@ -74,6 +82,30 @@ vec2 weaveGradient(vec2 uv, float twillMix) {
   float warp = mix(1.0, 0.45, over);
   float weft = mix(0.45, 1.0, over);
   return vec2(warp * cos(TAU * uv.x), weft * cos(TAU * uv.y));
+}
+
+vec2 hash22(vec2 p) {
+  float n = dot(p, vec2(127.1, 311.7));
+  return fract(sin(vec2(n, n * 1.37 + 1.0)) * vec2(43758.5453, 22578.1459));
+}
+
+/**
+ * Felt. Matted fibres rather than an ordered weave, so no grid: a few octaves
+ * of cheap trigonometric noise whose derivative is known in closed form.
+ */
+vec2 feltGradient(vec2 uv) {
+  vec2 g = vec2(0.0);
+  vec2 q = uv;
+  float a = 1.0;
+  for (int i = 0; i < 3; i++) {
+    g += a * vec2(
+      cos(q.x * 1.7 + sin(q.y * 2.3)),
+      cos(q.y * 1.9 + sin(q.x * 2.1))
+    );
+    q *= 2.13;
+    a *= 0.55;
+  }
+  return g;
 }
 
 /** Irregular ridge derivative, used directly as a normal perturbation. */
@@ -122,10 +154,38 @@ void main() {
 
   // Threads pulled apart cover less area, so the weave relief shallows out
   // exactly where the sheet is stretched thinnest.
-  // Matte features drop the weave entirely, so a marker glyph reads as a hard
-  // untextured surface rather than as more fabric.
+  // Matte features drop the surface detail entirely, so a marker glyph reads as
+  // a hard untextured object rather than as more fabric.
   float weaveAmp = uWeaveIntensity * (1.0 - 0.4 * thin) * (1.0 - f.matte);
-  vec2 weave = weaveGradient(weaveUv, uWeaveTwill) * weaveAmp;
+
+  vec2 weave;
+  float surfaceAo = 1.0;   // gaps between discrete elements, such as sequins
+  float specMask = 1.0;    // how much of the specular this surface carries
+  float specTighten = 1.0;
+
+  if (uSurfaceMode < 0.5) {
+    weave = weaveGradient(weaveUv, uWeaveTwill) * weaveAmp;
+  } else if (uSurfaceMode < 1.5) {
+    weave = feltGradient(weaveUv) * weaveAmp;
+  } else {
+    // Sequins. An offset grid of discs, each sitting at its own angle, which is
+    // what makes the surface glitter: one lobe, hundreds of independent
+    // normals, so only a scattered few catch it at any moment.
+    vec2 su = weaveUv;
+    su.x += mod(floor(su.y), 2.0) * 0.5;
+    vec2 cell = floor(su);
+    vec2 local = fract(su) - 0.5;
+    float disc = smoothstep(0.47, 0.38, length(local));
+
+    vec2 rnd = hash22(cell) - 0.5;
+    // Random tilt per disc, plus a slight dome across each one.
+    weave = (rnd * uSequinTilt + local * uSequinDome) * disc;
+
+    // The thread showing between the discs.
+    surfaceAo = mix(0.45, 1.0, disc);
+    specMask = mix(0.08, 1.0, disc);
+    specTighten = 5.0;
+  }
 
   // Tension ridges run down the slope, so their phase advances across the
   // contour. Masking on gradient magnitude fades them out on both the plateau
@@ -159,8 +219,9 @@ void main() {
 
   // A matte feature is not dull, it is smooth. Tighter and brighter highlight,
   // which is what separates a moulded plastic marker from woven cloth.
-  float specPower = mix(uSpecPower, uSpecPower * 2.2, f.matte);
-  float specIntensity = uSpecIntensity * (1.0 + 0.7 * thin) * mix(1.0, 2.0, f.matte);
+  float specPower = mix(uSpecPower, uSpecPower * 2.2, f.matte) * specTighten;
+  float specIntensity = uSpecIntensity * (1.0 + 0.7 * thin)
+                      * mix(1.0, 2.0, f.matte) * mix(specMask, 1.0, f.matte);
   float specIso = pow(max(dot(N, H), 0.0), specPower);
 
   // Kajiya Kay style lobe for the twill, tight and aligned to the warp. The
@@ -178,9 +239,19 @@ void main() {
 
   // Cheap contact shading so the sunken tray reads as a well rather than a
   // flat darker patch.
-  float ao = 1.0 - 0.22 * clamp(-f.h / 0.12, 0.0, 1.0);
+  float ao = (1.0 - 0.22 * clamp(-f.h / 0.12, 0.0, 1.0)) * mix(surfaceAo, 1.0, f.matte);
 
-  vec3 color = base * (uAmbient + diffuse * uKeyColor + fill) * ao + spec * uSpecColor;
+  // Sheen. Fibres standing off the surface scatter light back at grazing
+  // angles, which is why cloth carries a soft rim that moulded plastic never
+  // does. This one term does more to sell fabric than any amount of weave
+  // detail, and it is suppressed on matte features so they stay hard.
+  float grazing = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), uSheenPower);
+  float sheenLight = clamp(dot(N, L) * 0.5 + 0.5, 0.0, 1.0);
+  vec3 sheen = uSheenColor * grazing * sheenLight * uSheenIntensity * (1.0 - f.matte);
+
+  vec3 color = base * (uAmbient + diffuse * uKeyColor + fill) * ao
+             + spec * uSpecColor
+             + sheen * base;
 
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>

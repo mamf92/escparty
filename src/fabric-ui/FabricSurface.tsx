@@ -14,8 +14,8 @@ import {
 } from './constants';
 import { FABRIC_FRAGMENT, FABRIC_VERTEX } from './shader/fabricMaterial';
 import { createSpring, shakeOffset, stepSpring, type Spring } from './springs';
-import { applyRect, type OverlayBridge } from './overlayBridge';
-import { PRESETS } from './presets';
+import { applyQuad, type OverlayBridge } from './overlayBridge';
+import { PRESETS, SURFACE_INDEX } from './presets';
 import type { FabricFeature, FabricShape, OptionState } from './types';
 import type { FabricControls } from './useFabricControls';
 
@@ -110,6 +110,13 @@ export default function FabricSurface({
             uThinning: { value: 0.75 },
             uGradRef: { value: 1 },
             uNormalEps: { value: 0.006 },
+
+            uSurfaceMode: { value: 0 },
+            uSheenIntensity: { value: 0.55 },
+            uSheenPower: { value: 2.6 },
+            uSheenColor: { value: new THREE.Color('#D5B8E6') },
+            uSequinTilt: { value: 0 },
+            uSequinDome: { value: 0 },
         }),
         [],
     );
@@ -148,6 +155,7 @@ export default function FabricSurface({
             elevation,
             falloff,
             pointerDimple,
+            sheen,
         } = controls;
 
         // Incorrect answers shake horizontally. Detect the transition here so
@@ -274,6 +282,12 @@ export default function FabricSurface({
         u.uKeyIntensity.value = look.keyIntensity;
         u.uFillIntensity.value = look.fillIntensity;
         u.uSpecColor.value.set(look.specColor);
+        u.uSurfaceMode.value = SURFACE_INDEX[look.surface];
+        u.uSheenIntensity.value = sheen;
+        u.uSheenPower.value = look.sheenPower;
+        u.uSheenColor.value.set(look.sheenColor);
+        u.uSequinTilt.value = look.sequinTilt;
+        u.uSequinDome.value = look.sequinDome;
 
         // The steepest slope the current settings can produce. Used to
         // normalise the stretch and ridge masks so they stay put when the
@@ -299,16 +313,38 @@ export default function FabricSurface({
             const hw = feature.halfSize[0];
             const hh = feature.halfSize[1];
 
+            // Centre plus the screen images of the plateau's own two axes.
             scratch.v.set(cx, cy, h).project(camera);
             scratch.edgeA.set(cx + hw, cy, h).project(camera);
             scratch.edgeB.set(cx, cy + hh, h).project(camera);
 
-            const rect = bridge.rects[i];
-            rect.x = (scratch.v.x * 0.5 + 0.5) * size.width;
-            rect.y = (-scratch.v.y * 0.5 + 0.5) * size.height;
-            rect.width = Math.abs(scratch.edgeA.x - scratch.v.x) * size.width;
-            rect.height = Math.abs(scratch.edgeB.y - scratch.v.y) * size.height;
-            applyRect(bridge, i);
+            const halfW = size.width * 0.5;
+            const halfH = size.height * 0.5;
+            const px = (scratch.v.x * 0.5 + 0.5) * size.width;
+            const py = (-scratch.v.y * 0.5 + 0.5) * size.height;
+            const ux = (scratch.edgeA.x - scratch.v.x) * halfW;
+            const uy = -(scratch.edgeA.y - scratch.v.y) * halfH;
+            const vx = (scratch.edgeB.x - scratch.v.x) * halfW;
+            const vy = -(scratch.edgeB.y - scratch.v.y) * halfH;
+
+            // The element keeps its unforeshortened size, so the matrix carries
+            // every bit of the foreshortening and shear rather than sharing it
+            // with the box model.
+            const zoom = (camera as THREE.OrthographicCamera).zoom;
+            const w = Math.max(2 * hw * zoom, 1);
+            const hpx = Math.max(2 * hh * zoom, 1);
+
+            const quad = bridge.quads[i];
+            quad.a = (2 * ux) / w;
+            quad.b = (2 * uy) / w;
+            // Element y runs down the screen while plane y runs up it.
+            quad.c = (-2 * vx) / hpx;
+            quad.d = (-2 * vy) / hpx;
+            quad.e = px - (quad.a * w) / 2 - (quad.c * hpx) / 2;
+            quad.f = py - (quad.b * w) / 2 - (quad.d * hpx) / 2;
+            quad.width = w;
+            quad.height = hpx;
+            applyQuad(bridge, i);
         }
     });
 

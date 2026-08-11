@@ -42,16 +42,28 @@ export interface FabricFeature {
     matte?: boolean;
 }
 
-/** Screen space rectangle of a feature plateau, used to place the DOM overlay. */
-export interface ProjectedRect {
-    x: number;
-    y: number;
+/**
+ * A feature plateau projected to screen space, as a CSS affine matrix plus the
+ * element's own unforeshortened box. The matrix carries all the tilt, yaw and
+ * shear, so the DOM label lies on the panel instead of hovering over it.
+ */
+export interface ProjectedQuad {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    e: number;
+    f: number;
     width: number;
     height: number;
 }
 
+export type SurfaceMode = 'woven' | 'felt' | 'sequin';
+
 export interface MaterialPreset {
     baseColor: string;
+    /** Which micro surface model the fragment shader runs. */
+    surface: SurfaceMode;
     weaveScale: number;
     weaveIntensity: number;
     /** 0 plain knit, 1 two by two twill. */
@@ -72,4 +84,11 @@ export interface MaterialPreset {
     thinning: number;
     ridgeIntensity: number;
     ridgeFrequency: number;
+    /** Grazing angle sheen. The main thing separating cloth from plastic. */
+    sheenIntensity: number;
+    sheenPower: number;
+    sheenColor: string;
+    /** Sequin only. Spread of the per disc random tilt, and the dome across one. */
+    sequinTilt: number;
+    sequinDome: number;
 }

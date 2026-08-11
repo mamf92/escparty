@@ -75,6 +75,11 @@ The key light must be well off the view axis, and the fill comes from the front 
 
 Text is never rendered into the surface.
 A DOM overlay of real `<button>` elements sits above the canvas, positioned each frame from the orthographic camera's projection of each plateau.
+
+Positioned is too weak a word for it.
+A plain translate leaves the label axis aligned while the plateau under it projects to a parallelogram, and the text then reads as floating above the panel rather than printed onto it, which gets worse the further the camera swings off axis.
+Each element instead receives the full CSS affine matrix that maps its own box onto that parallelogram, so the text foreshortens and shears with the panel it belongs to.
+The element keeps its unforeshortened size and the matrix carries all of the distortion, rather than sharing it with the box model.
 The DOM layer owns interaction and state, and the shader renders that state.
 This gives crisp type, a working tab order, screen reader support, and no raycasting hit test logic.
 
@@ -117,6 +122,7 @@ Making `pressed` the deepest point and `selected` shallower did the opposite, si
 | `thinning` | How much the sheet lightens, brightens its specular, and shallows its weave at maximum stretch. Subtle by design. |
 | `specPower` | Tightness of the specular lobe. Low is a broad soft sheen, high is a narrow glint. |
 | `specIntensity` | Strength of the specular. |
+| `sheen` | Grazing angle scatter. This is the single term that separates cloth from moulded plastic, and it is worth setting to zero once just to see how fast every preset collapses back into vacuum formed plastic without it. |
 
 ### Shape
 
@@ -143,6 +149,8 @@ Making `pressed` the deepest point and `selected` shallower did the opposite, si
 | `lightPosition` | World position of the key light. Keep the Z component well below X and Y. A light close to head-on darkens every slope regardless of which way it faces, which removes the difference between an up facing and a down facing slope and makes shapes read as dents. Moving it toward one axis makes that thread direction dominate the weave. |
 | `cameraTilt` | Degrees the camera drops below the sheet's normal. At 0 the slopes are hard to read. It no longer trades against `elevation`. Capped at 35, which is the widest angle the plane still fills. |
 | `cameraYaw` | Degrees the camera swings left of the sheet's normal. Positive is left. Off both axes each shape shows two side faces instead of one, which reads as depth far more strongly than shading alone. |
+| `parallax` | Whether the viewpoint follows the device, or the pointer where there is no device orientation to read. |
+| `parallaxStrength` | Peak parallax swing in degrees, on each axis. |
 | `showTray` | Whether the options sit inside a sunken well. Off by default. |
 
 ## Deliberate deviations from the brief
@@ -156,6 +164,40 @@ Making `pressed` the deepest point and `selected` shallower did the opposite, si
   `lightPosition` is still exposed in leva.
 - **The option rows are never tinted, in any state.**
   See below.
+
+## Materials
+
+Four presets, all deriving their colours from the app's token set.
+
+| Preset | What it is |
+| --- | --- |
+| `spandex` | Knit stretch fabric. Broad soft specular, fine knit, high stretch response. |
+| `felt` | Pressed wool. No weave at all, since felt is matted fibre rather than ordered thread. Almost no specular, a very wide terminator, and the sheen doing nearly all of the work. |
+| `sequin` | An offset grid of discs, each at its own random angle. One light source lands on a scattered few at a time, so the surface glitters as the sheet or the viewpoint moves. |
+| `carbon` | Woven twill. Narrow falloff, near linear profile, low stretch response, and a tight highlight aligned to the warp. |
+
+The first three all lean on one term more than anything else: **sheen**.
+Fibres standing off a surface scatter light back at grazing angles, which is why cloth carries a soft rim that moulded plastic never does.
+Before it was added, every preset read as a vacuum formed plastic tray no matter how much weave detail was piled on, because weave detail is a texture problem and this was a BRDF problem.
+
+### Why not a texture library
+
+Free CC0 PBR fabric scans are excellent, and none of them fit here.
+A baked normal map cannot stretch.
+It would sit rigidly on a membrane whose entire premise is that the weave spreads under tension, and the texture would visibly swim against the deformation wherever the sheet moves.
+Everything here stays procedural so that it can respond to the height field's own gradient.
+
+## Surfaces you cannot press
+
+Elevation means interactive.
+
+- **Raised** is something you can press.
+- **Debossed** is a label pressed into the material, like the question card.
+- **Flat** is the ground.
+
+The alternative was to give non interactive surfaces a flat theme coloured cap, the same treatment as the marker glyphs.
+That was rejected on purpose: if every non interactive surface carries a colour, colour stops meaning "result" and the check and cross lose their punch.
+Shape carries the distinction instead, the same way it carries pressed versus raised.
 
 ## Feedback without colour
 

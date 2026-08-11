@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { folder, useControls } from 'leva';
-import { MARKER_COLOR, PRESETS } from './presets';
+import { MARKER_COLOR, PRESETS, PRESET_NAMES, type PresetName } from './presets';
 
 const spandex = PRESETS.spandex;
 
@@ -14,7 +14,7 @@ const spandex = PRESETS.spandex;
 export function useFabricControls() {
     const [values, set] = useControls(() => ({
         Material: folder({
-            preset: { value: 'spandex', options: ['spandex', 'carbon'] },
+            preset: { value: 'spandex', options: PRESET_NAMES },
             baseColor: spandex.baseColor,
             accentColor: MARKER_COLOR.correct,
             wrongColor: MARKER_COLOR.wrong,
@@ -25,7 +25,8 @@ export function useFabricControls() {
             ridgeFrequency: { value: spandex.ridgeFrequency, min: 4, max: 90, step: 1 },
             thinning: { value: spandex.thinning, min: 0, max: 2, step: 0.01 },
             specPower: { value: spandex.specPower, min: 2, max: 80, step: 1 },
-            specIntensity: { value: spandex.specIntensity, min: 0, max: 1.5, step: 0.01 },
+            specIntensity: { value: spandex.specIntensity, min: 0, max: 2, step: 0.01 },
+            sheen: { value: spandex.sheenIntensity, min: 0, max: 1.5, step: 0.01 },
         }),
 
         Shape: folder({
@@ -46,13 +47,17 @@ export function useFabricControls() {
         Scene: folder({
             lightPosition: { value: [-4.6, 4.4, 2.6] as [number, number, number], step: 0.1 },
             cameraTilt: { value: 15, min: 0, max: 35, step: 1 },
-            cameraYaw: { value: 14, min: -35, max: 35, step: 1 },
+            cameraYaw: { value: 8, min: -35, max: 35, step: 1 },
+            parallax: true,
+            parallaxStrength: { value: 9, min: 0, max: 25, step: 0.5 },
             showTray: false,
         }),
     }));
 
     // leva widens a select's value to string, so narrow it back here.
-    const preset: PresetName = values.preset === 'carbon' ? 'carbon' : 'spandex';
+    const preset: PresetName = (PRESET_NAMES as string[]).includes(values.preset)
+        ? (values.preset as PresetName)
+        : 'spandex';
     const applied = useRef<PresetName | null>(null);
 
     useEffect(() => {
@@ -72,11 +77,11 @@ export function useFabricControls() {
             specIntensity: p.specIntensity,
             falloff: p.falloff,
             tension: p.tension,
+            sheen: p.sheenIntensity,
         });
     }, [preset, set]);
 
     return { ...values, preset };
 }
 
-export type PresetName = 'spandex' | 'carbon';
 export type FabricControls = ReturnType<typeof useFabricControls>;

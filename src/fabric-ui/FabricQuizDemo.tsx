@@ -24,6 +24,7 @@ import {
 import { createOverlayBridge } from './overlayBridge';
 import type { FabricFeature, OptionState } from './types';
 import { useFabricControls } from './useFabricControls';
+import { useParallax } from './useParallax';
 
 const colorScratch = new THREE.Color();
 
@@ -37,6 +38,10 @@ const NO_TINT: [number, number, number] = [0, 0, 0];
 
 export default function FabricQuizDemo() {
     const controls = useFabricControls();
+    const { offset: parallax, needsPermission, requestMotion } = useParallax(
+        controls.parallax,
+        controls.parallaxStrength,
+    );
 
     const [questions, setQuestions] = useState<QuizQuestion[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -326,7 +331,7 @@ export default function FabricQuizDemo() {
                     gl={{ antialias: true }}
                     camera={{ position: [0, 3, 7], zoom: 140, near: 0.1, far: 40 }}
                 >
-                    <CameraRig tilt={controls.cameraTilt} yaw={controls.cameraYaw} />
+                    <CameraRig tilt={controls.cameraTilt} yaw={controls.cameraYaw} parallax={parallax} />
                     <FabricSurface
                         features={features}
                         optionStates={optionStates}
@@ -393,6 +398,11 @@ export default function FabricQuizDemo() {
             </Stage>
 
             <Footer>
+                {needsPermission && controls.parallax && (
+                    <MotionButton type="button" onClick={requestMotion}>
+                        Enable motion parallax
+                    </MotionButton>
+                )}
                 <StateRow aria-live="polite">
                     {optionStates.slice(0, options.length).map((state, i) => (
                         <StateChip key={options[i]} $state={state}>
@@ -471,6 +481,7 @@ const Plateau = styled.div`
   justify-content: center;
   text-align: center;
   padding: 0 0.75rem;
+  transform-origin: 0 0;
   will-change: transform;
 `;
 
@@ -496,6 +507,7 @@ const fabricButton = `
   background: transparent;
   border: none;
   cursor: pointer;
+  transform-origin: 0 0;
   will-change: transform;
   font-weight: 700;
   color: #ffffff;
@@ -562,6 +574,18 @@ const StateChip = styled.span<{ $state: OptionState }>`
   border-radius: 999px;
   color: ${({ theme }) => theme.colors.nightblue};
   background: ${({ $state }) => STATE_CHIP_COLOR[$state]};
+`;
+
+const MotionButton = styled.button`
+  font-family: ${({ theme }) => theme.fonts.body};
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 0.0625rem solid ${({ theme }) => theme.colors.amethyst}; /* 1px */
+  background: transparent;
+  color: ${({ theme }) => theme.colors.pinkLavender};
+  cursor: pointer;
 `;
 
 const BackLink = styled(Link)`
