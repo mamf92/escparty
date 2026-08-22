@@ -89,3 +89,18 @@
   font-weight: 400;
   opacity: 0.72;
 }
+
+/*
+  A chosen answer stays pressed in.
+
+  The stylesheet reads selection as a lift, which is right for a toggle but
+  wrong here: the membrane mode shows a chosen answer sunk into the sheet, and
+  a lift is also far too close to the resting state to spot. Chosen holds the
+  sink instead, so both modes agree and the choice is unmistakable.
+*/
+.lycra.is-chosen,
+.lycra.is-chosen:hover {
+  transform: translate(1px, 2px);
+  background: var(--lyc-face-down);
+  box-shadow: var(--lyc-sink);
+}

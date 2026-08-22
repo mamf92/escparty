@@ -46,7 +46,8 @@ function Glyph({ kind }: { kind: 'correct' | 'wrong' }) {
 function classes(item: OverlayItem): string {
     const out = ['lycra', 'is-block'];
     if (!item.interactive) out.push('is-static');
-    if (item.selected || item.level === 'high') out.push('is-selected');
+    if (item.selected) out.push('is-chosen');
+    if (item.level === 'high') out.push('is-selected');
     if (item.level === 'high') out.push('is-high');
     if (item.level === 'low') out.push('is-low');
     if (item.marker) out.push('is-marked');
