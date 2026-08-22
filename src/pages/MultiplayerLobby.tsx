@@ -97,7 +97,7 @@ const MultiplayerLobby = () => {
       const playerId = uuidv4();
 
       // Get a unique name for the player
-      let randomName = await getUniquePlayerName(joinCode.toUpperCase(), ESC_WINNERS);
+      const randomName = await getUniquePlayerName(joinCode.toUpperCase(), ESC_WINNERS);
 
       // Join the room in Firestore
       const joined = await joinRoom(joinCode.toUpperCase(), playerId, randomName);
@@ -114,15 +114,16 @@ const MultiplayerLobby = () => {
       } else {
         alert("Game not found or already started!");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { message: string };
       console.error("Error joining game:", error);
       
       // Specific error messages
-      if (error.message.includes('Security rules')) {
+      if (err.message.includes('Security rules')) {
         alert("Unable to join game due to security restrictions. Please try again.");
-      } else if (error.message.includes('not found')) {
+      } else if (err.message.includes('not found')) {
         alert("Game not found! Please check the code and try again.");
-      } else if (error.message.includes('already started')) {
+      } else if (err.message.includes('already started')) {
         alert("This game has already started!");
       } else {
         alert("Failed to join game. Please try again.");

@@ -81,10 +81,8 @@ const directImportQuizData = async (difficulty: QuizDifficulty): Promise<QuizQue
     console.log(`🔍 Attempting direct import for ${difficulty} quiz`);
 
     try {
-        let quizData;
-
-        // Force type assertion to any to avoid TypeScript errors with dynamic imports
-        let importPromise: Promise<any>;
+        // The three JSON modules share a shape, narrowed after the race below.
+        let importPromise: Promise<{ default?: unknown }>;
 
         switch (difficulty) {
             case 'easy':
@@ -106,7 +104,7 @@ const directImportQuizData = async (difficulty: QuizDifficulty): Promise<QuizQue
             setTimeout(() => reject(new Error('Import timeout after 5 seconds')), 5000);
         });
 
-        quizData = await Promise.race([importPromise, timeoutPromise]);
+        const quizData = (await Promise.race([importPromise, timeoutPromise])) as { default?: unknown };
 
         if (quizData?.default && Array.isArray(quizData.default)) {
             console.log('✅ Successfully loaded quiz data via direct import:', quizData.default.length, 'questions');
