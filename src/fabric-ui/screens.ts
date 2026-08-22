@@ -29,6 +29,17 @@ export interface OverlayItem {
     /** Rendered as aria-pressed on an interactive item. */
     selected?: boolean;
     scale?: 'body' | 'lead';
+    /**
+     * Correctness, for renderers that cannot push a glyph through the sheet and
+     * have to draw one instead.
+     */
+    marker?: 'correct' | 'wrong';
+    /**
+     * Where this sits in the surface's elevation ladder. The membrane reads a
+     * continuous elevation off the feature; a shadow based renderer only has
+     * discrete steps, so it reads this.
+     */
+    level?: 'high' | 'rest' | 'low';
     onSelect?: () => void;
     onHover?: (on: boolean) => void;
     onPress?: (on: boolean) => void;
@@ -187,6 +198,8 @@ export function buildQuizScreen(input: QuizScreenInput): ScreenBuild {
                 interactive: true,
                 disabled: input.submitted,
                 selected: state === 'selected',
+                marker: state === 'correct' ? 'correct' : state === 'incorrect' ? 'wrong' : undefined,
+                level: state === 'correct' ? 'high' : state === 'incorrect' ? 'low' : 'rest',
                 onSelect: () => input.onSelectOption(i),
                 onHover: (on) => input.onHoverOption(i, on),
                 onPress: (on) => input.onPressOption(i, on),
@@ -330,6 +343,7 @@ export function buildResultsScreen(input: ResultsScreenInput): ScreenBuild {
             text: `${i + 1}.  ${row.name}`,
             sub: `${row.score}`,
             interactive: false,
+            level: i === 0 ? 'high' : i === rows.length - 1 ? 'low' : 'rest',
         });
     });
 

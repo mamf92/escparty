@@ -181,21 +181,58 @@ Making `pressed` the deepest point and `selected` shallower did the opposite, si
 
 ## Sparkle is opt in
 
-Two modes, switched from the toolbar.
+Two modes, switched from the toolbar. They are not two skins of the same
+renderer, they are two renderers over one content model.
 
 | | Calm | Sparkle |
 | --- | --- | --- |
-| Material | felt | sequin |
-| Parallax | off | on, at full strength |
-| Camera | fixed modest tilt and yaw | dead on, motion supplies the depth |
-| Spring damping | 0.78, settles flat | 0.47, settles with a bounce |
+| Surface | `lycra-surface.css`, stacked box shadows | displaced height field in WebGL |
+| Runs on | the CPU, no GPU work at all | the GPU, five field evaluations per pixel |
+| Motion | none beyond the press itself | device or pointer parallax at full strength |
+| Camera | not applicable | dead on, motion supplies the depth |
 
-Calm is what everyone lands on, and that is a deliberate default rather than a modest one.
-Parallax is viewport coupled motion, which is exactly the thing that makes motion sensitive people ill, and the operating system already publishes that preference through `prefers-reduced-motion`.
-A system level reduced motion setting outranks the switch entirely: flipping to sparkle still swaps the material, but the parallax stays off.
+Calm is what everyone lands on, and that is a deliberate default rather than a
+modest one.
+Parallax is viewport coupled motion, which is exactly the thing that makes
+motion sensitive people ill, and the operating system already publishes that
+preference through `prefers-reduced-motion`.
+A system level reduced motion setting outranks the switch entirely: flipping to
+sparkle still swaps the surface, but the parallax stays off.
 
-Calm is not a stripped down mode.
-Felt at a fixed tilt reads as depth without any motion at all, which is the point: the affordance survives turning every effect off.
+Both modes render from the same `OverlayItem[]` the screen builders produce, so
+they cannot drift apart in what they say, only in how they say it.
+The membrane reads a continuous elevation off each feature; the shadow renderer
+only has three steps, so `OverlayItem.level` tells it which one to use.
+
+### The calm surface
+
+`lycra-surface.css` is vendored byte for byte from the file the project owner
+supplied, including its own comments, so it stays diffable against its source.
+Demo specific additions live in `calm.css` next to it and never edit the
+original.
+
+Two things about it are worth knowing before changing anything:
+
+- **It needs a dark, non-flat ground.** The pane is translucent and its
+  `backdrop-filter` has nothing to refract against a flat fill, so `.calm-ground`
+  is a dependency rather than decoration.
+- **Controls have to stay direct siblings of the pane.** The stylesheet's nicest
+  detail is `.lycra:active + .lycra`, which tugs a pressed key's neighbours a
+  couple of pixels toward the dent. Wrapping each control in a row silently
+  kills it, which is why the correctness markers are positioned out of each
+  control rather than sitting beside it.
+
+Its `:disabled` rule drops a control to 0.42 opacity and flattens it into a
+groove, which is right for an unavailable control and wrong for a settled
+answer, so rows carrying a marker opt back out of it in `calm.css`.
+
+Note that the original brief ruled out a CSS box shadow fallback. That call was
+reversed on purpose: calm is not a fallback, it is the landing experience, and
+it needs to be a conventional interface rather than a degraded membrane.
+
+## Materials
+
+Sparkle mode only.
 
 ## Materials
 

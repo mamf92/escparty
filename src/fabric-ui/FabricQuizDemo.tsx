@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { loadQuizData, type QuizQuestion } from '../utils/QuizDataProvider';
 import CameraRig from './CameraRig';
 import FabricSurface from './FabricSurface';
+import CalmSurface from './CalmSurface';
 import { OPTION_COUNT } from './constants';
 import { createOverlayBridge } from './overlayBridge';
 import {
@@ -237,9 +238,9 @@ export default function FabricQuizDemo() {
             <Header>
                 <Title>Fabric UI</Title>
                 <Subtitle>
-                    Three ESCParty screens rebuilt as shapes pushing through a stretched
-                    membrane. Elevation is the affordance: raised with a darker plate is a
-                    control, raised and plain is information, pressed in is chosen.
+                    Three ESCParty screens on a stretched fabric surface. Calm draws it with
+                    stacked shadows, on the CPU, with no motion. Sparkle pushes the same
+                    screens through a real membrane in WebGL.
                 </Subtitle>
             </Header>
 
@@ -270,31 +271,35 @@ export default function FabricQuizDemo() {
                 </SparkleToggle>
             </Toolbar>
 
-            <Stage ref={stageRef}>
-                <Canvas
-                    orthographic
-                    dpr={[1, 1.75]}
-                    gl={{ antialias: true }}
-                    camera={{ position: [0, 3, 7], zoom: 140, near: 0.1, far: 40 }}
-                >
-                    <CameraRig
-                        tilt={controls.cameraTilt}
-                        yaw={controls.cameraYaw}
-                        parallax={parallax}
-                    />
-                    <FabricSurface features={build.features} controls={controls} bridge={bridge} />
-                </Canvas>
-
-                <Overlay>
-                    {build.items.map((item) => (
-                        <OverlayElement
-                            key={item.key}
-                            item={item}
-                            register={registerElement(item.slot)}
+            {controls.sparkle ? (
+                <Stage ref={stageRef}>
+                    <Canvas
+                        orthographic
+                        dpr={[1, 1.75]}
+                        gl={{ antialias: true }}
+                        camera={{ position: [0, 3, 7], zoom: 140, near: 0.1, far: 40 }}
+                    >
+                        <CameraRig
+                            tilt={controls.cameraTilt}
+                            yaw={controls.cameraYaw}
+                            parallax={parallax}
                         />
-                    ))}
-                </Overlay>
-            </Stage>
+                        <FabricSurface features={build.features} controls={controls} bridge={bridge} />
+                    </Canvas>
+
+                    <Overlay>
+                        {build.items.map((item) => (
+                            <OverlayElement
+                                key={item.key}
+                                item={item}
+                                register={registerElement(item.slot)}
+                            />
+                        ))}
+                    </Overlay>
+                </Stage>
+            ) : (
+                <CalmSurface items={build.items} />
+            )}
 
             <Footer>
                 {needsPermission && controls.parallax && (

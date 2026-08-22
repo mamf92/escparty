@@ -1,0 +1,153 @@
+/*
+  Vendored verbatim from lycra-surface.css supplied by the project owner.
+  Left byte for byte as authored, including its own comments, so it stays
+  diffable against the source it came from.
+*/
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Nocturne — Lycra surface (variant A: contact + flank)
+   Fabric stretched over a flat-topped prism with rounded corners.
+
+   Drop this file in, wrap a region in .lycra-pane, and give any control the
+   .lycra class. Requires a dark, non-flat ground behind the pane — the pane is
+   translucent and needs something to refract.
+
+     <div class="lycra-pane">
+       <button class="lycra">Lock in</button>
+       <input class="lycra-field" placeholder="Your name" />
+     </div>
+
+   The physics, so tweaks stay consistent:
+   · Light is fixed top-left on every surface. Never flip it per component.
+   · The crown is DEAD FLAT — no gradient across the face. Flat means flat; a
+     gradient there reads as a dome and the illusion dies.
+   · All curvature lives in three layers: a 1px contact line where the skin
+     leaves the top edge, a steep ~6px flank right under it, and a long faint
+     tail easing into the pane.
+   · Shading is dark-dominant. On a dark ground a fabric slope mostly reads as
+     surface turned AWAY from light, so the shadow flank carries roughly 3x the
+     weight of the lit one. Resist adding white.
+   · Only two states move: press sinks, selection lifts. No glow, no scale.
+   · Pressed = the prism retracts and the skin falls into the socket, so the
+     outward shading disappears entirely and you read the outline of the hole.
+   · Timing is asymmetric: an 80ms hard drop, a 420ms overshoot on release,
+     because lycra snaps back past its rest position before settling.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --lyc-ink: 4, 2, 16;          /* shadow color, as r,g,b */
+  --lyc-radius: 12px;
+  --lyc-gap: 18px;              /* narrower than the flank: neighbouring hems overlap */
+
+  /* at rest — the prism pushes the skin up */
+  --lyc-rise:
+    inset 0 1px 0 rgba(255,255,255,0.36), inset 1px 0 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.38), inset -1px 0 0 rgba(0,0,0,0.17),
+    2px 3px 5px rgba(var(--lyc-ink),0.52),
+    -2px -2px 5px rgba(255,255,255,0.05),
+    6px 9px 24px rgba(var(--lyc-ink),0.33),
+    -4px -6px 22px rgba(255,255,255,0.028),
+    13px 19px 64px rgba(var(--lyc-ink),0.17),
+    -9px -12px 56px rgba(255,255,255,0.014);
+
+  /* selected — the same prism pushed further out */
+  --lyc-rise-high:
+    inset 0 1px 0 rgba(255,255,255,0.46), inset 1px 0 0 rgba(255,255,255,0.16),
+    inset 0 -1px 0 rgba(0,0,0,0.4), inset -1px 0 0 rgba(0,0,0,0.19),
+    3px 4px 7px rgba(var(--lyc-ink),0.56),
+    -3px -3px 7px rgba(255,255,255,0.065),
+    8px 12px 32px rgba(var(--lyc-ink),0.38),
+    -5px -8px 30px rgba(255,255,255,0.036),
+    18px 26px 84px rgba(var(--lyc-ink),0.2),
+    -12px -16px 74px rgba(255,255,255,0.018);
+
+  /* pressed — the prism retracts, the skin falls into the cavity */
+  --lyc-sink:
+    inset 0 0 0 1px rgba(var(--lyc-ink),0.55),
+    inset 3px 5px 2px rgba(var(--lyc-ink),0.85),
+    inset 9px 13px 18px rgba(var(--lyc-ink),0.6),
+    inset 18px 22px 38px rgba(var(--lyc-ink),0.32),
+    inset -2px -3px 2px rgba(255,255,255,0.24),
+    inset -9px -12px 20px rgba(255,255,255,0.1);
+
+  /* a channel that never rises — fields, tracks, wells */
+  --lyc-groove:
+    inset 0 0 0 1px rgba(var(--lyc-ink),0.34),
+    inset 2px 4px 2px rgba(var(--lyc-ink),0.6),
+    inset 7px 10px 16px rgba(var(--lyc-ink),0.36),
+    inset -2px -3px 2px rgba(255,255,255,0.16),
+    inset -7px -9px 16px rgba(255,255,255,0.05);
+
+  /* the crown: flat, with corner tenting only where the rounded shoulders
+     stretch the skin hardest */
+  --lyc-face:
+    radial-gradient(16px 16px at 0 0, rgba(255,255,255,0.085), transparent 74%),
+    radial-gradient(16px 16px at 100% 0, rgba(255,255,255,0.055), transparent 74%),
+    radial-gradient(18px 18px at 0 100%, rgba(255,255,255,0.03), transparent 74%),
+    radial-gradient(18px 18px at 100% 100%, rgba(0,0,0,0.08), transparent 74%),
+    linear-gradient(rgba(255,255,255,0.048), rgba(255,255,255,0.042));
+  --lyc-face-hover:
+    radial-gradient(16px 16px at 0 0, rgba(255,255,255,0.12), transparent 74%),
+    radial-gradient(16px 16px at 100% 0, rgba(255,255,255,0.08), transparent 74%),
+    radial-gradient(18px 18px at 0 100%, rgba(255,255,255,0.045), transparent 74%),
+    radial-gradient(18px 18px at 100% 100%, rgba(0,0,0,0.08), transparent 74%),
+    linear-gradient(rgba(255,255,255,0.07), rgba(255,255,255,0.062));
+  --lyc-face-down: rgba(255,255,255,0.005);
+
+  --lyc-in: 80ms cubic-bezier(.35,0,.9,.4);
+  --lyc-out: 420ms cubic-bezier(.16,1.62,.32,1);
+}
+
+/* the pane — one sheet of skin; controls are things pushed up through it */
+.lycra-pane {
+  position: relative; isolation: isolate;
+  display: grid; gap: var(--lyc-gap); padding: 32px 24px;
+  background: rgba(255,255,255,0.05);
+  -webkit-backdrop-filter: blur(16px) saturate(155%); backdrop-filter: blur(16px) saturate(155%);
+  border: 1px solid rgba(255,255,255,0.16); border-radius: 22px;
+  box-shadow: 0 12px 32px rgba(var(--lyc-ink),0.45), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+/* the control */
+.lycra {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 48px; padding: 15px 20px; cursor: pointer; text-decoration: none;
+  font: inherit; font-weight: 600; font-size: 15px; line-height: 1.2; color: inherit;
+  border: 0; border-radius: var(--lyc-radius);
+  background: var(--lyc-face);
+  box-shadow: var(--lyc-rise);
+  transition: box-shadow var(--lyc-out), transform var(--lyc-out), background 200ms ease;
+}
+.lycra:hover { background: var(--lyc-face-hover); }
+.lycra:active, .lycra.is-pressed {
+  transform: translate(1px, 2px);
+  background: var(--lyc-face-down);
+  box-shadow: var(--lyc-sink);
+  transition: box-shadow var(--lyc-in), transform var(--lyc-in), background var(--lyc-in);
+}
+.lycra.is-selected { transform: translate(-1px, -2px); box-shadow: var(--lyc-rise-high); }
+.lycra.is-selected:active { transform: translate(1px, 2px); box-shadow: var(--lyc-sink); }
+.lycra:disabled, .lycra[aria-disabled='true'] { opacity: 0.42; cursor: not-allowed; transform: none; box-shadow: var(--lyc-groove); background: var(--lyc-face-down); }
+.lycra:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+
+/* fabric tension — the skin between two keys never fully flattens, so pressing
+   one tugs its neighbours a couple of pixels toward the dent */
+.lycra:active + .lycra { transform: translateY(-2px) scaleY(0.995); }
+.lycra:has(+ .lycra:active) { transform: translateY(2px) scaleY(0.995); }
+
+/* the inverse cut — fields and tracks, sunken and static */
+.lycra-field, .lycra-well {
+  width: 100%; min-height: 48px; padding: 13px 16px; font: inherit; font-size: 15px; color: inherit;
+  border: 0; border-radius: var(--lyc-radius);
+  background: var(--lyc-face-down);
+  box-shadow: var(--lyc-groove);
+}
+.lycra-field::placeholder { color: rgba(255,255,255,0.38); }
+.lycra-field:focus-visible { outline: none; box-shadow: var(--lyc-groove), 0 0 0 1px currentColor; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lycra { transition: box-shadow 120ms linear, background 120ms linear; }
+  .lycra:active, .lycra.is-pressed { transform: none; transition: box-shadow 80ms linear, background 80ms linear; }
+  .lycra.is-selected { transform: none; }
+  .lycra:active + .lycra, .lycra:has(+ .lycra:active) { transform: none; }
+}
