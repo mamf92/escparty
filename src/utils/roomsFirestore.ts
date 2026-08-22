@@ -6,7 +6,8 @@ import {
     arrayUnion,
     onSnapshot,
     serverTimestamp,
-    Timestamp
+    Timestamp,
+    FieldValue
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -15,7 +16,7 @@ export interface Player {
     id: string;
     name: string;
     score: number;
-    joinedAt?: any; // Firestore timestamp
+    joinedAt?: Timestamp | FieldValue;
 }
 
 export interface Room {
@@ -23,7 +24,7 @@ export interface Room {
     hostId: string;
     started: boolean;
     difficulty?: string;
-    createdAt: any; // Firestore timestamp
+    createdAt: Timestamp | FieldValue;
     players: Player[];
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
     continueReady?: boolean; // Flag to indicate if host has signaled to continue to next question
@@ -90,7 +91,8 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
         console.log(`Room ${roomCode} created successfully`);
     } catch (error) {
         console.error("Error creating room:", error);
-        console.error("Error details:", (error as any)?.code, (error as any)?.message);
+        const detail = error as { code?: string; message?: string };
+        console.error("Error details:", detail?.code, detail?.message);
         console.error("Stack:", (error as Error).stack);
         throw new Error(`Failed to create room: ${(error as Error).message}`);
     }
@@ -162,10 +164,11 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
             players: arrayUnion(newPlayer)
         });
         
-    } catch (error: any) {
+    } catch (error) {
+        const err = error as { code?: string; message: string };
         console.error("Error adding player to room:", error);
         
-        if (error.code === 'permission-denied') {
+        if (err.code === 'permission-denied') {
             throw new Error("Security rules prevented joining the room");
         }
         
@@ -410,13 +413,14 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
         // Add player to room
         await addPlayerToRoom(roomCode, playerId, playerName);
         return true;
-    } catch (error: any) {
+    } catch (error) {
+        const err = error as { code?: string; message: string };
         console.error("Error joining room:", error);
         
-        if (error.code === 'permission-denied' || error.message.includes('Security rules')) {
+        if (err.code === 'permission-denied' || err.message.includes('Security rules')) {
             throw new Error("Failed to join room: Security rules prevented access");
         }
         
-        throw new Error(`Failed to join room: ${error.message}`);
+        throw new Error(`Failed to join room: ${err.message}`);
     }
 };

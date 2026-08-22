@@ -19,6 +19,12 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // The codebase already marks deliberately unused bindings with a leading
+      // underscore, so make the linter agree with the convention.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+      ],
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },

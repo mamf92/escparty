@@ -55,7 +55,9 @@ export const useGameStore = create<GameState>((set) => ({
       sessionStorage.removeItem('playerName');
       sessionStorage.removeItem('isHost');
       sessionStorage.removeItem('multiplayerGame');
-    } catch {}
+    } catch {
+      // Storage can be unavailable in private mode. Nothing to recover here.
+    }
   },
 }));
 

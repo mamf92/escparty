@@ -1,0 +1,332 @@
+# Fabric UI
+
+A proof of concept for a UI style where interface elements push up through, or sink down into, a taut sheet of elastic fabric.
+It is adjacent to neumorphism, but the surface is a stretched membrane rather than a moulded plastic panel.
+The sheet shows tension ridges sloping from each shape's edge down to a flat base plane, the weave visibly thins and spreads where the material is pulled, and it responds elastically to press and release.
+
+This is a prototype, not a production component library.
+
+## Three screens
+
+The demo carries three ESCParty screens, switchable from the tab strip.
+
+| Screen | Source | What it shows off |
+| --- | --- | --- |
+| `difficulty` | `src/pages/SelectDifficulty.tsx` | Controls carrying a label and a blurb, with the real copy. |
+| `quiz` | `src/components/Quiz.tsx` | The full interaction state range and the correctness markers. |
+| `results` | `src/pages/QuizResults.tsx` | A ranked list where **elevation encodes rank**. |
+
+The results screen is the best argument for the whole idea.
+First place literally stands highest out of the sheet and last place is nearly flush with it, so the ranking is readable before you have read a single number.
+A flat list cannot do that.
+
+## What it reimplements
+
+The **answer option list** from the ESCParty quiz: `OptionsContainer` and `OptionButton` in `src/components/Quiz.tsx`.
+
+That component was picked because it exercises the full state range, and because its real props map one to one onto the elevation table below.
+
+| Real prop in `Quiz.tsx` | Demo state |
+| --- | --- |
+| default | idle |
+| pointer over, or keyboard focus | hover |
+| pointer held down | pressed |
+| `$isSelected` | selected |
+| `$isCorrect` | correct |
+| `$isWrong` | incorrect |
+
+Content is real.
+Questions load through the app's own `loadQuizData('easy')` from `src/utils/QuizDataProvider.ts`, so the demo shows the same Eurovision questions the app does.
+Colours derive from `src/styles/theme.ts` rather than being invented.
+
+## Running it
+
+```bash
+npm install
+npm run dev
+```
+
+Then open `http://localhost:5173/#/fabric-ui`.
+
+There is nothing to install beyond the repo's own dependencies.
+The route is lazy loaded, so `three`, `@react-three/fiber` and `leva` stay out of the app's main bundle and only this page pays for them.
+
+Click an option, then Submit answer, to see selected, correct and incorrect.
+Tab, Enter and Space operate the options with a visible focus ring.
+Hold the pointer down anywhere on the sheet and drag to see the local pointer dimple.
+
+## How it works
+
+The fabric is **not** simulated.
+There is no mass spring system, no Verlet integration, no cloth solver.
+The sheet is always taut and pinned at its edges, and it is deformed only by shapes whose position and size are known in advance, so a solver would be expensive, would settle unpredictably, and would never produce the crisp flat plateau the design needs.
+
+Instead the fabric is a displaced height field evaluated analytically in a shader.
+
+1. A single `PlaneGeometry` at 192 by 192 segments, rendered with a custom `ShaderMaterial`.
+2. A `features` array in TypeScript describes every element on the sheet, and is uploaded as uniform arrays with a fixed `MAX_FEATURES` of 8.
+3. Height at a point is the accumulation of each feature's profile against its signed distance function.
+   Elevation is signed, which is what lets a selected answer read as pressed in while its neighbours stay raised.
+4. The vertex shader displaces along the surface normal for silhouette.
+   The fragment shader re-evaluates the same height function at four small offsets to derive per pixel normals, which keeps the slope smooth without raising tessellation.
+
+The slope profile is a linear ramp with soft knees at both ends, built from a smooth maximum against 0 and a smooth minimum against 1.
+The knee width is what `tension` drives: wide knees give a soft rubbery S curve, narrow knees give a near straight slope with sharp shoulders.
+
+Positive and negative contributions accumulate separately, so a raised option inside a sunken tray rests on the tray floor instead of cancelling against it.
+Within each sign a smooth maximum stops two adjacent options from stacking into one tall mound.
+
+The camera sits at negative Y and swings a little to the left, so the near edge of the sheet is the bottom of the screen and each shape shows two side faces rather than one.
+Being off both axes is what carries the depth; shading on its own is ambiguous.
+
+The negative Y in particular is load bearing.
+This is what makes a raised element read as raised: each shape's near slope expands down the screen into a visible band while its far slope hides behind the plateau, which is what a protrusion looks like.
+From positive Y the reverse happens, the visible band sits above every element, and the eye reads the result as a dent.
+It also decouples elevation from tilt, since from positive Y the near slope folds under itself once `tan(tilt)` exceeds `falloff / elevation`.
+
+Lighting follows from that.
+The key light must be well off the view axis, and the fill comes from the front rather than from below, because a fill with a negative Y lifts exactly the down facing slopes that carry the contact shadow.
+
+Text is never rendered into the surface.
+A DOM overlay of real `<button>` elements sits above the canvas, positioned each frame from the orthographic camera's projection of each plateau.
+
+Positioned is too weak a word for it.
+A plain translate leaves the label axis aligned while the plateau under it projects to a parallelogram, and the text then reads as floating above the panel rather than printed onto it, which gets worse the further the camera swings off axis.
+Each element instead receives the full CSS affine matrix that maps its own box onto that parallelogram, so the text foreshortens and shears with the panel it belongs to.
+The element keeps its unforeshortened size and the matrix carries all of the distortion, rather than sharing it with the box model.
+The DOM layer owns interaction and state, and the shader renders that state.
+This gives crisp type, a working tab order, screen reader support, and no raycasting hit test logic.
+
+Per feature, an independent critically underdamped spring drives current elevation toward target elevation.
+Release is never tweened, since an ease-out lands dead and reads as a plastic button.
+
+`selected` is the resting pushed in depth, and `pressed` sits deeper than it.
+Holding an option therefore drives it past where it will end up, and letting go settles it back onto the full depth with one small bounce.
+Measured on the overlay's screen position: idle to held is 21px, and release settles at 18px after overshooting to 17px.
+Making `pressed` the deepest point and `selected` shallower did the opposite, sinking the option on click and then raising it to a half depth, which read as the press failing to take.
+
+### Files
+
+| File | Role |
+| --- | --- |
+| `shader/field.glsl.ts` | The height field, shared verbatim by both shader stages |
+| `shader/fabricMaterial.ts` | Vertex and fragment shaders: lighting, weave, stretch, ridges |
+| `FabricSurface.tsx` | Springs, uniform uploads, plateau projection for the overlay |
+| `FabricQuizDemo.tsx` | Quiz logic, DOM overlay, page chrome |
+| `CameraRig.tsx` | Orthographic camera fit and tilt |
+| `constants.ts` | Layout of the sheet and the state to elevation table |
+| `presets.ts` | The two material presets, derived from the app's tokens |
+| `springs.ts` | Second order spring integration and the incorrect shake |
+
+## The leva panel
+
+### Material
+
+| Control | What it does |
+| --- | --- |
+| `preset` | Switches between spandex and carbon fibre. Pushes a whole set of values back into the panel rather than hiding them, so everything stays tweakable after the switch. |
+| `baseColor` | Colour of the undisturbed sheet. |
+| `accentColor` | Colour of the correct marker glyph. |
+| `wrongColor` | Colour of the wrong marker glyph. |
+| `weaveScale` | Thread crossings per plane unit. Higher is a finer knit. Above roughly 40 the weave starts to alias on a 560px canvas. |
+| `weaveIntensity` | Depth of the weave's normal perturbation. |
+| `stretchAnisotropy` | How much the weave spreads along the direction of stretch. Roughly, thread spacing in the slope band grows by `1 / (1 - stretchAnisotropy)`, so values below about 0.4 are hard to see, and none of it is visible unless the weave itself is visible. Turn `weaveIntensity` up before judging this one. |
+| `ridgeIntensity` | Strength of the tension ridges that run down the slope. Scaled internally by the slope's own steepness, so it keeps working when `falloff` is tight. As an absolute perturbation it disappeared at narrow falloffs, because the slope's gradient swamped it. |
+| `ridgeFrequency` | How many ridges per plane unit. Above roughly 20 it reads as noise rather than as ridges once `falloff` is narrow, since the slope band is only a few pixels wide. |
+| `thinning` | How much the sheet lightens, brightens its specular, and shallows its weave at maximum stretch. Subtle by design. |
+| `specPower` | Tightness of the specular lobe. Low is a broad soft sheen, high is a narrow glint. |
+| `specIntensity` | Strength of the specular. |
+| `sheen` | Grazing angle scatter. This is the single term that separates cloth from moulded plastic, and it is worth setting to zero once just to see how fast every preset collapses back into vacuum formed plastic without it. |
+
+### Shape
+
+| Control | What it does |
+| --- | --- |
+| `elevation` | Resting height of an idle option. Every other state is a multiple of this, so raising it scales the whole state table. |
+| `shapeWidth`, `shapeHeight` | Half extents of an option's plateau. |
+| `cornerRadius` | Corner radius of the rounded rectangle SDF. |
+| `falloff` | Width of the slope band. Keep it well under `shapeHeight` or the slope eats the plateau and the shape becomes a dome. |
+| `tension` | Blends the slope profile from a soft S curve at 0 to a near straight ramp with tight knees at 1. This is the control that decides whether the sheet reads as gel or as fabric. |
+
+### Motion
+
+| Control | What it does |
+| --- | --- |
+| `springFrequency` | Angular frequency of the elevation spring, in radians per second. |
+| `springDamping` | Damping ratio. Below 1 the release overshoots once, which is what sells the elasticity. At 1 or above it settles flat. |
+| `pointerDimple` | Whether holding the pointer down adds a local dimple that follows the cursor. It sums on top of the field rather than joining the signed accumulation, so it deforms whatever it is dragged across. |
+
+### Scene
+
+| Control | What it does |
+| --- | --- |
+| `lightPosition` | World position of the key light. Keep the Z component well below X and Y. A light close to head-on darkens every slope regardless of which way it faces, which removes the difference between an up facing and a down facing slope and makes shapes read as dents. Moving it toward one axis makes that thread direction dominate the weave. |
+| `cameraTilt` | Degrees the camera drops below the sheet's normal. At 0 the slopes are hard to read. It no longer trades against `elevation`. Capped at 35, which is the widest angle the plane still fills. |
+| `cameraYaw` | Degrees the camera swings left of the sheet's normal. Positive is left. Off both axes each shape shows two side faces instead of one, which reads as depth far more strongly than shading alone. |
+| `parallax` | Whether the viewpoint follows the device, or the pointer where there is no device orientation to read. |
+| `parallaxStrength` | Peak parallax swing in degrees, on each axis. |
+| `showTray` | Whether the options sit inside a sunken well. Off by default. |
+
+## Deliberate deviations from the brief
+
+- **`@react-three/drei` is not installed.**
+  With a custom `ShaderMaterial` and a manually fitted orthographic camera, not one symbol from it would be imported.
+- **The demo has no countdown timer**, unlike the real component, which auto advances after 10 seconds.
+  A timer would make the states impossible to inspect by hand.
+- **Lights are shader uniforms, not r3f light nodes.**
+  A raw `ShaderMaterial` does not consume three's light uniforms.
+  `lightPosition` is still exposed in leva.
+- **The option rows are never tinted, in any state.**
+  See below.
+
+## Sparkle is opt in
+
+Two modes, switched from the toolbar. They are not two skins of the same
+renderer, they are two renderers over one content model.
+
+| | Calm | Sparkle |
+| --- | --- | --- |
+| Surface | `lycra-surface.css`, stacked box shadows | displaced height field in WebGL |
+| Runs on | the CPU, no GPU work at all | the GPU, five field evaluations per pixel |
+| Motion | none beyond the press itself | device or pointer parallax at full strength |
+| Camera | not applicable | dead on, motion supplies the depth |
+
+Calm is what everyone lands on, and that is a deliberate default rather than a
+modest one.
+Parallax is viewport coupled motion, which is exactly the thing that makes
+motion sensitive people ill, and the operating system already publishes that
+preference through `prefers-reduced-motion`.
+A system level reduced motion setting outranks the switch entirely: flipping to
+sparkle still swaps the surface, but the parallax stays off.
+
+Both modes render from the same `OverlayItem[]` the screen builders produce, so
+they cannot drift apart in what they say, only in how they say it.
+The membrane reads a continuous elevation off each feature; the shadow renderer
+only has three steps, so `OverlayItem.level` tells it which one to use.
+
+### The calm surface
+
+`lycra-surface.css` is vendored byte for byte from the file the project owner
+supplied, including its own comments, so it stays diffable against its source.
+Demo specific additions live in `calm.css` next to it and never edit the
+original.
+
+Two things about it are worth knowing before changing anything:
+
+- **It needs a dark, non-flat ground.** The pane is translucent and its
+  `backdrop-filter` has nothing to refract against a flat fill, so `.calm-ground`
+  is a dependency rather than decoration.
+- **Controls have to stay direct siblings of the pane.** The stylesheet's nicest
+  detail is `.lycra:active + .lycra`, which tugs a pressed key's neighbours a
+  couple of pixels toward the dent. Wrapping each control in a row silently
+  kills it, which is why the correctness markers are positioned out of each
+  control rather than sitting beside it.
+
+Its `:disabled` rule drops a control to 0.42 opacity and flattens it into a
+groove, which is right for an unavailable control and wrong for a settled
+answer, so rows carrying a marker opt back out of it in `calm.css`.
+
+Note that the original brief ruled out a CSS box shadow fallback. That call was
+reversed on purpose: calm is not a fallback, it is the landing experience, and
+it needs to be a conventional interface rather than a degraded membrane.
+
+## Materials
+
+Sparkle mode only.
+
+## Materials
+
+Four presets, all deriving their colours from the app's token set.
+
+| Preset | What it is |
+| --- | --- |
+| `spandex` | Knit stretch fabric. Broad soft specular, fine knit, high stretch response. |
+| `felt` | Pressed wool. No weave at all, since felt is matted fibre rather than ordered thread. Almost no specular, a very wide terminator, and the sheen doing nearly all of the work. |
+| `sequin` | An offset grid of discs, each at its own random angle. One light source lands on a scattered few at a time, so the surface glitters as the sheet or the viewpoint moves. |
+| `carbon` | Woven twill. Narrow falloff, near linear profile, low stretch response, and a tight highlight aligned to the warp. |
+
+The first three all lean on one term more than anything else: **sheen**.
+Fibres standing off a surface scatter light back at grazing angles, which is why cloth carries a soft rim that moulded plastic never does.
+Before it was added, every preset read as a vacuum formed plastic tray no matter how much weave detail was piled on, because weave detail is a texture problem and this was a BRDF problem.
+
+### Why not a texture library
+
+Free CC0 PBR fabric scans are excellent, and none of them fit here.
+A baked normal map cannot stretch.
+It would sit rigidly on a membrane whose entire premise is that the weave spreads under tension, and the texture would visibly swim against the deformation wherever the sheet moves.
+Everything here stays procedural so that it can respond to the height field's own gradient.
+
+## Surfaces you cannot press
+
+A control carries a **darker plate on its flat top**, and nothing else does.
+
+- **Raised with a plate** is something you can press.
+- **Raised and plain** is information, like the question panel.
+- **Pressed in** is chosen.
+- **Flat** is the ground.
+
+The plate stops exactly where the slope begins, using the same top face window as the marker tint, so it never smears down the side and never reads as a shadow.
+
+The alternative was to give non interactive surfaces a flat theme coloured cap, the same treatment as the marker glyphs.
+That was rejected: if every non interactive surface carries a colour, colour stops meaning "result" and the check and cross lose their punch.
+The plate costs no colour at all, which is why it can carry this without competing.
+
+## Feedback without colour
+
+An option's surface says one thing and one thing only: whether it is raised or
+pressed.
+No state tints the row, because a colour shift competes with that reading.
+A lighter patch reads as nearer, so tinting a pressed option actively fights the
+press it is supposed to be showing.
+
+Correctness is called out separately, by a marker glyph in the left gutter:
+
+- A **check mark** beside the correct answer, in `correctGreen`.
+- A **cross** beside the answer the player picked, if it was wrong, in
+  `incorrectRed`.
+
+The glyphs are `matte` features. The weave and the tension ridges are suppressed
+across them and their highlight tightens, so they read as hard objects sitting in
+the fabric rather than as more fabric.
+Both are drawn as capsules, not as rounded boxes.
+The roundness of a Material style icon lives in its stroke: semicircular caps and
+a naturally filleted join where two strokes meet.
+Filleting the corners of a box does not get there.
+Their x position tracks the option width so the gutter never collides.
+
+Colour is confined to the top face. A broader mask lets it run down the extruded
+sides, which reads as a glow bleeding off the glyph instead of a flat coloured
+cap. The transition window is a few pixels wide, enough to stay antialiased
+without smearing.
+
+`correctGreen` was already in the theme and unused by the app, which reaches for
+the much darker `accentgreen`.
+
+Two things about glyph SDFs are worth knowing before adding more:
+
+- A primitive union needs real overlap, not a shared edge.
+  Two shapes whose boundaries touch leave the union's distance at exactly zero
+  along the seam, and the profile maps zero to the base plane, so a slot gets cut
+  clean through the glyph.
+  This is why the strokes of a polyline are capsules sharing an endpoint rather
+  than segments meeting end to end.
+- Every stroke has to stay thicker than the slope band.
+  Below that it is all slope with no plateau, so it never reaches full height and
+  there is no flat top left for the colour to sit on.
+
+## Performance
+
+The fragment shader evaluates the height function five times per pixel, over a bounded loop of 10 features.
+Device pixel ratio is capped at 1.75.
+Inactive feature slots take a uniform branch, which is coherent across the whole draw, so the two marker slots cost nothing until an answer is submitted.
+
+Plane subdivision is the one number worth being careful with.
+The membrane is happy at 192, but the marker glyphs are small and hard edged, and at 192 their slope band was narrower than a single quad, which tore the silhouette into spikes.
+288 clears that.
+384 gives visibly cleaner glyph edges under magnification, but it measured a consistent 20 percent slower and the difference does not show at 1:1.
+
+Be careful measuring this.
+On a 120Hz display every healthy configuration reads as exactly 120fps, so run with vsync disabled or the number tells you nothing.
+Even then, absolute figures on this machine drifted between roughly 60 and 180fps for the same build depending on thermal state and what else was running, so single readings are worthless.
+Paired alternating runs are reproducible: 384 came out slower than 288 in every pair, by about 20 percent.
+Trust the ratio, not the number.

@@ -1,0 +1,106 @@
+/*
+  Demo side companion to lycra-surface.css.
+
+  The vendored stylesheet is left untouched. Everything here is either the
+  ground it asks for, or a variant the demo needs and it does not ship.
+*/
+
+/*
+  "Requires a dark, non-flat ground behind the pane." A flat fill gives the
+  pane's backdrop-filter nothing to refract and the whole thing goes dead, so
+  this is a real dependency rather than decoration.
+*/
+.calm-ground {
+  position: relative;
+  width: min(92vw, 35rem);
+  padding: 1.5rem 1.25rem;
+  border-radius: 1.375rem;
+  background:
+    radial-gradient(120% 90% at 12% 4%, #3a1a63 0%, transparent 58%),
+    radial-gradient(110% 80% at 88% 96%, #2a0f4d 0%, transparent 62%),
+    radial-gradient(70% 60% at 78% 12%, #4a1f6e 0%, transparent 70%),
+    #120a28;
+}
+
+/*
+  Room for the marker gutter.
+
+  The controls stay direct siblings inside the pane rather than each sitting in
+  a wrapper, because the stylesheet's fabric tension rules key off
+  `.lycra:active + .lycra`. Wrapping them silently kills the nicest detail in
+  the file, so the markers are positioned out of each control instead.
+*/
+.calm-ground .lycra-pane {
+  padding-left: 3.5rem;
+}
+
+.calm-marker {
+  position: absolute;
+  left: -2.25rem;
+  top: 50%;
+  translate: 0 -50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A raised surface that is not a control: information, so no pointer, no hover. */
+.lycra.is-static {
+  cursor: default;
+}
+.lycra.is-static:hover {
+  background: var(--lyc-face);
+}
+
+.lycra.is-block {
+  width: 100%;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: center;
+}
+
+/* Bottom of the ladder: flush with the sheet rather than proud of it. */
+.lycra.is-low {
+  box-shadow: var(--lyc-groove);
+  background: var(--lyc-face-down);
+}
+
+/*
+  A settled answer is not interactive any more, but it is the most important
+  thing on the screen. The vendored disabled rule drops it to 0.42 opacity and
+  flattens it into a groove, which is right for an unavailable control and
+  wrong for a result, so marked rows opt back out of it.
+*/
+.lycra.is-marked:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.lycra.is-marked.is-high:disabled {
+  background: var(--lyc-face);
+  box-shadow: var(--lyc-rise-high);
+}
+.lycra.is-marked.is-low:disabled {
+  background: var(--lyc-face-down);
+  box-shadow: var(--lyc-groove);
+}
+
+.calm-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.72;
+}
+
+/*
+  A chosen answer stays pressed in.
+
+  The stylesheet reads selection as a lift, which is right for a toggle but
+  wrong here: the membrane mode shows a chosen answer sunk into the sheet, and
+  a lift is also far too close to the resting state to spot. Chosen holds the
+  sink instead, so both modes agree and the choice is unmistakable.
+*/
+.lycra.is-chosen,
+.lycra.is-chosen:hover {
+  transform: translate(1px, 2px);
+  background: var(--lyc-face-down);
+  box-shadow: var(--lyc-sink);
+}

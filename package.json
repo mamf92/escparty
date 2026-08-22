@@ -14,13 +14,16 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.7.0",
     "@types/uuid": "^10.0.0",
     "firebase": "^11.7.1",
+    "leva": "^0.10.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.4.0",
     "react-router-dom": "^7.1.5",
     "styled-components": "^6.1.15",
+    "three": "^0.185.1",
     "uuid": "^11.1.0",
     "zustand": "^5.0.13"
   },
@@ -30,6 +33,7 @@
     "@types/react-dom": "^19.0.3",
     "@types/react-router-dom": "^5.3.3",
     "@types/styled-components": "^5.1.34",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^9.19.0",
     "eslint-plugin-react-hooks": "^5.0.0",
