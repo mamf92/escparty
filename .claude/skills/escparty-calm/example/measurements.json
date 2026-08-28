@@ -1,0 +1,37 @@
+{
+  "_source": "Measured from the live app at commit f82f676, rendered headless at 900x1400 dpr2. Colour figures from the .calm-ground crop; CSS figures read from lycra-surface.css and calm.css.",
+  "accent_coverage_pct": 0.042,
+  "type_sizes_px": [
+    15,
+    12
+  ],
+  "tinted_control_states": [],
+  "outer_shadow_blurs_px": [
+    5,
+    24,
+    64
+  ],
+  "outer_shadow_alphas": {
+    "dark": [
+      0.52,
+      0.33,
+      0.17
+    ],
+    "light": [
+      0.05,
+      0.028,
+      0.014
+    ]
+  },
+  "press_ms": 80,
+  "release_ms": 420,
+  "controls_not_direct_children": 0,
+  "reduced_motion_transforms": [
+    "none",
+    "none",
+    "none",
+    "none"
+  ],
+  "face_gradient_alpha_delta": 0.006,
+  "_face_gradient_note": "--lyc-face runs linear-gradient(rgba(255,255,255,0.048), rgba(255,255,255,0.042)); delta 0.006. Corner radials (0.085/0.055/0.03 white, 0.08 black) are shoulders, not crown, and are excluded."
+}
