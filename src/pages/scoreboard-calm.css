@@ -13,6 +13,27 @@
 .scoreboard-calm .calm-ground {
   width: 100%;
   padding: 1.25rem 1rem;
+
+  /*
+    The ground is re-pooled for a tall card.
+
+    calm.css puts its two bright pools at 12% 4% and 78% 12% and its darkest at
+    88% 96%. On the demo's near-square 560px card that reads as even. On a
+    ~350x1100 list it becomes a monotonic top-to-bottom brightness ramp, and
+    measured against the real render that ramp swamped the elevation it is
+    supposed to sit behind: the proud row came out DARKER than three of the
+    rows at rest, purely because it sat lower down the card.
+
+    Same three hues, same "dark, non-flat ground" the backdrop-filter needs,
+    but the pools are mirrored top and bottom so vertical position carries no
+    brightness of its own and the shadows are left to say everything.
+  */
+  background:
+    radial-gradient(80% 28% at 10% 8%, #3a1a63 0%, transparent 62%),
+    radial-gradient(80% 28% at 90% 92%, #3a1a63 0%, transparent 62%),
+    radial-gradient(62% 22% at 88% 34%, #4a1f6e 0%, transparent 66%),
+    radial-gradient(62% 22% at 12% 68%, #4a1f6e 0%, transparent 66%),
+    #190c31;
 }
 
 /*
@@ -39,6 +60,42 @@
   to the canvas width. Shrinking it with the card would widen the visual gap
   between hems and the sheet would stop reading as continuous.
 */
+
+/*
+  A stronger proud step, for a ladder rather than a selection.
+
+  PROPOSED AMENDMENT to the Calm language — not something it already had.
+
+  --lyc-rise-high is only 1.4x the blur and 1.08x the alpha of the resting
+  rise. That is a RELATIVE cue: ample when a selected option sits directly
+  beside unselected peers, which is the only place the demo ever uses it.
+  Scattered down a six row list there is nothing adjacent to read it against,
+  and measured on the real render the proud row's contact shadow (0.121) fell
+  INSIDE the spread of the rows at rest (0.102-0.149). The archetype's whole
+  claim -- that the ranking reads before any number does -- was false.
+
+  The membrane twin does not have this problem because its elevation is
+  continuous over a 2.65x span, so every row sits at its own height and the
+  eye reads a slope. Three discrete steps cannot do that, and the language's
+  stated ceiling of "about eight rows" is too generous at the proud end.
+
+  So this scales the same physics up rather than inventing new ones:
+    - the same three outer layers, blurs 12/56/150, holding the language's
+      1 : ~4.7 : ~12.5 ratio (rest is 5/24/64, selected is 7/32/84)
+    - dark-dominant preserved: 9.7x, 11.5x and 11.8x, all above the 8x floor
+    - light still fixed top-left, contact line still 1px, crown still flat
+*/
+.scoreboard-calm .lycra.is-rank.is-high {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.52), inset 1px 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.42), inset -1px 0 0 rgba(0, 0, 0, 0.2),
+    5px 7px 12px rgba(var(--lyc-ink), 0.68),
+    -4px -5px 11px rgba(255, 255, 255, 0.07),
+    14px 20px 56px rgba(var(--lyc-ink), 0.46),
+    -8px -12px 50px rgba(255, 255, 255, 0.04),
+    32px 46px 150px rgba(var(--lyc-ink), 0.26),
+    -20px -28px 130px rgba(255, 255, 255, 0.022);
+}
 
 .scoreboard-calm .lycra.is-rank {
   align-items: stretch;
