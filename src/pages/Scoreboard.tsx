@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
+import "../fabric-ui/lycra-surface.css";
+import "../fabric-ui/calm.css";
+import "./scoreboard-calm.css";
 
 interface ScoreEntry {
     score: number;
@@ -9,139 +12,262 @@ interface ScoreEntry {
     date: string;
 }
 
+type SortKey = "date" | "difficulty" | "score";
+
+/** The three elevation steps the Calm surface has. */
+type Level = "high" | "rest" | "low";
+
+/*
+  Score leads, because the ladder has to read on arrival.
+
+  The ranked-ladder archetype carries an unstated premise, found by measuring
+  the real render rather than by reading the spec: the list has to be ordered
+  by whatever elevation encodes. `--lyc-rise-high` is only about 10% stronger
+  than the resting rise, which is a relative signal — plenty when the proud row
+  sits beside its peers, invisible when it is scattered somewhere down a list
+  of six. Sorted by score, the ladder descends and the eye reads a slope; the
+  other two sorts are still honest (the best and worst stay marked) but they
+  are a history, not a ranking.
+*/
+const SORTS: { key: SortKey; label: string }[] = [
+    { key: "score", label: "Score" },
+    { key: "date", label: "Date" },
+    { key: "difficulty", label: "Difficulty" },
+];
+
+function ratioOf(entry: ScoreEntry): number {
+    return entry.total > 0 ? entry.score / entry.total : 0;
+}
+
+/**
+ * Elevation encodes the score, never the row's place in the list.
+ *
+ * The ranked-ladder archetype exists so the ranking reads before any number
+ * does. If height tracked list position, sorting by date would put the newest
+ * run highest and the elevation would be telling a lie the numbers underneath
+ * it contradict. Keyed to the score instead, sorting rearranges the rows
+ * without ever relabelling them: a personal best stands proud whichever way
+ * the list is ordered.
+ *
+ * Calm has exactly three steps, so this is best / middle / worst rather than a
+ * continuous ramp. When every run scored the same there is no ranking to show
+ * and the whole list sits at rest — a ladder with one rung is not a ladder.
+ */
+function levelsFor(entries: ScoreEntry[]): Map<ScoreEntry, Level> {
+    const levels = new Map<ScoreEntry, Level>();
+    if (entries.length === 0) return levels;
+
+    const ratios = entries.map(ratioOf);
+    const best = Math.max(...ratios);
+    const worst = Math.min(...ratios);
+
+    for (const entry of entries) {
+        if (best === worst) {
+            levels.set(entry, "rest");
+            continue;
+        }
+        const r = ratioOf(entry);
+        levels.set(entry, r === best ? "high" : r === worst ? "low" : "rest");
+    }
+    return levels;
+}
+
+function rowClass(level: Level): string {
+    const out = ["lycra", "is-block", "is-static", "is-rank"];
+    // `is-selected` carries the taller shadow; `is-high` is what calm.css keys
+    // the settled-result overrides off. The membrane renderer reads the same
+    // pair, so the two modes agree on what "proud" means.
+    if (level === "high") out.push("is-selected", "is-high");
+    if (level === "low") out.push("is-low");
+    return out.join(" ");
+}
+
+function formatDate(iso: string): string {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+        ? "Unknown date"
+        : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 const Scoreboard = () => {
     const navigate = useNavigate();
     const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
-    const [sortKey, setSortKey] = useState<"date" | "difficulty" | "score">("date");
+    const [sortKey, setSortKey] = useState<SortKey>("score");
 
     useEffect(() => {
-        const storedScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-        setScoreHistory(storedScores);
+        try {
+            const stored = JSON.parse(localStorage.getItem("quizScores") || "[]");
+            setScoreHistory(Array.isArray(stored) ? stored : []);
+        } catch {
+            setScoreHistory([]);
+        }
     }, []);
 
-    const sortedScores = [...scoreHistory].sort((a, b) => {
-        if (sortKey === "date") return new Date(b.date).getTime() - new Date(a.date).getTime();
-        if (sortKey === "difficulty") return a.difficulty.localeCompare(b.difficulty);
-        if (sortKey === "score") return b.score - a.score;
-        return 0;
-    });
+    // Levels are computed from the unsorted history, so re-sorting moves rows
+    // without changing how high any of them sits.
+    const levels = useMemo(() => levelsFor(scoreHistory), [scoreHistory]);
+
+    const sortedScores = useMemo(() => {
+        const rows = [...scoreHistory];
+        if (sortKey === "date") {
+            return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        }
+        if (sortKey === "difficulty") {
+            return rows.sort((a, b) => a.difficulty.localeCompare(b.difficulty));
+        }
+        return rows.sort((a, b) => ratioOf(b) - ratioOf(a));
+    }, [scoreHistory, sortKey]);
 
     return (
-        <Container>
-            <Title>📊 Quiz Scoreboard</Title>
+        <Page className="scoreboard-calm">
+            <Header>
+                <Title>Scoreboard</Title>
+                <Subtitle>
+                    {scoreHistory.length === 0
+                        ? "No runs recorded yet."
+                        : `${scoreHistory.length} ${scoreHistory.length === 1 ? "run" : "runs"}. Your best stands highest.`}
+                </Subtitle>
+            </Header>
 
-            <SortContainer>
-                <SortText>Sort by:</SortText>
-                <SortButton onClick={() => setSortKey("date")}>📅 Date</SortButton>
-                <SortButton onClick={() => setSortKey("difficulty")}>🎯 Difficulty</SortButton>
-                <SortButton onClick={() => setSortKey("score")}>🏆 Score</SortButton>
-            </SortContainer>
+            {scoreHistory.length > 1 && (
+                <Toolbar>
+                    <SortTabs role="tablist" aria-label="Sort scores by">
+                        {SORTS.map(({ key, label }) => (
+                            <Tab
+                                key={key}
+                                type="button"
+                                role="tab"
+                                aria-selected={sortKey === key}
+                                $active={sortKey === key}
+                                onClick={() => setSortKey(key)}
+                            >
+                                {label}
+                            </Tab>
+                        ))}
+                    </SortTabs>
+                </Toolbar>
+            )}
 
-            <ScoreTable>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Difficulty</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {sortedScores.map((entry, index) => (
-                        <tr key={index}>
-                            <td>{new Date(entry.date).toLocaleDateString()}</td>
-                            <td>{entry.difficulty}</td>
-                            <td>{entry.score} / {entry.total}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </ScoreTable>
+            <div className="calm-ground">
+                <ol className="lycra-pane">
+                    {sortedScores.length === 0 ? (
+                        <li className="lycra is-block is-static is-rank">
+                            <span className="rank-line">
+                                <span>No runs yet</span>
+                            </span>
+                            <span className="calm-sub">
+                                Play a quiz and your scores land here.
+                            </span>
+                        </li>
+                    ) : (
+                        sortedScores.map((entry, index) => (
+                            <li
+                                key={`${entry.date}-${index}`}
+                                className={rowClass(levels.get(entry) ?? "rest")}
+                            >
+                                <span className="rank-line">
+                                    <span>
+                                        {entry.score} / {entry.total}
+                                    </span>
+                                    <span className="calm-sub">{entry.difficulty}</span>
+                                </span>
+                                <span className="calm-sub">{formatDate(entry.date)}</span>
+                            </li>
+                        ))
+                    )}
+                </ol>
+            </div>
 
-            <BackButton onClick={() => navigate("/")}>🏠 Back to Home</BackButton>
-        </Container>
+            <Footer>
+                <BackButton type="button" onClick={() => navigate("/")}>
+                    Back to ESCParty
+                </BackButton>
+            </Footer>
+        </Page>
     );
 };
 
 export default Scoreboard;
 
-// Styled Components
-const Container = styled.div`
+/*
+  Page chrome. Everything below sits OUTSIDE the surface on purpose.
+
+  The fabric-ui demo draws the same line: the screen tabs and the back link are
+  ordinary styled-components, and only the content itself is .lycra. Keeping
+  navigation out of the pane is also what lets the score rows stay direct
+  siblings — the fabric tension rule keys off `.lycra:active + .lycra`, and a
+  wrapper element around any control kills it silently.
+*/
+
+const Page = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
     width: 100%;
-    max-width: 31.25rem; /* 500px - standardizing width */
-    margin: auto;
+    padding: 0.5rem 0 1.5rem;
+`;
+
+const Header = styled.header`
     text-align: center;
-    padding: 1.25rem; /* 20px */
-    background: ${({ theme }) => theme.colors.white};
 `;
 
-const Title = styled.h2`
+const Title = styled.h1`
     font-family: ${({ theme }) => theme.fonts.heading};
-    color: ${({ theme }) => theme.colors.night};
     font-size: 1.5rem;
-    margin-bottom: 1.25rem; /* 20px */
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: ${({ theme }) => theme.colors.pinkLavender};
+    margin: 0;
 `;
 
-const SortContainer = styled.div`
+const Subtitle = styled.p`
+    margin-top: 0.5rem;
+    font-family: ${({ theme }) => theme.fonts.body};
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: ${({ theme }) => theme.colors.magnolia};
+    opacity: 0.75;
+`;
+
+const Toolbar = styled.div`
     display: flex;
     justify-content: center;
-    align-items: center;
-    gap: 0.625rem; /* 10px */
-    margin-bottom: 0.9375rem; /* 15px */
 `;
 
-const SortText = styled.p`
-    font-size: 1rem;
-    color: ${({ theme }) => theme.colors.black};
-    font-weight: bold;
+const SortTabs = styled.div`
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 999px;
+    background: rgba(213, 184, 230, 0.12);
 `;
 
-const SortButton = styled.button`
-    background: ${({ theme }) => theme.colors.purple};
-    color: white;
-    font-size: 0.9rem;
-    padding: 0.5rem;
+const Tab = styled.button<{ $active: boolean }>`
+    font-family: ${({ theme }) => theme.fonts.body};
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.85rem;
     border: none;
+    border-radius: 999px;
     cursor: pointer;
-    transition: 0.3s;
-
-    &:hover {
-        background: ${({ theme }) => theme.colors.darkpurple};
-    }
+    background: ${({ $active, theme }) => ($active ? theme.colors.amethyst : "transparent")};
+    color: ${({ $active, theme }) => ($active ? theme.colors.nightblue : theme.colors.pinkLavender)};
 `;
 
-const ScoreTable = styled.table`
-    width: 100%;
-    margin-top: 0.625rem; /* 10px */
-    border-collapse: collapse;
-    font-size: 1rem;
-
-    th, td {
-        border: 0.0625rem solid ${({ theme }) => theme.colors.gray}; /* 1px */
-        padding: 0.5rem; /* 8px */
-        text-align: center;
-    }
-
-    th {
-        background: ${({ theme }) => theme.colors.nightblue};
-        color: white;
-    }
-    
-    td {
-        color: ${({ theme }) => theme.colors.black};
-    }
+const Footer = styled.footer`
+    display: flex;
+    justify-content: center;
 `;
 
 const BackButton = styled.button`
-    background: ${({ theme }) => theme.colors.gray};
-    color: white;
-    font-size: 1rem;
-    font-weight: bold;
-    padding: 1rem;
+    font-family: ${({ theme }) => theme.fonts.body};
+    font-size: 0.85rem;
+    background: none;
     border: none;
+    padding: 0.25rem;
     cursor: pointer;
-    margin-top: 1.25rem; /* 20px */
-    width: 100%;
-
-    &:hover {
-        background: ${({ theme }) => theme.colors.night};
-    }
+    text-decoration: underline;
+    color: ${({ theme }) => theme.colors.pinkLavender};
 `;
