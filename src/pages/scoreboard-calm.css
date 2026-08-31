@@ -1,0 +1,55 @@
+/*
+  Page-scoped adaptations of the Calm surface for the Scoreboard.
+
+  calm.css is left alone; everything specific to this screen lives here.
+*/
+
+/*
+  calm.css sizes .calm-ground at min(92vw, 35rem), which is right for the
+  full-bleed fabric-ui demo and wrong inside the 375px phone frame: 92vw
+  resolves against the viewport, not the frame, so the card overflows its
+  container. The ground fills the frame instead.
+*/
+.scoreboard-calm .calm-ground {
+  width: 100%;
+  padding: 1.25rem 1rem;
+}
+
+/*
+  No marker gutter on this screen.
+
+  calm.css reserves 3.5rem on the left of the pane for the correct and wrong
+  glyphs. That emptiness is load-bearing on the quiz screen because something
+  lands in it. Nothing is ever marked here, so the same 56px would just be
+  dead asymmetry on a 335px card.
+*/
+.scoreboard-calm .calm-ground .lycra-pane {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+
+  /* The pane is an <ol> here, for a list that reads as a list. */
+  margin: 0;
+  list-style: none;
+}
+
+/*
+  The gap stays at the vendored 18px rather than scaling with the card.
+
+  It is coupled to the shadow flank, which is absolute (5/24/64px blur), not
+  to the canvas width. Shrinking it with the card would widen the visual gap
+  between hems and the sheet would stop reading as continuous.
+*/
+
+.scoreboard-calm .lycra.is-rank {
+  align-items: stretch;
+  text-align: left;
+}
+
+/* Score and its context sit on one line, at the two ends of the plate. */
+.scoreboard-calm .rank-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
