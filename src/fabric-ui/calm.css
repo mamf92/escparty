@@ -51,6 +51,15 @@
 .lycra.is-static:hover {
   background: var(--lyc-face);
 }
+/*
+  The rule above cancels the hover lift by pinning the raised face colour,
+  which is wrong for a static row that rests in the groove: pointing at the
+  last place row flashed it up to the raised colour. A sunken row keeps its
+  own resting face instead.
+*/
+.lycra.is-static.is-low:hover {
+  background: var(--lyc-face-down);
+}
 
 .lycra.is-block {
   width: 100%;
