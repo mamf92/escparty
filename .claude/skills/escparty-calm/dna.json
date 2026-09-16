@@ -1,0 +1,239 @@
+{
+  "meta": {
+    "name": "ESCParty Calm",
+    "slug": "escparty-calm",
+    "source": [
+      "src/fabric-ui/lycra-surface.css",
+      "src/fabric-ui/calm.css",
+      "src/fabric-ui/CalmSurface.tsx",
+      "src/styles/theme.ts",
+      "captured at commit f82f676"
+    ],
+    "captured": "2026-08-28",
+    "medium_of_origin": "React web app quiz surface, a 560px-wide card rendered at a 900x1400 viewport, deviceScaleFactor 2",
+    "not_copied": [
+      "The ESCParty name and wordmark",
+      "'Eurovision Song Contest' and 'Eurovision' — EBU trademarks. Reproduce the surface system, never the event's marks, logo, or heart-flag device.",
+      "Quiz question content in public/quizdata — it is the app's content, not part of the style"
+    ]
+  },
+
+  "soul": {
+    "one_line": "A dark violet sheet with controls pushed up through it, lit from one fixed corner, where nothing carries colour but a right answer and a wrong one.",
+    "adjectives": ["tactile", "restrained", "nocturnal", "low-contrast", "unhurried"],
+    "lineage": "Neumorphism corrected toward stretched fabric — a taut membrane rather than a moulded plastic panel",
+    "read_distance": "arms-length",
+    "energy": { "density": 4, "variance": 3, "contrast": 4, "warmth": 4 }
+  },
+
+  "palette": {
+    "colors": [
+      {
+        "role": "ground",
+        "hex": "#120a28",
+        "name": "midnight aubergine, pooled with bruised plum (#3a1a63 top-left, #2a0f4d bottom-right, #4a1f6e upper-right)",
+        "coverage": 59
+      },
+      {
+        "role": "raised face",
+        "hex": "#2a1a45",
+        "name": "lifted violet — 5% white laid over the ground, never a colour of its own",
+        "coverage": 40
+      },
+      { "role": "type", "hex": "#EEE8F0", "name": "magnolia", "coverage": 0.9 },
+      { "role": "correct marker", "hex": "#28a745", "name": "signal green", "coverage": 0.02 },
+      { "role": "wrong marker", "hex": "#dc3545", "name": "signal red", "coverage": 0.02 },
+      { "role": "shadow ink", "hex": "#040210", "name": "ink — shadow only, never a fill", "coverage": 0 }
+    ],
+    "mode": "fixed dark — there is no light variant, and the pane's backdrop-filter makes one impossible without a redesign",
+    "banned": [
+      "Never tint a control's surface in any state",
+      "Never let green or red touch anything but a marker glyph",
+      "Never introduce a second accent hue",
+      "Never place a gradient across a control's flat top"
+    ]
+  },
+
+  "type": {
+    "families": [
+      { "role": "display", "family": "Montserrat", "fallback": "'Segoe UI', system-ui, sans-serif", "weights": ["700"], "licence_risk": "SIL OFL — safe to embed and self-host" },
+      { "role": "body", "family": "Open Sans", "fallback": "'Segoe UI', system-ui, sans-serif", "weights": ["400", "600"], "licence_risk": "SIL OFL — safe to embed and self-host" }
+    ],
+    "scale": {
+      "display_to_body_ratio": "1.25:1 (15px control label over 12px sub-label)",
+      "steps": ["15px / 600 control label", "12px / 400 sub-label at 0.72 opacity"],
+      "max_sizes_per_frame": 2
+    },
+    "treatment": {
+      "tracking": "none on controls; 0.08em uppercase reserved for the page title, which is chrome and not part of the surface",
+      "leading": "1.2 on control labels",
+      "case": "sentence case on every control; never uppercase a control label",
+      "measure": "control labels run 1-5 words and never wrap past two lines",
+      "numerals": "no special treatment — this style has no numeric display role"
+    }
+  },
+
+  "space": {
+    "grid": "single column, one control per row, no horizontal subdivision",
+    "margin_pct": 4.3,
+    "gutter_pct": 3.2,
+    "alignment": "text centred within each control; the whole column offset right to clear a 56px left marker gutter",
+    "rhythm": "18px between controls — deliberately narrower than the shadow flank, so neighbouring hems overlap and the sheet reads as continuous",
+    "negative_space": "the 56px left gutter stays empty until an answer settles; it is roughly 10% of the card width and its emptiness is what makes a marker land",
+    "safe_area": {
+      "card": "min(92vw, 35rem) — caps at 560px and never goes full-bleed",
+      "control": "48px minimum height, 15px/20px internal padding"
+    }
+  },
+
+  "surface": {
+    "texture": { "present": false, "note": "No grain, no noise, no pattern anywhere. The surface is defined entirely by shadow geometry." },
+    "edges": "12px radius on controls, 22px on both the pane and the ground. One 1px rgba(255,255,255,0.16) border on the pane; controls carry no border at all.",
+    "elevation": "Three discrete steps only: proud (--lyc-rise-high), rest (--lyc-rise), flush (--lyc-groove). Each built from a 1px contact line, a steep ~6px flank, and a long faint tail.",
+    "imagery": "none — this style ships no photography or illustration",
+    "iconography": "Two glyphs, check and cross, drawn as round-capped strokes at 3.2 stroke-width in a 24px viewBox, rendered 20px. No other icons exist."
+  },
+
+  "signatures": [
+    {
+      "move": "Dark-dominant shading",
+      "how": "Each outer shadow layer runs 10-12x the alpha of its lit counterpart (measured 0.52:0.05, 0.33:0.028, 0.17:0.014). Only the 1px contact insets approach parity, at roughly 1:1.",
+      "when": "Every raised surface, always",
+      "never": "Never balance it by adding white. On a dark ground a fabric slope mostly reads as surface turned away from the light."
+    },
+    {
+      "move": "Three-layer curvature",
+      "how": "Exactly three outer shadow layers at 5px / 24px / 64px blur, offsets 2,3 then 6,9 then 13,19.",
+      "when": "Every raised control",
+      "never": "One layer reads as flat and two reads as moulded plastic. Never ship fewer than three."
+    },
+    {
+      "move": "Dead flat crown",
+      "how": "No gradient across the top face. Only 16-18px corner radials at alpha 0.085 and below, where the rounded shoulders stretch the skin hardest.",
+      "when": "Every control face",
+      "never": "A gradient across the face reads as a dome and the membrane illusion collapses."
+    },
+    {
+      "move": "Asymmetric press timing",
+      "how": "80ms in, 420ms out — a 5.25:1 ratio — and the release curve overshoots (cubic-bezier(.16,1.62,.32,1); the 1.62 is past 1 on purpose).",
+      "when": "Every press and release",
+      "never": "Never make the release symmetric with the press. Lycra snaps back past its rest position before settling; an ease-out lands dead and reads as plastic."
+    },
+    {
+      "move": "One fixed light",
+      "how": "Top-left on every surface, every component, every state.",
+      "when": "Always",
+      "never": "Never flip it per component to make one element pop. Consistency of light is what holds the sheet together as one object."
+    },
+    {
+      "move": "Elevation is the hierarchy",
+      "how": "Type scale is 1.25:1 and carries no rank at all. Height carries it, in three steps.",
+      "when": "Any ranked or prioritised content",
+      "never": "Never reach for a bigger font to signal importance. Raise it instead."
+    },
+    {
+      "move": "State without colour",
+      "how": "A control's shape says one thing only — raised or pressed. Colour is reserved entirely for correctness.",
+      "when": "Every interaction state",
+      "never": "Never tint a pressed control. A lighter patch reads as nearer, which fights the press it is meant to show."
+    }
+  ],
+
+  "weird_move": {
+    "what": "Pressing one control tugs its two immediate neighbours two pixels toward the dent.",
+    "how": ".lycra:active + .lycra { transform: translateY(-2px) scaleY(0.995) } pulls the control below upward, and .lycra:has(+ .lycra:active) { transform: translateY(2px) scaleY(0.995) } pushes the control above downward. Both move toward the press, and both squash very slightly on the Y axis.",
+    "why": "It is the only rule in the entire system where one control's state changes another control's appearance — everything else is strictly per-element. That single coupling is what makes the surface read as one continuous sheet under tension rather than a row of separate buttons. It is also structurally fragile: the selector needs the controls to be direct siblings, so wrapping each one in its own row div destroys it silently, with no error and no visual warning beyond the sheet quietly going dead."
+  },
+
+  "archetypes": [
+    {
+      "id": "prompt-and-options",
+      "purpose": "Ask one question and take one answer. Opens the quiz screen.",
+      "anatomy": "One non-interactive lead plate carrying the prompt, then N interactive option plates, then one commit control at the bottom.",
+      "content_budget": "Prompt up to two lines; four options; one commit verb. A fifth option pushes the card past a comfortable single screen."
+    },
+    {
+      "id": "labelled-choice-list",
+      "purpose": "Choose between a few named modes, where each needs a line of explanation.",
+      "anatomy": "A lead title plate, then interactive plates each carrying a 15px label above a 12px sub-label at 0.72 opacity.",
+      "content_budget": "Three to five choices; sub-label under about eight words."
+    },
+    {
+      "id": "ranked-ladder",
+      "purpose": "Show an ordered result where the ranking should be readable before any number is.",
+      "anatomy": "Non-interactive plates where elevation encodes rank: first place proud (is-high), the middle at rest, last place flush with the sheet (is-low).",
+      "content_budget": "Up to about eight rows before the three elevation steps stop discriminating."
+    }
+  ],
+
+  "motion": {
+    "easing": "in cubic-bezier(.35,0,.9,.4), out cubic-bezier(.16,1.62,.32,1)",
+    "durations": "80ms press, 420ms release, 200ms background cross-fade",
+    "entrances": "none — elements never animate in",
+    "never_moves": "The ground, the pane, and the marker gutter. Nothing in this style is coupled to the viewport: no parallax, no scroll effect, no idle animation, no device orientation.",
+    "reduced_motion": "Under prefers-reduced-motion every transform drops to none and transitions become 120ms linear (80ms for the press). The neighbour tug is disabled outright — it is the one signature the style is willing to lose rather than move someone's screen unasked."
+  },
+
+  "voice": {
+    "register": "plain, second person, no exclamation marks",
+    "sentence_length": "short — control labels run one to five words",
+    "headline_shape": "a direct question, or a bare imperative verb phrase ('Next question', 'Submit answer')",
+    "banned_words": ["amazing", "stunning", "unleash", "elevate", "seamless", "magical", "effortlessly", "delightful"]
+  },
+
+  "bans": [
+    "Never tint a control's surface in any state — not hover, press, selection, correct, or wrong.",
+    "Never place a gradient across a control's flat top.",
+    "Never flip the light direction per component; it is top-left everywhere, always.",
+    "Never let saturated colour cover more than 0.1% of the surface.",
+    "Never wrap a control in a row element — controls must stay direct siblings of the pane or the neighbour tug dies silently.",
+    "Never add glow or scale to any state.",
+    "Never use more than two type sizes in one frame.",
+    "Never place this surface on a flat background — the pane's backdrop-filter needs a dark, non-flat ground to refract.",
+    "Never couple motion to the viewport, scroll position, or device orientation.",
+    "Never let a settled result inherit the disabled style — 0.42 opacity is right for an unavailable control and wrong for the most important thing on screen."
+  ],
+
+  "tests": [
+    { "id": "accent_budget", "check": "Green and red together cover under 0.1% of the surface", "fail_looks_like": "Colour reads as a theme rather than a verdict; the check and cross stop punching", "auto": true },
+    { "id": "type_count", "check": "No more than 2 distinct type sizes in one frame", "fail_looks_like": "A third size appears and the flat scale stops reading as deliberate", "auto": true },
+    { "id": "type_ratio", "check": "Largest-to-smallest type ratio is between 1.2:1 and 1.4:1", "fail_looks_like": "Type starts carrying hierarchy that elevation is supposed to carry", "auto": true },
+    { "id": "no_tint", "check": "No control's background hue differs from any other control's, in any state", "fail_looks_like": "A pressed or selected row is tinted, fighting the press it should be showing", "auto": true },
+    { "id": "shadow_dominance", "check": "On every raised control the darkest outer shadow layer carries at least 8x the alpha of the lightest", "fail_looks_like": "The surface reads as glossy plastic instead of cloth on a dark ground", "auto": true },
+    { "id": "three_layers", "check": "Every raised control carries exactly 3 outer shadow layers, at 5px / 24px / 64px blur", "fail_looks_like": "One layer reads flat, two reads as a moulded button", "auto": true },
+    { "id": "flat_crown", "check": "A control face's alpha varies by no more than 0.01 across the crown (the reference runs 0.048 to 0.042). Corner radials are exempt — they are the shoulders, not the crown.", "fail_looks_like": "The face domes and the membrane illusion dies", "auto": true },
+    { "id": "timing_ratio", "check": "Release duration is 5x the press duration, within ±0.5x", "fail_looks_like": "The release lands dead and the control reads as plastic", "auto": true },
+    { "id": "sibling_controls", "check": "Every control is a direct child of the pane element", "fail_looks_like": "The neighbour tug silently stops firing and the sheet reads as separate buttons", "auto": true },
+    { "id": "reduced_motion", "check": "Under prefers-reduced-motion every transform resolves to none", "fail_looks_like": "The surface moves for someone who asked it not to", "auto": true },
+    { "id": "neighbour_tug", "check": "Pressing a control moves both its immediate neighbours 2px toward it, exactly once per press", "fail_looks_like": "The weird move is missing and the sheet reads as a row of buttons", "auto": false },
+    { "id": "squint_ladder", "check": "Squint from three metres — the raised/rest/flush ladder is readable before any text is", "fail_looks_like": "Elevation is not doing the hierarchy work and the layout needs to be read to be understood", "auto": false }
+  ],
+
+  "reconstruction": {
+    "attempted": true,
+    "passes": 2,
+    "gaps_found": [
+      "Pass 1: the rebuild put controls at even spacing without noting that the 18px gap must be NARROWER than the shadow flank. Rebuilt hems did not overlap and the sheet read as separate cards. Folded into space.rhythm as a stated relationship rather than a raw value.",
+      "Pass 1: the rebuild inherited the vendored :disabled rule for settled answers, dropping the correct answer to 0.42 opacity. The reference deliberately opts marked rows back out. Added as a ban.",
+      "Pass 1: the rebuild used a lift for the chosen state, which is what the vendored stylesheet does. The shipped surface overrides this to hold the SINK so it agrees with the sparkle twin. Added to signatures and to the cross-mode notes in SKILL.md.",
+      "Pass 2: the rebuild centred the column, losing the 56px left marker gutter. The gutter is load-bearing negative space, not padding. Promoted into space.negative_space with its own percentage.",
+      "Pass 2: the rebuild's shadows used a single blur value scaled three ways rather than the measured 5/24/64px triple, which flattened the flank. Recorded the three blur radii explicitly.",
+      "Pass 2: running tools/check.py against the reference's own measured values failed the flat_crown test. The test was wrong, not the reference — it checked whether a gradient SPANS the face, and the reference does carry a full-face linear-gradient. What actually matters is how much the face varies: the reference runs alpha 0.048 to 0.042, a delta of 0.006. Rewritten to test delta against a 0.01 ceiling. This is the clearest evidence in the record that a spec never run against its own source has never been tested."
+    ]
+  },
+
+  "confidence": {
+    "inferred_values": [
+      "The 59% ground / 40% raised-face coverage split is estimated from layout area. Both read as the same violet family in a pixel histogram (the raised face is 5% white over the ground, not a distinct colour), so they could not be separated by sampling — only the combined violet field was measured, at roughly 99% of the card.",
+      "The '~6px flank' figure is quoted from the stylesheet's own header comment; what was actually measured is the shadow blur triple 5/24/64px and the offsets. The flank is a description of the visual result, not a value in the file.",
+      "Type coverage of 0.9% was measured as near-white pixels and therefore also includes the pane's 1px top-edge highlight, so true type coverage is slightly lower.",
+      "The '#2a1a45 lifted violet' hex is a computed composite of rgba(255,255,255,0.05) over the ground, not a value present anywhere in the source."
+    ],
+    "low_confidence_rules": [
+      "The 8x threshold in the shadow_dominance test is set below the measured 10-12x to leave headroom; the right cutoff has not been tested against a deliberately bad copy.",
+      "'Never more than two type sizes' held across all three captured screens, but only three screens were captured. A denser screen (a scoreboard with numerals) may legitimately need a third.",
+      "The ranked-ladder archetype's stated ceiling of about eight rows is reasoned from having only three elevation steps, not measured against a real long list.",
+      "read_distance is recorded as arms-length from the 900x1400 desktop capture; the app is mobile-first, so a phone capture might justify a larger minimum type size."
+    ]
+  }
+}

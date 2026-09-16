@@ -1,0 +1,257 @@
+{
+  "meta": {
+    "name": "ESCParty Sparkle",
+    "slug": "escparty-sparkle",
+    "source": [
+      "src/fabric-ui/presets.ts (sequin preset)",
+      "src/fabric-ui/useFabricControls.ts (MODES.sparkle)",
+      "src/fabric-ui/FabricSurface.tsx",
+      "src/fabric-ui/shader/fabricMaterial.ts",
+      "src/fabric-ui/shader/field.glsl.ts",
+      "src/fabric-ui/constants.ts",
+      "src/fabric-ui/CameraRig.tsx",
+      "src/fabric-ui/useParallax.ts",
+      "captured at commit f82f676"
+    ],
+    "captured": "2026-08-28",
+    "medium_of_origin": "WebGL displaced height field on a 560x560 CSS canvas at device pixel ratio capped to 1.75, with a DOM overlay for all text",
+    "not_copied": [
+      "The ESCParty name and wordmark",
+      "'Eurovision Song Contest' and 'Eurovision' — EBU trademarks. This style is descended from Eurovision stagecraft, which is a lineage, not a licence: reproduce the sequin surface, never the event's marks, logo, or heart-flag device.",
+      "Verka Serduchka's likeness, costume design, and stage imagery — cited as a mood reference by the style's owner, never to be reproduced or imitated as a character",
+      "Quiz question content in public/quizdata"
+    ]
+  },
+
+  "soul": {
+    "one_line": "A magenta sequin sheet, dead flat to the eye until you move it, when a few hundred discs catch one light and the whole surface tilts.",
+    "adjectives": ["glittering", "saturated", "kinetic", "brash", "buoyant"],
+    "lineage": "Eurovision stagecraft — sequin curtain and mirrorball — built as a physical membrane rather than applied as a filter",
+    "read_distance": "arms-length",
+    "energy": { "density": 6, "variance": 8, "contrast": 7, "warmth": 6 }
+  },
+
+  "palette": {
+    "colors": [
+      {
+        "role": "sheet",
+        "hex": "#C04BF2",
+        "name": "electric orchid — the undisturbed membrane, shaded per-disc from deep grape to hot lilac",
+        "coverage": 93
+      },
+      {
+        "role": "specular glitter",
+        "hex": "#FFFFFF",
+        "name": "mirrorball white — a tight lobe landing on a scattered few discs at a time",
+        "coverage": 0.5
+      },
+      { "role": "type", "hex": "#EEE8F0", "name": "magnolia", "coverage": 0.9 },
+      { "role": "correct marker", "hex": "#28a745", "name": "signal green", "coverage": 0.02 },
+      { "role": "wrong marker", "hex": "#dc3545", "name": "signal red", "coverage": 0.02 },
+      {
+        "role": "mode toggle",
+        "hex": "#FF9F1D",
+        "name": "stage amber — page chrome only, and the only place amber is ever allowed to appear",
+        "coverage": 0.3
+      }
+    ],
+    "mode": "fixed — this surface exists only on a dark page ground and has no light variant",
+    "banned": [
+      "Never tint an option row in any state",
+      "Never put a second accent hue on the sheet",
+      "Never let stage amber touch the membrane; it belongs to the mode toggle and nothing else",
+      "Never let the sheet's mean brightness drop toward the calm surface's — at that point it stops being a distinct language"
+    ]
+  },
+
+  "type": {
+    "families": [
+      { "role": "display", "family": "Montserrat", "fallback": "'Segoe UI', system-ui, sans-serif", "weights": ["700"], "licence_risk": "SIL OFL — safe to embed and self-host" },
+      { "role": "body", "family": "Open Sans", "fallback": "'Segoe UI', system-ui, sans-serif", "weights": ["400", "700"], "licence_risk": "SIL OFL — safe to embed and self-host" }
+    ],
+    "scale": {
+      "display_to_body_ratio": "1.36:1 (15.2px lead plate over 11.2px sub-label)",
+      "steps": ["15.2px / 700 lead plate", "13.6px / 700 control label", "11.2px / 400 sub-label at 0.8 opacity"],
+      "max_sizes_per_frame": 3
+    },
+    "treatment": {
+      "tracking": "none on plates",
+      "leading": "1.25 on the lead plate, 1.2 on controls",
+      "case": "sentence case throughout; never uppercase a plate label",
+      "measure": "labels run one to five words; the lead plate may reach two lines",
+      "numerals": "no special treatment"
+    }
+  },
+
+  "space": {
+    "grid": "single column in fabric-plane units, offset 0.24 units right of centre (6% of the design width) to open a left marker gutter",
+    "margin_pct": 6,
+    "gutter_pct": 11.1,
+    "alignment": "each plate centred on the offset column; markers sit in the left gutter, never on the plate",
+    "rhythm": "option row centres at y = 0.66, 0.22, -0.22, -0.66 — an even 0.44-unit pitch, 11.1% of the design height",
+    "negative_space": "the left gutter, plus the plane overfilling the framed design area by 30% (5.2 units against a 4.0-unit frame) so no sheet edge ever enters shot when parallax swings the camera",
+    "safe_area": {
+      "plate": "half-extents 1.51 x 0.17 units — 75.5% of the design width, 8.6% of its height",
+      "corner_radius": "0.08 units, 47% of the plate's half-height"
+    }
+  },
+
+  "surface": {
+    "texture": {
+      "present": true,
+      "kind": "an offset grid of sequin discs, each at its own hashed random tilt",
+      "opacity": "weaveIntensity 0.8 — ten times the woven presets' 0.08",
+      "scale": "weaveScale 32.5 cells per plane unit, rows offset half a cell",
+      "stacking_order": "disc mask is smoothstep(0.47, 0.38) on the cell-local radius, with the thread visible in the gaps between discs"
+    },
+    "edges": "rounded-rectangle SDF at 0.08-unit corner radius; the slope band (falloff 0.07) is 41% of the plate half-height and must stay under 50% or the slope eats the plateau and the plate becomes a dome",
+    "elevation": "continuous and signed, spanning -1.05x to +1.6x the base elevation of 0.3 units — a 2.65x total range, against the calm twin's three discrete steps",
+    "imagery": "none — and no baked texture maps of any kind, because a baked normal map cannot stretch and would swim against the deformation",
+    "iconography": "check and cross only, built as capsule SDFs sharing endpoints, matte, standing 1.15x proud of an option, stroke half-thickness 0.38 of the marker half-extent"
+  },
+
+  "signatures": [
+    {
+      "move": "Specular carries everything",
+      "how": "specIntensity 1.5 against the knit preset's 0.18 — 8.3x — with a tight specPower 50 lobe and a pure white spec colour, landing on hundreds of independently tilted disc normals (sequinTilt 1.7, sequinDome 0.5).",
+      "when": "Always; it is the entire material",
+      "never": "Never soften the lobe to spread the highlight. A broad lobe lights every disc at once and the glitter becomes a sheen."
+    },
+    {
+      "move": "Under one percent is actually glitter",
+      "how": "Measured near-white coverage on the sheet is roughly 0.4-0.5% of the canvas at any instant. The sparkle is almost entirely implied by contrast against a saturated field.",
+      "when": "Every frame",
+      "never": "Never chase more glitter by raising ambient or adding bloom. Past about 1% the surface reads as blown out rather than sequinned."
+    },
+    {
+      "move": "Dead-on at rest",
+      "how": "cameraTilt 0 and cameraYaw 0. At rest the overlay's projection matrix is pure translation with no shear terms at all; every bit of depth arrives from motion.",
+      "when": "The resting pose, always",
+      "never": "Never give the camera a resting angle to make the depth visible in a screenshot. A fixed yaw means looking at a phone from an angle nobody is holding it at."
+    },
+    {
+      "move": "Parallax chased, not snapped",
+      "how": "±20 degrees on both axes from device orientation or pointer, exponentially smoothed at 6 per second so the sheet lags the input very slightly.",
+      "when": "Whenever motion is permitted",
+      "never": "Never bind the camera directly to the input. The lag is what gives the sheet mass; without it the surface feels glued to the cursor."
+    },
+    {
+      "move": "Press past the destination",
+      "how": "pressed sits at -0.85x and selected at -0.533x, so holding drives a plate 1.59x deeper than where it will land, and release settles back up with one bounce (spring 18.5 rad/s, damping 0.47).",
+      "when": "Every press and release",
+      "never": "Never make pressed shallower than selected. Reversing them sinks the plate on click then raises it halfway, which reads as the press failing to take."
+    },
+    {
+      "move": "Signed continuous elevation",
+      "how": "Correct rises to +1.6x, incorrect sinks to -1.05x, a 2.65x span, with positive and negative contributions accumulated separately so a raised plate inside a sunken tray rests on the tray floor instead of cancelling against it.",
+      "when": "All state feedback",
+      "never": "Never quantise it into steps. The continuous field is the whole difference from the calm twin."
+    },
+    {
+      "move": "State without colour",
+      "how": "A plate's surface says only raised or pressed; correctness is a separate glyph in the left gutter. Shared verbatim with the calm twin.",
+      "when": "Every interaction state",
+      "never": "Never tint a plate. A lighter patch reads as nearer and fights the press."
+    }
+  ],
+
+  "weird_move": {
+    "what": "The sequin surface sets sheen to exactly zero — the one term the rest of the material system calls the thing that separates cloth from plastic.",
+    "how": "Every sibling preset leans on sheen (spandex 0.55, felt 0.85, carbon 0.12). Sequin sets sheenIntensity to 0 and pushes specIntensity to 1.5 with a tight 50-power lobe instead. Tension ridges, stretch anisotropy and thinning are all zeroed alongside it.",
+    "why": "It is the one preset that breaks its own system's central rule, and it has to. Sheen models fibres standing off a surface and scattering light at grazing angles; sequins are not fibres, they are hundreds of hard reflective discs, and lighting them like cloth is simply wrong. Restore the sheen and the sheet reads as glittery velvet — softer, prettier, and no longer Eurovision. This is also the first thing a mechanical extraction will 'fix', because it looks like a missing value rather than a decision: the sequin preset even still carries a sheenColor of #FF9F1D that never renders, exactly the kind of loose thread that invites someone to turn the intensity back up."
+  },
+
+  "archetypes": [
+    {
+      "id": "prompt-and-options",
+      "purpose": "Ask one question and take one answer. Opens the quiz screen.",
+      "anatomy": "A non-interactive lead plate carrying the prompt, four option plates on the 0.44-unit pitch, and one commit plate at y -1.44.",
+      "content_budget": "Prompt up to two lines; four options; one commit verb. MAX_FEATURES is 10, and two slots are reserved for markers."
+    },
+    {
+      "id": "labelled-choice-list",
+      "purpose": "Choose between a few named modes, each needing a line of explanation.",
+      "anatomy": "A lead title plate, then plates each carrying a label above a 11.2px sub-label at 0.8 opacity.",
+      "content_budget": "Three to five choices; sub-label under about eight words."
+    },
+    {
+      "id": "ranked-ladder",
+      "purpose": "Show an ordered result where the ranking reads before any number does.",
+      "anatomy": "Non-interactive plates whose continuous elevation encodes rank — first place literally stands highest out of the sheet, last place sits nearly flush.",
+      "content_budget": "Bounded by MAX_FEATURES at 10 features total, so about eight rows plus a lead plate."
+    }
+  ],
+
+  "motion": {
+    "easing": "a critically underdamped second-order spring, not a bezier — release is never tweened, because an ease-out lands dead and reads as a plastic button",
+    "durations": "spring frequency 18.5 rad/s at damping 0.47, integrated on a fixed 1/300s substep and clamped to 1/15s per frame so a backgrounded tab does not integrate one huge step",
+    "entrances": "none — plates do not animate in",
+    "never_moves": "The content model. Both modes render the same OverlayItem list, so they can differ in how they say something but never in what they say. The horizontal shake is reserved for the incorrect state alone (amplitude 0.055 units, 26 Hz, decay 7.5).",
+    "reduced_motion": "A system-level prefers-reduced-motion setting outranks the sparkle switch entirely: the sequin surface still renders, the parallax stays off. This is not a graceful degradation, it is the rule — parallax is viewport-coupled motion, which is exactly what makes motion-sensitive people ill."
+  },
+
+  "voice": {
+    "register": "plain, second person, no exclamation marks — the surface is loud so the copy does not have to be",
+    "sentence_length": "short — plate labels run one to five words",
+    "headline_shape": "a direct question, or a bare imperative verb phrase",
+    "banned_words": ["amazing", "stunning", "unleash", "elevate", "seamless", "magical", "dazzling", "iconic", "serve", "slay"]
+  },
+
+  "bans": [
+    "Never enable parallax when the OS reports prefers-reduced-motion, even when the user has explicitly chosen sparkle.",
+    "Never restore sheen on the sequin surface.",
+    "Never tint an option plate in any state.",
+    "Never give the camera a resting tilt or yaw — depth comes from motion only.",
+    "Never snap the camera to the parallax input; always chase it with smoothing.",
+    "Never make the pressed elevation shallower than the selected elevation.",
+    "Never use a baked normal map, texture atlas, or scanned PBR material — the weave has to respond to the height field's own gradient or it swims against the deformation.",
+    "Never let a marker glyph's stroke be thinner than the slope band, or it is all slope with no flat top for the colour to sit on.",
+    "Never let a saturated colour other than a marker glyph onto the sheet.",
+    "Never raise plane subdivision above 288 — 384 measured a consistent 20% slower with no visible gain at 1:1.",
+    "Never make sparkle the landing state. It is opt-in, and that is a deliberate default rather than a modest one."
+  ],
+
+  "tests": [
+    { "id": "sheet_brightness", "check": "The sheet's mean HSV value is between 0.52 and 0.64", "fail_looks_like": "The sheet darkens toward the calm surface and the two languages stop being distinguishable", "auto": true },
+    { "id": "saturation_match", "check": "Mean saturation is within 0.05 of 0.70, the calm surface's measured saturation", "fail_looks_like": "The pair stops reading as one family; sparkle looks like a different product", "auto": true },
+    { "id": "glitter_budget", "check": "Near-white pixels cover between 0.3% and 1.0% of the canvas", "fail_looks_like": "Below, the sheet reads as flat purple; above, it reads as blown out rather than sequinned", "auto": true },
+    { "id": "sheen_zero", "check": "sheenIntensity is exactly 0 on the sequin surface", "fail_looks_like": "The sheet reads as glittery velvet — softer, and no longer this style", "auto": true },
+    { "id": "camera_at_rest", "check": "At rest cameraTilt and cameraYaw are both 0, and the overlay projection matrix has no shear terms", "fail_looks_like": "Depth is drawn on rather than felt, and the sheet is being viewed from an angle nobody is holding", "auto": true },
+    { "id": "press_deeper", "check": "The pressed elevation multiplier is deeper than selected by a factor between 1.4 and 1.8", "fail_looks_like": "The press reads as failing to take — the plate sinks then rises halfway", "auto": true },
+    { "id": "falloff_ratio", "check": "falloff stays under half the plate half-height", "fail_looks_like": "The slope eats the plateau and every plate becomes a dome", "auto": true },
+    { "id": "elevation_span", "check": "The signed elevation table spans at least 2.5x the base elevation", "fail_looks_like": "Continuous elevation collapses toward the calm twin's three steps", "auto": true },
+    { "id": "reduced_motion", "check": "With prefers-reduced-motion set, parallax is off while the sequin surface still renders", "fail_looks_like": "Someone who asked for less motion gets a sheet that tracks their phone", "auto": true },
+    { "id": "no_tint", "check": "No option plate carries a non-zero tint strength in any state", "fail_looks_like": "Colour competes with elevation and the press stops reading", "auto": true },
+    { "id": "marker_stroke", "check": "Marker stroke half-thickness exceeds the marker's falloff", "fail_looks_like": "The glyph never reaches full height and has no flat top to hold its colour", "auto": true },
+    { "id": "squint_glitter", "check": "Squint from three metres — the surface reads as glittering, not as a flat purple panel", "fail_looks_like": "All the shader work is invisible at real viewing distance", "auto": false }
+  ],
+
+  "reconstruction": {
+    "attempted": true,
+    "passes": 2,
+    "gaps_found": [
+      "Pass 1: the rebuild gave the camera a resting tilt to make the plates visibly three-dimensional in a still. That is exactly the calm-membrane pose the sparkle mode deliberately abandoned. Promoted 'dead-on at rest' to its own signature.",
+      "Pass 1: the rebuild reached for a broad soft highlight, which lit every disc at once and produced a sheen rather than a glitter. Recorded the spec lobe tightness (specPower 50) and the 8.3x intensity ratio explicitly, not just 'high specular'.",
+      "Pass 1: the rebuild restored a small amount of sheen because zero looked like an oversight. This is the weird move being 'fixed', exactly as predicted. Added the dead sheenColor note to weird_move.why so the next reader knows the loose thread is deliberate.",
+      "Pass 2: the rebuild treated glitter density as 'lots', producing roughly 6% near-white coverage. The measured figure is under 1%. Added glitter_budget as a bounded test rather than a floor.",
+      "Pass 2: the rebuild let plates keep the same elevation for correct and incorrect, losing the signed range. Recorded the full multiplier table and the 2.65x span as a test.",
+      "Pass 2 (partial, honest): a static reconstruction cannot exercise parallax, the spring, or the shake. Those three were verified by re-reading the source and by comparing two live parallax captures, not by rebuilding them."
+    ]
+  },
+
+  "confidence": {
+    "inferred_values": [
+      "Glitter coverage of ~0.4-0.5% is derived, not directly sampled: total near-white was measured at 1.323% on the sparkle canvas and 0.887% on the calm surface, and calm has no glitter, so the difference is attributed to specular. Both figures include white type, which is assumed to contribute equally — it very nearly does, since both modes render the same labels at nearly the same size, but calm also carries a 1px pane highlight that sparkle does not.",
+      "The 93% sheet coverage is the remainder after the measured minor roles, not an independent measurement.",
+      "energy.variance of 8 is a judgement about the per-disc normal scatter, not a measured statistic.",
+      "All captures were made in headless Chromium with SwiftShader software rendering. Colour and coverage are trustworthy; anything about real-GPU timing, frame rate, or antialiasing quality is not, and none is recorded here as measured.",
+      "read_distance is recorded as arms-length from a 900x1400 desktop capture; the app is mobile-first and a phone capture might justify a larger minimum type size."
+    ],
+    "low_confidence_rules": [
+      "The 0.3-1.0% glitter band is built around a single measured instant. Because the discs are randomly tilted and the camera moves, instantaneous coverage varies frame to frame and the true distribution was not sampled over time.",
+      "The brightness band of 0.52-0.64 is centred on one measurement (0.587) with a margin chosen by judgement, not tested against a deliberately bad copy.",
+      "Whether the three archetypes hold beyond the captured screens is untested — MAX_FEATURES of 10 is a hard ceiling that none of the three currently approaches.",
+      "The claim that restoring sheen makes the sheet read as 'glittery velvet' comes from the source's own design notes plus one reconstruction attempt, not from a controlled A/B render."
+    ]
+  }
+}

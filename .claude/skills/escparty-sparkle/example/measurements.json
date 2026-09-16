@@ -1,0 +1,21 @@
+{
+  "_source": "Measured from the live app at commit f82f676, rendered headless (SwiftShader) at 900x1400 dpr2. Colour from the 560x560 canvas crop; shader/layout figures read from presets.ts, constants.ts and useFabricControls.ts; overlay matrix read from the live DOM.",
+  "mean_hsv_value": 0.587,
+  "mean_saturation": 0.699,
+  "near_white_pct": 0.44,
+  "_near_white_note": "Derived, not directly sampled: total near-white measured 1.323% on sparkle and 0.887% on calm, which has no glitter. Difference attributed to specular, assuming the shared white type contributes equally.",
+  "sheen_intensity": 0.0,
+  "camera_rest": { "tilt": 0, "yaw": 0 },
+  "overlay_matrix": [1, 0, 0, 1, 102.2, 163.8],
+  "elevation": {
+    "idle": 1, "hover": 1.2667, "pressed": -0.85,
+    "selected": -0.5333, "correct": 1.6, "incorrect": -1.05
+  },
+  "falloff": 0.07,
+  "plate_half_height": 0.17,
+  "reduced_motion": { "parallax_enabled": false, "sequins_render": true },
+  "tinted_plate_states": [],
+  "marker_stroke_half_thickness": 0.0665,
+  "marker_falloff": 0.0441,
+  "_marker_note": "stroke = strokeRatio 0.38 x min half-extent 0.175; slope band = falloffRatio 0.63 x falloff 0.07."
+}
