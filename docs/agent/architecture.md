@@ -57,9 +57,11 @@ plan that also removes the ad hoc storage it would duplicate.
   small hardcoded fallback, in an order that differs between dev and
   production (see the file for which order).
 - `pathUtils.ts` — environment detection (`isDevelopmentEnvironment`,
-  `isProductionPreview`) and base-path helpers used by both `firebase.ts`
-  and `QuizDataProvider.ts`. The Vite `base` config (GitHub Pages vs.
-  Vercel) flows through here.
+  `isProductionPreview`) plus the base-path helper `getAssetPath`.
+  `firebase.ts` uses both detection functions (but no base-path helper);
+  `QuizDataProvider.ts` uses `isDevelopmentEnvironment` and `getAssetPath`
+  (but not `isProductionPreview`). The Vite `base` config (GitHub Pages vs.
+  Vercel) flows through `getAssetPath`.
 
 ## `src/firebase.ts`
 
