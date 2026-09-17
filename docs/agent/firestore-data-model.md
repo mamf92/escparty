@@ -66,7 +66,10 @@ exist only in the Firebase console and are not version-controlled or
 reviewable in a PR diff. Error handling in `roomsFirestore.ts` for
 `permission-denied` implies rules exist and are enforced, but their actual
 content is invisible from the codebase. Treat any change to write patterns
-here as a change to an implicit, unreviewed contract. This is a known
+here as a change to an implicit, unreviewed contract. Until that gap is
+closed, exercise any change to `roomsFirestore.ts` against the local
+emulator (`npm run emulators`) before shipping it — there's no automated
+check standing in for that yet (see `docs/agent/testing.md`). This is a known
 security gap — cross-link the repo's security-hardening work if you're
 picking this up.
 
