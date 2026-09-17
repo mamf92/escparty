@@ -16,6 +16,8 @@ anywhere in the codebase (see `docs/agent/firestore-data-model.md`).
 - `npm run dev` — start the Vite dev server.
 - `npm run build` — `tsc -b` then `vite build`.
 - `npm run lint` — ESLint; CI runs this and `build` on every PR.
+- `npm run preview` — serve the production build locally.
+- `npm run deploy` — build then publish `dist/` to GitHub Pages (`gh-pages`).
 - `npm run emulators` — start the local Firestore emulator (needs a JDK).
 
 There is no test suite yet. `docs/agent/testing.md` is a stub until that
@@ -55,6 +57,9 @@ One paragraph bridging the two, without repeating the skills' content:
 - Production Firestore rules — they live only in the Firebase console (there
   is no `firestore.rules` file in this repo), so there's nothing to diff
   against locally. Treat any change here as high risk.
+
+If you're unsure whether a change affects hosting, env vars, or Firestore
+rules, ask before making it rather than guessing.
 
 ## Known landmines
 
