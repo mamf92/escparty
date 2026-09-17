@@ -96,6 +96,15 @@ This app keeps the `/escparty/` base path for GitHub Pages, but automatically sw
 
 ---
 
+## 🤝 Contributing
+
+Picking up an issue or opening a PR? See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for the dev loop (pick a task, plan if it's non-trivial, execute, PR,
+review, merge-after-review) and [`CLAUDE.md`](CLAUDE.md) for project facts
+an agent or new contributor needs.
+
+---
+
 ## 👤 Contact
 
 - [LinkedIn – Martin Fischer](https://www.linkedin.com/in/mamf92/)

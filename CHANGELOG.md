@@ -10,6 +10,7 @@
 
 ## [Unreleased]
 ### Added
+- Added root CLAUDE.md, docs/agent/ deep dives, a steward skill for the pick/plan/execute/PR/review/merge loop, a PR template, and CONTRIBUTING.md; trimmed .github/copilot-instructions.md to a pointer file (2026-09-17)
 - Added product manager custom agent for planning and progress tracking (2026-05-21)
 - Added short-term plan and long-term roadmap docs under plans/ (2026-05-21)
 - Added Project Board Cleanup prompt for GitHub Project backlog refresh (2026-05-21)
