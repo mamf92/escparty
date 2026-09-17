@@ -37,8 +37,11 @@ question loading), and `pathUtils.ts` (base-path/env helpers). Full layout:
 
 ## Design themes
 
-Two design languages, both rendering from the same `OverlayItem[]` content
-model so they never disagree on *what* they show, only *how*:
+Two design languages. Inside the `src/fabric-ui/` demo they render from the
+same `OverlayItem[]` content model so they never disagree on *what* they
+show, only *how* — see `docs/agent/theming.md` for how that scopes to live
+pages, which today adopt Calm's CSS directly rather than going through
+`OverlayItem`:
 
 - **Calm** — dark violet CSS surface, no motion beyond a press, the default
   and accessible landing experience. Skill: `.claude/skills/escparty-calm/`.

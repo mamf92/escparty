@@ -18,17 +18,28 @@ just the bridge between them.
 
 ## Why they can't drift apart in meaning
 
-Both themes render from the same `OverlayItem[]` content model produced by
-the screen builders. That means they can differ in *how* they present a
-given piece of UI state (raised/pressed/selected/correct/wrong) but never in
-*what* state is being shown. If you're adding a new interactive state, it
-needs to be expressible in that shared model, not bolted onto one theme
-only — otherwise the two themes stop being twins.
+Inside the `src/fabric-ui/` proof-of-concept, both renderers read from the
+same `OverlayItem[]` content model produced by the screen builders — they
+can differ in *how* they present a given UI state (raised/pressed/selected/
+correct/wrong) but never in *what* state is being shown. That guarantee is
+scoped to `fabric-ui`'s own renderer abstraction, not something every live
+page automatically plugs into (see the `fabric-ui` note in
+`docs/agent/architecture.md`).
+
+Outside `fabric-ui`, a live page that wants the Calm look (e.g.
+`Scoreboard.tsx`) applies it directly by importing `calm.css` and adding a
+page-scoped override stylesheet — there's no `OverlayItem` involved on that
+path. If you're adding a new interactive state, decide which path you're
+on: inside the demo's shared model, or a direct CSS adoption on a real page.
 
 ## Where the implementation lives
 
-Sparkle's renderer is `src/fabric-ui/` (see `docs/agent/architecture.md`).
-Calm is CSS-driven and vendored per the notes in each skill's `SKILL.md`.
+Sparkle's renderer and the `OverlayItem` model live in `src/fabric-ui/` (see
+`docs/agent/architecture.md`) and, as of this writing, are not confirmed
+wired into any live page — only the standalone `/fabric-ui` demo route uses
+them. Calm's CSS (`calm.css`, vendored per the notes in
+`.claude/skills/escparty-calm/SKILL.md`) is also authored in `fabric-ui/`
+but *is* imported directly by at least one live page (`Scoreboard.tsx`).
 Don't duplicate the skills' `dna.json`/`PROMPT.md` content here or in
 `CLAUDE.md` — if you need the measured values or build workflow, load the
 skill.
