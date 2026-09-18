@@ -73,51 +73,76 @@ Firebase console, port the same change here in the same PR (or as a
 same-day follow-up) — this file is only useful if it doesn't drift from
 what's actually deployed.
 
-**Known gaps, verified against the real emulator and deliberately not fixed
-in the PR that first imported this file** (see #50 — tightening rules and
-importing them in the same PR that also changes behavior makes both harder
-to review; these are real gaps in what's live in the Firebase console
-today, not something introduced by importing the file):
-- No `allow update` branch below restricts a write to *only* the field(s)
-  it validates. `isSettingDifficulty()`, for example, only checks
-  `difficulty` and `existingData.started == false` — it never checks that
-  `hostId` (or anything else) is unchanged. Confirmed against the emulator:
-  a single update bundling a valid `difficulty` change with a forged
-  `hostId` is **accepted**. The same gap exists in `isUpdatingPlayerScores()`
-  — a mid-game score update can piggyback a forged `hostId` or
-  `continueReady` in the same request.
-- `isAddingPlayer()`'s second branch (the `request.writeFields` check) is
-  **not** dead code — confirmed against the emulator, it resolves and is
-  the operative path for `addPlayerToRoom`'s real `arrayUnion`-style writes
-  (which touch only the `players` field), not the size/shape-checked first
-  branch. It never calls `isValidPlayerBasic` and has no upper bound on
-  array growth: a single-field `players` update replacing the array with
-  entries missing required fields (e.g. no `score`) was **accepted** in
-  testing. This makes the intended per-player shape validation effectively
-  unreachable for the common case.
-- No emulator-based tests exist yet exercising these abuse cases formally —
-  blocked on Epic 3's test infra landing (`docs/agent/testing.md`).
+**Two real bugs found and fixed in the rules imported from the Firebase
+console** (verified against the real emulator before and after — see
+`scripts/verify-firestore-rules.mjs`), both root-caused by the same mistake:
+`data.players.hasAll(isValidPlayerBasic)` passes a function name where
+`hasAll` expects a list. Firestore Rules has no `.every()`/map-over-list
+construct, so this was presumably an attempt at "validate every player" that
+doesn't do what it looks like — it's an undefined-identifier reference that
+errors at evaluation time, not a type error caught at load time (the file
+still loads and deploys fine).
 
-These are real, currently-exploitable gaps in production, not
-Firestore-adjacent theory — tightening this is the priority follow-up to
-#50, not an optional nice-to-have. Until it lands, exercise any change to
-`roomsFirestore.ts` against the local emulator (`npm run emulators`) before
-shipping it — there's no automated check standing in for that yet.
+That one bug had two distinct live consequences, fixed together:
+1. In `isUpdatingPlayerScores()`, the error meant this branch reliably
+   **denied every score update once a game had started** — `submitAnswer`
+   and `handleTimeUp` in `Quiz.tsx` both swallow `updatePlayerScore`'s
+   rejection into `console.error` and keep going, so this would have been
+   silently eating every player's score write with no visible symptom
+   beyond scores not syncing to other clients. If you've seen reports of
+   scores not showing up for other players during a multiplayer game, this
+   is almost certainly why — worth confirming with whoever reported it.
+2. In `isAddingPlayer()`, the same error made its first (intended,
+   shape-checked) branch always fail, silently falling through to a second,
+   unrelated branch (`request.writeFields != null`, itself referencing a
+   field that doesn't exist on `request`) that happened to still allow the
+   write through with **no shape validation and no size bound** — replacing
+   the whole `players` array with malformed entries was accepted.
+
+Both are fixed now: every `allow update` branch takes the write's
+`affectedKeys()` (computed once in `isValidRoomUpdate()`, not per-branch —
+calling `.diff()` up to six times per write was expensive enough to trip the
+rules engine's per-request expression budget) and requires it match exactly
+the field(s) that operation is for, so a legitimate-looking write can no
+longer piggyback an unrelated forged field (e.g. `hostId`) in the same
+request. Player-array shape validation no longer relies on a function
+reference — `allPlayersValid()` unrolls the check up to 32 players (there's
+no loop/recursion in Firestore Rules, so this is the standard workaround;
+32 comfortably covers a realistic party-quiz room, and anything larger is
+rejected by the size check rather than silently accepted). `isAddingPlayer`
+no longer has a second bypass branch, and validates every entry in the
+resulting array via `allPlayersValid()`, not just the newly appended one —
+an earlier version of this fix only checked the last entry, which a review
+pass caught: array-grew-by-one doesn't by itself prove the write came from
+`arrayUnion` appending rather than a full replace with an earlier entry
+corrupted.
+
+Remaining gap: no emulator-based tests are wired into CI yet exercising
+these paths on every PR — blocked on Epic 3's test infra landing
+(`docs/agent/testing.md`). `scripts/verify-firestore-rules.mjs` is a
+manual (not CI-wired) verification script written while fixing this that
+exercises the real client SDK write paths against a running emulator; run
+it by hand (`npm run emulators &` then
+`node scripts/verify-firestore-rules.mjs`) after any change to
+`firestore.rules`, and fold it into the real suite once Epic 3 lands.
 
 ## Trust boundary for client-submitted writes
 
 There's no auth in this app — any visitor with a room code is an equally
 trusted (or untrusted) client. That shapes what's worth enforcing:
 
-- **Should be rejected outright (belongs in `firestore.rules`):** a client
-  writing another player's entry in `players` (`playerId` in the write must
-  match the entry being changed), a non-host client forging `started: true`
-  or `difficulty`, and any client writing to a room it was never part of.
-  The current `firestore.rules` doesn't fully express the "own player only"
-  constraint yet — its `isUpdatingPlayerScores()`/`isAddingPlayer()` checks
-  validate shape, not which player index changed. Tightening this is
-  tracked as a follow-up to #50, once emulator tests exist to verify a
-  tightened rule doesn't also break legitimate writes.
+- **Should be rejected outright (belongs in `firestore.rules`):** a non-host
+  client forging `started: true` or `difficulty`, or forging an unrelated
+  field (e.g. `hostId`) by piggybacking it onto another legitimate write —
+  both now enforced (see above). **Not yet enforceable:** a client writing
+  another *specific* player's score entry rather than its own — `players`
+  is a plain array with no per-player identity to check a write's author
+  against, since this app has no auth. Rules can (and now do) validate that
+  a player entry has a valid *shape*, but not *whose* entry a given write is
+  allowed to change. Closing this fully would need either Firebase Auth
+  (anonymous auth, matching `request.auth.uid` to a player's `id`) or a
+  Cloud Function validation layer — both bigger than a rules-only fix, and
+  not yet justified for this app's threat model (see below).
 - **Acceptable client trust, not worth enforcing server-side, for a
   Eurovision party quiz with no auth and no stakes beyond bragging
   rights:** exact millisecond timing of `timeLeftMs` — a modified client

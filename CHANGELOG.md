@@ -11,6 +11,7 @@
 ## [Unreleased]
 ### Added
 - Added `firestore.rules` at the repo root, imported verbatim from the Firebase console and wired into `firebase.json`, so production access control is versioned and reviewable for the first time (2026-09-18)
+- Added `scripts/verify-firestore-rules.mjs`, a manual emulator-based verification script for `firestore.rules` (2026-09-18)
 - Added a `gitleaks` CI check that scans every PR for likely secrets (2026-09-18)
 - Added root CLAUDE.md, docs/agent/ deep dives, a steward skill for the pick/plan/execute/PR/review/merge loop, a PR template, and CONTRIBUTING.md; trimmed .github/copilot-instructions.md to a pointer file (2026-09-17)
 - Added product manager custom agent for planning and progress tracking (2026-05-21)
@@ -31,6 +32,7 @@
 - Standardized button styling across components for better UI consistency (14 May 2025)
 
 ### Fixed
+- Fixed two bugs in `firestore.rules` caused by a broken `hasAll(isValidPlayerBasic)` call: score updates were being denied outright once a game had started (silently swallowed client-side, so scores never synced to other players), and the resulting fallback path let a write replace the whole `players` array with no shape validation at all. Also closed a gap where a legitimate write (e.g. setting difficulty) could piggyback an unrelated forged field (e.g. `hostId`) in the same request (2026-09-18)
 - Fixed `updatePlayerScore` silently dropping a concurrent score update by moving it to a Firestore transaction, and rejecting non-finite/negative/decreasing score writes; clamped `timeLeftMs` in `Quiz.tsx` before computing the time bonus (2026-09-18)
 - Fixed Zustand setup by adding the missing dependency and updating `useGameStore` typings/imports for strict TypeScript builds (2026-05-16)
 - Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
