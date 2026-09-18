@@ -123,6 +123,8 @@ const Lobby = () => {
         );
     }
 
+    const visiblePlayers = room?.players.filter(player => !(room.hostIsObserver && player.id === room.hostId)) ?? [];
+
     return (
         <Container>
             <Title>Quiz Lobby</Title>
@@ -145,16 +147,18 @@ const Lobby = () => {
                 </DifficultySection>
             )}
 
-            <PlayerListTitle>Current players:</PlayerListTitle>
-            <PlayerList>
-                {room?.players
-                    .filter(player => !(room.hostIsObserver && player.id === room.hostId))
-                    .map((player, _index) => (
-                        <Player key={player.id}>
-                            {player.name}
-                        </Player>
-                    ))}
-            </PlayerList>
+            {visiblePlayers.length > 1 && (
+                <>
+                    <PlayerListTitle>Current players:</PlayerListTitle>
+                    <PlayerList>
+                        {visiblePlayers.map((player) => (
+                            <Player key={player.id}>
+                                {player.name}
+                            </Player>
+                        ))}
+                    </PlayerList>
+                </>
+            )}
 
             {isHost && room?.difficulty && <StartButton onClick={handleStartGame}>Start Game</StartButton>}
         </Container>
