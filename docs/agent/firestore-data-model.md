@@ -73,23 +73,36 @@ Firebase console, port the same change here in the same PR (or as a
 same-day follow-up) — this file is only useful if it doesn't drift from
 what's actually deployed.
 
-**Known gaps, deliberately not fixed in the PR that first imported this
-file** (see #50 — tightening rules and importing them in the same PR that
-also changes behavior makes both harder to review):
-- No emulator-based tests exist yet exercising the abuse cases this file is
-  supposed to guard against (wrong player writing another's score, forging
-  `started`, etc.) — blocked on Epic 3's test infra landing
-  (`docs/agent/testing.md`).
-- `isAddingPlayer()`'s second branch reads `request.writeFields`, which
-  isn't a documented Firestore Rules variable — it's very likely dead code
-  that always evaluates falsy, meaning `arrayUnion`-style player-add writes
-  from `addPlayerToRoom` may only be passing today because of the first
-  branch's list-diff check. Worth confirming against the emulator before
-  touching `isAddingPlayer` for any other reason.
+**Known gaps, verified against the real emulator and deliberately not fixed
+in the PR that first imported this file** (see #50 — tightening rules and
+importing them in the same PR that also changes behavior makes both harder
+to review; these are real gaps in what's live in the Firebase console
+today, not something introduced by importing the file):
+- No `allow update` branch below restricts a write to *only* the field(s)
+  it validates. `isSettingDifficulty()`, for example, only checks
+  `difficulty` and `existingData.started == false` — it never checks that
+  `hostId` (or anything else) is unchanged. Confirmed against the emulator:
+  a single update bundling a valid `difficulty` change with a forged
+  `hostId` is **accepted**. The same gap exists in `isUpdatingPlayerScores()`
+  — a mid-game score update can piggyback a forged `hostId` or
+  `continueReady` in the same request.
+- `isAddingPlayer()`'s second branch (the `request.writeFields` check) is
+  **not** dead code — confirmed against the emulator, it resolves and is
+  the operative path for `addPlayerToRoom`'s real `arrayUnion`-style writes
+  (which touch only the `players` field), not the size/shape-checked first
+  branch. It never calls `isValidPlayerBasic` and has no upper bound on
+  array growth: a single-field `players` update replacing the array with
+  entries missing required fields (e.g. no `score`) was **accepted** in
+  testing. This makes the intended per-player shape validation effectively
+  unreachable for the common case.
+- No emulator-based tests exist yet exercising these abuse cases formally —
+  blocked on Epic 3's test infra landing (`docs/agent/testing.md`).
 
-Until emulator tests exist, exercise any change to `roomsFirestore.ts`
-against the local emulator (`npm run emulators`) before shipping it — there's
-no automated check standing in for that yet.
+These are real, currently-exploitable gaps in production, not
+Firestore-adjacent theory — tightening this is the priority follow-up to
+#50, not an optional nice-to-have. Until it lands, exercise any change to
+`roomsFirestore.ts` against the local emulator (`npm run emulators`) before
+shipping it — there's no automated check standing in for that yet.
 
 ## Trust boundary for client-submitted writes
 
