@@ -11,6 +11,7 @@ const Lobby = () => {
     const [_playerId, setPlayerId] = useState<string | null>(null); // Renamed to _playerId to indicate it's not used directly
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
+    const [isSettingDifficulty, setIsSettingDifficulty] = useState<boolean>(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -71,14 +72,21 @@ const Lobby = () => {
     }, [navigate]);
 
     const handleSelectDifficulty = async (displayDifficulty: string) => {
-        if (isHost && gameCode) {
+        // Guard against a double-click firing two writes before the first
+        // one's onSnapshot update disables these buttons — firestore.rules
+        // now treats difficulty as a one-shot field, so a second write
+        // would otherwise be denied and surface as a dead-end error screen.
+        if (isHost && gameCode && !isSettingDifficulty) {
             // Convert to lowercase for internal storage while keeping display capitalized
             const difficulty = displayDifficulty.toLowerCase();
+            setIsSettingDifficulty(true);
             try {
                 await setRoomDifficulty(gameCode, difficulty);
             } catch (error) {
                 console.error("Error setting difficulty:", error);
                 setError("Failed to set difficulty");
+            } finally {
+                setIsSettingDifficulty(false);
             }
         }
     };
@@ -130,9 +138,9 @@ const Lobby = () => {
                 <DifficultySection>
                     <SubTitle>Select Difficulty:</SubTitle>
                     <ButtonGroup>
-                        <DifficultyButton onClick={() => handleSelectDifficulty("Easy")}>Easy</DifficultyButton>
-                        <DifficultyButton onClick={() => handleSelectDifficulty("Medium")}>Medium</DifficultyButton>
-                        <DifficultyButton onClick={() => handleSelectDifficulty("Hard")}>Hard</DifficultyButton>
+                        <DifficultyButton disabled={isSettingDifficulty} onClick={() => handleSelectDifficulty("Easy")}>Easy</DifficultyButton>
+                        <DifficultyButton disabled={isSettingDifficulty} onClick={() => handleSelectDifficulty("Medium")}>Medium</DifficultyButton>
+                        <DifficultyButton disabled={isSettingDifficulty} onClick={() => handleSelectDifficulty("Hard")}>Hard</DifficultyButton>
                     </ButtonGroup>
                 </DifficultySection>
             )}

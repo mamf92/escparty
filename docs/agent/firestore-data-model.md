@@ -132,6 +132,15 @@ criteria (also verified against the emulator, also in
   Fixed with `!('difficulty' in existingData)`. There's still no way to
   check the caller is actually the *host* specifically (no auth to check
   it against) — this only makes it a one-shot choice, not a host-only one.
+  Making this one-shot at the rules layer turned a client-side race (a fast
+  double-click on two difficulty buttons in `Lobby.tsx`, sending two writes
+  before the first one's `onSnapshot` update disables the buttons) from a
+  harmless duplicate write into a `permission-denied` error that used to
+  render `Lobby.tsx`'s dead-end full-page error screen. Fixed alongside
+  this rules change by disabling the difficulty buttons for the duration of
+  the write (`isSettingDifficulty` state in `Lobby.tsx`) — a rules change
+  that makes something one-shot should come with a look at whether any
+  client code assumed re-sending the same kind of write was harmless.
 
 Remaining gaps, all pre-existing and **not** closed by any of the above:
 - No emulator-based tests are wired into CI yet exercising these paths on
