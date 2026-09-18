@@ -117,14 +117,36 @@ pass caught: array-grew-by-one doesn't by itself prove the write came from
 `arrayUnion` appending rather than a full replace with an earlier entry
 corrupted.
 
-Remaining gap: no emulator-based tests are wired into CI yet exercising
-these paths on every PR — blocked on Epic 3's test infra landing
-(`docs/agent/testing.md`). `scripts/verify-firestore-rules.mjs` is a
-manual (not CI-wired) verification script written while fixing this that
-exercises the real client SDK write paths against a running emulator; run
-it by hand (`npm run emulators &` then
-`node scripts/verify-firestore-rules.mjs`) after any change to
-`firestore.rules`, and fold it into the real suite once Epic 3 lands.
+**Two more real gaps found and fixed** on a pass against #50's own acceptance
+criteria (also verified against the emulator, also in
+`scripts/verify-firestore-rules.mjs`):
+- `allow read: if true` covers both Firestore's `get` (fetch one doc you
+  already know the path to) and `list` (query the collection). This app
+  never queries the `rooms` collection — every read is `getDoc`/`onSnapshot`
+  on a known room code — so `list` being open meant any client could
+  enumerate every room in the collection with **no code at all**, reading
+  every room's player names, scores, and `hostId`. Split into
+  `allow get: if true; allow list: if false;`.
+- `isSettingDifficulty()` didn't check whether `difficulty` was already set,
+  so it could be changed repeatedly before the game started, not just once.
+  Fixed with `!('difficulty' in existingData)`. There's still no way to
+  check the caller is actually the *host* specifically (no auth to check
+  it against) — this only makes it a one-shot choice, not a host-only one.
+
+Remaining gaps, all pre-existing and **not** closed by any of the above:
+- No emulator-based tests are wired into CI yet exercising these paths on
+  every PR — blocked on Epic 3's test infra landing (`docs/agent/testing.md`).
+  `scripts/verify-firestore-rules.mjs` is a manual (not CI-wired)
+  verification script exercising the real client SDK write paths against a
+  running emulator; run it by hand (`npm run emulators &` then
+  `node scripts/verify-firestore-rules.mjs`) after any change to
+  `firestore.rules`, and fold it into the real suite once Epic 3 lands.
+- A client still can't be stopped from writing a *different* player's score
+  entry specifically — rules can validate shape, not identity, without auth.
+- There's no "finished room" concept in the `Room` schema at all (no field
+  for it), so #50's "can't resurrect a finished room's state" can't be
+  enforced by a rule yet — that needs a data-model change first, not just a
+  rules change.
 
 ## Trust boundary for client-submitted writes
 

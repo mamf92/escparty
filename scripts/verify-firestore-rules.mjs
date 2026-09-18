@@ -20,6 +20,8 @@ import {
   updateDoc,
   arrayUnion,
   serverTimestamp,
+  collection,
+  getDocs,
 } from "firebase/firestore";
 
 const app = initializeApp({ projectId: "demo-escparty" });
@@ -131,6 +133,20 @@ await expectAllowed("set difficulty alone", () =>
 await expectAllowed("start game after difficulty set", () =>
   updateDoc(diff2.roomRef, { started: true })
 );
+
+// 5b. Malicious: re-set difficulty after it's already been set once
+const diff3 = freshRoom("DIFF3");
+await createRoom(diff3.roomRef, diff3.roomCode);
+await updateDoc(diff3.roomRef, { difficulty: "easy" });
+await expectDenied("re-set difficulty after it's already set", () =>
+  updateDoc(diff3.roomRef, { difficulty: "hard" })
+);
+
+// 5c. Malicious: list/enumerate the whole rooms collection with no code
+await expectDenied("list the entire rooms collection with no code", async () => {
+  const snap = await getDocs(collection(db, "rooms"));
+  if (snap.size > 0) throw { code: "unexpectedly-succeeded", size: snap.size };
+});
 
 // 6. Legitimate: update player scores after game started
 const score1 = freshRoom("SCORE");
