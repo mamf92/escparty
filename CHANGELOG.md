@@ -10,6 +10,7 @@
 
 ## [Unreleased]
 ### Added
+- Added `firestore.rules` at the repo root, imported verbatim from the Firebase console and wired into `firebase.json`, so production access control is versioned and reviewable for the first time (2026-09-18)
 - Added a `gitleaks` CI check that scans every PR for likely secrets (2026-09-18)
 - Added root CLAUDE.md, docs/agent/ deep dives, a steward skill for the pick/plan/execute/PR/review/merge loop, a PR template, and CONTRIBUTING.md; trimmed .github/copilot-instructions.md to a pointer file (2026-09-17)
 - Added product manager custom agent for planning and progress tracking (2026-05-21)

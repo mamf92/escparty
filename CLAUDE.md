@@ -58,9 +58,12 @@ One paragraph bridging the two, without repeating the skills' content:
 - `vite.config.ts`'s `base` path — breaks the GitHub Pages deployment.
 - `roomsFirestore.ts`'s exported function signatures — multiple pages depend
   on this exact API; change it as a coordinated migration, not a drive-by edit.
-- Production Firestore rules — they live only in the Firebase console (there
-  is no `firestore.rules` file in this repo), so there's nothing to diff
-  against locally. Treat any change here as high risk.
+- `firestore.rules` at the repo root — this is the actual production rules
+  file (imported verbatim from the Firebase console, wired up via
+  `firebase.json`). Deploying it re-deploys production access control for
+  every multiplayer room. Treat any change here as high risk: verify against
+  the emulator first, and keep it in sync with whatever's live in the
+  Firebase console (see `docs/agent/firestore-data-model.md`).
 
 If you're unsure whether a change affects hosting, env vars, or Firestore
 rules, ask before making it rather than guessing.
