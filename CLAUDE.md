@@ -8,8 +8,9 @@ the links instead of re-deriving it by grepping the codebase.
 React 19 + Vite + TypeScript, styled-components for styling, react-router
 (`HashRouter` — routes are `#/...`, required by the GitHub Pages deploy).
 Backend is Firebase Firestore via the client SDK: state syncs through
-`onSnapshot` listeners, there are no WebSockets and no Firestore transactions
-anywhere in the codebase (see `docs/agent/firestore-data-model.md`).
+`onSnapshot` listeners, there are no WebSockets, and `updatePlayerScore` is
+the only Firestore transaction in the codebase — everything else is a plain
+read/write (see `docs/agent/firestore-data-model.md`).
 
 ## Commands
 
@@ -75,9 +76,10 @@ rules, ask before making it rather than guessing.
 - The Firestore `Room` doc has **no `currentQuestionIndex` field** — question
   progression during a multiplayer quiz is driven client-locally (each
   client runs its own timer), not by a server-authoritative field.
-- No Firestore transactions are used anywhere in `roomsFirestore.ts`; a few
-  writes (`updatePlayerScore`, `markPlayerAtMidQuiz`) are manual
-  read-modify-write and are race-prone under concurrent writers.
+- `markPlayerAtMidQuiz` is a manual read-modify-write with no transaction and
+  is race-prone under concurrent writers. `updatePlayerScore` used to be the
+  same but now runs inside a Firestore transaction — don't revert it back to
+  a plain `getDoc`/`updateDoc` pair.
 
 ## The dev loop
 

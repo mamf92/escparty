@@ -5,6 +5,7 @@ import {
     updateDoc,
     arrayUnion,
     onSnapshot,
+    runTransaction,
     serverTimestamp,
     Timestamp,
     FieldValue
@@ -234,30 +235,36 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
     }
 
     try {
-        // Get current room data to find the player
         const roomRef = doc(db, "rooms", roomCode);
-        const roomDoc = await getDoc(roomRef);
+        // A transaction (not a plain getDoc+updateDoc) so the "don't lower an
+        // existing score" check below reads the state it actually writes
+        // against — a manual read-modify-write here can't stop a concurrent
+        // write (e.g. submitAnswer and handleTimeUp both firing near a
+        // question's deadline) from reverting an already-committed score.
+        await runTransaction(db, async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
 
-        if (!roomDoc.exists()) {
-            throw new Error(`Room ${roomCode} does not exist`);
-        }
-
-        const room = roomDoc.data() as Room;
-        const existingPlayer = room.players.find(player => player.id === playerId);
-        if (existingPlayer && score < existingPlayer.score) {
-            throw new Error(
-                `Refusing to lower score for player ${playerId} in room ${roomCode} (${existingPlayer.score} -> ${score})`
-            );
-        }
-
-        const updatedPlayers = room.players.map(player => {
-            if (player.id === playerId) {
-                return { ...player, score };
+            if (!roomDoc.exists()) {
+                throw new Error(`Room ${roomCode} does not exist`);
             }
-            return player;
-        });
 
-        await updateDoc(roomRef, { players: updatedPlayers });
+            const room = roomDoc.data() as Room;
+            const existingPlayer = room.players.find(player => player.id === playerId);
+            if (existingPlayer && score < existingPlayer.score) {
+                throw new Error(
+                    `Refusing to lower score for player ${playerId} in room ${roomCode} (${existingPlayer.score} -> ${score})`
+                );
+            }
+
+            const updatedPlayers = room.players.map(player => {
+                if (player.id === playerId) {
+                    return { ...player, score };
+                }
+                return player;
+            });
+
+            transaction.update(roomRef, { players: updatedPlayers });
+        });
         console.log(`Score updated for player ${playerId} in room ${roomCode}`);
     } catch (error) {
         console.error("Error updating player score:", error);

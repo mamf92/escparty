@@ -40,15 +40,18 @@ why; see `docs/agent/multiplayer-sync.md`.
 ## Which writes are safe vs. race-prone
 
 - **Safe:** `addPlayerToRoom` uses `arrayUnion` — concurrent joins can't
-  clobber each other.
-- **Race-prone:** `updatePlayerScore` and `markPlayerAtMidQuiz` both do a
-  manual read-modify-write (`getDoc` then `updateDoc` with a recomputed
-  array). Two near-simultaneous calls for different players can read the
-  same snapshot and each overwrite the other's change, silently dropping one
-  player's score update or mid-quiz-ready flag. No Firestore transaction is
-  used anywhere in this file. If you're adding a new field that multiple
-  clients might write concurrently, use `arrayUnion`/`arrayRemove` where the
-  shape allows it, or a transaction — don't add another manual
+  clobber each other. `updatePlayerScore` runs inside a `runTransaction` —
+  Firestore retries it on a conflicting concurrent write, so two
+  near-simultaneous score updates for the same player (e.g. `submitAnswer`
+  and `handleTimeUp` in `Quiz.tsx` both firing near a question's deadline)
+  can't silently drop one of them the way a plain read-modify-write would.
+- **Race-prone:** `markPlayerAtMidQuiz` still does a manual read-modify-write
+  (`getDoc` then `updateDoc` with a recomputed array). Two near-simultaneous
+  calls for different players can read the same snapshot and each overwrite
+  the other's change, silently dropping one player's mid-quiz-ready flag. If
+  you're adding a new field that multiple clients might write concurrently,
+  use `arrayUnion`/`arrayRemove` where the shape allows it, or a transaction
+  (see `updatePlayerScore` for the pattern) — don't add another manual
   read-modify-write.
 
 ## Progression flags
@@ -89,9 +92,10 @@ trusted (or untrusted) client. That shapes what's worth enforcing:
   can already see the correct answer in the bundle, so precise timing
   fraud isn't a meaningfully bigger risk than that.
 - **Fixed as defense in depth (not a security boundary, just guards
-  against an honest client's own bugs):** `updatePlayerScore` in
-  `roomsFirestore.ts` now rejects non-finite/negative scores and rejects
-  a write that would lower an existing player's score, and `Quiz.tsx`
+  against an honest client's own bugs and against silently dropping a
+  concurrent update):** `updatePlayerScore` in `roomsFirestore.ts` now
+  runs in a transaction and rejects non-finite/negative scores and a
+  write that would lower an existing player's score, and `Quiz.tsx`
   clamps `timeLeftMs` to `[0, 10000]` before computing the time bonus.
   None of this stops a client that edits its own JS before sending the
   request — only real Firestore rules do that.
