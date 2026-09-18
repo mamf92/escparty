@@ -40,15 +40,18 @@ why; see `docs/agent/multiplayer-sync.md`.
 ## Which writes are safe vs. race-prone
 
 - **Safe:** `addPlayerToRoom` uses `arrayUnion` — concurrent joins can't
-  clobber each other.
-- **Race-prone:** `updatePlayerScore` and `markPlayerAtMidQuiz` both do a
-  manual read-modify-write (`getDoc` then `updateDoc` with a recomputed
-  array). Two near-simultaneous calls for different players can read the
-  same snapshot and each overwrite the other's change, silently dropping one
-  player's score update or mid-quiz-ready flag. No Firestore transaction is
-  used anywhere in this file. If you're adding a new field that multiple
-  clients might write concurrently, use `arrayUnion`/`arrayRemove` where the
-  shape allows it, or a transaction — don't add another manual
+  clobber each other. `updatePlayerScore` runs inside a `runTransaction` —
+  Firestore retries it on a conflicting concurrent write, so two
+  near-simultaneous score updates for the same player (e.g. `submitAnswer`
+  and `handleTimeUp` in `Quiz.tsx` both firing near a question's deadline)
+  can't silently drop one of them the way a plain read-modify-write would.
+- **Race-prone:** `markPlayerAtMidQuiz` still does a manual read-modify-write
+  (`getDoc` then `updateDoc` with a recomputed array). Two near-simultaneous
+  calls for different players can read the same snapshot and each overwrite
+  the other's change, silently dropping one player's mid-quiz-ready flag. If
+  you're adding a new field that multiple clients might write concurrently,
+  use `arrayUnion`/`arrayRemove` where the shape allows it, or a transaction
+  (see `updatePlayerScore` for the pattern) — don't add another manual
   read-modify-write.
 
 ## Progression flags
@@ -72,6 +75,33 @@ emulator (`npm run emulators`) before shipping it — there's no automated
 check standing in for that yet (see `docs/agent/testing.md`). This is a known
 security gap — cross-link the repo's security-hardening work if you're
 picking this up.
+
+## Trust boundary for client-submitted writes
+
+There's no auth in this app — any visitor with a room code is an equally
+trusted (or untrusted) client. That shapes what's worth enforcing:
+
+- **Should be rejected outright (belongs in `firestore.rules`, once that
+  file exists — see the gap above):** a client writing another player's
+  entry in `players` (`playerId` in the write must match the entry being
+  changed), a non-host client forging `started: true` or `difficulty`,
+  and any client writing to a room it was never part of.
+- **Acceptable client trust, not worth enforcing server-side, for a
+  Eurovision party quiz with no auth and no stakes beyond bragging
+  rights:** exact millisecond timing of `timeLeftMs` — a modified client
+  can already see the correct answer in the bundle, so precise timing
+  fraud isn't a meaningfully bigger risk than that.
+- **Fixed as defense in depth (not a security boundary, just guards
+  against an honest client's own bugs and against silently dropping a
+  concurrent update):** `updatePlayerScore` in `roomsFirestore.ts` now
+  runs in a transaction and rejects non-finite/negative scores and a
+  write that would lower an existing player's score, and `Quiz.tsx`
+  clamps `timeLeftMs` to `[0, 10000]` before computing the time bonus.
+  None of this stops a client that edits its own JS before sending the
+  request — only real Firestore rules do that.
+- **Out of scope for now:** a Cloud Function to validate score deltas
+  server-side. Worth revisiting only if this app ever has real stakes
+  (money, ranked competition) attached to a score.
 
 ## Env / emulator
 

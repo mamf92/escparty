@@ -10,6 +10,7 @@
 
 ## [Unreleased]
 ### Added
+- Added a `gitleaks` CI check that scans every PR for likely secrets (2026-09-18)
 - Added root CLAUDE.md, docs/agent/ deep dives, a steward skill for the pick/plan/execute/PR/review/merge loop, a PR template, and CONTRIBUTING.md; trimmed .github/copilot-instructions.md to a pointer file (2026-09-17)
 - Added product manager custom agent for planning and progress tracking (2026-05-21)
 - Added short-term plan and long-term roadmap docs under plans/ (2026-05-21)
@@ -29,6 +30,7 @@
 - Standardized button styling across components for better UI consistency (14 May 2025)
 
 ### Fixed
+- Fixed `updatePlayerScore` silently dropping a concurrent score update by moving it to a Firestore transaction, and rejecting non-finite/negative/decreasing score writes; clamped `timeLeftMs` in `Quiz.tsx` before computing the time bonus (2026-09-18)
 - Fixed Zustand setup by adding the missing dependency and updating `useGameStore` typings/imports for strict TypeScript builds (2026-05-16)
 - Fixed scoreboard not updating dynamically for observing hosts when participants answer questions (13 May 2025)
 - Fixed quiz timer issue with duplicate cleanup functions causing timer malfunction when reaching zero (13 May 2025)

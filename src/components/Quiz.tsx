@@ -406,7 +406,9 @@ const Quiz = () => {
     if (answer === currentQuestion.correctAnswer) {
       // Calculate time-based score with millisecond precision
       // Base score of 500 + up to 500 more based on time remaining
-      const timeBonus = Math.floor((timeLeftMs / 10000) * 500);
+      // Clamp timeLeftMs so a stale timer tick can't push the bonus outside [0, 500]
+      const clampedTimeLeftMs = Math.max(0, Math.min(timeLeftMs, 10000));
+      const timeBonus = Math.floor((clampedTimeLeftMs / 10000) * 500);
       // Using timeLeftMs (milliseconds) for more precise scoring
       const pointsForAnswer = 500 + timeBonus;
       console.log(`Correct answer! Time left: ${timeLeftMs / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
