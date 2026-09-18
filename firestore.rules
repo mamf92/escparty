@@ -4,8 +4,15 @@ service cloud.firestore {
 
     // Rules for multiplayer game rooms
     match /rooms/{roomCode} {
-      // Allow anyone to read room data (needed for joining games and real-time updates)
-      allow read: if true;
+      // Allow fetching a single room by its (4-letter) code — needed for
+      // joining games and real-time updates, and this app has no auth to
+      // gate it on. Explicitly split from `list`: the app never queries the
+      // rooms collection (every read is getDoc/onSnapshot on a known doc
+      // path), so there's no legitimate reason to allow enumerating it —
+      // `allow read: if true` used to cover both and let anyone list every
+      // room in the collection with no code at all.
+      allow get: if true;
+      allow list: if false;
 
       // Allow room creation with proper validation
       allow create: if isValidRoomCreation();
@@ -63,7 +70,12 @@ service cloud.firestore {
       let data = request.resource.data;
       let existingData = resource.data;
 
+      // Once set, difficulty is a one-shot choice — not re-settable, even
+      // before the game starts. Without auth there's no way to check the
+      // caller is actually the host, so this is the closest enforceable
+      // proxy for "only the host sets difficulty, and only once."
       return affected.hasOnly(['difficulty']) &&
+             !('difficulty' in existingData) &&
              'difficulty' in data &&
              data.difficulty is string &&
              data.difficulty in ['easy', 'medium', 'hard'] &&
