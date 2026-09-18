@@ -64,6 +64,7 @@ service cloud.firestore {
       let existingData = resource.data;
 
       return affected.hasOnly(['difficulty']) &&
+             'difficulty' in data &&
              data.difficulty is string &&
              data.difficulty in ['easy', 'medium', 'hard'] &&
              existingData.started == false;
@@ -72,22 +73,29 @@ service cloud.firestore {
     function isAddingPlayer(affected) {
       let data = request.resource.data;
       let existingData = resource.data;
-      let newCount = data.players.size();
-      let oldCount = existingData.players.size();
 
-      // Only the players field may change, it must grow by exactly one
-      // (matching addPlayerToRoom's arrayUnion of a single new player), and
-      // the newly appended player must have a valid shape. This intentionally
-      // doesn't re-validate every existing entry — arrayUnion only appends,
-      // it can't rewrite earlier elements — and doesn't check the new
-      // player's id against the caller's identity, since this app has no
-      // auth to check it against (see docs/agent/firestore-data-model.md).
+      // Only the players field may change, and it must grow by exactly one
+      // (matching addPlayerToRoom's arrayUnion of a single new player). Every
+      // entry in the resulting array is shape-validated via allPlayersValid,
+      // not just the appended one — a plain updateDoc({players: [...]}) can
+      // rewrite any index, not only append, so "the array grew by one"
+      // doesn't by itself guarantee the earlier entries are untouched. This
+      // doesn't check the new player's id against the caller's identity,
+      // since this app has no auth to check it against (see
+      // docs/agent/firestore-data-model.md) — same limitation as
+      // isUpdatingPlayerScores below.
+      //
+      // Type-checks are ordered deliberately: `is list` must short-circuit
+      // before any `.size()`/index access below it, since those throw
+      // (denying the whole isValidRoomUpdate() OR-chain via an evaluation
+      // error, rather than this branch cleanly evaluating to false) when
+      // called on a non-list.
       return affected.hasOnly(['players']) &&
              existingData.started == false &&
              data.players is list &&
-             newCount == oldCount + 1 &&
-             newCount <= 32 &&
-             isValidPlayerBasic(data.players[newCount - 1]);
+             existingData.players is list &&
+             data.players.size() == existingData.players.size() + 1 &&
+             allPlayersValid(data.players);
     }
 
     function isStartingGame(affected) {
@@ -107,6 +115,7 @@ service cloud.firestore {
       return affected.hasOnly(['players']) &&
              existingData.started == true &&
              data.players is list &&
+             existingData.players is list &&
              data.players.size() == existingData.players.size() &&
              allPlayersValid(data.players);
     }
@@ -115,6 +124,7 @@ service cloud.firestore {
       let data = request.resource.data;
 
       return affected.hasOnly(['continueReady']) &&
+             'continueReady' in data &&
              data.continueReady is bool;
     }
 
@@ -122,6 +132,7 @@ service cloud.firestore {
       let data = request.resource.data;
 
       return affected.hasOnly(['playersAtMidQuiz']) &&
+             'playersAtMidQuiz' in data &&
              data.playersAtMidQuiz is list;
     }
 

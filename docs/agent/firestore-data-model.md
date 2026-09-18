@@ -110,8 +110,12 @@ reference — `allPlayersValid()` unrolls the check up to 32 players (there's
 no loop/recursion in Firestore Rules, so this is the standard workaround;
 32 comfortably covers a realistic party-quiz room, and anything larger is
 rejected by the size check rather than silently accepted). `isAddingPlayer`
-no longer has a second bypass branch — it directly validates the one newly
-appended player.
+no longer has a second bypass branch, and validates every entry in the
+resulting array via `allPlayersValid()`, not just the newly appended one —
+an earlier version of this fix only checked the last entry, which a review
+pass caught: array-grew-by-one doesn't by itself prove the write came from
+`arrayUnion` appending rather than a full replace with an earlier entry
+corrupted.
 
 Remaining gap: no emulator-based tests are wired into CI yet exercising
 these paths on every PR — blocked on Epic 3's test infra landing

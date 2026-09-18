@@ -93,6 +93,22 @@ await expectDenied("inject malformed players array (missing score)", () =>
   })
 );
 
+// 3b. Malicious: same array length as a legitimate join (oldCount + 1), but
+// with an EARLIER entry corrupted rather than just the appended one — this
+// is the shape isAddingPlayer's "only validate the last entry" version
+// missed, since size() == oldCount + 1 alone doesn't prove the write came
+// from arrayUnion appending, not a full replace.
+const evilAppend = freshRoom("EVILAPPEND");
+await createRoom(evilAppend.roomRef, evilAppend.roomCode);
+await expectDenied("replace earlier player while appending a valid-looking one", () =>
+  updateDoc(evilAppend.roomRef, {
+    players: [
+      { id: "host-1" }, // host entry corrupted: no name/score
+      { id: "player-2", name: "Guest", score: 0 }, // looks like a legit join
+    ],
+  })
+);
+
 // 4. Malicious: piggyback forged hostId onto a legitimate difficulty write
 const diff1 = freshRoom("DIFF");
 await createRoom(diff1.roomRef, diff1.roomCode);
