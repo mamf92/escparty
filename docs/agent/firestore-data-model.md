@@ -62,30 +62,62 @@ why; see `docs/agent/multiplayer-sync.md`.
   scoreboard, built via `markPlayerAtMidQuiz` (race-prone, see above) and
   cleared by `resetPlayersAtMidQuiz`.
 
-## Security rules — known gap
+## Security rules
 
-**There is no `firestore.rules` file in this repository.** Production rules
-exist only in the Firebase console and are not version-controlled or
-reviewable in a PR diff. Error handling in `roomsFirestore.ts` for
-`permission-denied` implies rules exist and are enforced, but their actual
-content is invisible from the codebase. Treat any change to write patterns
-here as a change to an implicit, unreviewed contract. Until that gap is
-closed, exercise any change to `roomsFirestore.ts` against the local
-emulator (`npm run emulators`) before shipping it — there's no automated
-check standing in for that yet (see `docs/agent/testing.md`). This is a known
-security gap — cross-link the repo's security-hardening work if you're
-picking this up.
+`firestore.rules` at the repo root is the production rules, imported
+verbatim from the Firebase console (no behavior change) and wired up via
+`firebase.json`'s `firestore.rules` key so the emulator and
+`firebase deploy --only firestore:rules` both use this file as the source of
+truth going forward. Keep it in sync: if you change production rules in the
+Firebase console, port the same change here in the same PR (or as a
+same-day follow-up) — this file is only useful if it doesn't drift from
+what's actually deployed.
+
+**Known gaps, verified against the real emulator and deliberately not fixed
+in the PR that first imported this file** (see #50 — tightening rules and
+importing them in the same PR that also changes behavior makes both harder
+to review; these are real gaps in what's live in the Firebase console
+today, not something introduced by importing the file):
+- No `allow update` branch below restricts a write to *only* the field(s)
+  it validates. `isSettingDifficulty()`, for example, only checks
+  `difficulty` and `existingData.started == false` — it never checks that
+  `hostId` (or anything else) is unchanged. Confirmed against the emulator:
+  a single update bundling a valid `difficulty` change with a forged
+  `hostId` is **accepted**. The same gap exists in `isUpdatingPlayerScores()`
+  — a mid-game score update can piggyback a forged `hostId` or
+  `continueReady` in the same request.
+- `isAddingPlayer()`'s second branch (the `request.writeFields` check) is
+  **not** dead code — confirmed against the emulator, it resolves and is
+  the operative path for `addPlayerToRoom`'s real `arrayUnion`-style writes
+  (which touch only the `players` field), not the size/shape-checked first
+  branch. It never calls `isValidPlayerBasic` and has no upper bound on
+  array growth: a single-field `players` update replacing the array with
+  entries missing required fields (e.g. no `score`) was **accepted** in
+  testing. This makes the intended per-player shape validation effectively
+  unreachable for the common case.
+- No emulator-based tests exist yet exercising these abuse cases formally —
+  blocked on Epic 3's test infra landing (`docs/agent/testing.md`).
+
+These are real, currently-exploitable gaps in production, not
+Firestore-adjacent theory — tightening this is the priority follow-up to
+#50, not an optional nice-to-have. Until it lands, exercise any change to
+`roomsFirestore.ts` against the local emulator (`npm run emulators`) before
+shipping it — there's no automated check standing in for that yet.
 
 ## Trust boundary for client-submitted writes
 
 There's no auth in this app — any visitor with a room code is an equally
 trusted (or untrusted) client. That shapes what's worth enforcing:
 
-- **Should be rejected outright (belongs in `firestore.rules`, once that
-  file exists — see the gap above):** a client writing another player's
-  entry in `players` (`playerId` in the write must match the entry being
-  changed), a non-host client forging `started: true` or `difficulty`,
-  and any client writing to a room it was never part of.
+- **Should be rejected outright (belongs in `firestore.rules`):** a client
+  writing another player's entry in `players` (`playerId` in the write must
+  match the entry being changed), a non-host client forging `started: true`
+  or `difficulty`, and any client writing to a room it was never part of.
+  The current `firestore.rules` doesn't fully express the "own player only"
+  constraint yet — its `isUpdatingPlayerScores()`/`isAddingPlayer()` checks
+  validate shape, not which player index changed. Tightening this is
+  tracked as a follow-up to #50, once emulator tests exist to verify a
+  tightened rule doesn't also break legitimate writes.
 - **Acceptable client trust, not worth enforcing server-side, for a
   Eurovision party quiz with no auth and no stakes beyond bragging
   rights:** exact millisecond timing of `timeLeftMs` — a modified client

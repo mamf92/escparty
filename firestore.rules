@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Rules for multiplayer game rooms
+    match /rooms/{roomCode} {
+      // Allow anyone to read room data (needed for joining games and real-time updates)
+      allow read: if true;
+
+      // Allow room creation with proper validation
+      allow create: if isValidRoomCreation();
+
+      // Allow updates for specific operations with validation
+      allow update: if isValidRoomUpdate();
+
+      // Prevent deletion of rooms
+      allow delete: if false;
+    }
+
+    // Helper functions for validation
+    function isValidRoomCreation() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['id', 'hostId', 'started', 'createdAt', 'players']) &&
+             data.id is string &&
+             data.hostId is string &&
+             data.started == false &&
+             data.players is list &&
+             data.players.size() == 1 &&
+             isValidPlayer(data.players[0]) &&
+             data.players[0].id == data.hostId &&
+             // Optional fields validation
+             (!('difficulty' in data) || data.difficulty is string) &&
+             (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
+             (!('continueReady' in data) || data.continueReady is bool) &&
+             (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list);
+    }
+
+    function isValidRoomUpdate() {
+      let data = request.resource.data;
+      let existingData = resource.data;
+
+      return (
+        // Setting difficulty
+        isSettingDifficulty() ||
+        // Adding players to room (simplified for arrayUnion)
+        isAddingPlayer() ||
+        // Starting game
+        isStartingGame() ||
+        // Updating player scores
+        isUpdatingPlayerScores() ||
+        // Setting continue ready state
+        isSettingContinueReady() ||
+        // Managing mid-quiz players
+        isManagingMidQuizPlayers()
+      );
+    }
+
+    function isSettingDifficulty() {
+      let data = request.resource.data;
+      let existingData = resource.data;
+
+      return 'difficulty' in data &&
+             data.difficulty is string &&
+             data.difficulty in ['easy', 'medium', 'hard'] &&
+             existingData.started == false;
+    }
+
+    function isAddingPlayer() {
+      let data = request.resource.data;
+      let existingData = resource.data;
+
+      // Simplified validation for arrayUnion operations
+      return (
+        // Check if this looks like a player addition
+        'players' in data &&
+        data.players is list &&
+        data.players.size() > existingData.players.size() &&
+        data.players.size() <= existingData.players.size() + 1 &&
+        // Game must not be started
+        existingData.started == false &&
+        // Basic validation that all items in players array are valid
+        data.players.hasAll(isValidPlayerBasic)
+      ) ||
+      (
+        // Alternative check for partial updates (arrayUnion style)
+        request.writeFields != null &&
+        request.writeFields.hasOnly(['players']) &&
+        existingData.started == false
+      );
+    }
+
+    function isStartingGame() {
+      let data = request.resource.data;
+      let existingData = resource.data;
+
+      return data.started == true &&
+             existingData.started == false &&
+             'difficulty' in existingData;
+    }
+
+    function isUpdatingPlayerScores() {
+      let data = request.resource.data;
+      let existingData = resource.data;
+
+      return existingData.started == true &&
+             'players' in data &&
+             data.players is list &&
+             data.players.size() == existingData.players.size() &&
+             data.players.hasAll(isValidPlayerBasic);
+    }
+
+    function isSettingContinueReady() {
+      let data = request.resource.data;
+
+      return 'continueReady' in data &&
+             data.continueReady is bool;
+    }
+
+    function isManagingMidQuizPlayers() {
+      let data = request.resource.data;
+
+      return 'playersAtMidQuiz' in data &&
+             data.playersAtMidQuiz is list;
+    }
+
+    function isValidPlayer(player) {
+      return player is map &&
+             player.keys().hasAll(['id', 'name', 'score']) &&
+             player.id is string &&
+             player.name is string &&
+             player.score is number &&
+             player.score >= 0 &&
+             // Optional joinedAt field
+             (!('joinedAt' in player) || player.joinedAt is timestamp);
+    }
+
+    // Simplified player validation for bulk operations
+    function isValidPlayerBasic(player) {
+      return player is map &&
+             'id' in player &&
+             'name' in player &&
+             'score' in player &&
+             player.id is string &&
+             player.name is string &&
+             player.score is number;
+    }
+
+    // Default deny all other collections and documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
