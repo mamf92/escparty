@@ -79,16 +79,19 @@ await expectAllowed("join room (arrayUnion, valid player)", () =>
   })
 );
 
-// 3. Malicious: replace whole players array with malformed entries (missing score)
+// 3. Malicious: append a new "player" that's missing a required field. Sized
+// to exactly oldCount + 1 so this write actually reaches allPlayersValid via
+// isAddingPlayer's exact-size-match branch, rather than getting denied on a
+// size mismatch before shape validation is ever evaluated (which would give
+// false confidence — the write is denied either way, but for the wrong
+// reason, masking a regression that removes the shape check itself).
 const evil = freshRoom("EVIL");
 await createRoom(evil.roomRef, evil.roomCode);
-await expectDenied("inject malformed players array (missing score)", () =>
+await expectDenied("append a player missing required fields", () =>
   updateDoc(evil.roomRef, {
     players: [
       { id: "host-1", name: "Host", score: 0 },
       { id: "attacker-1", name: "Mallory" }, // no score
-      { id: "attacker-2", name: "Eve" }, // no score
-      { id: "attacker-3", name: "Trent" }, // no score
     ],
   })
 );
@@ -137,6 +140,22 @@ await updateDoc(score1.roomRef, { started: true });
 await expectAllowed("update player score after start", () =>
   updateDoc(score1.roomRef, {
     players: [{ id: "host-1", name: "Host", score: 500 }],
+  })
+);
+
+// 6b. Malicious: same-size players array during an active game, but with a
+// malformed entry (missing name/score) — exercises allPlayersValid via
+// isUpdatingPlayerScores specifically, the other of the two branches this
+// PR fixed. Without this, a regression that dropped allPlayersValid from
+// just this branch would go undetected even though test 3/3b above cover
+// the isAddingPlayer branch.
+const score1b = freshRoom("SCOREB");
+await createRoom(score1b.roomRef, score1b.roomCode);
+await updateDoc(score1b.roomRef, { difficulty: "medium" });
+await updateDoc(score1b.roomRef, { started: true });
+await expectDenied("update players with malformed entry during active game", () =>
+  updateDoc(score1b.roomRef, {
+    players: [{ id: "host-1", name: "Host" }], // no score
   })
 );
 
