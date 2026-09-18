@@ -226,6 +226,13 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
         throw new Error("Firebase not initialized");
     }
 
+    // Defense in depth: reject nonsensical scores before they ever reach Firestore.
+    // This is client-side validation only, not a security boundary — see
+    // docs/agent/firestore-data-model.md for the actual trust boundary.
+    if (!Number.isFinite(score) || score < 0) {
+        throw new Error(`Refusing to write invalid score ${score} for player ${playerId}`);
+    }
+
     try {
         // Get current room data to find the player
         const roomRef = doc(db, "rooms", roomCode);
@@ -236,6 +243,13 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
         }
 
         const room = roomDoc.data() as Room;
+        const existingPlayer = room.players.find(player => player.id === playerId);
+        if (existingPlayer && score < existingPlayer.score) {
+            throw new Error(
+                `Refusing to lower score for player ${playerId} in room ${roomCode} (${existingPlayer.score} -> ${score})`
+            );
+        }
+
         const updatedPlayers = room.players.map(player => {
             if (player.id === playerId) {
                 return { ...player, score };

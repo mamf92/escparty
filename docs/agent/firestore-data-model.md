@@ -73,6 +73,32 @@ check standing in for that yet (see `docs/agent/testing.md`). This is a known
 security gap — cross-link the repo's security-hardening work if you're
 picking this up.
 
+## Trust boundary for client-submitted writes
+
+There's no auth in this app — any visitor with a room code is an equally
+trusted (or untrusted) client. That shapes what's worth enforcing:
+
+- **Should be rejected outright (belongs in `firestore.rules`, once that
+  file exists — see the gap above):** a client writing another player's
+  entry in `players` (`playerId` in the write must match the entry being
+  changed), a non-host client forging `started: true` or `difficulty`,
+  and any client writing to a room it was never part of.
+- **Acceptable client trust, not worth enforcing server-side, for a
+  Eurovision party quiz with no auth and no stakes beyond bragging
+  rights:** exact millisecond timing of `timeLeftMs` — a modified client
+  can already see the correct answer in the bundle, so precise timing
+  fraud isn't a meaningfully bigger risk than that.
+- **Fixed as defense in depth (not a security boundary, just guards
+  against an honest client's own bugs):** `updatePlayerScore` in
+  `roomsFirestore.ts` now rejects non-finite/negative scores and rejects
+  a write that would lower an existing player's score, and `Quiz.tsx`
+  clamps `timeLeftMs` to `[0, 10000]` before computing the time bonus.
+  None of this stops a client that edits its own JS before sending the
+  request — only real Firestore rules do that.
+- **Out of scope for now:** a Cloud Function to validate score deltas
+  server-side. Worth revisiting only if this app ever has real stakes
+  (money, ranked competition) attached to a score.
+
 ## Env / emulator
 
 Firestore is initialized in `src/firebase.ts` from `VITE_FIREBASE_*` vars.
