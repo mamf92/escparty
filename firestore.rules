@@ -36,90 +36,92 @@ service cloud.firestore {
     }
 
     function isValidRoomUpdate() {
-      let data = request.resource.data;
-      let existingData = resource.data;
+      // Computed once and threaded through, rather than each branch below
+      // calling request.resource.data.diff(resource.data) independently —
+      // diff() is expensive enough that doing it up to six times per write
+      // (once per OR branch tried) was blowing the rules engine's per-request
+      // expression budget on some writes.
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
 
       return (
         // Setting difficulty
-        isSettingDifficulty() ||
-        // Adding players to room (simplified for arrayUnion)
-        isAddingPlayer() ||
-        // Starting game
-        isStartingGame() ||
+        isSettingDifficulty(affected) ||
+        // Adding a player to the room
+        isAddingPlayer(affected) ||
+        // Starting the game
+        isStartingGame(affected) ||
         // Updating player scores
-        isUpdatingPlayerScores() ||
+        isUpdatingPlayerScores(affected) ||
         // Setting continue ready state
-        isSettingContinueReady() ||
+        isSettingContinueReady(affected) ||
         // Managing mid-quiz players
-        isManagingMidQuizPlayers()
+        isManagingMidQuizPlayers(affected)
       );
     }
 
-    function isSettingDifficulty() {
+    function isSettingDifficulty(affected) {
       let data = request.resource.data;
       let existingData = resource.data;
 
-      return 'difficulty' in data &&
+      return affected.hasOnly(['difficulty']) &&
              data.difficulty is string &&
              data.difficulty in ['easy', 'medium', 'hard'] &&
              existingData.started == false;
     }
 
-    function isAddingPlayer() {
+    function isAddingPlayer(affected) {
       let data = request.resource.data;
       let existingData = resource.data;
+      let newCount = data.players.size();
+      let oldCount = existingData.players.size();
 
-      // Simplified validation for arrayUnion operations
-      return (
-        // Check if this looks like a player addition
-        'players' in data &&
-        data.players is list &&
-        data.players.size() > existingData.players.size() &&
-        data.players.size() <= existingData.players.size() + 1 &&
-        // Game must not be started
-        existingData.started == false &&
-        // Basic validation that all items in players array are valid
-        data.players.hasAll(isValidPlayerBasic)
-      ) ||
-      (
-        // Alternative check for partial updates (arrayUnion style)
-        request.writeFields != null &&
-        request.writeFields.hasOnly(['players']) &&
-        existingData.started == false
-      );
+      // Only the players field may change, it must grow by exactly one
+      // (matching addPlayerToRoom's arrayUnion of a single new player), and
+      // the newly appended player must have a valid shape. This intentionally
+      // doesn't re-validate every existing entry — arrayUnion only appends,
+      // it can't rewrite earlier elements — and doesn't check the new
+      // player's id against the caller's identity, since this app has no
+      // auth to check it against (see docs/agent/firestore-data-model.md).
+      return affected.hasOnly(['players']) &&
+             existingData.started == false &&
+             data.players is list &&
+             newCount == oldCount + 1 &&
+             newCount <= 32 &&
+             isValidPlayerBasic(data.players[newCount - 1]);
     }
 
-    function isStartingGame() {
+    function isStartingGame(affected) {
       let data = request.resource.data;
       let existingData = resource.data;
 
-      return data.started == true &&
+      return affected.hasOnly(['started']) &&
+             data.started == true &&
              existingData.started == false &&
              'difficulty' in existingData;
     }
 
-    function isUpdatingPlayerScores() {
+    function isUpdatingPlayerScores(affected) {
       let data = request.resource.data;
       let existingData = resource.data;
 
-      return existingData.started == true &&
-             'players' in data &&
+      return affected.hasOnly(['players']) &&
+             existingData.started == true &&
              data.players is list &&
              data.players.size() == existingData.players.size() &&
-             data.players.hasAll(isValidPlayerBasic);
+             allPlayersValid(data.players);
     }
 
-    function isSettingContinueReady() {
+    function isSettingContinueReady(affected) {
       let data = request.resource.data;
 
-      return 'continueReady' in data &&
+      return affected.hasOnly(['continueReady']) &&
              data.continueReady is bool;
     }
 
-    function isManagingMidQuizPlayers() {
+    function isManagingMidQuizPlayers(affected) {
       let data = request.resource.data;
 
-      return 'playersAtMidQuiz' in data &&
+      return affected.hasOnly(['playersAtMidQuiz']) &&
              data.playersAtMidQuiz is list;
     }
 
@@ -142,7 +144,39 @@ service cloud.firestore {
              'score' in player &&
              player.id is string &&
              player.name is string &&
-             player.score is number;
+             player.score is number &&
+             player.score >= 0;
+    }
+
+    // Firestore Rules has no loop/`.every()` construct and no recursion, so
+    // "validate every element of a list" has to be unrolled by hand up to a
+    // fixed bound. 32 comfortably covers a realistic party-quiz room; a room
+    // that somehow exceeds it is rejected outright by the size check below
+    // rather than silently validated. isValidPlayerAt(i) is trivially true
+    // once i is past the end of the list, so this works for any list from
+    // size 0 up to the bound.
+    function isValidPlayerAt(players, i) {
+      return i >= players.size() || isValidPlayerBasic(players[i]);
+    }
+
+    function allPlayersValid(players) {
+      return players.size() <= 32 &&
+        isValidPlayerAt(players, 0) && isValidPlayerAt(players, 1) &&
+        isValidPlayerAt(players, 2) && isValidPlayerAt(players, 3) &&
+        isValidPlayerAt(players, 4) && isValidPlayerAt(players, 5) &&
+        isValidPlayerAt(players, 6) && isValidPlayerAt(players, 7) &&
+        isValidPlayerAt(players, 8) && isValidPlayerAt(players, 9) &&
+        isValidPlayerAt(players, 10) && isValidPlayerAt(players, 11) &&
+        isValidPlayerAt(players, 12) && isValidPlayerAt(players, 13) &&
+        isValidPlayerAt(players, 14) && isValidPlayerAt(players, 15) &&
+        isValidPlayerAt(players, 16) && isValidPlayerAt(players, 17) &&
+        isValidPlayerAt(players, 18) && isValidPlayerAt(players, 19) &&
+        isValidPlayerAt(players, 20) && isValidPlayerAt(players, 21) &&
+        isValidPlayerAt(players, 22) && isValidPlayerAt(players, 23) &&
+        isValidPlayerAt(players, 24) && isValidPlayerAt(players, 25) &&
+        isValidPlayerAt(players, 26) && isValidPlayerAt(players, 27) &&
+        isValidPlayerAt(players, 28) && isValidPlayerAt(players, 29) &&
+        isValidPlayerAt(players, 30) && isValidPlayerAt(players, 31);
     }
 
     // Default deny all other collections and documents

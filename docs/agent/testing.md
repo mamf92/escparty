@@ -10,6 +10,16 @@ runner, and no e2e test runner configured. Don't assume test commands exist
 when writing setup instructions or a PR template checklist item — check this
 file first, since it's updated the moment that changes.
 
+## Interim: manual Firestore rules verification
+
+`scripts/verify-firestore-rules.mjs` exercises `firestore.rules` against a
+running local emulator using the real client SDK write paths
+`roomsFirestore.ts` uses. It's a plain Node script, not wired into any test
+runner or CI — run it by hand (`npm run emulators &` then
+`node scripts/verify-firestore-rules.mjs`) after changing `firestore.rules`.
+Fold it into the real suite once the test infra below lands, rather than
+letting it bit-rot as a one-off.
+
 ## What's expected to land here
 
 Once test coverage is introduced (tracked as its own epic), this file should
