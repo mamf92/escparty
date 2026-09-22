@@ -2,9 +2,9 @@
 
 ## Supported versions
 
-ESCParty is deployed continuously from `main`. Only the version currently live
-at https://mamf92.github.io/escparty/ (and its Vercel mirror) is supported —
-there are no maintained older releases.
+ESCParty is deployed continuously from `main` to Vercel. Only the version
+currently live at https://escparty-murex.vercel.app is supported — there are
+no maintained older releases.
 
 ## Reporting a vulnerability
 

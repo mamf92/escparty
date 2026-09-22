@@ -6,7 +6,8 @@ the links instead of re-deriving it by grepping the codebase.
 ## Stack
 
 React 19 + Vite + TypeScript, styled-components for styling, react-router
-(`HashRouter` — routes are `#/...`, required by the GitHub Pages deploy).
+(`HashRouter` — routes are `#/...`, a holdover from the original GitHub
+Pages deploy that every existing link now depends on).
 Backend is Firebase Firestore via the client SDK: state syncs through
 `onSnapshot` listeners, there are no WebSockets, and `updatePlayerScore` is
 the only Firestore transaction in the codebase — everything else is a plain
@@ -20,7 +21,6 @@ read/write (see `docs/agent/firestore-data-model.md`).
 - `npm test` — Vitest unit/component suite (`vitest run`); `npm run
   test:watch` for watch mode.
 - `npm run preview` — serve the production build locally.
-- `npm run deploy` — build then publish `dist/` to GitHub Pages (`gh-pages`).
 - `npm run emulators` — start the local Firestore emulator (needs a JDK).
 
 Unit/component tests run on Vitest + React Testing Library, but coverage is
@@ -58,7 +58,9 @@ One paragraph bridging the two, without repeating the skills' content:
 
 ## Do not change without explicit instruction
 
-- `vite.config.ts`'s `base` path — breaks the GitHub Pages deployment.
+- `vite.config.ts`'s `base` path — it resolves to `/` when Vercel builds
+  (`VERCEL=1`), which is what makes the deployed assets load from the domain
+  root. Changing it breaks the deploy.
 - `roomsFirestore.ts`'s exported function signatures — multiple pages depend
   on this exact API; change it as a coordinated migration, not a drive-by edit.
 - `firestore.rules` at the repo root — this is the actual production rules

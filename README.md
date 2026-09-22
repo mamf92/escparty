@@ -88,11 +88,13 @@ npm run emulators
 ### 🌐 Live Demo
 
 Check out the deployed app here:  
-👉 [https://mamf92.github.io/escparty/](https://mamf92.github.io/escparty/)
+👉 [https://escparty-murex.vercel.app](https://escparty-murex.vercel.app)
 
-### 🌐 Vercel deploy note
+### 🌐 Deploy note
 
-This app keeps the `/escparty/` base path for GitHub Pages, but automatically switches to `/` when Vercel builds it so the deployed assets load correctly there. That means the suggested `npx plugins add vercel/vercel-plugin` step is not necessary for this repo.
+ESCParty is hosted on Vercel, deployed by Vercel's GitHub integration: every push to `main` becomes a production deploy and every PR gets its own preview URL. There's nothing to configure in this repo — no `vercel.json`, no deploy workflow, no secrets — and no manual deploy step to run.
+
+Vite's `base` switches to `/` when Vercel builds, so the deployed assets resolve from the domain root. That's why the suggested `npx plugins add vercel/vercel-plugin` step isn't necessary here.
 
 ---
 
