@@ -1,8 +1,9 @@
 # Contributing
 
-This is the dev loop for ESCParty — the same loop whether you're a human or
-an AI agent (the `steward` skill at `.claude/skills/steward/SKILL.md`
-encodes this exact policy for agent sessions). For project facts (stack,
+This is the dev loop for ESCParty — pick up, plan, execute, commit, PR,
+review, fix, merge — the same loop whether you're a human or an AI agent
+(the `steward` skill at `.claude/skills/steward/SKILL.md` encodes this exact
+policy for agent sessions). For project facts (stack,
 architecture, known landmines), read `CLAUDE.md` and `docs/agent/` first —
 this file is about *how* to work, not *what* the codebase is.
 
@@ -29,7 +30,20 @@ this repo's history, but prefer a short `type/description` form (e.g.
 `fix/vercel-base-path`, `feat/fabric-ui-membrane-demo`) or an
 issue-numbered form (e.g. `43-write-root-claude-md`) over an unscoped name.
 
-## 4. Open a PR
+## 4. Commit
+
+One logical change per commit. Write the subject line in the imperative and
+keep it under ~72 characters; the body is for *why*, since the diff already
+shows what. Reference the issue (`#NN`).
+
+Add the one-line `CHANGELOG.md` bullet under `[Unreleased]` in the same
+commit as the change it describes — after-the-fact changelog passes are how
+entries go missing.
+
+Run `npm run lint`, `npm run build` and `npm test` **before** committing,
+not after the push comes back red.
+
+## 5. Open a PR
 
 Every PR should:
 
@@ -42,27 +56,33 @@ Every PR should:
   isn't a CI check yet, so CI going green says nothing about it (see
   `docs/agent/testing.md`).
 
-## 5. Get it reviewed
+## 6. Get it reviewed
 
 Every PR needs a review pass before merge — a human review, or an
 agent-driven one (the `code-review` skill, or GitHub's Claude Approvals
 check where configured). Never skip both.
 
-## 6. Merge only after review — never on green CI alone
+## 7. Fix what review and CI raise
+
+A red or conflicted PR is work now, not something to wait out — it is never
+"waiting on review" while it's red. Reproduce the failure locally, fix the
+root cause, show the same check passing, then push. "Flake" is not a root
+cause, and neither is a re-run. Never skip, disable or quarantine a test to
+get to green.
+
+For review comments: implement the small, local asks (nits, renames, an
+added test) and push them. For an ask that's bigger than the PR, reply with
+a proposal rather than quietly widening the diff — the author decides.
+Resolve the threads you actually addressed, and re-request review after
+pushing fixes for a changes-requested review.
+
+## 8. Merge only after review — never on green CI alone
 
 This is the one hard rule in this document: **do not merge with green CI
 but no review, and do not merge with unresolved review comments.** Green CI
 means the change didn't break the build; it says nothing about whether the
 change is the right one. Waiting on review is not a bottleneck to route
 around by self-merging — it's the point of having the rule.
-
-## Changelog
-
-After every implementation or otherwise significant change, add a one-line
-bullet to `CHANGELOG.md` under the appropriate `[Unreleased]`/version
-heading. This is a process expectation carried over from the repo's
-original Copilot instructions — it didn't stop applying just because it
-moved documents.
 
 ## Secrets
 

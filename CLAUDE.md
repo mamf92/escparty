@@ -89,10 +89,11 @@ rules, ask before making it rather than guessing.
 
 ## The dev loop
 
-Pick a task → plan if it's non-trivial → execute on a branch → open a PR →
-get it reviewed → merge only after review approves. Full policy:
-`CONTRIBUTING.md`. An agent following this loop end-to-end should use the
-`steward` skill (`.claude/skills/steward/SKILL.md`).
+Pick a task → plan if it's non-trivial → execute on a branch → commit →
+open a PR → get it reviewed → fix what review and CI raise → merge only
+after review approves. Full policy: `CONTRIBUTING.md`. An agent following
+this loop end-to-end should use the `steward` skill
+(`.claude/skills/steward/SKILL.md`).
 
 ## Deep dives (read only when the task touches that area)
 

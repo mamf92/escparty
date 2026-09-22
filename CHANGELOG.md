@@ -22,6 +22,7 @@
 - Added initial Zustand client store sketch for session and multiplayer state management (2026-05-16)
 - Added GitHub Actions CI workflow to run build and lint on PRs (2026-05-16)
 ### Changed
+- Added the missing Commit and Fix steps to the dev loop in `.claude/skills/steward/SKILL.md` and `CONTRIBUTING.md`, so the written loop is pick → plan → execute → commit → PR → review → fix → merge (2026-09-22)
 - Updated Home navigation: Single-player button now routes to `/select-difficulty` (2026-05-16)
 ### Updated
 - Refreshed the long-term roadmap milestones and README to reflect the 2026-2027 product goals (2026-05-21)
