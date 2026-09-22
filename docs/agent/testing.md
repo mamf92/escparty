@@ -9,6 +9,9 @@ no e2e runner yet, and the unit suite is not yet a required CI check — see
 - `npm test` — run the unit/component suite once (`vitest run`). This is the
   command CI will call once the suite is wired in.
 - `npm run test:watch` — the same suite in watch mode while developing.
+- `npm run test:coverage` — the same run plus a coverage report, and the
+  per-file floors described under "The coverage floor" below. Not part of
+  `npm test`, so an ordinary run stays fast.
 
 `npm run lint` and `npm run build` still run in CI
 (`.github/workflows/ci.yml`) on every PR and push to `main`.
@@ -62,8 +65,30 @@ way — it's what makes the GitHub Pages deploy work (see `CLAUDE.md`).
 
 ## Firestore-touching tests
 
-Anything that talks to Firestore belongs against the local emulator
+Anything that talks to a *real* Firestore belongs against the local emulator
 (`npm run emulators`), never production credentials.
+
+`src/utils/roomsFirestore.test.ts` talks to neither: it mocks the Firebase
+client SDK (`vi.mock("firebase/firestore", …)` plus `vi.mock("../firebase")`)
+and asserts on the exact write payloads the module hands the SDK. That's a
+deliberate split — the emulator needs a JDK and a running process, so an
+emulator-bound unit suite would be un-runnable the moment `npm test` becomes
+a CI check (#57). What the mocked suite pins down is the logic this module
+adds *on top of* the SDK: the guards (`Firebase not initialized`, "game
+already started", duplicate player, non-finite/negative/decreasing score),
+the wrapped error messages pages match on, and which writes go through a
+transaction rather than a read-modify-write. What it cannot tell you is
+whether `firestore.rules` would accept those writes — that's the emulator's
+job, below.
+
+Two patterns in that file worth reusing:
+
+- The `../firebase` mock exposes `db` through a **getter** over a mutable
+  `vi.hoisted` object, so one test can drop it to `undefined` and exercise
+  every function's "Firebase not initialized" guard without a second file.
+- `runTransaction` is mocked to invoke its callback once with a fake
+  `{ get, update }`. That means retry-on-conflict is *not* exercised — it's
+  the SDK's behaviour, not this module's.
 
 `scripts/verify-firestore-rules.mjs` exercises `firestore.rules` against a
 running emulator using the same client SDK write paths as
@@ -72,15 +97,44 @@ or CI — run it by hand (`npm run emulators &` then
 `node scripts/verify-firestore-rules.mjs`) after changing `firestore.rules`.
 Folding it into the real suite is part of the rules work tracked in #50.
 
+## The coverage floor
+
+`npm run test:coverage` enforces per-file thresholds, configured under
+`test.coverage` in `vite.config.ts`. They are deliberately **not** a
+repo-wide percentage: a single repo number is met by testing easy UI and
+leaving the risky layer bare, which is the state this epic exists to fix.
+Coverage `include` therefore lists exactly the files with a floor:
+
+| File | Floor |
+| --- | --- |
+| `src/utils/quizScoring.ts` | 100% statements / branches / functions / lines |
+| `src/utils/roomsFirestore.ts` | 100% statements / branches / functions / lines |
+| `src/utils/QuizDataProvider.ts` | 98% statements & lines, 96% branches, 100% functions |
+
+`QuizDataProvider.ts` is short of 100% only because of the `default:` arm in
+`directImportQuizData`'s switch, which `loadQuizData` normalises away before
+ever calling it.
+
+Adding a file to the list is how coverage gets ratcheted up (#59 tracks the
+backlog); **lowering a floor to make a run go green is not** — cover the new
+branch instead. `npm run test:coverage` is not a CI check yet; #57 wires the
+suite in.
+
 ## Known gaps
 
 The unit harness is the first rung of the test-coverage epic (#53). Still
 open at the time of writing:
 
-- **Coverage is one smoke test.** `src/pages/Home.test.tsx` proves the
-  harness works end to end; the actually risky code (`roomsFirestore.ts`,
-  the scoring math in `Quiz.tsx`, `QuizDataProvider.ts`) has no tests yet —
-  that's #56.
+- **Covered so far: the data/logic layer, not the screens.**
+  `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts` and the
+  extracted scoring math in `src/utils/quizScoring.ts` have unit tests with
+  a coverage floor (#56). `src/pages/Home.test.tsx` is still the only
+  component test — every other page and `Quiz.tsx` itself are uncovered,
+  which is #59.
+- **`Quiz.tsx` is covered only where it was extracted.** The scoring formula
+  moved to `src/utils/quizScoring.ts` and is tested directly; the component's
+  own timer, question progression and multiplayer branching are not tested
+  at all. Don't read "scoring is covered" as "the quiz is covered".
 - **No e2e runner.** Playwright is #55.
 - **Not enforced by CI.** `npm test` doesn't run in `ci.yml` yet, and the
   Vercel deploy still fires on push to `main` regardless of test state —

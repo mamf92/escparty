@@ -55,7 +55,13 @@ plan that also removes the ad hoc storage it would duplicate.
 - `QuizDataProvider.ts` — loads quiz questions for a difficulty, trying a
   direct JSON import, then a `fetch` against `public/quizdata/`, then a
   small hardcoded fallback, in an order that differs between dev and
-  production (see the file for which order).
+  production (see the file for which order). Loading deliberately returns
+  the bank as authored; `filterEnabledQuestions` (same file) is the separate
+  step that drops questions flagged `disabled`, called by `Quiz.tsx`.
+- `quizScoring.ts` — the answer-scoring math (`500` base plus a time bonus
+  of up to `500`, linear in the time left and rounded down), extracted from
+  `Quiz.tsx` so the rule players actually see can be unit-tested without
+  rendering the component. Pure functions, no React, no Firestore.
 - `pathUtils.ts` — environment detection (`isDevelopmentEnvironment`,
   `isProductionPreview`) plus the base-path helper `getAssetPath`.
   `firebase.ts` uses both detection functions (but no base-path helper);
