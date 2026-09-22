@@ -11,8 +11,8 @@ a pointer rather than a second copy that can drift.
 - `docs/agent/` — deep dives on architecture, the Firestore data model,
   multiplayer sync, and theming, loaded only when the task needs them.
 - `/CONTRIBUTING.md` — the dev loop: pick a task, plan if non-trivial,
-  execute on a branch, open a PR, get it reviewed, merge only after review
-  approves.
+  execute on a branch, commit, open a PR, get it reviewed, fix what review
+  and CI raise, merge only after review approves.
 
 ## Copilot-specific notes
 
