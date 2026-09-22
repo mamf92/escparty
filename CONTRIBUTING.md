@@ -38,8 +38,9 @@ Every PR should:
   open the PR) — including the docs-updated checkbox if the change touches
   architecture, the data model, or routes.
 - Pass CI (`npm run build` and `npm run lint`, per
-  `.github/workflows/ci.yml`). Once a test suite exists (see
-  `docs/agent/testing.md`), it'll run here too.
+  `.github/workflows/ci.yml`). Run `npm test` locally too — the unit suite
+  isn't a CI check yet, so CI going green says nothing about it (see
+  `docs/agent/testing.md`).
 
 ## 5. Get it reviewed
 

@@ -103,7 +103,8 @@ get it reviewed → merge only after review approves. Full policy:
   results actually flows today.
 - `docs/agent/theming.md` — how Calm and Sparkle relate; pointers to both
   skills.
-- `docs/agent/testing.md` — stub; fills in once a test suite exists.
+- `docs/agent/testing.md` — how to run and write tests, and what isn't
+  covered yet.
 
 ## Keeping this file honest
 
