@@ -74,6 +74,15 @@ the local emulator only when `isDevelopmentEnvironment()` is true **and**
 The shared styled-components theme (colors, fonts) both design themes pull
 their tokens from. See `docs/agent/theming.md`.
 
+## `src/test/`
+
+Test harness only — no app code imports it. `setup.ts` is Vitest's per-file
+setup (jest-dom matchers, Testing Library cleanup) and `test-utils.tsx`
+exports `renderWithProviders`, which wraps a component in the same
+`ThemeProvider` + router pair `App.tsx` mounts screens under. Tests
+themselves live next to the code they cover, not here. See
+`docs/agent/testing.md`.
+
 ## Data files
 
 `src/data/*.json` and `public/quizdata/*.json` are duplicates of the same
