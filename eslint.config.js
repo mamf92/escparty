@@ -31,4 +31,14 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Test files and the shared test helpers never ship in the app bundle,
+    // so Fast Refresh's "components only" rule doesn't apply to them —
+    // test-utils.tsx exports a provider wrapper alongside plain helpers on
+    // purpose.
+    files: ['src/test/**/*.{ts,tsx}', '**/*.{test,spec}.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 )

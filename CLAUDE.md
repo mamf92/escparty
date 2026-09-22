@@ -17,12 +17,15 @@ read/write (see `docs/agent/firestore-data-model.md`).
 - `npm run dev` — start the Vite dev server.
 - `npm run build` — `tsc -b` then `vite build`.
 - `npm run lint` — ESLint; CI runs this and `build` on every PR.
+- `npm test` — Vitest unit/component suite (`vitest run`); `npm run
+  test:watch` for watch mode.
 - `npm run preview` — serve the production build locally.
 - `npm run deploy` — build then publish `dist/` to GitHub Pages (`gh-pages`).
 - `npm run emulators` — start the local Firestore emulator (needs a JDK).
 
-There is no test suite yet. `docs/agent/testing.md` is a stub until that
-lands — don't assume `npm test` exists.
+Unit/component tests run on Vitest + React Testing Library, but coverage is
+currently one smoke test and `npm test` is **not** a CI check yet — see
+`docs/agent/testing.md` before assuming a given flow is covered.
 
 ## Where things live
 
