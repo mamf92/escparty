@@ -19,13 +19,16 @@ read/write (see `docs/agent/firestore-data-model.md`).
 - `npm run build` — `tsc -b` then `vite build`.
 - `npm run lint` — ESLint; CI runs this and `build` on every PR.
 - `npm test` — Vitest unit/component suite (`vitest run`); `npm run
-  test:watch` for watch mode.
+  test:watch` for watch mode, `npm run test:coverage` for the per-file
+  coverage floors.
 - `npm run preview` — serve the production build locally.
 - `npm run emulators` — start the local Firestore emulator (needs a JDK).
 
-Unit/component tests run on Vitest + React Testing Library, but coverage is
-currently one smoke test and `npm test` is **not** a CI check yet — see
-`docs/agent/testing.md` before assuming a given flow is covered.
+Unit/component tests run on Vitest + React Testing Library. Covered today:
+`roomsFirestore.ts`, `QuizDataProvider.ts` and `quizScoring.ts` (with
+per-file coverage floors), plus one `Home.tsx` smoke test — every other page,
+and `Quiz.tsx` itself, is uncovered, and `npm test` is **not** a CI check
+yet. See `docs/agent/testing.md` before assuming a given flow is covered.
 
 ## Where things live
 
@@ -36,7 +39,9 @@ are pages). `src/fabric-ui/` is a self-contained WebGL rendering module for
 the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one
 file, `useGameStore.ts`, which is dead code (see Landmines). `src/utils/`
 has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz
-question loading), and `pathUtils.ts` (base-path/env helpers). Full layout:
+question loading), `quizScoring.ts` (the answer-scoring math, extracted from
+`Quiz.tsx` so it can be tested directly), and `pathUtils.ts` (base-path/env
+helpers). Full layout:
 `docs/agent/architecture.md`.
 
 ## Design themes

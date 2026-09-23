@@ -4,7 +4,8 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
 import { updatePlayerScore, listenToRoom, Room } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
-import { loadQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
+import { loadQuizData, filterEnabledQuestions, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
+import { calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -218,7 +219,7 @@ const Quiz = () => {
           return;
         }
 
-        const filteredQuestions = quizData.filter(q => !q.disabled);
+        const filteredQuestions = filterEnabledQuestions(quizData);
         console.log(`📋 Loaded ${filteredQuestions.length} questions for ${difficulty} difficulty`);
 
         if (filteredQuestions.length === 0) {
@@ -404,13 +405,10 @@ const Quiz = () => {
 
     // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
-      // Calculate time-based score with millisecond precision
-      // Base score of 500 + up to 500 more based on time remaining
-      // Clamp timeLeftMs so a stale timer tick can't push the bonus outside [0, 500]
-      const clampedTimeLeftMs = Math.max(0, Math.min(timeLeftMs, 10000));
-      const timeBonus = Math.floor((clampedTimeLeftMs / 10000) * 500);
-      // Using timeLeftMs (milliseconds) for more precise scoring
-      const pointsForAnswer = 500 + timeBonus;
+      // Base score plus a time bonus, both clamped and rounded in
+      // `quizScoring.ts` so the rule is unit-tested rather than inline here.
+      const timeBonus = calculateTimeBonus(timeLeftMs);
+      const pointsForAnswer = calculateQuestionScore(timeLeftMs);
       console.log(`Correct answer! Time left: ${timeLeftMs / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
 
       // Set points for current question to display in the UI

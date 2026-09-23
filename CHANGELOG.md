@@ -10,6 +10,7 @@
 
 ## [Unreleased]
 ### Added
+- Added baseline unit tests for the critical logic: `roomsFirestore.ts` (Firebase SDK mocked, covering the join/score/mid-quiz guards and every wrapped error message), `QuizDataProvider.ts` (the three-tier dev/prod fallback chain) and the quiz scoring math, which moved out of `Quiz.tsx` into a pure `src/utils/quizScoring.ts`; added `npm run test:coverage` with per-file coverage floors for exactly those three files (2026-09-22)
 - Added a Vitest + React Testing Library unit/component test harness (`npm test`, `npm run test:watch`), a `renderWithProviders` helper that mounts components under the app's ThemeProvider + router, and a `Home.tsx` smoke test proving it works end to end (2026-09-22)
 - Added `firestore.rules` at the repo root, imported verbatim from the Firebase console and wired into `firebase.json`, so production access control is versioned and reviewable for the first time (2026-09-18)
 - Added `scripts/verify-firestore-rules.mjs`, a manual emulator-based verification script for `firestore.rules` (2026-09-18)

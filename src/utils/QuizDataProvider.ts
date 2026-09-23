@@ -15,6 +15,17 @@ export interface QuizQuestion {
     disabled?: boolean;
 }
 
+/**
+ * Drop the questions flagged `disabled` in the source JSON.
+ *
+ * Loading deliberately doesn't do this — `loadQuizData` returns the file as
+ * authored, so a quiz editor can still see a retired question. Every player-
+ * facing surface filters before showing anything, so the rule lives here
+ * rather than being re-typed at each call site.
+ */
+export const filterEnabledQuestions = (questions: QuizQuestion[]): QuizQuestion[] =>
+    questions.filter(question => !question.disabled);
+
 // Fallback quiz data in case nothing else loads
 const fallbackQuizData: Record<QuizDifficulty, QuizQuestion[]> = {
     'easy': [
