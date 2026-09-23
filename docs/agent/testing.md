@@ -1,20 +1,23 @@
 # Testing
 
 Unit and component tests run on **Vitest + React Testing Library**. There is
-no e2e runner yet, and the unit suite is not yet a required CI check — see
-"Known gaps" below for which issue covers each.
+no e2e runner yet, but the unit suite now runs on every PR and push to `main`
+as part of `ci.yml` — see "Known gaps" below for what's still missing.
 
 ## Commands
 
 - `npm test` — run the unit/component suite once (`vitest run`). This is the
-  command CI will call once the suite is wired in.
+  command `ci.yml` runs on every PR and push to `main`.
 - `npm run test:watch` — the same suite in watch mode while developing.
 - `npm run test:coverage` — the same run plus a coverage report, and the
   per-file floors described under "The coverage floor" below. Not part of
   `npm test`, so an ordinary run stays fast.
 
-`npm run lint` and `npm run build` still run in CI
-(`.github/workflows/ci.yml`) on every PR and push to `main`.
+`npm run lint`, `npm run build`, and now `npm test` run in CI
+(`.github/workflows/ci.yml`) on every PR and push to `main`. A red test run
+fails the workflow, but nothing yet stops it from merging (that's branch
+protection, #49) or from deploying (Vercel's GitHub integration deploys
+`main` independently of this workflow's result — see #57 for the plan there).
 
 ## Where tests live
 
@@ -72,8 +75,8 @@ Anything that talks to a *real* Firestore belongs against the local emulator
 client SDK (`vi.mock("firebase/firestore", …)` plus `vi.mock("../firebase")`)
 and asserts on the exact write payloads the module hands the SDK. That's a
 deliberate split — the emulator needs a JDK and a running process, so an
-emulator-bound unit suite would be un-runnable the moment `npm test` becomes
-a CI check (#57). What the mocked suite pins down is the logic this module
+emulator-bound unit suite would be un-runnable now that `npm test` is a CI
+check. What the mocked suite pins down is the logic this module
 adds *on top of* the SDK: the guards (`Firebase not initialized`, "game
 already started", duplicate player, non-finite/negative/decreasing score),
 the wrapped error messages pages match on, and which writes go through a
@@ -117,8 +120,8 @@ ever calling it.
 
 Adding a file to the list is how coverage gets ratcheted up (#59 tracks the
 backlog); **lowering a floor to make a run go green is not** — cover the new
-branch instead. `npm run test:coverage` is not a CI check yet; #57 wires the
-suite in.
+branch instead. `npm run test:coverage` itself is still not a CI check —
+`ci.yml` runs the faster `npm test` — a coverage-diff gate is tracked in #57.
 
 ## Known gaps
 
@@ -136,9 +139,11 @@ open at the time of writing:
   own timer, question progression and multiplayer branching are not tested
   at all. Don't read "scoring is covered" as "the quiz is covered".
 - **No e2e runner.** Playwright is #55.
-- **Not enforced by CI.** `npm test` doesn't run in `ci.yml` yet, and the
-  Vercel deploy still fires on push to `main` regardless of test state —
-  that's #57.
+- **Test failures don't block merge or deploy yet.** `npm test` runs in
+  `ci.yml`, but nothing requires it to pass before merge (branch protection,
+  #49) or before Vercel deploys `main` (no workflow chains to Vercel's
+  GitHub integration today — #57 tracks the coverage-diff gate and the
+  Vercel/branch-protection decision).
 - **Review policy hasn't tightened yet.** `.claude/skills/steward/SKILL.md`
   and `.github/pull_request_template.md` still treat "no tests for a new
   component" as a known gap to note rather than a blocking finding. #58
