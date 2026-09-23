@@ -22,7 +22,11 @@
 - Added host observer mode allowing quiz hosts to monitor players without participating (13 May 2025)
 - Added initial Zustand client store sketch for session and multiplayer state management (2026-05-16)
 - Added GitHub Actions CI workflow to run build and lint on PRs (2026-05-16)
+### Removed
+- Removed the GitHub Pages deploy path (`predeploy`/`deploy` scripts and the `gh-pages` devDependency) and `.github/workflows/deploy-vercel.yml`, which had failed on all 12 of its runs for want of the `VERCEL_*` secrets; Vercel's GitHub integration is the one deploy path that actually runs (2026-09-22)
+
 ### Changed
+- Pointed the README live-demo link, `SECURITY.md`'s supported-version URL and `package.json`'s `homepage` at https://escparty-murex.vercel.app, replacing the GitHub Pages URL whose last build was from October 2025 (2026-09-22)
 - Added the missing Commit and Fix steps to the dev loop in `.claude/skills/steward/SKILL.md` and `CONTRIBUTING.md`, so the written loop is pick → plan → execute → commit → PR → review → fix → merge (2026-09-22)
 - Updated Home navigation: Single-player button now routes to `/select-difficulty` (2026-05-16)
 ### Updated
