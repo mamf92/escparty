@@ -58,7 +58,7 @@ Two choices worth knowing:
   happens with globals on) is wired manually in `src/test/setup.ts`.
 
 `vite.config.ts`'s `base` path is untouched by any of this and must stay that
-way — it's what makes the GitHub Pages deploy work (see `CLAUDE.md`).
+way — it's what makes the Vercel deploy's assets resolve (see `CLAUDE.md`).
 
 ## Firestore-touching tests
 

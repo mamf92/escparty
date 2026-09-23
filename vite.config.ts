@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
       restoreMocks: true,
     },
     build: {
-      // Output directory - this should match your GitHub Pages settings
+      // Output directory - Vercel picks this up as the build output
       outDir: 'dist',
       rollupOptions: {
         output: {
