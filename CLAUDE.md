@@ -27,8 +27,9 @@ read/write (see `docs/agent/firestore-data-model.md`).
 Unit/component tests run on Vitest + React Testing Library. Covered today:
 `roomsFirestore.ts`, `QuizDataProvider.ts` and `quizScoring.ts` (with
 per-file coverage floors), plus one `Home.tsx` smoke test — every other page,
-and `Quiz.tsx` itself, is uncovered, and `npm test` is **not** a CI check
-yet. See `docs/agent/testing.md` before assuming a given flow is covered.
+and `Quiz.tsx` itself, is uncovered. `npm test` now runs in `ci.yml`, but a
+red run doesn't yet block merge or deploy (see #57). See
+`docs/agent/testing.md` before assuming a given flow is covered.
 
 ## Where things live
 

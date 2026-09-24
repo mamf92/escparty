@@ -84,3 +84,6 @@ out
 
 # VSCode testing
 .vscode-test/
+
+# Claude Code worktrees
+.claude/worktrees/

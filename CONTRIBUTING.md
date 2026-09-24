@@ -51,10 +51,10 @@ Every PR should:
 - Fill in `.github/pull_request_template.md` (it auto-populates when you
   open the PR) — including the docs-updated checkbox if the change touches
   architecture, the data model, or routes.
-- Pass CI (`npm run build` and `npm run lint`, per
-  `.github/workflows/ci.yml`). Run `npm test` locally too — the unit suite
-  isn't a CI check yet, so CI going green says nothing about it (see
-  `docs/agent/testing.md`).
+- Pass CI (`npm run build`, `npm run lint`, and `npm test`, per
+  `.github/workflows/ci.yml`). CI runs on Node 22.x/24.x (jsdom's engine
+  requirement) — see `package.json`'s `engines` field before debugging a
+  local `npm test` failure that doesn't reproduce in CI.
 
 ## 6. Get it reviewed
 
