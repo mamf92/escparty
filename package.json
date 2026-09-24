@@ -28,7 +28,7 @@
     "react-router-dom": "^7.1.5",
     "styled-components": "^6.1.15",
     "three": "^0.185.1",
-    "uuid": "^11.1.0",
+    "uuid": "^14.0.2",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
