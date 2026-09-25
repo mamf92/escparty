@@ -8,6 +8,7 @@ name: Firestore rules
 # See docs/agent/firestore-data-model.md ("Deploying rules").
 
 on:
+  # Keep the two paths lists identical.
   pull_request:
     branches: [main]
     paths:
@@ -85,7 +86,7 @@ jobs:
     # edit this file, so a PR run holding the key could deploy unreviewed
     # rules. The `production` environment's deployment-branch rule (main
     # only) enforces the same thing on GitHub's side.
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -115,6 +116,15 @@ jobs:
         env:
           OVERWRITE_LIVE: ${{ inputs.overwrite_live && 'true' || 'false' }}
         run: |
+          # Only ever deploy the tip of main. Re-running an older run must
+          # not put back rules a later commit replaced.
+          git fetch -q origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "::notice::$GITHUB_SHA is no longer the tip of main; the newer commit's run deploys instead."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           live="$RUNNER_TEMP/live.rules"
           node scripts/firestore-live-rules.mjs > "$live"
 
@@ -128,33 +138,42 @@ jobs:
           # firestore.rules that main has ever had, they're just an older
           # deploy (or the original console import) and safe to replace. If
           # they match none, someone edited them outside the repo, and
-          # deploying would silently throw that edit away.
+          # deploying would silently throw that edit away. Line endings and
+          # trailing whitespace are ignored, since a console paste can change
+          # them without changing any rule.
+          normalize() { sed -e 's/\r$//' -e 's/[[:space:]]*$//' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'; }
+          normalize < "$live" > "$RUNNER_TEMP/live.normalized"
           source_commit=""
-          for commit in $(git log --format=%H HEAD -- firestore.rules); do
-            if git show "$commit:firestore.rules" 2>/dev/null | cmp -s - "$live"; then
+          for commit in $(git log --full-history --format=%H HEAD -- firestore.rules); do
+            if git show "$commit:firestore.rules" 2>/dev/null | normalize | cmp -s - "$RUNNER_TEMP/live.normalized"; then
               source_commit="$commit"
               break
             fi
           done
 
+          diff -u --label live --label firestore.rules "$live" firestore.rules > "$RUNNER_TEMP/change.diff" || true
           echo "::group::Diff: live rules -> firestore.rules at $GITHUB_SHA"
-          diff -u --label live --label firestore.rules "$live" firestore.rules || true
+          cat "$RUNNER_TEMP/change.diff"
           echo "::endgroup::"
-          {
-            echo "## What this deploy changes"
-            echo '```diff'
-            diff -u --label live --label firestore.rules "$live" firestore.rules || true
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -n "$source_commit" ]; then
-            echo "Live rules match firestore.rules as of $(git log -1 --format='%h (%ad) %s' --date=short "$source_commit")." | tee -a "$GITHUB_STEP_SUMMARY"
+            heading="Deploying: live rules were firestore.rules as of $(git log -1 --format='%h (%ad) %s' --date=short "$source_commit")"
           elif [ "$OVERWRITE_LIVE" = "true" ]; then
+            heading="Deploying over rules edited outside the repo (overwrite_live was set)"
             echo "::warning::Live rules match no version in main's history; overwriting them because overwrite_live was set."
           else
+            heading="Refused: live rules were edited outside the repo; nothing was deployed"
+          fi
+          {
+            echo "## $heading"
+            echo '```diff'; cat "$RUNNER_TEMP/change.diff"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$source_commit" ] && [ "$OVERWRITE_LIVE" != "true" ]; then
             echo "::error::Live rules match no version of firestore.rules in main's history, so they were edited outside the repo (e.g. in the Firebase console). Port that edit into firestore.rules, or re-run this workflow by hand with overwrite_live to discard it. The diff is in this step's log."
             exit 1
           fi
+          echo "$heading"
           echo "deploy=true" >> "$GITHUB_OUTPUT"
 
       - name: Deploy

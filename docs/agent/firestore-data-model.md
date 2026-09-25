@@ -92,8 +92,18 @@ verify script runs on the installed `firebase` SDK):
   job refuses to deploy rather than silently discard that edit. Port the
   edit into the file, or re-run the workflow by hand with `overwrite_live`
   to discard it.
-- A missing secret or variable fails the deploy job rather than skipping it,
-  since a green run on `main` reads as "deployed".
+- It only deploys the current tip of `main`. Re-running an older run is a
+  no-op, so it can't put back rules a later commit replaced. A missing
+  secret or variable fails the job rather than skipping it, since a green
+  run on `main` reads as "deployed".
+- Known gaps, not closed yet:
+  - A rollback made in the console, to an older ruleset that matches some
+    earlier commit, looks like a stale deploy and gets replaced on the next
+    push. Roll back by reverting in the repo instead.
+  - Auth is a long-lived JSON key. Workload Identity Federation scoped to
+    `main` would remove it.
+  - `firebase-tools` runs via a pinned `npx` version, not a lockfile, and
+    actions are pinned by tag, not SHA. Both match `ci.yml` today.
 
 So: **never edit rules in the Firebase console.** Change this file in a PR.
 Credentials: the `FIREBASE_SERVICE_ACCOUNT` secret, which belongs in the
