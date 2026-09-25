@@ -72,10 +72,10 @@ One paragraph bridging the two, without repeating the skills' content:
 - `firestore.rules` at the repo root — this is the actual production rules
   file, and **merging a change to it deploys it** to production
   (`.github/workflows/firestore-rules.yml`): it's access control for every
-  multiplayer room. Treat any change here as high risk. The workflow's PR
-  run verifies it against the emulator and shows the live-vs-repo diff;
-  read that diff before merging. Never edit rules in the Firebase console
-  (see `docs/agent/firestore-data-model.md`).
+  multiplayer room. Treat any change here as high risk: the PR run only
+  verifies it against the emulator, so the PR diff is what goes live on
+  merge. Never edit rules in the Firebase console (see
+  `docs/agent/firestore-data-model.md`).
 
 If you're unsure whether a change affects hosting, env vars, or Firestore
 rules, ask before making it rather than guessing.

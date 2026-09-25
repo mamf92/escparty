@@ -74,27 +74,34 @@ of truth.
 
 `.github/workflows/firestore-rules.yml` deploys this file. It runs on any PR
 or push to `main` that touches the rules, `firebase.json`, either rules
-script, or the workflow itself:
+script, the workflow itself, or `package.json`/`package-lock.json` (the
+verify script runs on the installed `firebase` SDK):
 
-- **On a PR:** `scripts/verify-firestore-rules.mjs` runs against the
-  emulator. Then, with the production service account, the job fetches the
-  live rules (`scripts/firestore-live-rules.mjs`) and writes two diffs to
-  the job summary: live vs. the base branch (drift, meaning edits made
-  outside the repo) and live vs. the PR (what merging will change). Last,
-  it dry-runs the deploy, which compiles against the real project and
-  proves the credentials still work.
-- **On merge to `main`:** it deploys, then reads the live rules back and
-  fails unless they match the file exactly. If the live rules had drifted
-  from the previous commit's file, it refuses to deploy rather than
-  silently overwrite a console edit. Port the edit into the file, or re-run
-  the workflow by hand with `overwrite_live` to discard it.
+- **On a PR:** only `scripts/verify-firestore-rules.mjs` against the
+  emulator. PR runs get no production access, because a PR can edit the
+  workflow itself, and a PR run holding the key could deploy unreviewed
+  rules. So the PR's diff of `firestore.rules` is exactly what goes live on
+  merge.
+- **On push to `main`** (the `deploy` job, in the `production` GitHub
+  environment): it reads the live rules (`scripts/firestore-live-rules.mjs`).
+  If they already match the file, it stops. Otherwise it checks where they
+  came from. If they match any version of `firestore.rules` in `main`'s
+  history, they're just an older deploy, so it logs the diff, deploys, and
+  reads the live rules back, failing unless they now match the file exactly.
+  If they match no version, someone edited them outside the repo, and the
+  job refuses to deploy rather than silently discard that edit. Port the
+  edit into the file, or re-run the workflow by hand with `overwrite_live`
+  to discard it.
+- A missing secret or variable fails the deploy job rather than skipping it,
+  since a green run on `main` reads as "deployed".
 
 So: **never edit rules in the Firebase console.** Change this file in a PR.
-Credentials are the `FIREBASE_SERVICE_ACCOUNT` repo secret (the
-`github-rules-deployer` service account, Firebase Rules Admin + Service
-Usage Consumer only, so it can't touch room data) and the
-`FIREBASE_PROJECT_ID` repo variable. PRs from forks and Dependabot don't get
-secrets, so they get the emulator check only.
+Credentials: the `FIREBASE_SERVICE_ACCOUNT` secret, which belongs in the
+`production` environment (deployment branches: `main` only) rather than
+the repo-wide secrets, since any PR's workflow can read a repo-wide secret.
+It's the `github-rules-deployer` service account, with Firebase Rules Admin
+and Service Usage Consumer only, so it can't touch room data. Plus the
+`FIREBASE_PROJECT_ID` repo variable.
 
 **Two real bugs found and fixed in the rules imported from the Firebase
 console** (verified against the real emulator before and after — see
@@ -167,11 +174,9 @@ criteria (also verified against the emulator, also in
 
 Remaining gaps, all pre-existing and **not** closed by any of the above:
 - The emulator checks are a plain Node script
-  (`scripts/verify-firestore-rules.mjs`), not part of the Vitest suite. CI
-  runs it on every PR that touches the rules (see "Deploying rules"), and
-  you can run it by hand (`npm run emulators &` then
-  `node scripts/verify-firestore-rules.mjs`). Fold it into the real suite
-  once Epic 3 lands.
+  (`scripts/verify-firestore-rules.mjs`), not part of the Vitest suite; see
+  `docs/agent/testing.md` for running it. Fold it into the real suite once
+  Epic 3 lands.
 - A client still can't be stopped from writing a *different* player's score
   entry specifically — rules can validate shape, not identity, without auth.
 - There's no "finished room" concept in the `Room` schema at all (no field
