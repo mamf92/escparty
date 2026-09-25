@@ -64,14 +64,37 @@ why; see `docs/agent/multiplayer-sync.md`.
 
 ## Security rules
 
-`firestore.rules` at the repo root is the production rules, imported
-verbatim from the Firebase console (no behavior change) and wired up via
-`firebase.json`'s `firestore.rules` key so the emulator and
-`firebase deploy --only firestore:rules` both use this file as the source of
-truth going forward. Keep it in sync: if you change production rules in the
-Firebase console, port the same change here in the same PR (or as a
-same-day follow-up) — this file is only useful if it doesn't drift from
-what's actually deployed.
+`firestore.rules` at the repo root is the production rules, originally
+imported verbatim from the Firebase console and wired up via
+`firebase.json`'s `firestore.rules` key, so the emulator and
+`firebase deploy --only firestore:rules` both use this file as the source
+of truth.
+
+### Deploying rules
+
+`.github/workflows/firestore-rules.yml` deploys this file. It runs on any PR
+or push to `main` that touches the rules, `firebase.json`, either rules
+script, or the workflow itself:
+
+- **On a PR:** `scripts/verify-firestore-rules.mjs` runs against the
+  emulator. Then, with the production service account, the job fetches the
+  live rules (`scripts/firestore-live-rules.mjs`) and writes two diffs to
+  the job summary: live vs. the base branch (drift, meaning edits made
+  outside the repo) and live vs. the PR (what merging will change). Last,
+  it dry-runs the deploy, which compiles against the real project and
+  proves the credentials still work.
+- **On merge to `main`:** it deploys, then reads the live rules back and
+  fails unless they match the file exactly. If the live rules had drifted
+  from the previous commit's file, it refuses to deploy rather than
+  silently overwrite a console edit. Port the edit into the file, or re-run
+  the workflow by hand with `overwrite_live` to discard it.
+
+So: **never edit rules in the Firebase console.** Change this file in a PR.
+Credentials are the `FIREBASE_SERVICE_ACCOUNT` repo secret (the
+`github-rules-deployer` service account, Firebase Rules Admin + Service
+Usage Consumer only, so it can't touch room data) and the
+`FIREBASE_PROJECT_ID` repo variable. PRs from forks and Dependabot don't get
+secrets, so they get the emulator check only.
 
 **Two real bugs found and fixed in the rules imported from the Firebase
 console** (verified against the real emulator before and after — see
@@ -143,13 +166,12 @@ criteria (also verified against the emulator, also in
   client code assumed re-sending the same kind of write was harmless.
 
 Remaining gaps, all pre-existing and **not** closed by any of the above:
-- No emulator-based tests are wired into CI yet exercising these paths on
-  every PR — blocked on Epic 3's test infra landing (`docs/agent/testing.md`).
-  `scripts/verify-firestore-rules.mjs` is a manual (not CI-wired)
-  verification script exercising the real client SDK write paths against a
-  running emulator; run it by hand (`npm run emulators &` then
-  `node scripts/verify-firestore-rules.mjs`) after any change to
-  `firestore.rules`, and fold it into the real suite once Epic 3 lands.
+- The emulator checks are a plain Node script
+  (`scripts/verify-firestore-rules.mjs`), not part of the Vitest suite. CI
+  runs it on every PR that touches the rules (see "Deploying rules"), and
+  you can run it by hand (`npm run emulators &` then
+  `node scripts/verify-firestore-rules.mjs`). Fold it into the real suite
+  once Epic 3 lands.
 - A client still can't be stopped from writing a *different* player's score
   entry specifically — rules can validate shape, not identity, without auth.
 - There's no "finished room" concept in the `Room` schema at all (no field

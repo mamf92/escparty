@@ -70,11 +70,12 @@ One paragraph bridging the two, without repeating the skills' content:
 - `roomsFirestore.ts`'s exported function signatures — multiple pages depend
   on this exact API; change it as a coordinated migration, not a drive-by edit.
 - `firestore.rules` at the repo root — this is the actual production rules
-  file (imported verbatim from the Firebase console, wired up via
-  `firebase.json`). Deploying it re-deploys production access control for
-  every multiplayer room. Treat any change here as high risk: verify against
-  the emulator first, and keep it in sync with whatever's live in the
-  Firebase console (see `docs/agent/firestore-data-model.md`).
+  file, and **merging a change to it deploys it** to production
+  (`.github/workflows/firestore-rules.yml`): it's access control for every
+  multiplayer room. Treat any change here as high risk. The workflow's PR
+  run verifies it against the emulator and shows the live-vs-repo diff;
+  read that diff before merging. Never edit rules in the Firebase console
+  (see `docs/agent/firestore-data-model.md`).
 
 If you're unsure whether a change affects hosting, env vars, or Firestore
 rules, ask before making it rather than guessing.

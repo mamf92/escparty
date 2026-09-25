@@ -10,6 +10,7 @@
 
 ## [Unreleased]
 ### Added
+- Added `.github/workflows/firestore-rules.yml`, which verifies `firestore.rules` against the emulator on PRs and diffs it against the live rules, then deploys it on merge to `main` and checks the result, so the rules no longer get pasted into the Firebase console by hand. Also added `scripts/firestore-live-rules.mjs` for reading the live rules back (2026-09-25)
 - Added `npm test` as a required step in `ci.yml`, bumped the CI Node matrix from 18.x/20.x to 22.x/24.x (jsdom's engine requirement) and added a matching `engines` field to `package.json`, and ignored `.claude/worktrees/` (2026-09-23)
 - Added baseline unit tests for the critical logic: `roomsFirestore.ts` (Firebase SDK mocked, covering the join/score/mid-quiz guards and every wrapped error message), `QuizDataProvider.ts` (the three-tier dev/prod fallback chain) and the quiz scoring math, which moved out of `Quiz.tsx` into a pure `src/utils/quizScoring.ts`; added `npm run test:coverage` with per-file coverage floors for exactly those three files (2026-09-22)
 - Added a Vitest + React Testing Library unit/component test harness (`npm test`, `npm run test:watch`), a `renderWithProviders` helper that mounts components under the app's ThemeProvider + router, and a `Home.tsx` smoke test proving it works end to end (2026-09-22)
