@@ -20,6 +20,13 @@ export interface Player {
     joinedAt?: Timestamp | FieldValue;
 }
 
+/**
+ * Which stage of the quiz a room is in. Server-authoritative: written only by
+ * createRoom/startGame (and, from rung 2 of #60 on, the progression writes),
+ * never derived per client. No page reads it yet — see #61.
+ */
+export type RoomPhase = "lobby" | "question" | "mid-scoreboard" | "results";
+
 export interface Room {
     id: string;
     hostId: string;
@@ -30,6 +37,14 @@ export interface Room {
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
     continueReady?: boolean; // Flag to indicate if host has signaled to continue to next question
     playersAtMidQuiz?: string[]; // Array of playerIds that have reached the mid-quiz scoreboard
+    // Shared progression state (#61). Optional because rooms created before
+    // these fields existed don't have them.
+    phase?: RoomPhase;
+    currentQuestionIndex?: number;
+    // Written as serverTimestamp(), never a client clock. Reads as null in a
+    // snapshot where that write is still pending (the writer's own listener
+    // sees it first), so readers must handle null.
+    phaseStartedAt?: Timestamp | FieldValue | null;
 }
 
 /**
@@ -71,6 +86,9 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
             started: false,
             hostIsObserver,
             createdAt: serverTimestamp(), // This is fine outside of the array
+            phase: "lobby",
+            currentQuestionIndex: 0,
+            phaseStartedAt: serverTimestamp(),
             players: [{
                 id: hostId,
                 name: hostName,
@@ -82,6 +100,7 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
         console.log("About to create room with data:", JSON.stringify({
             ...roomData,
             createdAt: "SERVER_TIMESTAMP", // Cannot stringify the timestamp
+            phaseStartedAt: "SERVER_TIMESTAMP",
             players: [{
                 ...roomData.players[0],
                 joinedAt: currentTime.toDate().toISOString() // Convert to ISO string for logging
@@ -209,7 +228,12 @@ export const startGame = async (roomCode: string): Promise<void> => {
 
     try {
         const roomRef = doc(db, "rooms", roomCode);
-        await updateDoc(roomRef, { started: true });
+        await updateDoc(roomRef, {
+            started: true,
+            phase: "question",
+            currentQuestionIndex: 0,
+            phaseStartedAt: serverTimestamp(),
+        });
         console.log(`Game started in room ${roomCode}`);
     } catch (error) {
         console.error("Error starting game:", error);

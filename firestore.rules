@@ -39,7 +39,13 @@ service cloud.firestore {
              (!('difficulty' in data) || data.difficulty is string) &&
              (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
              (!('continueReady' in data) || data.continueReady is bool) &&
-             (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list);
+             (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list) &&
+             // Shared progression state (#61). Optional so clients that predate
+             // it can still create rooms; when present, a new room must start in
+             // the lobby on question 0, stamped with the server's clock.
+             (!('phase' in data) || data.phase == 'lobby') &&
+             (!('currentQuestionIndex' in data) || data.currentQuestionIndex == 0) &&
+             (!('phaseStartedAt' in data) || data.phaseStartedAt == request.time);
     }
 
     function isValidRoomUpdate() {
@@ -114,10 +120,22 @@ service cloud.firestore {
       let data = request.resource.data;
       let existingData = resource.data;
 
-      return affected.hasOnly(['started']) &&
-             data.started == true &&
+      return data.started == true &&
              existingData.started == false &&
-             'difficulty' in existingData;
+             'difficulty' in existingData &&
+             (
+               // Clients that predate #61 flip `started` alone. Kept so a
+               // cached old bundle can still start a game.
+               affected.hasOnly(['started']) ||
+               // Current clients also move the room into its first question
+               // in the same write. phaseStartedAt must be the server's
+               // request time, so no client can back-date the timestamp that
+               // question timing will be paced against.
+               (affected.hasOnly(['started', 'phase', 'currentQuestionIndex', 'phaseStartedAt']) &&
+                data.phase == 'question' &&
+                data.currentQuestionIndex == 0 &&
+                data.phaseStartedAt == request.time)
+             );
     }
 
     function isUpdatingPlayerScores(affected) {

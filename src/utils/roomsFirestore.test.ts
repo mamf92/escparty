@@ -131,8 +131,22 @@ describe("createRoom", () => {
             started: false,
             hostIsObserver: false,
             createdAt: SERVER_TIMESTAMP,
+            phase: "lobby",
+            currentQuestionIndex: 0,
+            phaseStartedAt: SERVER_TIMESTAMP,
             players: [{ id: "host-1", name: "Martin", score: 0, joinedAt: NOW }],
         });
+    });
+
+    it("opens the room in the lobby on question 0, stamped with the server clock", async () => {
+        await createRoom("ABCD", "host-1", "Martin");
+
+        const written = mocks.setDoc.mock.calls[0][1] as Room;
+        expect(written.phase).toBe("lobby");
+        expect(written.currentQuestionIndex).toBe(0);
+        // firestore.rules requires phaseStartedAt == request.time, so a
+        // client Timestamp here would be denied.
+        expect(written.phaseStartedAt).toBe(SERVER_TIMESTAMP);
     });
 
     it("starts the host on zero and the game not started", async () => {
@@ -467,12 +481,31 @@ describe("markPlayerAtMidQuiz", () => {
     });
 });
 
-describe("the single-field room writes", () => {
-    it("startGame flips only `started`", async () => {
+describe("startGame", () => {
+    it("starts the game and moves the room to question 0 in one write", async () => {
         await startGame("ABCD");
 
-        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), { started: true });
+        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
+        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), {
+            started: true,
+            phase: "question",
+            currentQuestionIndex: 0,
+            // firestore.rules requires phaseStartedAt == request.time.
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
     });
+
+    it("doesn't retry a rejected start", async () => {
+        mocks.updateDoc.mockRejectedValue(
+            Object.assign(new Error("denied"), { code: "permission-denied" }),
+        );
+
+        await expect(startGame("ABCD")).rejects.toThrow("Failed to start game: denied");
+        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("the single-field room writes", () => {
 
     it("setRoomDifficulty writes only `difficulty`", async () => {
         await setRoomDifficulty("ABCD", "hard");
