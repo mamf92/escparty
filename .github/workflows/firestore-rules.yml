@@ -138,14 +138,18 @@ jobs:
           # firestore.rules that main has ever had, they're just an older
           # deploy (or the original console import) and safe to replace. If
           # they match none, someone edited them outside the repo, and
-          # deploying would silently throw that edit away. Line endings and
-          # trailing whitespace are ignored, since a console paste can change
-          # them without changing any rule.
-          normalize() { sed -e 's/\r$//' -e 's/[[:space:]]*$//' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'; }
+          # deploying would silently throw that edit away. Line endings,
+          # trailing whitespace, trailing blank lines and a missing final
+          # newline are ignored: the console-era live rules have trailing
+          # spaces and no final newline, and none of that changes a rule.
+          # (awk, not sed: GNU sed preserves a missing final newline.)
+          normalize() { tr -d '\r' | awk '{ sub(/[[:space:]]+$/, ""); line[NR] = $0 } END { n = NR; while (n > 0 && line[n] == "") n--; for (i = 1; i <= n; i++) print line[i] }'; }
           normalize < "$live" > "$RUNNER_TEMP/live.normalized"
           source_commit=""
           for commit in $(git log --full-history --format=%H HEAD -- firestore.rules); do
-            if git show "$commit:firestore.rules" 2>/dev/null | normalize | cmp -s - "$RUNNER_TEMP/live.normalized"; then
+            # cmp -s stops reading at the first difference; the 2>/dev/null
+            # keeps the resulting broken-pipe noise out of the log.
+            if git show "$commit:firestore.rules" 2>/dev/null | normalize 2>/dev/null | cmp -s - "$RUNNER_TEMP/live.normalized"; then
               source_commit="$commit"
               break
             fi
