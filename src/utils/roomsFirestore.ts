@@ -20,6 +20,13 @@ export interface Player {
     joinedAt?: Timestamp | FieldValue;
 }
 
+/**
+ * Which stage of the quiz a room is in. Server-authoritative: written only by
+ * createRoom/startGame (and, from rung 2 of #60 on, the progression writes),
+ * never derived per client. No page reads it yet — see #61.
+ */
+export type RoomPhase = "lobby" | "question" | "mid-scoreboard" | "results";
+
 export interface Room {
     id: string;
     hostId: string;
@@ -30,6 +37,11 @@ export interface Room {
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
     continueReady?: boolean; // Flag to indicate if host has signaled to continue to next question
     playersAtMidQuiz?: string[]; // Array of playerIds that have reached the mid-quiz scoreboard
+    // Shared progression state (#61). Optional because rooms created before
+    // these fields existed don't have them.
+    phase?: RoomPhase;
+    currentQuestionIndex?: number;
+    phaseStartedAt?: Timestamp | FieldValue; // Always serverTimestamp() — never a client clock
 }
 
 /**
@@ -71,6 +83,9 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
             started: false,
             hostIsObserver,
             createdAt: serverTimestamp(), // This is fine outside of the array
+            phase: "lobby",
+            currentQuestionIndex: 0,
+            phaseStartedAt: serverTimestamp(),
             players: [{
                 id: hostId,
                 name: hostName,
@@ -209,7 +224,28 @@ export const startGame = async (roomCode: string): Promise<void> => {
 
     try {
         const roomRef = doc(db, "rooms", roomCode);
-        await updateDoc(roomRef, { started: true });
+        try {
+            await updateDoc(roomRef, {
+                started: true,
+                phase: "question",
+                currentQuestionIndex: 0,
+                phaseStartedAt: serverTimestamp(),
+            });
+        } catch (error) {
+            // Rules that predate #61 only accept a started-only write. Merging
+            // ships this client via Vercel, but nothing deploys firestore.rules,
+            // so fall back to the old write rather than blocking every game
+            // until the rules catch up. Remove once rung 2 (#62) starts reading
+            // `phase` and the new rules are confirmed live.
+            if ((error as { code?: string })?.code !== "permission-denied") {
+                throw error;
+            }
+            console.warn(
+                `Rules rejected the phase fields when starting room ${roomCode}; ` +
+                "retrying with started only — firestore.rules needs deploying (see #61)."
+            );
+            await updateDoc(roomRef, { started: true });
+        }
         console.log(`Game started in room ${roomCode}`);
     } catch (error) {
         console.error("Error starting game:", error);

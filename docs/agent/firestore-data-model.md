@@ -21,6 +21,9 @@ interface Room {
   hostIsObserver?: boolean;
   continueReady?: boolean;
   playersAtMidQuiz?: string[];
+  phase?: RoomPhase;                 // "lobby" | "question" | "mid-scoreboard" | "results"
+  currentQuestionIndex?: number;
+  phaseStartedAt?: Timestamp | FieldValue; // always serverTimestamp()
 }
 
 interface Player {
@@ -31,10 +34,28 @@ interface Player {
 }
 ```
 
-**There is no `currentQuestionIndex` field, and never has been.** Question
-progression during a multiplayer quiz is not server-authoritative — each
-client runs its own local timer and advances independently. If you're
-debugging players seeing different questions at different times, this is
+**`phase` / `currentQuestionIndex` / `phaseStartedAt` are written but not
+yet read (#61, rung 1 of #60).** They're the server-authoritative
+progression state the rest of Epic #60 builds on. Today:
+
+- `createRoom` writes `phase: "lobby"`, `currentQuestionIndex: 0`,
+  `phaseStartedAt: serverTimestamp()`.
+- `startGame` writes `started: true` plus `phase: "question"`,
+  `currentQuestionIndex: 0`, `phaseStartedAt: serverTimestamp()` in one
+  `updateDoc`. If the rules reject that with `permission-denied` (the live
+  rules predate these fields until `firestore.rules` is deployed), it falls
+  back to the old started-only write. Remove that fallback in #62 once the
+  new rules are confirmed live.
+- `"mid-scoreboard"` and `"results"` are in the type but nothing writes them
+  yet. Nor does anything advance `currentQuestionIndex` past 0; that's #62.
+- All three are optional on `Room`. Rooms created before #61 don't have
+  them, and a room started by a pre-#61 client (or via the fallback) stays
+  `phase: "lobby"` after `started` flips. So until #62, `started` is still
+  the only reliable "game is on" signal.
+
+Clients still don't consume any of this: question progression during a
+multiplayer quiz is still each client's own local timer. If you're
+debugging players seeing different questions at different times, that's
 why; see `docs/agent/multiplayer-sync.md`.
 
 ## Which writes are safe vs. race-prone
@@ -63,6 +84,18 @@ why; see `docs/agent/multiplayer-sync.md`.
   cleared by `resetPlayersAtMidQuiz`.
 
 ## Security rules
+
+**Progression fields (#61).** `isValidRoomCreation` accepts the three
+fields as optional, but when present they must be `phase == 'lobby'`,
+`currentQuestionIndex == 0` and `phaseStartedAt == request.time`.
+`isStartingGame` accepts either the legacy started-only write or exactly
+`started` + the three fields, with `phase == 'question'`,
+`currentQuestionIndex == 0` and `phaseStartedAt == request.time`. Pinning
+the timestamp to `request.time` means a client can't back-date the clock
+that #62 will pace questions against. No other update branch admits these
+keys (each one is `hasOnly` its own fields), so they can't be forged
+alongside another write. Covered by case 11 of
+`scripts/verify-firestore-rules.mjs`.
 
 `firestore.rules` at the repo root is the production rules, imported
 verbatim from the Firebase console (no behavior change) and wired up via
