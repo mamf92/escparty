@@ -1,0 +1,192 @@
+name: Firestore rules
+
+# firestore.rules is production access control for every multiplayer room.
+# This workflow makes the repo file the only way it changes:
+#   - on a PR: verify it against the emulator (no production access)
+#   - on merge to main: deploy it, then read the live rules back and check
+#     they match the file exactly
+# See docs/agent/firestore-data-model.md ("Deploying rules").
+
+on:
+  # Keep the two paths lists identical.
+  pull_request:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - scripts/verify-firestore-rules.mjs
+      - scripts/firestore-live-rules.mjs
+      - .github/workflows/firestore-rules.yml
+      # The verify script runs on the firebase SDK these install.
+      - package.json
+      - package-lock.json
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - scripts/verify-firestore-rules.mjs
+      - scripts/firestore-live-rules.mjs
+      - .github/workflows/firestore-rules.yml
+      # The verify script runs on the firebase SDK these install.
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+    inputs:
+      overwrite_live:
+        description: >-
+          Deploy even if the live rules match no version of firestore.rules in
+          main's history (i.e. discard edits made in the Firebase console).
+          Read the diff in the last run's log first.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Never run two deploys at once, and never cancel one halfway. A pending run
+# can still be superseded by a newer one; that's safe, because the deploy
+# job below doesn't assume the previous commit was the one deployed.
+concurrency:
+  group: firestore-rules-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FIREBASE_TOOLS: firebase-tools@15.31.0
+
+jobs:
+  verify:
+    name: Verify rules against the emulator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Cache the emulator download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS }}
+      - run: npm ci
+      - name: Run scripts/verify-firestore-rules.mjs
+        run: >-
+          npx -y "$FIREBASE_TOOLS" emulators:exec --only firestore
+          --project demo-escparty "node scripts/verify-firestore-rules.mjs"
+
+  deploy:
+    name: Deploy to production
+    needs: verify
+    # Only main ever touches production. PR runs never see the key: a PR can
+    # edit this file, so a PR run holding the key could deploy unreviewed
+    # rules. The `production` environment's deployment-branch rule (main
+    # only) enforces the same thing on GitHub's side.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Write the service account key
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          # A missing credential must fail loudly: a green run on main is
+          # read as "deployed".
+          test -n "$KEY" || { echo "::error::Secret FIREBASE_SERVICE_ACCOUNT is not available to this job"; exit 1; }
+          test -n "$FIREBASE_PROJECT_ID" || { echo "::error::Variable FIREBASE_PROJECT_ID is not set"; exit 1; }
+          umask 077
+          printf '%s' "$KEY" > "$RUNNER_TEMP/service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/service-account.json" >> "$GITHUB_ENV"
+
+      - name: Compare the live rules with the repo
+        id: compare
+        env:
+          OVERWRITE_LIVE: ${{ inputs.overwrite_live && 'true' || 'false' }}
+        run: |
+          # Only ever deploy the tip of main. Re-running an older run must
+          # not put back rules a later commit replaced.
+          git fetch -q origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "::notice::$GITHUB_SHA is no longer the tip of main; the newer commit's run deploys instead."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          live="$RUNNER_TEMP/live.rules"
+          node scripts/firestore-live-rules.mjs > "$live"
+
+          if cmp -s "$live" firestore.rules; then
+            echo "Live rules already match firestore.rules at $GITHUB_SHA; nothing to deploy." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Where did the live rules come from? If they match any version of
+          # firestore.rules that main has ever had, they're just an older
+          # deploy (or the original console import) and safe to replace. If
+          # they match none, someone edited them outside the repo, and
+          # deploying would silently throw that edit away. Line endings and
+          # trailing whitespace are ignored, since a console paste can change
+          # them without changing any rule.
+          normalize() { sed -e 's/\r$//' -e 's/[[:space:]]*$//' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'; }
+          normalize < "$live" > "$RUNNER_TEMP/live.normalized"
+          source_commit=""
+          for commit in $(git log --full-history --format=%H HEAD -- firestore.rules); do
+            if git show "$commit:firestore.rules" 2>/dev/null | normalize | cmp -s - "$RUNNER_TEMP/live.normalized"; then
+              source_commit="$commit"
+              break
+            fi
+          done
+
+          diff -u --label live --label firestore.rules "$live" firestore.rules > "$RUNNER_TEMP/change.diff" || true
+          echo "::group::Diff: live rules -> firestore.rules at $GITHUB_SHA"
+          cat "$RUNNER_TEMP/change.diff"
+          echo "::endgroup::"
+
+          if [ -n "$source_commit" ]; then
+            heading="Deploying: live rules were firestore.rules as of $(git log -1 --format='%h (%ad) %s' --date=short "$source_commit")"
+          elif [ "$OVERWRITE_LIVE" = "true" ]; then
+            heading="Deploying over rules edited outside the repo (overwrite_live was set)"
+            echo "::warning::Live rules match no version in main's history; overwriting them because overwrite_live was set."
+          else
+            heading="Refused: live rules were edited outside the repo; nothing was deployed"
+          fi
+          {
+            echo "## $heading"
+            echo '```diff'; cat "$RUNNER_TEMP/change.diff"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$source_commit" ] && [ "$OVERWRITE_LIVE" != "true" ]; then
+            echo "::error::Live rules match no version of firestore.rules in main's history, so they were edited outside the repo (e.g. in the Firebase console). Port that edit into firestore.rules, or re-run this workflow by hand with overwrite_live to discard it. The diff is in this step's log."
+            exit 1
+          fi
+          echo "$heading"
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy
+        if: steps.compare.outputs.deploy == 'true'
+        run: npx -y "$FIREBASE_TOOLS" deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --non-interactive
+
+      - name: Check the live rules now match the repo
+        if: steps.compare.outputs.deploy == 'true'
+        run: |
+          node scripts/firestore-live-rules.mjs > "$RUNNER_TEMP/deployed.rules"
+          diff -u --label live --label firestore.rules "$RUNNER_TEMP/deployed.rules" firestore.rules
+          echo "Deployed: live rules now match firestore.rules at $GITHUB_SHA." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/service-account.json"

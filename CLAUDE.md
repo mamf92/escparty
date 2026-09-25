@@ -69,12 +69,10 @@ One paragraph bridging the two, without repeating the skills' content:
   root. Changing it breaks the deploy.
 - `roomsFirestore.ts`'s exported function signatures — multiple pages depend
   on this exact API; change it as a coordinated migration, not a drive-by edit.
-- `firestore.rules` at the repo root — this is the actual production rules
-  file (imported verbatim from the Firebase console, wired up via
-  `firebase.json`). Deploying it re-deploys production access control for
-  every multiplayer room. Treat any change here as high risk: verify against
-  the emulator first, and keep it in sync with whatever's live in the
-  Firebase console (see `docs/agent/firestore-data-model.md`).
+- `firestore.rules` at the repo root — production access control for every
+  multiplayer room, and **merging a change to it deploys it**. Treat any
+  change here as high risk; how the deploy works and what it guards against
+  is in "Deploying rules" in `docs/agent/firestore-data-model.md`.
 
 If you're unsure whether a change affects hosting, env vars, or Firestore
 rules, ask before making it rather than guessing.
