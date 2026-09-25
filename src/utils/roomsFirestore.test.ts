@@ -482,8 +482,6 @@ describe("markPlayerAtMidQuiz", () => {
 });
 
 describe("startGame", () => {
-    const permissionDenied = () => Object.assign(new Error("denied"), { code: "permission-denied" });
-
     it("starts the game and moves the room to question 0 in one write", async () => {
         await startGame("ABCD");
 
@@ -492,32 +490,18 @@ describe("startGame", () => {
             started: true,
             phase: "question",
             currentQuestionIndex: 0,
+            // firestore.rules requires phaseStartedAt == request.time.
             phaseStartedAt: SERVER_TIMESTAMP,
         });
     });
 
-    it("falls back to a started-only write when the rules predate the phase fields", async () => {
-        mocks.updateDoc.mockRejectedValueOnce(permissionDenied()).mockResolvedValueOnce(undefined);
-
-        await startGame("ABCD");
-
-        expect(mocks.updateDoc).toHaveBeenCalledTimes(2);
-        expect(mocks.updateDoc).toHaveBeenLastCalledWith(refFor("ABCD"), { started: true });
-        expect(console.warn).toHaveBeenCalled();
-    });
-
-    it("doesn't retry on errors other than permission-denied", async () => {
-        mocks.updateDoc.mockRejectedValue(new Error("offline"));
-
-        await expect(startGame("ABCD")).rejects.toThrow("Failed to start game: offline");
-        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
-    });
-
-    it("surfaces a denial of the fallback write too", async () => {
-        mocks.updateDoc.mockRejectedValue(permissionDenied());
+    it("doesn't retry a rejected start", async () => {
+        mocks.updateDoc.mockRejectedValue(
+            Object.assign(new Error("denied"), { code: "permission-denied" }),
+        );
 
         await expect(startGame("ABCD")).rejects.toThrow("Failed to start game: denied");
-        expect(mocks.updateDoc).toHaveBeenCalledTimes(2);
+        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
     });
 });
 

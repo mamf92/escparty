@@ -291,36 +291,84 @@ await expectDenied("create room with a client-chosen phaseStartedAt", () =>
 
 // 11e. Malicious starts: wrong phase/index, a client-chosen timestamp, a
 // forged field riding along, or moving phase without starting the game.
+// Each room is set up *before* expectDenied, so a denial during setup (say,
+// a regression that stops phase-aware rooms being created) fails loudly
+// instead of passing as "the start was denied".
 async function readyToStart(prefix) {
   const room = freshRoom(prefix);
   await createRoomWithPhase(room.roomRef, room.roomCode);
   await updateDoc(room.roomRef, { difficulty: "easy" });
   return room.roomRef;
 }
-await expectDenied("start game straight into results", async () =>
-  updateDoc(await readyToStart("PHASEEVILD"), startWrite({ phase: "results" }))
+const evilD = await readyToStart("PHASEEVILD");
+await expectDenied("start game straight into results", () =>
+  updateDoc(evilD, startWrite({ phase: "results" }))
 );
-await expectDenied("start game on a later question", async () =>
-  updateDoc(await readyToStart("PHASEEVILE"), startWrite({ currentQuestionIndex: 5 }))
+const evilE = await readyToStart("PHASEEVILE");
+await expectDenied("start game on a later question", () =>
+  updateDoc(evilE, startWrite({ currentQuestionIndex: 5 }))
 );
-await expectDenied("start game with a client-chosen phaseStartedAt", async () =>
-  updateDoc(await readyToStart("PHASEEVILF"), startWrite({ phaseStartedAt: backdated }))
+const evilF = await readyToStart("PHASEEVILF");
+await expectDenied("start game with a client-chosen phaseStartedAt", () =>
+  updateDoc(evilF, startWrite({ phaseStartedAt: backdated }))
 );
-await expectDenied("start game with phase fields + forged hostId", async () =>
-  updateDoc(await readyToStart("PHASEEVILG"), startWrite({ hostId: "attacker-controlled" }))
+const evilG = await readyToStart("PHASEEVILG");
+await expectDenied("start game with phase fields + forged hostId", () =>
+  updateDoc(evilG, startWrite({ hostId: "attacker-controlled" }))
 );
-await expectDenied("move phase without starting the game", async () =>
-  updateDoc(await readyToStart("PHASEEVILH"), {
+const evilH = await readyToStart("PHASEEVILH");
+await expectDenied("move phase without starting the game", () =>
+  updateDoc(evilH, {
     phase: "question",
     currentQuestionIndex: 0,
     phaseStartedAt: serverTimestamp(),
   })
 );
-await expectDenied("start game with phase fields but no difficulty set", async () => {
-  const room = freshRoom("PHASEEVILI");
+const evilI = freshRoom("PHASEEVILI");
+await createRoomWithPhase(evilI.roomRef, evilI.roomCode);
+await expectDenied("start game with phase fields but no difficulty set", () =>
+  updateDoc(evilI.roomRef, startWrite())
+);
+
+// 11f. The phase fields can't ride along on any other legitimate write.
+// Each of these is exactly an allowed write plus a jump to the results
+// phase; only the phase keys make it a forgery.
+const skipToResults = { phase: "results", currentQuestionIndex: 9 };
+// A fresh lobby room per case: if one forgery got through, the room would
+// already be in "results" and the next case's phase keys wouldn't change
+// anything, so a shared room would muddle which rule broke.
+async function lobbyRoom(prefix) {
+  const room = freshRoom(prefix);
   await createRoomWithPhase(room.roomRef, room.roomCode);
-  await updateDoc(room.roomRef, startWrite());
-});
+  return room.roomRef;
+}
+const piggyA = await lobbyRoom("PHASEPIGGYA");
+await expectDenied("phase fields riding on setting difficulty", () =>
+  updateDoc(piggyA, { difficulty: "easy", ...skipToResults })
+);
+const piggyB = await lobbyRoom("PHASEPIGGYB");
+await expectDenied("phase fields riding on a player join", () =>
+  updateDoc(piggyB, {
+    players: arrayUnion({ id: "player-2", name: "Guest", score: 0 }),
+    ...skipToResults,
+  })
+);
+const piggyC = await lobbyRoom("PHASEPIGGYC");
+await expectDenied("phase fields riding on continueReady", () =>
+  updateDoc(piggyC, { continueReady: true, ...skipToResults })
+);
+const piggyD = await lobbyRoom("PHASEPIGGYD");
+await expectDenied("phase fields riding on playersAtMidQuiz", () =>
+  updateDoc(piggyD, { playersAtMidQuiz: ["host-1"], ...skipToResults })
+);
+const piggyStarted = await readyToStart("PHASEPIGGYE");
+await updateDoc(piggyStarted, startWrite());
+await expectDenied("phase fields riding on a score update", () =>
+  updateDoc(piggyStarted, {
+    players: [{ id: "host-1", name: "Host", score: 500 }],
+    ...skipToResults,
+  })
+);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

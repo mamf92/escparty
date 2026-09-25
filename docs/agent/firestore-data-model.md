@@ -42,16 +42,21 @@ progression state the rest of Epic #60 builds on. Today:
   `phaseStartedAt: serverTimestamp()`.
 - `startGame` writes `started: true` plus `phase: "question"`,
   `currentQuestionIndex: 0`, `phaseStartedAt: serverTimestamp()` in one
-  `updateDoc`. If the rules reject that with `permission-denied` (the live
-  rules predate these fields until `firestore.rules` is deployed), it falls
-  back to the old started-only write. Remove that fallback in #62 once the
-  new rules are confirmed live.
+  `updateDoc`. There's no started-only fallback. The rules that accept this
+  write deploy on the same merge as the client (see "Deploying rules"
+  below). The only exposure is the minute or so between Vercel serving the
+  new bundle and the rules deploy finishing, when a start gets
+  `permission-denied`.
 - `"mid-scoreboard"` and `"results"` are in the type but nothing writes them
   yet. Nor does anything advance `currentQuestionIndex` past 0; that's #62.
 - All three are optional on `Room`. Rooms created before #61 don't have
-  them, and a room started by a pre-#61 client (or via the fallback) stays
+  them, and a room started by a tab still running a pre-#61 bundle stays
   `phase: "lobby"` after `started` flips. So until #62, `started` is still
   the only reliable "game is on" signal.
+- `phaseStartedAt` reads as `null` in a snapshot whose `serverTimestamp()`
+  write is still pending. The writer's own listener sees that local
+  snapshot first, so readers (#62) must handle `null`, or read with
+  `serverTimestamps: "estimate"`.
 
 Clients still don't consume any of this: question progression during a
 multiplayer quiz is still each client's own local timer. If you're

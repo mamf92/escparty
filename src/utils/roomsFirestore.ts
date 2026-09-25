@@ -41,7 +41,10 @@ export interface Room {
     // these fields existed don't have them.
     phase?: RoomPhase;
     currentQuestionIndex?: number;
-    phaseStartedAt?: Timestamp | FieldValue; // Always serverTimestamp() — never a client clock
+    // Written as serverTimestamp(), never a client clock. Reads as null in a
+    // snapshot where that write is still pending (the writer's own listener
+    // sees it first), so readers must handle null.
+    phaseStartedAt?: Timestamp | FieldValue | null;
 }
 
 /**
@@ -97,6 +100,7 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
         console.log("About to create room with data:", JSON.stringify({
             ...roomData,
             createdAt: "SERVER_TIMESTAMP", // Cannot stringify the timestamp
+            phaseStartedAt: "SERVER_TIMESTAMP",
             players: [{
                 ...roomData.players[0],
                 joinedAt: currentTime.toDate().toISOString() // Convert to ISO string for logging
@@ -224,28 +228,12 @@ export const startGame = async (roomCode: string): Promise<void> => {
 
     try {
         const roomRef = doc(db, "rooms", roomCode);
-        try {
-            await updateDoc(roomRef, {
-                started: true,
-                phase: "question",
-                currentQuestionIndex: 0,
-                phaseStartedAt: serverTimestamp(),
-            });
-        } catch (error) {
-            // Rules that predate #61 only accept a started-only write. Merging
-            // ships this client via Vercel, but nothing deploys firestore.rules,
-            // so fall back to the old write rather than blocking every game
-            // until the rules catch up. Remove once rung 2 (#62) starts reading
-            // `phase` and the new rules are confirmed live.
-            if ((error as { code?: string })?.code !== "permission-denied") {
-                throw error;
-            }
-            console.warn(
-                `Rules rejected the phase fields when starting room ${roomCode}; ` +
-                "retrying with started only — firestore.rules needs deploying (see #61)."
-            );
-            await updateDoc(roomRef, { started: true });
-        }
+        await updateDoc(roomRef, {
+            started: true,
+            phase: "question",
+            currentQuestionIndex: 0,
+            phaseStartedAt: serverTimestamp(),
+        });
         console.log(`Game started in room ${roomCode}`);
     } catch (error) {
         console.error("Error starting game:", error);

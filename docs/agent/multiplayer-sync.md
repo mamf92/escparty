@@ -15,7 +15,9 @@ any of it, update this file in the same PR rather than leaving it stale.
 2. **`Lobby.tsx`** — reads those `localStorage` values back out, then opens
    one `onSnapshot` listener via `listenToRoom(gameCode, callback)`. The host
    picks a difficulty (`setRoomDifficulty`) and starts the game
-   (`startGame`, sets `Room.started = true`). Every client's listener fires
+   (`startGame`, which sets `Room.started = true` and moves the room to
+   `phase: "question"` in the same write; see
+   `docs/agent/firestore-data-model.md`). Every client's listener fires
    on that write; each one independently stashes a `multiplayerGame` blob in
    `sessionStorage` and navigates itself to `/quiz/:difficulty`. There is no
    single "go" signal beyond the `started` flag — navigation is a side
@@ -24,11 +26,9 @@ any of it, update this file in the same PR rather than leaving it stale.
    if present, falling back to the `sessionStorage` `multiplayerGame` blob
    (needed on refresh, since `location.state` doesn't survive one). Question
    progression is driven by a **client-local timer per browser tab**, not by
-   any Firestore field. `Room.currentQuestionIndex`/`phase` exist (#61) but
-   no client reads them yet. This means two players' screens can legitimately be on different
-   questions if their timers drift; that's a known limitation, not a bug to
-   "fix" by guessing at a quick patch — it needs a server-authoritative
-   progression field (see `docs/agent/firestore-data-model.md`).
+   any Firestore field. This means two players' screens can legitimately be
+   on different questions if their timers drift; that's a known limitation,
+   not a bug to "fix" by guessing at a quick patch — see the section below.
 4. **Mid-quiz** — `MidQuizScoreboard.tsx` marks each arriving player ready
    via `markPlayerAtMidQuiz` (race-prone read-modify-write, see the
    firestore doc) and reads `Room.continueReady` to know when the host has
@@ -59,8 +59,8 @@ which one wins depends on the page:
 ## If you're asked to add server-authoritative progression
 
 That's the fix for the "different players see different questions" class of
-bug. The `Room` fields for it (`phase`, `currentQuestionIndex`,
-`phaseStartedAt`) landed in #61, written but not yet read. What's left is
+bug. The `Room` fields for it landed in #61 (their current state is in
+`docs/agent/firestore-data-model.md`). What's left is
 a transaction-safe write pattern for advancing them and listener-driven
 progression on the client instead of a local timer (#62). This is
 a real architecture change — update `docs/agent/firestore-data-model.md` and
