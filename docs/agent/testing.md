@@ -95,9 +95,11 @@ Two patterns in that file worth reusing:
 
 `scripts/verify-firestore-rules.mjs` exercises `firestore.rules` against a
 running emulator using the same client SDK write paths as
-`roomsFirestore.ts`. It is still a plain Node script, not wired into Vitest
-or CI — run it by hand (`npm run emulators &` then
-`node scripts/verify-firestore-rules.mjs`) after changing `firestore.rules`.
+`roomsFirestore.ts`. It is still a plain Node script, not part of Vitest.
+Run it by hand with `npm run emulators &` then
+`node scripts/verify-firestore-rules.mjs`. CI runs it on rules PRs as the
+gate before a deploy (see "Deploying rules" in
+`docs/agent/firestore-data-model.md`).
 Folding it into the real suite is part of the rules work tracked in #50.
 
 ## The coverage floor

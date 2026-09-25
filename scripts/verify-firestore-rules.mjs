@@ -1,6 +1,7 @@
-// Manual verification script for firestore.rules — NOT wired into CI or any
-// test runner (there is no test suite yet, see docs/agent/testing.md). Run
-// it by hand against a running local emulator:
+// Verification script for firestore.rules. CI runs it on every PR that
+// touches the rules (.github/workflows/firestore-rules.yml); it isn't part
+// of the Vitest suite (see docs/agent/testing.md). To run it by hand against
+// a local emulator:
 //
 //   npm run emulators &
 //   node scripts/verify-firestore-rules.mjs
@@ -45,12 +46,16 @@ async function expectAllowed(name, fn) {
   }
 }
 
+// Only a rules denial counts. Any other rejection (invalid-argument from a
+// malformed write, unavailable from the emulator, the list case's
+// unexpectedly-succeeded) means the rule was never actually exercised, so
+// it's reported as a failure rather than a pass.
 async function expectDenied(name, fn) {
   try {
     await fn();
     report(name, "denied", "allowed");
   } catch (e) {
-    report(name, "denied", `denied (${e.code})`);
+    report(name, "denied", e.code === "permission-denied" ? "denied (permission-denied)" : `error (${e.code})`);
   }
 }
 
