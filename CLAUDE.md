@@ -27,8 +27,8 @@ transactions are `updatePlayerScore`, `advanceQuestion` and
 
 Unit/component tests run on Vitest + React Testing Library. Covered today:
 `roomsFirestore.ts`, `QuizDataProvider.ts`, `quizScoring.ts` and
-`quizTiming.ts` (with per-file coverage floors), plus one `Home.tsx` smoke
-test — every other page,
+`quizTiming.ts` (with per-file coverage floors), the `useResumeRoom` hook
+(no floor), plus one `Home.tsx` smoke test — every other page,
 and `Quiz.tsx` itself, is uncovered. `npm test` now runs in `ci.yml`, but a
 red run doesn't yet block merge or deploy (see #57). See
 `docs/agent/testing.md` before assuming a given flow is covered.

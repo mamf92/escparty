@@ -11,13 +11,17 @@ describe("useResumeRoom", () => {
         vi.spyOn(console, "error").mockImplementation(() => { });
     });
 
-    it("resumes the room and is idle again afterwards", async () => {
+    it("resumes the room and stays busy until reset (the room's snapshot comes a moment later)", async () => {
         mocks.resumeAfterMidQuiz.mockResolvedValue(true);
         const { result } = renderHook(() => useResumeRoom("ABCD"));
         await act(() => result.current.resume());
         expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledWith("ABCD");
-        expect(result.current.resuming).toBe(false);
+        expect(result.current.resuming).toBe(true);
         expect(result.current.resumeError).toBeNull();
+        await act(() => result.current.resume()); // a tap in the gap
+        expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledTimes(1);
+        act(() => result.current.reset());
+        expect(result.current.resuming).toBe(false);
     });
 
     it("ignores a second tap while a resume is in flight", async () => {
@@ -50,6 +54,9 @@ describe("useResumeRoom", () => {
         const { result } = renderHook(() => useResumeRoom("ABCD"));
         await act(() => result.current.resume());
         expect(result.current.resumeError).toMatch(/isn't at a break/);
+        expect(result.current.resuming).toBe(false);
+        act(() => result.current.reset());
+        expect(result.current.resumeError).toBeNull();
     });
 
     it("does nothing without a room", async () => {

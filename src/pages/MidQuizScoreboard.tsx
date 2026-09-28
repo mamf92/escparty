@@ -11,7 +11,6 @@ interface MultiplayerGameData {
   roomCode: string;
   playerId: string;
   difficulty?: string;
-  hostIsObserver?: boolean;
 }
 
 const MidQuizScoreboard = () => {
@@ -27,8 +26,7 @@ const MidQuizScoreboard = () => {
     players: [],
     multiplayer: false,
     roomCode: null,
-    playerId: null,
-    hostIsObserver: false
+    playerId: null
   };
 
   // Use state from location, or try to recover from sessionStorage
@@ -40,8 +38,7 @@ const MidQuizScoreboard = () => {
     players: locationState.players || [],
     multiplayer: locationState.multiplayer || false,
     roomCode: locationState.roomCode || null,
-    playerId: locationState.playerId || null,
-    hostIsObserver: locationState.hostIsObserver || false
+    playerId: locationState.playerId || null
   });
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
@@ -76,7 +73,8 @@ const MidQuizScoreboard = () => {
           difficulty: gameData.difficulty,
           players: players,
           roomCode: gameData.roomCode
-        }
+        },
+        replace: true // no way back into the players' break screen
       });
     }
   }, [isHost, hostIsObserver, navigate, gameData, players]);
@@ -146,8 +144,7 @@ const MidQuizScoreboard = () => {
             multiplayer: true,
             roomCode: multiplayerData.roomCode,
             playerId: multiplayerData.playerId,
-            difficulty: multiplayerData.difficulty || prev.difficulty,
-            hostIsObserver: multiplayerData.hostIsObserver || false
+            difficulty: multiplayerData.difficulty || prev.difficulty
           }));
         } catch (e) {
           console.error("Error parsing multiplayer data from sessionStorage:", e);

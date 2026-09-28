@@ -13,7 +13,6 @@ interface MultiplayerGameData {
   roomCode: string;
   playerId: string;
   difficulty?: string;
-  hostIsObserver?: boolean;
 }
 
 const Quiz = () => {
@@ -25,7 +24,6 @@ const Quiz = () => {
     multiplayer?: boolean;
     roomCode?: string;
     playerId?: string;
-    hostIsObserver?: boolean;
   } | null;
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(locationState?.currentQuestionIndex || 0);
@@ -62,6 +60,9 @@ const Quiz = () => {
   const roomStartMs = startedAtMillis(room?.phaseStartedAt);
   // This player's score as the room has it.
   const storedScore = room?.players.find(p => p.id === playerId)?.score ?? 0;
+  // Set once this page navigates away for good (to the observer view, a
+  // break or the results), so only one of those navigations happens.
+  const leftQuizRef = useRef(false);
 
   // Calculate current question based on currentQuestionIndex and questions array
   const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
@@ -75,12 +76,15 @@ const Quiz = () => {
   // (who'd end up playing).
   const isObserverHost = !!room && !!playerId && room.hostIsObserver === true && room.hostId === playerId;
   useEffect(() => {
-    if (!isMultiplayer || !isObserverHost || !room) return;
+    if (!isMultiplayer || !isObserverHost || !room || leftQuizRef.current) return;
+    // Claims the one navigation away from this page, so the phase effect
+    // below can't send the observer to the players' break or results.
+    leftQuizRef.current = true;
     navigate("/host-observer", {
       state: {
         currentQuestionIndex: room.currentQuestionIndex ?? 0,
         difficulty,
-        players: room.players,
+        players: room.players.filter(p => p.id !== room.hostId), // the observer isn't a player
         roomCode
       },
       replace: true // Replace history to prevent back navigation to the quiz page
@@ -294,7 +298,6 @@ const Quiz = () => {
   isSubmittedRef.current = isSubmitted;
   const lastAdvanceAttemptRef = useRef(0);
   const advanceInFlightRef = useRef(false);
-  const leftQuizRef = useRef(false);
   const markTimeUpRef = useRef<() => void>(() => { });
   const lockQuestionRef = useRef<(options: { hideTimer: boolean }) => void>(() => { });
 
@@ -421,7 +424,7 @@ const Quiz = () => {
   // room's copy of this player's score if it's higher: a player coming back
   // from a refresh or a locked phone may not have picked it back up yet.
   useEffect(() => {
-    if (!sharedClock || !room || loading || leftQuizRef.current) return;
+    if (!sharedClock || !room || loading || isObserverHost || leftQuizRef.current) return;
     const bestScore = bestKnownScore(score, room.players, playerId);
     if (room.phase === "mid-scoreboard") {
       leftQuizRef.current = true;
@@ -451,7 +454,7 @@ const Quiz = () => {
         }
       });
     }
-  }, [sharedClock, room, loading, score, questions.length, difficulty, roomCode, playerId, navigate]);
+  }, [sharedClock, room, loading, isObserverHost, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
   // Lock the current question: no more answers, show its feedback.
   const lockQuestion = ({ hideTimer }: { hideTimer: boolean }) => {

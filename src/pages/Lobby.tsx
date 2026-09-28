@@ -40,24 +40,21 @@ const Lobby = () => {
 
                 // Check if game has started
                 if (roomData.started) {
-                    // Save essentials to sessionStorage to persist through page refresh 
-                    // Only pass hostIsObserver=true if the current user is the host and host is observer
-                    const isCurrentUserObserver = storedIsHost && roomData.hostIsObserver || false;
-
+                    // Save essentials to sessionStorage to persist through page refresh.
+                    // (Whether this user is an observer host isn't passed on: the quiz
+                    // and break screens read it from the room, #63.)
                     sessionStorage.setItem("multiplayerGame", JSON.stringify({
                         multiplayer: true,
                         roomCode: storedGameCode,
                         playerId: storedPlayerId,
-                        difficulty: roomData.difficulty,
-                        hostIsObserver: isCurrentUserObserver
+                        difficulty: roomData.difficulty
                     }));
 
                     navigate(`/quiz/${roomData.difficulty}`, {
                         state: {
                             multiplayer: true,
                             roomCode: storedGameCode,
-                            playerId: storedPlayerId,
-                            hostIsObserver: isCurrentUserObserver
+                            playerId: storedPlayerId
                         }
                     });
                 }

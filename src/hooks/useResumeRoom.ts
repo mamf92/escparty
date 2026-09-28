@@ -7,6 +7,12 @@ import { resumeAfterMidQuiz } from "../utils/roomsFirestore";
  * room, so a failure is a retryable message rather than a dead end, and a
  * second tap while a resume is in flight is ignored. Nobody navigates from
  * here: every page follows the room's phase once the resume lands.
+ *
+ * After a successful resume it stays busy until `reset()`: the page learns
+ * the break is over from the room's next snapshot, a moment after the
+ * transaction resolves, and a tap in that gap would only report "not at a
+ * break". A page that stays mounted across breaks (HostObserverView) calls
+ * `reset()` when the room's phase changes; MidQuizScoreboard navigates away.
  */
 export const useResumeRoom = (roomCode: string | null) => {
     // A ref, not the state below: two taps in the same render would both
@@ -25,17 +31,23 @@ export const useResumeRoom = (roomCode: string | null) => {
             // resumed it, or there's no break on). Say so rather than
             // looking like nothing happened.
             const resumed = await resumeAfterMidQuiz(roomCode);
-            if (!resumed) {
-                setResumeError("The quiz isn't at a break right now, so there's nothing to continue.");
+            if (resumed) {
+                return; // stay busy until reset()
             }
+            setResumeError("The quiz isn't at a break right now, so there's nothing to continue.");
         } catch (err) {
             console.error("Error resuming the room after the mid-quiz break:", err);
             setResumeError("Couldn't continue the quiz. Check your connection and try again.");
-        } finally {
-            inFlightRef.current = false;
-            setResuming(false);
         }
+        inFlightRef.current = false;
+        setResuming(false);
     }, [roomCode]);
 
-    return { resume, resuming, resumeError };
+    const reset = useCallback(() => {
+        inFlightRef.current = false;
+        setResuming(false);
+        setResumeError(null);
+    }, []);
+
+    return { resume, resuming, resumeError, reset };
 };

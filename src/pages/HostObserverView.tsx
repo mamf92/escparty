@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom } from "../utils/roomsFirestore";
+import { Player, RoomPhase, listenToRoom } from "../utils/roomsFirestore";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 
 const HostObserverView = () => {
@@ -31,7 +31,14 @@ const HostObserverView = () => {
     // navigate to the quiz itself. Players follow the room's phase back to
     // the quiz (#63), and the same write clears the ready marks for the next
     // break.
-    const { resume, resuming, resumeError } = useResumeRoom(gameData.roomCode);
+    const { resume, resuming, resumeError, reset } = useResumeRoom(gameData.roomCode);
+    // This screen stays up for the whole quiz, so Continue only works while
+    // the room is actually in a break, and any Continue state or message
+    // from the last break is dropped as soon as the room moves on.
+    const [roomPhase, setRoomPhase] = useState<RoomPhase | undefined>(undefined);
+    useEffect(() => {
+        reset();
+    }, [roomPhase, reset]);
 
     useEffect(() => {
         // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -62,6 +69,7 @@ const HostObserverView = () => {
 
                     // Always update players array to ensure real-time score updates
                     setPlayers(filteredPlayers);
+                    setRoomPhase(room.phase);
 
                     // Update the players at mid-quiz array
                     if (room.playersAtMidQuiz) {
@@ -132,8 +140,10 @@ const HostObserverView = () => {
 
             <NextButton
                 onClick={resume}
-                disabled={resuming || (players.length > 0 && !allPlayersReady)}
-                title={!allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question"}
+                disabled={resuming || roomPhase !== "mid-scoreboard" || (players.length > 0 && !allPlayersReady)}
+                title={roomPhase !== "mid-scoreboard"
+                    ? "Continue opens at the next mid-quiz break"
+                    : !allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question"}
             >
                 {resuming ? "Continuing..." : "Continue Quiz"}
             </NextButton>
