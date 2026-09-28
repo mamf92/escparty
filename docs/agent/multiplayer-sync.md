@@ -35,9 +35,10 @@ any of it, update this file in the same PR rather than leaving it stale.
    there. Single player still runs local timers. Details:
    `docs/agent/firestore-data-model.md`.
 4. **Mid-quiz** — `MidQuizScoreboard.tsx` marks each arriving player ready
-   via `markPlayerAtMidQuiz` (race-prone read-modify-write, see the
-   firestore doc). The host's continue calls `resumeAfterMidQuiz` (the room
-   back to `phase: "question"` at the next question), then still flips
+   via `markPlayerAtMidQuiz` (`arrayUnion`, since everyone arrives at once).
+   The host's continue calls `resumeAfterMidQuiz` (the room back to
+   `phase: "question"` at the next question, clearing the ready marks), then
+   still flips
    `Room.continueReady` with its fixed 3s reset, which rung 3 (#63)
    replaces. A player who misses that window goes back anyway, because the
    scoreboard also returns to the quiz as soon as the room's phase is

@@ -426,59 +426,33 @@ describe("updatePlayerScore", () => {
 });
 
 describe("markPlayerAtMidQuiz", () => {
-    it("adds the player to an empty (absent) list", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith()));
-
+    it("adds the player server-side with arrayUnion, without reading the room first", async () => {
         await markPlayerAtMidQuiz("ABCD", "p-1");
 
+        expect(mocks.getDoc).not.toHaveBeenCalled();
         expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), {
-            playersAtMidQuiz: ["p-1"],
+            playersAtMidQuiz: { __arrayUnion: ["p-1"] },
         });
     });
 
-    it("appends to an existing list without dropping who's already there", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ playersAtMidQuiz: ["p-1"] })));
-
-        await markPlayerAtMidQuiz("ABCD", "p-2");
-
-        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), {
-            playersAtMidQuiz: ["p-1", "p-2"],
-        });
-    });
-
-    it("doesn't write again for a player already marked", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ playersAtMidQuiz: ["p-1"] })));
-
-        await markPlayerAtMidQuiz("ABCD", "p-1");
-
-        expect(mocks.updateDoc).not.toHaveBeenCalled();
-    });
-
-    it("fails for a room that doesn't exist", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(null));
-
-        await expect(markPlayerAtMidQuiz("ZZZZ", "p-1")).rejects.toThrow(
-            "Failed to mark player as ready: Room ZZZZ does not exist",
-        );
-    });
-
-    it("loses one of two concurrent marks — the known race, not a fix", async () => {
-        // This pins the *current* behaviour so the race is visible in the
-        // suite rather than only in a doc: two clients that read the same
-        // snapshot each write an array missing the other's player, so the
-        // second write silently drops the first. Fixing it (arrayUnion or a
-        // transaction) is #64 — delete this test when that lands, don't
-        // loosen it.
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ playersAtMidQuiz: [] })));
-
+    it("sends each concurrent mark as its own arrayUnion, so none drops another", async () => {
+        // Since #62 every player reaches the break on the same snapshot. With
+        // a read-modify-write, two marks read the same list and the second
+        // write dropped the first; arrayUnion merges on the server instead.
         await Promise.all([markPlayerAtMidQuiz("ABCD", "p-1"), markPlayerAtMidQuiz("ABCD", "p-2")]);
 
-        expect(mocks.updateDoc).toHaveBeenCalledTimes(2);
         expect(mocks.updateDoc.mock.calls.map((call) => call[1])).toEqual([
-            { playersAtMidQuiz: ["p-1"] },
-            { playersAtMidQuiz: ["p-2"] },
+            { playersAtMidQuiz: { __arrayUnion: ["p-1"] } },
+            { playersAtMidQuiz: { __arrayUnion: ["p-2"] } },
         ]);
-        // If this ever becomes arrayUnion, the second write would carry both.
+    });
+
+    it("wraps a failed write, e.g. a room that doesn't exist", async () => {
+        mocks.updateDoc.mockRejectedValue(new Error("No document to update"));
+
+        await expect(markPlayerAtMidQuiz("ZZZZ", "p-1")).rejects.toThrow(
+            "Failed to mark player as ready: No document to update",
+        );
     });
 });
 
@@ -589,6 +563,7 @@ describe("resumeAfterMidQuiz", () => {
         expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
             phase: "question",
             phaseStartedAt: SERVER_TIMESTAMP,
+            playersAtMidQuiz: [],
         });
     });
 

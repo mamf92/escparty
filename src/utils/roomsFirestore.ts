@@ -346,7 +346,8 @@ export const advanceQuestion = async (roomCode: string, fromIndex: number, total
 
 /**
  * Leave the mid-quiz break: start the question the room is already pointing
- * at (the break's currentQuestionIndex is the next question). A no-op unless
+ * at (the break's currentQuestionIndex is the next question), and clear who
+ * was marked ready at the scoreboard for the next break. A no-op unless
  * the room is actually in the break, so a double-click or a second host tab
  * can't restart a question that's already running.
  *
@@ -370,9 +371,13 @@ export const resumeAfterMidQuiz = async (roomCode: string): Promise<boolean> => 
                 return false;
             }
 
+            // Clearing the ready marks in the same write means a resume can't
+            // half-happen and leave stale marks that make the next break
+            // look "all ready" before anyone has arrived.
             transaction.update(roomRef, {
                 phase: "question",
                 phaseStartedAt: serverTimestamp(),
+                playersAtMidQuiz: [],
             });
             return true;
         });
@@ -470,27 +475,15 @@ export const markPlayerAtMidQuiz = async (roomCode: string, playerId: string): P
     }
 
     try {
+        // arrayUnion, not a read-modify-write: since #62 every player reaches
+        // the break on the same snapshot, and concurrent read-modify-writes
+        // dropped each other's IDs, leaving an observer host's Continue
+        // disabled for good. arrayUnion adds server-side and skips an ID
+        // that's already there, so no read is needed. (updateDoc fails on a
+        // room that doesn't exist.)
         const roomRef = doc(db, "rooms", roomCode);
-        const roomDoc = await getDoc(roomRef);
-
-        if (!roomDoc.exists()) {
-            throw new Error(`Room ${roomCode} does not exist`);
-        }
-
-        const room = roomDoc.data() as Room;
-
-        // Initialize the array if it doesn't exist
-        const playersAtMidQuiz = room.playersAtMidQuiz || [];
-
-        // Only add the player if not already in the list
-        if (!playersAtMidQuiz.includes(playerId)) {
-            await updateDoc(roomRef, {
-                playersAtMidQuiz: [...playersAtMidQuiz, playerId]
-            });
-            console.log(`Player ${playerId} marked as ready at mid-quiz in room ${roomCode}`);
-        } else {
-            console.log(`Player ${playerId} was already marked as ready at mid-quiz`);
-        }
+        await updateDoc(roomRef, { playersAtMidQuiz: arrayUnion(playerId) });
+        console.log(`Player ${playerId} marked as ready at mid-quiz in room ${roomCode}`);
     } catch (error) {
         console.error("Error marking player as ready at mid-quiz:", error);
         throw new Error(`Failed to mark player as ready: ${(error as Error).message}`);

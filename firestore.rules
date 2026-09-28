@@ -141,7 +141,8 @@ service cloud.firestore {
     //   question N -> question N+1          (N+1 not a multiple of 5)
     //   question N -> mid-scoreboard at N+1 (N+1 a multiple of 5)
     //   question N -> results               (index unchanged)
-    //   mid-scoreboard N -> question N      (host resumes after the break)
+    //   mid-scoreboard N -> question N      (host resumes after the break,
+    //                                        clearing playersAtMidQuiz)
     // A question can't be ended before its 15s slot (QUESTION_SLOT_MS) is
     // over, so no client can cut one short or race ahead; phaseStartedAt is
     // always the server's request time. Rules can't see how many questions
@@ -150,7 +151,12 @@ service cloud.firestore {
       let data = request.resource.data;
       let existingData = resource.data;
 
-      return affected.hasOnly(['phase', 'currentQuestionIndex', 'phaseStartedAt']) &&
+      return affected.hasOnly(['phase', 'currentQuestionIndex', 'phaseStartedAt', 'playersAtMidQuiz']) &&
+             // The ready marks may only be cleared, and only by the resume.
+             (!affected.hasAny(['playersAtMidQuiz']) ||
+              (existingData.phase == 'mid-scoreboard' &&
+               data.playersAtMidQuiz is list &&
+               data.playersAtMidQuiz.size() == 0)) &&
              existingData.started == true &&
              'phase' in existingData &&
              'currentQuestionIndex' in existingData &&

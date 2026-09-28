@@ -6,7 +6,7 @@ import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
-import { QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -271,8 +271,8 @@ const Quiz = () => {
     // Only start a new timer if we're in question mode (not feedback mode)
     if (!showFeedback) {
       console.log("Setting up new question timer");
-      setTimeLeft(10);
-      setTimeLeftMs(10000);
+      setTimeLeft(QUESTION_MS / 1000);
+      setTimeLeftMs(QUESTION_MS);
 
       // Use a more precise interval for millisecond timer (100ms)
       const msTimer = setInterval(() => {
@@ -331,20 +331,32 @@ const Quiz = () => {
   // Refs so the 100ms tick below reads current values without restarting.
   const isSubmittedRef = useRef(isSubmitted);
   isSubmittedRef.current = isSubmitted;
-  const scoreRef = useRef(score);
-  scoreRef.current = score;
   const lastAdvanceAttemptRef = useRef(0);
+  const advanceInFlightRef = useRef(false);
   const leftQuizRef = useRef(false);
-  const markTimeUpRef = useRef<(currentScore: number) => void>(() => { });
+  const markTimeUpRef = useRef<() => void>(() => { });
 
   // Whoever ends a question first wins and everyone else's attempt is a
-  // no-op, but each attempt is a transaction on the same document. So the
-  // host tries right away and players wait a moment (spread per player) and
-  // only step in if the room hasn't moved on, e.g. when the host observes
-  // and never runs the quiz, or is backgrounded.
-  const advanceGraceMs = localStorage.getItem("isHost") === "true"
+  // no-op, but each attempt is a transaction on the same document. So one
+  // client, picked from the room itself, tries right away: the host, or the
+  // first player by ID when the host only observes. Everyone else waits a
+  // moment (spread per player) and only steps in if the room hasn't moved
+  // on, e.g. the leader closed their tab.
+  const advanceLeaderId = room
+    ? (room.hostIsObserver ? room.players.filter(p => p.id !== room.hostId) : [{ id: room.hostId }])
+        .map(p => p.id).sort()[0]
+    : undefined;
+  const advanceGraceMs = playerId && playerId === advanceLeaderId
     ? 0
     : 1500 + ([...(playerId ?? "")].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 1000);
+
+  // The question this client already answered (or timed out on), kept in
+  // sessionStorage so a refresh can't reopen it and score it a second time.
+  const answeredKey = roomCode ? `answeredQuestion:${roomCode}` : null;
+  const rememberAnswered = (index: number) => {
+    if (sharedClock && answeredKey) sessionStorage.setItem(answeredKey, String(index));
+  };
+  const answeredIndex = answeredKey ? Number(sessionStorage.getItem(answeredKey) ?? -1) : -1;
 
   // Pick the player's score back up from the room after a refresh or rejoin:
   // local state starts at 0 without router state, and updatePlayerScore
@@ -375,6 +387,19 @@ const Quiz = () => {
     }
   }, [sharedClock, room?.phase, room?.currentQuestionIndex, currentQuestionIndex]);
 
+  // Back on a question this client already answered (a refresh): show it as
+  // answered rather than letting it be answered and scored again.
+  useEffect(() => {
+    if (!sharedClock || room?.phase !== "question") return;
+    if ((room.currentQuestionIndex ?? 0) !== currentQuestionIndex) return;
+    if (answeredIndex >= currentQuestionIndex && !isSubmitted) {
+      isSubmittedRef.current = true;
+      setIsSubmitted(true);
+      setIsTimerVisible(false);
+      setShowFeedback(true);
+    }
+  }, [sharedClock, room?.phase, room?.currentQuestionIndex, currentQuestionIndex, answeredIndex, isSubmitted]);
+
   // The countdown every client shows, derived from the room's start time
   // rather than counted down locally, and the shared advance once the
   // question's slot (answering + feedback) is over.
@@ -397,7 +422,7 @@ const Quiz = () => {
         setTimeLeft(Math.ceil(clock.timeLeftMs / 1000));
       } else {
         if (!isSubmittedRef.current) {
-          markTimeUpRef.current(scoreRef.current);
+          markTimeUpRef.current();
         }
         setTimeLeft(Math.max(0, Math.ceil((QUESTION_SLOT_MS - clock.elapsedMs) / 1000)));
       }
@@ -405,11 +430,17 @@ const Quiz = () => {
       // Any client may end the question; the transaction makes the extra
       // attempts no-ops, and the rules turn away a too-early one (a fast
       // local clock), so just retry once a second until the room moves on.
-      if (clock.elapsedMs >= QUESTION_SLOT_MS + advanceGraceMs && now - lastAdvanceAttemptRef.current >= 1000) {
+      if (clock.elapsedMs >= QUESTION_SLOT_MS + advanceGraceMs &&
+          !advanceInFlightRef.current && now - lastAdvanceAttemptRef.current >= 1000) {
         lastAdvanceAttemptRef.current = now;
-        void advanceQuestion(roomCode, index, questions.length).catch(error => {
-          console.warn("Advancing the question didn't go through yet, retrying:", error);
-        });
+        advanceInFlightRef.current = true;
+        void advanceQuestion(roomCode, index, questions.length)
+          .catch(error => {
+            console.warn("Advancing the question didn't go through yet, retrying:", error);
+          })
+          .finally(() => {
+            advanceInFlightRef.current = false;
+          });
       }
     };
 
@@ -451,33 +482,30 @@ const Quiz = () => {
     }
   }, [sharedClock, room, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
-  // Time's up without an answer (both clocks): lock the question, show
-  // feedback with 0 points, and sync the unchanged score in multiplayer.
-  const markTimeUp = (currentScore: number) => {
+  // Time's up without an answer (both clocks): lock the question and show
+  // feedback with 0 points. The score didn't change, so nothing to write:
+  // an unchanged-score write from every timed-out player at once only
+  // competes with real score writes on the room document.
+  const markTimeUp = () => {
     isSubmittedRef.current = true;
     setIsSubmitted(true);
     setIsTimerVisible(false);
     setCurrentQuestionPoints(0);
     setShowFeedback(true);
-
-    if (isMultiplayer && roomCode && playerId) {
-      void updatePlayerScore(roomCode, playerId, currentScore).catch(error => {
-        console.error("Failed to update score:", error);
-      });
-    }
+    rememberAnswered(currentQuestionIndex);
   };
   markTimeUpRef.current = markTimeUp;
 
   // Local clock only: time's up, then 5 seconds of feedback
   const handleTimeUp = () => {
-    markTimeUp(score);
-    setTimeLeft(5);
+    markTimeUp();
+    setTimeLeft(FEEDBACK_MS / 1000);
   };
 
   // Function to automatically move to the next question
   const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      if ((currentQuestionIndex + 1) % 5 === 0) {
+      if ((currentQuestionIndex + 1) % MID_QUIZ_EVERY === 0) {
         navigate("/mid-quiz-scoreboard", {
           state: {
             score,
@@ -496,8 +524,8 @@ const Quiz = () => {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
         setIsSubmitted(false);
-        setTimeLeft(10); // Reset timer for new question
-        setTimeLeftMs(10000); // Reset precise timer for new question
+        setTimeLeft(QUESTION_MS / 1000); // Reset timer for new question
+        setTimeLeftMs(QUESTION_MS); // Reset precise timer for new question
         setIsTimerVisible(true); // Show timer again for the next question
         setCurrentQuestionPoints(0); // Reset points for new question
       }
@@ -541,6 +569,7 @@ const Quiz = () => {
 
     setIsSubmitted(true);
     setIsTimerVisible(false); // Hide timer when answer is submitted
+    rememberAnswered(currentQuestionIndex);
 
     // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
@@ -573,7 +602,7 @@ const Quiz = () => {
     // 5 seconds; in multiplayer the shared tick counts down to the slot's end.
     setShowFeedback(true);
     if (!sharedClock) {
-      const feedbackTime = Math.min(timeLeft, 10) + 5;
+      const feedbackTime = Math.min(timeLeft, QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
       setTimeLeft(feedbackTime);
     }
   };

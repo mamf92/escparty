@@ -87,7 +87,7 @@ const MidQuizScoreboard = () => {
         }
         navigate(`/quiz/${gameData.difficulty}`, {
           state: {
-            currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+            currentQuestionIndex: nextQuestionIndex, // The question after the break
             score: gameData.score, // Host's score (might be 0 if not playing)
             players, // Live players list from Firestore
             multiplayer: gameData.multiplayer,
@@ -113,7 +113,7 @@ const MidQuizScoreboard = () => {
     else if (!isHost && gameData.multiplayer && gameData.roomCode) {
       navigate(`/quiz/${gameData.difficulty}`, {
         state: {
-          currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+          currentQuestionIndex: nextQuestionIndex, // The question after the break
           score: gameData.score, // Participant's current score from gameData
           players, // Live players list from Firestore
           multiplayer: gameData.multiplayer,
@@ -127,7 +127,7 @@ const MidQuizScoreboard = () => {
     else if (!gameData.multiplayer) {
       navigate(`/quiz/${gameData.difficulty}`, {
         state: {
-          currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+          currentQuestionIndex: nextQuestionIndex, // The question after the break
           score: gameData.score,
           players: gameData.players, // Initial players list for single player
           multiplayer: false,

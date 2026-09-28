@@ -93,10 +93,12 @@ rules, ask before making it rather than guessing.
   reintroduce a locally incremented index or a local countdown there. The
   mid-quiz `continueReady` flag is still the old fixed-delay handshake until
   #63.
-- `markPlayerAtMidQuiz` is a manual read-modify-write with no transaction and
-  is race-prone under concurrent writers. `updatePlayerScore` used to be the
-  same but now runs inside a Firestore transaction — don't revert it back to
-  a plain `getDoc`/`updateDoc` pair.
+- Writes several clients make at once must not be a plain read-modify-write.
+  `updatePlayerScore`, `advanceQuestion` and `resumeAfterMidQuiz` are
+  transactions and `markPlayerAtMidQuiz` is an `arrayUnion` — all players
+  reach the mid-quiz break on the same snapshot (#62), and the old
+  read-modify-write there dropped player IDs. Don't revert any of them to a
+  `getDoc`/`updateDoc` pair.
 
 ## The dev loop
 

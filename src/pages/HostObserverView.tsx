@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, resetPlayersAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom, setContinueReady, resumeAfterMidQuiz } from "../utils/roomsFirestore";
 
 const HostObserverView = () => {
     const location = useLocation();
@@ -46,10 +46,8 @@ const HostObserverView = () => {
                     return;
                 }
                 // continueReady is only for tabs still running an older bundle.
+                // (The resume already cleared playersAtMidQuiz for the next break.)
                 await setContinueReady(gameData.roomCode, true);
-
-                // Reset the players at mid-quiz array to prepare for the next mid-quiz break
-                await resetPlayersAtMidQuiz(gameData.roomCode);
 
                 // Reset the continue flag after a short delay
                 setTimeout(async () => {

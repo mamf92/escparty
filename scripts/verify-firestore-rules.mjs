@@ -212,6 +212,9 @@ await expectAllowed("set continueReady", () =>
 await expectAllowed("set playersAtMidQuiz", () =>
   updateDoc(flag.roomRef, { playersAtMidQuiz: ["host-1"] })
 );
+await expectAllowed("mark a player at the break with arrayUnion (markPlayerAtMidQuiz)", () =>
+  updateDoc(flag.roomRef, { playersAtMidQuiz: arrayUnion("player-2") })
+);
 await expectAllowed("reset playersAtMidQuiz to empty", () =>
   updateDoc(flag.roomRef, { playersAtMidQuiz: [] })
 );
@@ -416,6 +419,9 @@ await expectDenied("take the mid-quiz break off a multiple of 5 (0 -> break at 1
 await expectDenied("advance with a client-chosen phaseStartedAt", () =>
   updateDoc(forgedClock, advanceTo("question", 1, { phaseStartedAt: backdated }))
 );
+await expectDenied("clear the ready marks while ending a question", () =>
+  updateDoc(piggyScore, { ...advanceTo("question", 1), playersAtMidQuiz: [] })
+);
 await expectDenied("advance + rewrite scores in the same write", () =>
   updateDoc(piggyScore, {
     ...advanceTo("question", 1),
@@ -449,8 +455,12 @@ await expectAllowed("take the mid-quiz break after question 5 (4 -> break at 5)"
 await expectDenied("leave the break onto a different question", () =>
   updateDoc(walker, advanceTo("question", 6))
 );
-await expectAllowed("resume after the mid-quiz break (break at 5 -> question 5)", () =>
-  updateDoc(walker, { phase: "question", phaseStartedAt: serverTimestamp() })
+await updateDoc(walker, { playersAtMidQuiz: arrayUnion("host-1", "player-2") });
+await expectDenied("resume while rewriting who is at the break", () =>
+  updateDoc(walker, { phase: "question", phaseStartedAt: serverTimestamp(), playersAtMidQuiz: ["host-1"] })
+);
+await expectAllowed("resume after the mid-quiz break, clearing the ready marks (break at 5 -> question 5)", () =>
+  updateDoc(walker, { phase: "question", phaseStartedAt: serverTimestamp(), playersAtMidQuiz: [] })
 );
 await expectDenied("end the resumed question immediately", () =>
   updateDoc(walker, advanceTo("question", 6))

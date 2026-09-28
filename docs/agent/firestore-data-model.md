@@ -55,8 +55,8 @@ The lifecycle:
   question (with `currentQuestionIndex` already pointing at the question
   after the break), or to `"results"` after the last one.
 - `resumeAfterMidQuiz(roomCode)` is the host's continue: `"mid-scoreboard"`
-  → `"question"` at the same index, with a fresh `phaseStartedAt`. A no-op
-  outside the break.
+  → `"question"` at the same index, with a fresh `phaseStartedAt`, clearing
+  `playersAtMidQuiz`. A no-op outside the break.
 - All three are optional on `Room`: rooms created before #61 don't have
   them, and `Quiz.tsx` falls back to its local timers for such a room.
 - `phaseStartedAt` reads as `null` in a snapshot whose `serverTimestamp()`
@@ -69,28 +69,32 @@ The lifecycle:
 
 ## Which writes are safe vs. race-prone
 
-- **Safe:** `addPlayerToRoom` uses `arrayUnion` — concurrent joins can't
-  clobber each other. `updatePlayerScore` runs inside a `runTransaction` —
+- **Safe:** `addPlayerToRoom` and `markPlayerAtMidQuiz` use `arrayUnion` —
+  concurrent joins, and every player reaching the mid-quiz break on the same
+  snapshot (#62), can't clobber each other. `advanceQuestion` and
+  `resumeAfterMidQuiz` are transactions (see above). `updatePlayerScore` runs inside a `runTransaction` —
   Firestore retries it on a conflicting concurrent write, so two
   near-simultaneous score updates for the same player (e.g. `submitAnswer`
   and `handleTimeUp` in `Quiz.tsx` both firing near a question's deadline)
   can't silently drop one of them the way a plain read-modify-write would.
-- **Race-prone:** `markPlayerAtMidQuiz` still does a manual read-modify-write
-  (`getDoc` then `updateDoc` with a recomputed array). Two near-simultaneous
-  calls for different players can read the same snapshot and each overwrite
-  the other's change, silently dropping one player's mid-quiz-ready flag. If
-  you're adding a new field that multiple clients might write concurrently,
-  use `arrayUnion`/`arrayRemove` where the shape allows it, or a transaction
-  (see `updatePlayerScore` for the pattern) — don't add another manual
-  read-modify-write.
+- **Don't add a manual read-modify-write.** `markPlayerAtMidQuiz` used to
+  be one (`getDoc` then `updateDoc` with a recomputed array); once #62 put
+  every player at the break at the same moment, concurrent calls dropped
+  each other's IDs and an observer host's Continue never enabled. If you're
+  adding a field several clients might write concurrently, use
+  `arrayUnion`/`arrayRemove` where the shape allows it, or a transaction
+  (see `updatePlayerScore` for the pattern).
 
 ## Progression flags
 
 - `continueReady` — host-set boolean signaling "advance to the next
   question" to observer-mode hosts. Reset by the host, not automatically.
 - `playersAtMidQuiz` — array of player IDs who have reached the mid-quiz
-  scoreboard, built via `markPlayerAtMidQuiz` (race-prone, see above) and
-  cleared by `resetPlayersAtMidQuiz`.
+  scoreboard, built via `markPlayerAtMidQuiz` (`arrayUnion`) and cleared by
+  `resumeAfterMidQuiz` in the same write that ends the break, so a
+  half-failed resume can't leave stale marks for the next one. The rules
+  only let a resume clear it. `resetPlayersAtMidQuiz` still exists but
+  nothing calls it any more.
 
 ## Security rules
 
@@ -156,7 +160,8 @@ way would have no phase for clients to follow.
 `isAdvancingPhase` covers every later move, mirroring `phaseAfterQuestion`
 in `quizTiming.ts`: question N → question N+1 (N+1 not a multiple of 5),
 question N → `mid-scoreboard` at N+1 (N+1 a multiple of 5), question N →
-`results`, and `mid-scoreboard` N → question N. A question can't be ended
+`results`, and `mid-scoreboard` N → question N (which may also clear
+`playersAtMidQuiz` to `[]`, and is the only move that may). A question can't be ended
 before `phaseStartedAt + 15s`, measured on the server's clock, so no client
 can cut a question short or race ahead. The 15s is hardcoded there; keep it
 in sync with `QUESTION_SLOT_MS`. Rules can't see how many questions a quiz
