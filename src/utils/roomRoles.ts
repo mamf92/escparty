@@ -31,3 +31,29 @@ export const shouldObserve = (
     room: Pick<Room, "hostId" | "hostIsObserver" | "phase"> | null | undefined,
     playerId: string | null | undefined,
 ): boolean => isObserverHost(room, playerId) && room?.phase !== "results";
+
+/** The router state HostObserverView expects; see observerRouteState. */
+export interface ObserverRouteState {
+    currentQuestionIndex: number;
+    difficulty?: string;
+    players: Player[];
+    roomCode: string;
+    playerId: string | null;
+}
+
+/**
+ * What every redirect to /host-observer hands over (Lobby, the quiz page
+ * and the break screen), built in one place so none of them drops a field
+ * the observer screen needs, like `playerId` for its Continue.
+ */
+export const observerRouteState = (
+    room: Pick<Room, "hostId" | "hostIsObserver" | "players" | "currentQuestionIndex" | "difficulty">,
+    roomCode: string,
+    playerId: string | null,
+): ObserverRouteState => ({
+    currentQuestionIndex: room.currentQuestionIndex ?? 0,
+    difficulty: room.difficulty,
+    players: playingPlayers(room),
+    roomCode,
+    playerId,
+});

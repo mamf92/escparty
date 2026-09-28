@@ -6,7 +6,7 @@ import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
-import { playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
@@ -74,21 +74,15 @@ const Quiz = () => {
   // from the room, not from localStorage "isHost".
   const observing = shouldObserve(room, playerId);
   useEffect(() => {
-    if (!isMultiplayer || !observing || !room || leftQuizRef.current) return;
+    if (!isMultiplayer || !observing || !room || !roomCode || leftQuizRef.current) return;
     // Claims the one navigation away from this page, so the phase effect
     // below can't send the observer to the players' break or results.
     leftQuizRef.current = true;
     navigate("/host-observer", {
-      state: {
-        currentQuestionIndex: room.currentQuestionIndex ?? 0,
-        difficulty,
-        players: playingPlayers(room),
-        roomCode,
-        playerId
-      },
+      state: observerRouteState(room, roomCode, playerId),
       replace: true // Replace history to prevent back navigation to the quiz page
     });
-  }, [isMultiplayer, observing, room, difficulty, roomCode, playerId, navigate]);
+  }, [isMultiplayer, observing, room, roomCode, playerId, navigate]);
 
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes

@@ -59,6 +59,18 @@ describe("useResumeRoom", () => {
         expect(result.current.resumeError).toBeNull();
     });
 
+    it("drops the result of a resume that settles after a reset (the room moved on meanwhile)", async () => {
+        let fail: (error: Error) => void = () => { };
+        mocks.resumeAfterMidQuiz.mockReturnValue(new Promise<boolean>((_, reject) => { fail = reject; }));
+        const { result } = renderHook(() => useResumeRoom("ABCD"));
+        let pending: Promise<void> = Promise.resolve();
+        act(() => { pending = result.current.resume(); });
+        act(() => result.current.reset());
+        await act(async () => { fail(new Error("reply lost")); await pending; });
+        expect(result.current.resumeError).toBeNull();
+        expect(result.current.resuming).toBe(false);
+    });
+
     it("does nothing without a room", async () => {
         const { result } = renderHook(() => useResumeRoom(null));
         await act(() => result.current.resume());

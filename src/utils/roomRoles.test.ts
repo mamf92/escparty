@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isObserverHost, isRoomHost, playingPlayers, shouldObserve } from "./roomRoles";
+import { isObserverHost, isRoomHost, observerRouteState, playingPlayers, shouldObserve } from "./roomRoles";
 
 const players = [
     { id: "host-1", name: "Host", score: 0 },
@@ -41,6 +41,23 @@ describe("shouldObserve", () => {
     it("not once the room has finished, nor anyone but the observer host", () => {
         expect(shouldObserve({ ...room, phase: "results" }, "host-1")).toBe(false);
         expect(shouldObserve({ ...room, phase: "question" }, "p-2")).toBe(false);
+    });
+});
+
+describe("observerRouteState", () => {
+    it("hands over the room's position, the players without the observer, and who's viewing", () => {
+        const room = { hostId: "host-1", hostIsObserver: true, players, currentQuestionIndex: 5, difficulty: "hard" };
+        expect(observerRouteState(room, "ABCD", "host-1")).toEqual({
+            currentQuestionIndex: 5,
+            difficulty: "hard",
+            players: [players[1]],
+            roomCode: "ABCD",
+            playerId: "host-1",
+        });
+    });
+
+    it("starts at question 0 when the room has no index", () => {
+        expect(observerRouteState({ hostId: "host-1", players }, "ABCD", null).currentQuestionIndex).toBe(0);
     });
 });
 

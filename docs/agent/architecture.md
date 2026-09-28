@@ -83,7 +83,9 @@ plan that also removes the ad hoc storage it would duplicate.
 - `roomRoles.ts` — who's who in a room, read from the room itself (#63):
   `isRoomHost`, `isObserverHost`, `shouldObserve` (whether to route to the
   observer screen: the observer host, while the game is on) and
-  `playingPlayers(room)` (the players without an observing host). Replaces the `localStorage` guesses pages
+  `playingPlayers(room)` (the players without an observing host), plus
+  `observerRouteState`, the router state every redirect to
+  `/host-observer` hands over. Replaces the `localStorage` guesses pages
   used to make. 100% coverage floor.
 
 ## `src/hooks/`

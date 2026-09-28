@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 import { listenToRoom, Room, setRoomDifficulty, startGame } from "../utils/roomsFirestore";
-import { playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 
 const Lobby = () => {
     const [room, setRoom] = useState<Room | null>(null);
@@ -57,13 +57,7 @@ const Lobby = () => {
                     // finished room on to the results, as for everyone else).
                     if (shouldObserve(roomData, storedPlayerId)) {
                         navigate("/host-observer", {
-                            state: {
-                                currentQuestionIndex: roomData.currentQuestionIndex ?? 0,
-                                difficulty: roomData.difficulty,
-                                players: playingPlayers(roomData),
-                                roomCode: storedGameCode,
-                                playerId: storedPlayerId
-                            },
+                            state: observerRouteState(roomData, storedGameCode, storedPlayerId),
                             replace: true // Back from the observer screen skips this started lobby
                         });
                         return;

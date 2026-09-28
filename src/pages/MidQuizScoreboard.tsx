@@ -5,7 +5,7 @@ import { Player, Room, listenToRoom, markPlayerAtMidQuiz } from "../utils/roomsF
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { hasLeftBreak } from "../utils/quizTiming";
 import { bestKnownScore } from "../utils/quizScoring";
-import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
+import { isObserverHost, isRoomHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -44,10 +44,9 @@ const MidQuizScoreboard = () => {
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(null);
-  // Whether this user is the host, and whether they only observe: set only
-  // from the room's snapshot (see the listener below).
+  // Whether this user is the host: set only from the room's snapshot (see
+  // the listener below).
   const [isHost, setIsHost] = useState(false);
-  const [hostIsObserver, setHostIsObserver] = useState(false);
   // The host's Continue. Nobody navigates on it: everyone, the host
   // included, goes back when the listener below sees the room resumed
   // (#63). That also covers a second host tab, or a resume whose reply got
@@ -63,23 +62,6 @@ const MidQuizScoreboard = () => {
   const roomDifficultyRef = useRef<string | null>(null);
   const markedRef = useRef(false);
 
-  // Check if host is observer and redirect if needed
-  useEffect(() => {
-    // Check if current user is the host and is an observer
-    if (hostIsObserver) {
-      // Redirect to dedicated HostObserverView
-      navigate("/host-observer", {
-        state: {
-          currentQuestionIndex: gameData.currentQuestionIndex,
-          difficulty: gameData.difficulty,
-          players: players,
-          roomCode: gameData.roomCode,
-          playerId: gameData.playerId
-        },
-        replace: true // no way back into the players' break screen
-      });
-    }
-  }, [hostIsObserver, navigate, gameData, players]);
 
   // This player's score. Without router state (a refresh) gameData.score is
   // 0, so in multiplayer the room's copy wins when it's higher.
@@ -195,10 +177,21 @@ const MidQuizScoreboard = () => {
           // Always update players array to ensure real-time score updates
           setPlayers(playingPlayers(room));
 
-          // Who's the host, and whether they only observe, as the room has it.
-          const observerHost = isObserverHost(room, gameData.playerId);
+          // Who's the host, as the room has it. An observer host isn't a
+          // player: while the game is on it only passes through here on its
+          // way to HostObserverView (a finished room sends it on to the
+          // results like everyone else, below).
           setIsHost(isRoomHost(room, gameData.playerId));
-          setHostIsObserver(observerHost);
+          if (shouldObserve(room, gameData.playerId)) {
+            if (!leftBreakRef.current && gameData.roomCode) {
+              leftBreakRef.current = true;
+              navigate("/host-observer", {
+                state: observerRouteState(room, gameData.roomCode, gameData.playerId),
+                replace: true // no way back into the players' break screen
+              });
+            }
+            return;
+          }
           if (room.difficulty) roomDifficultyRef.current = room.difficulty;
 
           const roomIndex = room.currentQuestionIndex ?? 0;
@@ -207,9 +200,7 @@ const MidQuizScoreboard = () => {
           }
 
           // Mark this player ready, once, while the room is actually in the
-          // break (the rules refuse a mark at any other time). An observer
-          // host isn't a player: it only passes through here on its way to
-          // HostObserverView.
+          // break (the rules refuse a mark at any other time).
           latestRoomRef.current = room;
           markIfInBreak();
 
@@ -218,9 +209,8 @@ const MidQuizScoreboard = () => {
           // arrives (a throttled background tab, a locked phone, a slow
           // network). It's a state, not a moment, so there's no window to
           // miss, and a snapshot that skips straight to the results still
-          // gets this player there, via the quiz page. Observer hosts stay
-          // on HostObserverView instead.
-          if (!observerHost && hasLeftBreak(room.phase, roomIndex, breakIndexRef.current ?? -1)) {
+          // gets this player there, via the quiz page.
+          if (hasLeftBreak(room.phase, roomIndex, breakIndexRef.current ?? -1)) {
             returnToQuizRef.current(room);
           }
         } else {
