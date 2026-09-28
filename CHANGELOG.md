@@ -29,6 +29,7 @@
 - Removed the GitHub Pages deploy path (`predeploy`/`deploy` scripts and the `gh-pages` devDependency) and `.github/workflows/deploy-vercel.yml`, which had failed on all 12 of its runs for want of the `VERCEL_*` secrets; Vercel's GitHub integration is the one deploy path that actually runs (2026-09-22)
 
 ### Changed
+- Let agents merge PRs they opened without waiting for a person, when CI is green, a `code-review` pass posted on the PR has every Important finding addressed, no thread is open, and the PR doesn't touch the guardrails themselves. The rule lives in `CONTRIBUTING.md` section 8, and `.claude/settings.json` allows the GitHub merge tool (2026-09-28)
 - Pointed the README live-demo link, `SECURITY.md`'s supported-version URL and `package.json`'s `homepage` at https://escparty-murex.vercel.app, replacing the GitHub Pages URL whose last build was from October 2025 (2026-09-22)
 - Added the missing Commit and Fix steps to the dev loop in `.claude/skills/steward/SKILL.md` and `CONTRIBUTING.md`, so the written loop is pick → plan → execute → commit → PR → review → fix → merge (2026-09-22)
 - Updated Home navigation: Single-player button now routes to `/select-difficulty` (2026-05-16)
