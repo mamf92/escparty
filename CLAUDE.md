@@ -9,9 +9,10 @@ React 19 + Vite + TypeScript, styled-components for styling, react-router
 (`HashRouter` — routes are `#/...`, a holdover from the original GitHub
 Pages deploy that every existing link now depends on).
 Backend is Firebase Firestore via the client SDK: state syncs through
-`onSnapshot` listeners, there are no WebSockets, and `updatePlayerScore` is
-the only Firestore transaction in the codebase — everything else is a plain
-read/write (see `docs/agent/firestore-data-model.md`).
+`onSnapshot` listeners, there are no WebSockets, and the only Firestore
+transactions are `updatePlayerScore`, `advanceQuestion` and
+`resumeAfterMidQuiz` — everything else is a plain read/write (see
+`docs/agent/firestore-data-model.md`).
 
 ## Commands
 
@@ -25,8 +26,9 @@ read/write (see `docs/agent/firestore-data-model.md`).
 - `npm run emulators` — start the local Firestore emulator (needs a JDK).
 
 Unit/component tests run on Vitest + React Testing Library. Covered today:
-`roomsFirestore.ts`, `QuizDataProvider.ts` and `quizScoring.ts` (with
-per-file coverage floors), plus one `Home.tsx` smoke test — every other page,
+`roomsFirestore.ts`, `QuizDataProvider.ts`, `quizScoring.ts` and
+`quizTiming.ts` (with per-file coverage floors), plus one `Home.tsx` smoke
+test — every other page,
 and `Quiz.tsx` itself, is uncovered. `npm test` now runs in `ci.yml`, but a
 red run doesn't yet block merge or deploy (see #57). See
 `docs/agent/testing.md` before assuming a given flow is covered.
@@ -41,8 +43,9 @@ the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one
 file, `useGameStore.ts`, which is dead code (see Landmines). `src/utils/`
 has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz
 question loading), `quizScoring.ts` (the answer-scoring math, extracted from
-`Quiz.tsx` so it can be tested directly), and `pathUtils.ts` (base-path/env
-helpers). Full layout:
+`Quiz.tsx` so it can be tested directly), `quizTiming.ts` (multiplayer
+question timing and what follows each question), and `pathUtils.ts`
+(base-path/env helpers). Full layout:
 `docs/agent/architecture.md`.
 
 ## Design themes

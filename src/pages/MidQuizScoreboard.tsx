@@ -77,10 +77,14 @@ const MidQuizScoreboard = () => {
     // Case 1: Host in a multiplayer game
     if (isHost && gameData.multiplayer && gameData.roomCode) {
       try {
-        // Start the next question for the whole room (#62), then signal and
-        // navigate (observer hosts are redirected elsewhere)
-        await resumeAfterMidQuiz(gameData.roomCode);
-        await setContinueReady(gameData.roomCode, true);
+        // Start the next question for the whole room (#62), then navigate
+        // (observer hosts are redirected elsewhere). continueReady is only
+        // for tabs still running an older bundle, and only after a real
+        // resume, so a double-click doesn't send a second signal.
+        const resumed = await resumeAfterMidQuiz(gameData.roomCode);
+        if (resumed) {
+          await setContinueReady(gameData.roomCode, true);
+        }
         navigate(`/quiz/${gameData.difficulty}`, {
           state: {
             currentQuestionIndex: nextQuestionIndex, // Use the incremented index
@@ -197,24 +201,27 @@ const MidQuizScoreboard = () => {
           setPlayers(filteredPlayers);
 
           // Update hostIsObserver if it exists in the room data
-          if (room.hostIsObserver !== undefined && isHost) {
+          if (room.hostIsObserver !== undefined && isUserHost) {
             setHostIsObserver(room.hostIsObserver);
           }
 
-          // The room already resumed (#62): a player who missed the
-          // continueReady window, or was backgrounded, goes straight back.
-          if (!isHost && room.phase === "question" &&
-              (room.currentQuestionIndex ?? 0) >= gameData.currentQuestionIndex) {
-            continueQuizRef.current();
-            return;
-          }
-
-          // Check if continue is ready
-          if (room.continueReady) {
+          // `isUserHost`, not the `isHost` state: this listener can be set up
+          // (and fire) before that state updates, which would treat the host
+          // as a player below.
+          if (room.phase) {
+            // The room drives the return (#62): players go back as soon as it
+            // has resumed, whether or not they saw the continueReady flag
+            // (missed window, backgrounded tab). A stale continueReady left
+            // over from the last break is ignored, so it can't bounce players
+            // to the quiz while the room is still in the break.
+            if (!isUserHost && room.phase === "question" &&
+                (room.currentQuestionIndex ?? 0) >= gameData.currentQuestionIndex) {
+              continueQuizRef.current();
+            }
+          } else if (room.continueReady) {
+            // Rooms from before #61 have no phase: keep the old signal.
             setContinueReadyState(true);
-
-            // If not host, continue automatically when host signals
-            if (!isHost && room.continueReady) {
+            if (!isUserHost) {
               continueQuizRef.current();
             }
           }

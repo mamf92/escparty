@@ -62,6 +62,12 @@ plan that also removes the ad hoc storage it would duplicate.
   of up to `500`, linear in the time left and rounded down), extracted from
   `Quiz.tsx` so the rule players actually see can be unit-tested without
   rendering the component. Pure functions, no React, no Firestore.
+- `quizTiming.ts` — multiplayer question timing (#62): the 10s + 5s slot,
+  `phaseAfterQuestion` (next question, mid-quiz break after every 5th, or
+  results) and `questionClock` (where a question is, given its
+  `phaseStartedAt`). Pure functions, shared by `Quiz.tsx` and
+  `advanceQuestion` in `roomsFirestore.ts`; `firestore.rules` hardcodes the
+  same 15s slot.
 - `pathUtils.ts` — environment detection (`isDevelopmentEnvironment`,
   `isProductionPreview`) plus the base-path helper `getAssetPath`.
   `firebase.ts` uses both detection functions (but no base-path helper);

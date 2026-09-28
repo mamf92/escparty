@@ -36,9 +36,16 @@ const HostObserverView = () => {
 
         if (gameData.roomCode) {
             try {
-                // Start the next question for the whole room (#62), then signal
-                // continue; the observer host doesn't navigate to the quiz itself
-                await resumeAfterMidQuiz(gameData.roomCode);
+                // Start the next question for the whole room (#62); the
+                // observer host doesn't navigate to the quiz itself. Nothing
+                // else to do if the room wasn't in a break (a double-click, a
+                // second host tab, or continue pressed mid-block): don't send
+                // a signal or clear the ready marks for a break that isn't on.
+                const resumed = await resumeAfterMidQuiz(gameData.roomCode);
+                if (!resumed) {
+                    return;
+                }
+                // continueReady is only for tabs still running an older bundle.
                 await setContinueReady(gameData.roomCode, true);
 
                 // Reset the players at mid-quiz array to prepare for the next mid-quiz break
