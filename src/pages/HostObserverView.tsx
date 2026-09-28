@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Player, Room, listenToRoom } from "../utils/roomsFirestore";
 import { ObserverRouteState, isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { useResumeRoom } from "../hooks/useResumeRoom";
+import { readMultiplayerGame } from "../utils/multiplayerSession";
 
 const HostObserverView = () => {
     const location = useLocation();
@@ -14,17 +15,13 @@ const HostObserverView = () => {
     // tab's sessionStorage game. Router state survives a refresh, but one
     // from an older version of the app may lack playerId, and without it
     // the Continue below could never be enabled.
+    // The session's playerId only counts for the same room: this tab may have
+    // played a later game since an old history entry was made.
     const routeState = (location.state ?? {}) as Partial<ObserverRouteState>;
-    const [session] = useState<{ roomCode?: string; playerId?: string } | null>(() => {
-        try {
-            return JSON.parse(sessionStorage.getItem("multiplayerGame") ?? "null");
-        } catch (e) {
-            console.error("Error parsing host observer data from sessionStorage:", e);
-            return null;
-        }
-    });
+    const [session] = useState(readMultiplayerGame);
     const roomCode = routeState.roomCode ?? session?.roomCode ?? null;
-    const playerId = routeState.playerId ?? session?.playerId ?? null;
+    const playerId = routeState.playerId
+        ?? (session && session.roomCode === roomCode ? session.playerId : null);
 
     // Everything below is derived from the latest snapshot.
     const [room, setRoom] = useState<Room | null>(null);

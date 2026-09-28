@@ -115,6 +115,7 @@ Coverage `include` therefore lists exactly the files with a floor:
 | `src/utils/quizScoring.ts` | 100% statements / branches / functions / lines |
 | `src/utils/quizTiming.ts` | 100% statements / branches / functions / lines |
 | `src/utils/roomRoles.ts` | 100% statements / branches / functions / lines |
+| `src/utils/multiplayerSession.ts` | 100% statements / branches / functions / lines |
 | `src/utils/roomsFirestore.ts` | 100% statements / branches / functions / lines |
 | `src/utils/QuizDataProvider.ts` | 98% statements & lines, 96% branches, 100% functions |
 
@@ -136,7 +137,8 @@ open at the time of writing:
   `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts`, the
   extracted scoring math in `src/utils/quizScoring.ts` and the multiplayer
   timing in `src/utils/quizTiming.ts` have unit tests with a coverage floor
-  (#56, #62), as does `src/utils/roomRoles.ts` (#63); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
+  (#56, #62), as do `src/utils/roomRoles.ts` and
+  `src/utils/multiplayerSession.ts` (#63); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
   floor. `src/pages/Home.test.tsx` is still the only
   component test — every other page and `Quiz.tsx` itself are uncovered,
   which is #59.

@@ -88,6 +88,11 @@ plan that also removes the ad hoc storage it would duplicate.
   `/host-observer` hands over. Replaces the `localStorage` guesses pages
   used to make. 100% coverage floor.
 
+- `multiplayerSession.ts` — `readMultiplayerGame()`, this tab's stored
+  multiplayer game (`sessionStorage` `multiplayerGame`: room code, player
+  ID, difficulty) for pages opened without router state (#63). Used by the
+  quiz page, the break screen and the observer screen. 100% coverage floor.
+
 ## `src/hooks/`
 
 - `useResumeRoom.ts` — the host's Continue at a mid-quiz break (#63), used

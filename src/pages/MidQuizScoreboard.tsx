@@ -6,13 +6,7 @@ import { useResumeRoom } from "../hooks/useResumeRoom";
 import { hasLeftBreak } from "../utils/quizTiming";
 import { bestKnownScore } from "../utils/quizScoring";
 import { isObserverHost, isRoomHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
-
-interface MultiplayerGameData {
-  multiplayer: boolean;
-  roomCode: string;
-  playerId: string;
-  difficulty?: string;
-}
+import { readMultiplayerGame } from "../utils/multiplayerSession";
 
 const MidQuizScoreboard = () => {
   const location = useLocation();
@@ -30,16 +24,22 @@ const MidQuizScoreboard = () => {
     playerId: null
   };
 
-  // Use state from location, or try to recover from sessionStorage
-  const [gameData, setGameData] = useState({
-    score: locationState.score || 0,
-    totalQuestions: locationState.totalQuestions || 0,
-    currentQuestionIndex: locationState.currentQuestionIndex || 0,
-    difficulty: locationState.difficulty || "easy",
-    players: locationState.players || [],
-    multiplayer: locationState.multiplayer || false,
-    roomCode: locationState.roomCode || null,
-    playerId: locationState.playerId || null
+  // Router state from the page that brought us here; without any (a direct
+  // link, a new or restored tab) this tab's stored multiplayer game, read
+  // up front so the very first render already knows it's multiplayer (and
+  // doesn't offer a single-player Continue to a guest).
+  const [gameData] = useState(() => {
+    const session = location.state ? null : readMultiplayerGame();
+    return {
+      score: locationState.score || 0,
+      totalQuestions: locationState.totalQuestions || 0,
+      currentQuestionIndex: locationState.currentQuestionIndex || 0,
+      difficulty: session?.difficulty || locationState.difficulty || "easy",
+      players: locationState.players || [],
+      multiplayer: session ? true : (locationState.multiplayer || false),
+      roomCode: session?.roomCode ?? (locationState.roomCode || null),
+      playerId: session?.playerId ?? (locationState.playerId || null)
+    };
   });
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
@@ -54,17 +54,18 @@ const MidQuizScoreboard = () => {
   const { resume, resuming, resumeError } = useResumeRoom(gameData.multiplayer ? gameData.roomCode : null);
 
   // Which break this is: the index of the question after it. Router state
-  // carries it; after a refresh there's none, so it's taken from the room's
-  // first snapshot instead (0 would read as "the room is past this break").
+  // carries it (and survives a refresh); without any (a direct link, a new
+  // tab) it's taken from the room's first snapshot instead (0 would read as
+  // "the room is past this break").
   const breakIndexRef = useRef<number | null>(location.state ? gameData.currentQuestionIndex : null);
-  // The room's own difficulty, so a refreshed page (no router state) goes
+  // The room's own difficulty, so a page opened without router state goes
   // back to the right quiz rather than the "easy" default.
   const roomDifficultyRef = useRef<string | null>(null);
   const markedRef = useRef(false);
 
-
-  // This player's score. Without router state (a refresh) gameData.score is
-  // 0, so in multiplayer the room's copy wins when it's higher.
+  // This player's score. Without router state gameData.score is 0, and a
+  // score write can land after the quiz handed its score over, so in
+  // multiplayer the room's copy wins when it's higher.
   const myScore = gameData.multiplayer
     ? bestKnownScore(gameData.score, players, gameData.playerId)
     : gameData.score;
@@ -85,7 +86,7 @@ const MidQuizScoreboard = () => {
       state: {
         // The index of the question after the break: the quiz hands it over
         // (it used to be incremented again here, which skipped a question at
-        // every mid-quiz break), or after a refresh it comes from the room.
+        // every mid-quiz break), or without router state from the room.
         currentQuestionIndex: room?.currentQuestionIndex ?? breakIndexRef.current ?? gameData.currentQuestionIndex,
         score: room ? bestKnownScore(gameData.score, room.players, gameData.playerId) : gameData.score,
         players: room ? room.players : gameData.players,
@@ -113,34 +114,15 @@ const MidQuizScoreboard = () => {
   }, [returnToQuiz]);
 
   useEffect(() => {
-    // If we don't have location state but we're on this page, try to recover from sessionStorage
-    if (!location.state) {
-      const storedData = sessionStorage.getItem('multiplayerGame');
-      if (storedData) {
-        try {
-          const multiplayerData = JSON.parse(storedData) as MultiplayerGameData;
-          setGameData(prev => ({
-            ...prev,
-            multiplayer: true,
-            roomCode: multiplayerData.roomCode,
-            playerId: multiplayerData.playerId,
-            difficulty: multiplayerData.difficulty || prev.difficulty
-          }));
-        } catch (e) {
-          console.error("Error parsing multiplayer data from sessionStorage:", e);
-          setError("Unable to retrieve game data. Please return to the lobby.");
-        }
-      }
-    }
-
     // Whether this user is the host (and only observes) comes from the
     // room's snapshot below, never from localStorage: that's shared by
     // every tab and outlives the game, so another tab, or an old game, can
     // leave it saying "host" for a guest or a single player. Until the
     // snapshot arrives nobody gets the host's Continue.
 
-    // The latest snapshot, for a retried ready mark (below).
-    const latestRoomRef: { current: Room | null } = { current: null };
+    // The latest snapshot, for a retried ready mark (below). Per
+    // subscription, like the timer and flag after it.
+    let latestRoom: Room | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     // Set on cleanup: a mark that fails after this page has closed (a write
     // queued offline, refused on reconnect) must not start retrying against
@@ -148,7 +130,7 @@ const MidQuizScoreboard = () => {
     let disposed = false;
     const markIfInBreak = () => {
       if (disposed) return;
-      const room = latestRoomRef.current;
+      const room = latestRoom;
       const roomCode = gameData.roomCode;
       const playerId = gameData.playerId;
       if (!room || !roomCode || !playerId || markedRef.current) return;
@@ -201,7 +183,7 @@ const MidQuizScoreboard = () => {
 
           // Mark this player ready, once, while the room is actually in the
           // break (the rules refuse a mark at any other time).
-          latestRoomRef.current = room;
+          latestRoom = room;
           markIfInBreak();
 
           // The room's state is the signal (#63): leave this break as soon
@@ -225,7 +207,7 @@ const MidQuizScoreboard = () => {
         clearTimeout(retryTimer);
       };
     }
-  }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, location.state, navigate]);
+  }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, navigate]);
 
   if (error) {
     return (
@@ -250,7 +232,7 @@ const MidQuizScoreboard = () => {
           </tr>
         </thead>
         <tbody>
-          {players
+          {[...players]
             .sort((a: Player, b: Player) => b.score - a.score)
             .map((player: Player) => (
               <tr key={player.id}>

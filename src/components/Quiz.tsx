@@ -7,6 +7,7 @@ import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
@@ -124,14 +125,9 @@ const Quiz = () => {
       // single player: the blob outlives a multiplayer game in this tab, and
       // reading it would turn a later single-player quiz back into that old
       // room (#63).
-      const storedData = sessionStorage.getItem('multiplayerGame');
-      if (storedData) {
-        try {
-          multiplayerData = JSON.parse(storedData) as MultiplayerGameData;
-          console.log("📱 Multiplayer data found in sessionStorage:", multiplayerData);
-        } catch (e) {
-          console.error("❌ Error parsing multiplayer data from sessionStorage:", e);
-        }
+      multiplayerData = readMultiplayerGame();
+      if (multiplayerData) {
+        console.log("📱 Multiplayer data found in sessionStorage:", multiplayerData);
       }
     }
 
