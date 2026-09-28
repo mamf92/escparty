@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom } from "../utils/roomsFirestore";
+import { Player, RoomPhase, listenToRoom } from "../utils/roomsFirestore";
 import { isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 
@@ -40,15 +40,16 @@ const HostObserverView = () => {
     // from the last break is dropped as soon as the room moves on. Keyed on
     // the phase and the index together: a locked phone can get one snapshot
     // that goes straight from one break to the next.
-    const [roomStep, setRoomStep] = useState<string | null>(null);
-    const inBreak = roomStep?.startsWith("mid-scoreboard:") ?? false;
+    const [roomPhase, setRoomPhase] = useState<RoomPhase | undefined>(undefined);
+    const [roomIndex, setRoomIndex] = useState(0);
+    const inBreak = roomPhase === "mid-scoreboard";
     // Continue resumes the room for everyone, so only the room's observer
     // host gets it, checked against the room rather than whoever opened
     // this page.
     const [isRoomObserver, setIsRoomObserver] = useState(false);
     useEffect(() => {
         reset();
-    }, [roomStep, reset]);
+    }, [roomPhase, roomIndex, reset]);
 
     useEffect(() => {
         // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -79,7 +80,8 @@ const HostObserverView = () => {
 
                     // Always update players array to ensure real-time score updates
                     setPlayers(filteredPlayers);
-                    setRoomStep(`${room.phase}:${room.currentQuestionIndex ?? 0}`);
+                    setRoomPhase(room.phase);
+                    setRoomIndex(room.currentQuestionIndex ?? 0);
                     setIsRoomObserver(isObserverHost(room, gameData.playerId));
 
                     // Update the players at mid-quiz array

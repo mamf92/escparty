@@ -160,7 +160,12 @@ const MidQuizScoreboard = () => {
     // The latest snapshot, for a retried ready mark (below).
     const latestRoomRef: { current: Room | null } = { current: null };
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    // Set on cleanup: a mark that fails after this page has closed (a write
+    // queued offline, refused on reconnect) must not start retrying against
+    // the last room this page saw.
+    let disposed = false;
     const markIfInBreak = () => {
+      if (disposed) return;
       const room = latestRoomRef.current;
       const roomCode = gameData.roomCode;
       const playerId = gameData.playerId;
@@ -175,6 +180,7 @@ const MidQuizScoreboard = () => {
         // still show the break from the cache, which would just repeat the
         // refusal. And not only on the next snapshot: a room at a break can
         // go quiet.
+        if (disposed) return;
         retryTimer = setTimeout(() => {
           markedRef.current = false;
           markIfInBreak();
@@ -224,6 +230,7 @@ const MidQuizScoreboard = () => {
       });
 
       return () => {
+        disposed = true;
         unsubscribe();
         clearTimeout(retryTimer);
       };

@@ -6,7 +6,7 @@ import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
-import { isObserverHost, playingPlayers } from "../utils/roomRoles";
+import { playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
@@ -53,7 +53,6 @@ const Quiz = () => {
   // stay in lockstep and a backgrounded tab catches up on return. Single
   // player keeps the local timers below.
   const sharedClock = isMultiplayer && !!room?.phase;
-  const localClock = !isMultiplayer;
   // A room created before #61 has no phase to follow, and the old local-timer
   // path for it is gone (#63). Rooms only live for one game, so this only
   // catches a tab left open from before the upgrade.
@@ -70,13 +69,10 @@ const Quiz = () => {
     ? questions[currentQuestionIndex]
     : { question: "", options: [], correctAnswer: "" };
 
-  // An observer host watches from HostObserverView instead of playing. Who
-  // that is comes from the room (roomRoles.ts), not from localStorage
-  // "isHost". Only while the game is on: a finished room (e.g. rejoined from
-  // a leftover sessionStorage blob when this tab later starts another quiz)
-  // sends the observer to the results like everyone else, which also clears
-  // that blob.
-  const observing = isObserverHost(room, playerId) && room?.phase !== "results";
+  // An observer host watches from HostObserverView instead of playing,
+  // while the game is on (shouldObserve in roomRoles.ts). Who that is comes
+  // from the room, not from localStorage "isHost".
+  const observing = shouldObserve(room, playerId);
   useEffect(() => {
     if (!isMultiplayer || !observing || !room || leftQuizRef.current) return;
     // Claims the one navigation away from this page, so the phase effect
@@ -238,7 +234,7 @@ const Quiz = () => {
 
   // Timer effect for question countdown (single player only)
   useEffect(() => {
-    if (quizCompleted || loading || !localClock) return;
+    if (quizCompleted || loading || isMultiplayer) return;
 
     // Only start a new timer if we're in question mode (not feedback mode)
     if (!showFeedback) {
@@ -275,11 +271,11 @@ const Quiz = () => {
         clearInterval(uiTimer);
       };
     }
-  }, [currentQuestionIndex, quizCompleted, loading, showFeedback, localClock]);
+  }, [currentQuestionIndex, quizCompleted, loading, showFeedback, isMultiplayer]);
 
   // Separate effect for feedback timer that automatically moves to next question
   useEffect(() => {
-    if (showFeedback && localClock) {
+    if (showFeedback && !isMultiplayer) {
       // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
       const feedbackTimer = setInterval(() => {
         setTimeLeft(prev => {
@@ -296,7 +292,7 @@ const Quiz = () => {
         clearInterval(feedbackTimer);
       };
     }
-  }, [showFeedback, localClock]);
+  }, [showFeedback, isMultiplayer]);
 
   // --- Shared, room-driven progression (multiplayer) ---
 
@@ -457,7 +453,7 @@ const Quiz = () => {
           multiplayer: true,
           roomCode,
           playerId,
-          players: room.players
+          players: playingPlayers(room)
         }
       });
     }

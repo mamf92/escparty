@@ -20,3 +20,14 @@ export const isRoomHost = (
     room: Pick<Room, "hostId"> | null | undefined,
     playerId: string | null | undefined,
 ): boolean => !!room && !!playerId && room.hostId === playerId;
+
+/**
+ * Whether `playerId` belongs on the observer screen (HostObserverView) right
+ * now: the room's observer host, while the game is on. A finished room sends
+ * the observer to the results like everyone else, which also clears a
+ * leftover sessionStorage game. Lobby and the quiz page both route by this.
+ */
+export const shouldObserve = (
+    room: Pick<Room, "hostId" | "hostIsObserver" | "phase"> | null | undefined,
+    playerId: string | null | undefined,
+): boolean => isObserverHost(room, playerId) && room?.phase !== "results";

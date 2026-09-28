@@ -62,7 +62,9 @@ plan that also removes the ad hoc storage it would duplicate.
 - `quizScoring.ts` — the answer-scoring math (`500` base plus a time bonus
   of up to `500`, linear in the time left and rounded down), extracted from
   `Quiz.tsx` so the rule players actually see can be unit-tested without
-  rendering the component. Pure functions, no React, no Firestore.
+  rendering the component, plus `bestKnownScore` (a multiplayer player's
+  local score or the room's, whichever is higher, #63). Pure functions, no
+  React, no Firestore.
 - `quizTiming.ts` — multiplayer question timing (#62): the 10s + 5s slot,
   `phaseAfterQuestion` (next question, mid-quiz break after every 5th, or
   results), `questionClock` (where a question is, given its
@@ -79,8 +81,9 @@ plan that also removes the ad hoc storage it would duplicate.
   `/escparty/` for any other production build) flows through `getAssetPath`.
 
 - `roomRoles.ts` — who's who in a room, read from the room itself (#63):
-  `isObserverHost(room, playerId)` and `playingPlayers(room)` (the players
-  without an observing host). Replaces the `localStorage` guesses pages
+  `isRoomHost`, `isObserverHost`, `shouldObserve` (whether to route to the
+  observer screen: the observer host, while the game is on) and
+  `playingPlayers(room)` (the players without an observing host). Replaces the `localStorage` guesses pages
   used to make. 100% coverage floor.
 
 ## `src/hooks/`

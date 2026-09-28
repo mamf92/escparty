@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isObserverHost, isRoomHost, playingPlayers } from "./roomRoles";
+import { isObserverHost, isRoomHost, playingPlayers, shouldObserve } from "./roomRoles";
 
 const players = [
     { id: "host-1", name: "Host", score: 0 },
@@ -27,6 +27,20 @@ describe("isRoomHost", () => {
         expect(isRoomHost({ hostId: "host-1" }, "p-2")).toBe(false);
         expect(isRoomHost(undefined, "host-1")).toBe(false);
         expect(isRoomHost({ hostId: "host-1" }, undefined)).toBe(false);
+    });
+});
+
+describe("shouldObserve", () => {
+    const room = { hostId: "host-1", hostIsObserver: true };
+
+    it("sends the observer host to the observer screen while the game is on", () => {
+        expect(shouldObserve({ ...room, phase: "question" }, "host-1")).toBe(true);
+        expect(shouldObserve({ ...room, phase: "mid-scoreboard" }, "host-1")).toBe(true);
+    });
+
+    it("not once the room has finished, nor anyone but the observer host", () => {
+        expect(shouldObserve({ ...room, phase: "results" }, "host-1")).toBe(false);
+        expect(shouldObserve({ ...room, phase: "question" }, "p-2")).toBe(false);
     });
 });
 
