@@ -45,6 +45,13 @@ describe("useResumeRoom", () => {
         expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledTimes(2);
     });
 
+    it("says so when the room wasn't in a break", async () => {
+        mocks.resumeAfterMidQuiz.mockResolvedValue(false);
+        const { result } = renderHook(() => useResumeRoom("ABCD"));
+        await act(() => result.current.resume());
+        expect(result.current.resumeError).toMatch(/isn't at a break/);
+    });
+
     it("does nothing without a room", async () => {
         const { result } = renderHook(() => useResumeRoom(null));
         await act(() => result.current.resume());

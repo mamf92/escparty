@@ -69,7 +69,9 @@ export const startedAtMillis = (value: unknown): number | null => {
  * leave it, given the room's current state (#63). True once the room is
  * anywhere past this break: back on a question, at a later break, or at the
  * results. A player whose snapshot arrives late (a locked phone) still gets
- * moved on, whatever the room did in the meantime.
+ * moved on, whatever the room did in the meantime. A snapshot from before
+ * this break (a question ahead of it, e.g. served from cache) isn't a reason
+ * to leave. Pass a negative `breakIndex` when the break isn't known.
  */
 export const hasLeftBreak = (
     phase: RoomPhase | undefined,
@@ -78,5 +80,6 @@ export const hasLeftBreak = (
 ): boolean => {
     if (!phase || phase === "lobby") return false;
     if (phase === "mid-scoreboard") return roomIndex > breakIndex;
+    if (phase === "question") return roomIndex >= breakIndex;
     return true;
 };

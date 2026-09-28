@@ -5,7 +5,7 @@ import { FaHome } from "react-icons/fa";
 import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
-import { calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
+import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
@@ -68,68 +68,24 @@ const Quiz = () => {
     ? questions[currentQuestionIndex]
     : { question: "", options: [], correctAnswer: "" };
 
-  const hostIsObserverFromLocation = locationState?.hostIsObserver;
-
+  // An observer host watches from HostObserverView instead of playing. Who
+  // that is comes from the room, not from localStorage "isHost": that's
+  // shared by every tab and outlives a game, so it can say "host" for a
+  // guest (who'd be bounced out of the quiz) or "not host" for the real one
+  // (who'd end up playing).
+  const isObserverHost = !!room && !!playerId && room.hostIsObserver === true && room.hostId === playerId;
   useEffect(() => {
-    // This effect handles redirection for an observing host.
-    // It depends on data being loaded and relevant states being set.
-    if (
-      hostIsObserverFromLocation &&
-      localStorage.getItem("isHost") === "true" &&
-      isMultiplayer &&
-      !loading &&
-      roomCode &&
-      playerId &&
-      difficulty &&
-      room &&
-      room.players &&
-      questions &&
-      questions.length > 0
-    ) {
-      navigate("/mid-quiz-scoreboard", {
-        state: {
-          score,
-          totalQuestions: questions.length,
-          currentQuestionIndex,
-          difficulty,
-          players: room.players,
-          multiplayer: true,
-          roomCode,
-          playerId,
-          hostIsObserver: true,
-        },
-        replace: true, // Replace history to prevent back navigation to the quiz page
-      });
-    }
-  }, [
-    hostIsObserverFromLocation,
-    isMultiplayer,
-    loading,
-    roomCode,
-    playerId,
-    difficulty,
-    room,
-    questions,
-    score,
-    currentQuestionIndex,
-    navigate,
-  ]);
-
-  useEffect(() => {
-    // If the current user is a host in observer mode, redirect to the mid-quiz scoreboard
-    if (locationState?.hostIsObserver && localStorage.getItem("isHost") === "true" && roomCode && playerId && difficulty) {
-      navigate("/mid-quiz-scoreboard", {
-        state: {
-          multiplayer: true, // Host observer implies a multiplayer context
-          roomCode: roomCode,
-          playerId: playerId,
-          difficulty: difficulty,
-          hostIsObserver: true, // Explicitly set for the scoreboard
-        },
-        replace: true // Replace the current entry in history
-      });
-    }
-  }, [locationState, roomCode, playerId, difficulty, navigate]);
+    if (!isMultiplayer || !isObserverHost || !room) return;
+    navigate("/host-observer", {
+      state: {
+        currentQuestionIndex: room.currentQuestionIndex ?? 0,
+        difficulty,
+        players: room.players,
+        roomCode
+      },
+      replace: true // Replace history to prevent back navigation to the quiz page
+    });
+  }, [isMultiplayer, isObserverHost, room, difficulty, roomCode, navigate]);
 
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes
@@ -466,7 +422,7 @@ const Quiz = () => {
   // from a refresh or a locked phone may not have picked it back up yet.
   useEffect(() => {
     if (!sharedClock || !room || loading || leftQuizRef.current) return;
-    const bestScore = Math.max(score, storedScore);
+    const bestScore = bestKnownScore(score, room.players, playerId);
     if (room.phase === "mid-scoreboard") {
       leftQuizRef.current = true;
       navigate("/mid-quiz-scoreboard", {
@@ -495,7 +451,7 @@ const Quiz = () => {
         }
       });
     }
-  }, [sharedClock, room, loading, score, storedScore, questions.length, difficulty, roomCode, playerId, navigate]);
+  }, [sharedClock, room, loading, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
   // Lock the current question: no more answers, show its feedback.
   const lockQuestion = ({ hideTimer }: { hideTimer: boolean }) => {

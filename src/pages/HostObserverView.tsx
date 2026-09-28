@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, listenToRoom } from "../utils/roomsFirestore";
@@ -32,14 +32,6 @@ const HostObserverView = () => {
     // the quiz (#63), and the same write clears the ready marks for the next
     // break.
     const { resume, resuming, resumeError } = useResumeRoom(gameData.roomCode);
-
-    const continueQuiz = useCallback(async () => {
-        if (error) {
-            navigate("/multiplayer");
-            return;
-        }
-        await resume();
-    }, [navigate, error, resume]);
 
     useEffect(() => {
         // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -139,7 +131,7 @@ const HostObserverView = () => {
             </WaitingMessage>
 
             <NextButton
-                onClick={continueQuiz}
+                onClick={resume}
                 disabled={resuming || (players.length > 0 && !allPlayersReady)}
                 title={!allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question"}
             >

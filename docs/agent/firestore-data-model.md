@@ -101,9 +101,11 @@ The lifecycle:
   half-failed resume can't leave stale marks for the next one. Among phase
   moves, only the resume may touch it (and only to clear it). On its own
   (`isManagingMidQuizPlayers`, #63), a room with a phase only accepts marks
-  while it's in `"mid-scoreboard"`, and only ones that append a single
-  player ID string, as `arrayUnion` does (so one client can't mark everyone
-  ready in one write), or leave the list unchanged. Without sign-in the
+  while it's in `"mid-scoreboard"`, and only ones that keep every existing
+  mark and add exactly one new player ID string as the last entry, as
+  `arrayUnion` does (so one client can't mark everyone ready in one write;
+  the order of the existing marks isn't checked), or leave the list
+  unchanged. Without sign-in the
   rules can't tell whose ID a mark is, so a client could still mark others
   one write at a time; per-player state on the room is #64. A mark queued
   offline or on a slow network that arrives after the resume is refused,

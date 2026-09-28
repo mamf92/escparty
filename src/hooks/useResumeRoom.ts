@@ -21,7 +21,13 @@ export const useResumeRoom = (roomCode: string | null) => {
         setResuming(true);
         setResumeError(null);
         try {
-            await resumeAfterMidQuiz(roomCode);
+            // False: the room wasn't in a break (another tab already
+            // resumed it, or there's no break on). Say so rather than
+            // looking like nothing happened.
+            const resumed = await resumeAfterMidQuiz(roomCode);
+            if (!resumed) {
+                setResumeError("The quiz isn't at a break right now, so there's nothing to continue.");
+            }
         } catch (err) {
             console.error("Error resuming the room after the mid-quiz break:", err);
             setResumeError("Couldn't continue the quiz. Check your connection and try again.");

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Player, Room, listenToRoom, markPlayerAtMidQuiz } from "../utils/roomsFirestore";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { hasLeftBreak } from "../utils/quizTiming";
+import { bestKnownScore } from "../utils/quizScoring";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -45,8 +46,10 @@ const MidQuizScoreboard = () => {
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(null);
+  // Whether this user is the host, and whether they only observe: set only
+  // from the room's snapshot (see the listener below).
   const [isHost, setIsHost] = useState(false);
-  const [hostIsObserver, setHostIsObserver] = useState(gameData.hostIsObserver);
+  const [hostIsObserver, setHostIsObserver] = useState(false);
   // The host's Continue. Nobody navigates on it: everyone, the host
   // included, goes back when the listener below sees the room resumed
   // (#63). That also covers a second host tab, or a resume whose reply got
@@ -80,8 +83,9 @@ const MidQuizScoreboard = () => {
 
   // This player's score. Without router state (a refresh) gameData.score is
   // 0, so in multiplayer the room's copy wins when it's higher.
-  const roomScore = players.find(p => p.id === gameData.playerId)?.score ?? 0;
-  const myScore = gameData.multiplayer ? Math.max(gameData.score, roomScore) : gameData.score;
+  const myScore = gameData.multiplayer
+    ? bestKnownScore(gameData.score, players, gameData.playerId)
+    : gameData.score;
 
   // Back to the quiz after the break. In multiplayer the quiz page follows
   // the room from there: onto its current question, or straight on to the
@@ -95,16 +99,14 @@ const MidQuizScoreboard = () => {
     // again, and the quiz page reloads on every navigation.
     if (leftBreakRef.current) return;
     leftBreakRef.current = true;
-    const roomPlayers = room?.players ?? players;
-    const roomScoreNow = roomPlayers.find(p => p.id === gameData.playerId)?.score ?? 0;
     navigate(`/quiz/${room?.difficulty ?? roomDifficultyRef.current ?? gameData.difficulty}`, {
       state: {
         // The index of the question after the break: the quiz hands it over
         // (it used to be incremented again here, which skipped a question at
         // every mid-quiz break), or after a refresh it comes from the room.
         currentQuestionIndex: room?.currentQuestionIndex ?? breakIndexRef.current ?? gameData.currentQuestionIndex,
-        score: gameData.multiplayer ? Math.max(gameData.score, roomScoreNow) : gameData.score,
-        players: gameData.multiplayer ? roomPlayers : gameData.players,
+        score: room ? bestKnownScore(gameData.score, room.players, gameData.playerId) : gameData.score,
+        players: room ? room.players : gameData.players,
         multiplayer: gameData.multiplayer,
         roomCode: gameData.roomCode,
         playerId: gameData.playerId,
@@ -114,14 +116,9 @@ const MidQuizScoreboard = () => {
         hostIsObserver: false
       }
     });
-  }, [gameData, navigate, players]);
+  }, [gameData, navigate]);
 
   const continueQuiz = useCallback(async () => {
-    if (error) {
-      navigate("/multiplayer");
-      return;
-    }
-
     if (!gameData.multiplayer) {
       returnToQuiz();
       return;
@@ -130,7 +127,7 @@ const MidQuizScoreboard = () => {
     if (isHost) {
       await resume();
     }
-  }, [gameData.multiplayer, isHost, navigate, error, returnToQuiz, resume]);
+  }, [gameData.multiplayer, isHost, returnToQuiz, resume]);
 
   const returnToQuizRef = useRef(returnToQuiz);
   useEffect(() => {
@@ -152,7 +149,6 @@ const MidQuizScoreboard = () => {
             difficulty: multiplayerData.difficulty || prev.difficulty,
             hostIsObserver: multiplayerData.hostIsObserver || false
           }));
-          setHostIsObserver(multiplayerData.hostIsObserver || false);
         } catch (e) {
           console.error("Error parsing multiplayer data from sessionStorage:", e);
           setError("Unable to retrieve game data. Please return to the lobby.");

@@ -207,15 +207,16 @@ service cloud.firestore {
 
     // A player marking itself ready at the mid-quiz break
     // (markPlayerAtMidQuiz). In a room with a phase (#61), marks only count
-    // while the room is in the break, and a write may only append one
-    // player ID (a string) to the end of the list, which is what arrayUnion
-    // does: clearing them is the resume's job (isAdvancingPhase), and one
-    // client can't mark everyone ready in a single write. (Without sign-in
-    // the rules can't tell whose ID a mark is, so a client could still mark
-    // others one write at a time; per-player state on the room is #64.)
-    // Otherwise a mark that was
-    // queued offline or on a slow network lands after the resume and counts
-    // the player as ready at the next break before they get there (#63).
+    // while the room is in the break, and a write must keep every existing
+    // mark and add exactly one new player ID (a string) as the last entry,
+    // which is what arrayUnion does. (The order of the existing marks isn't
+    // checked.) Clearing them is the resume's job (isAdvancingPhase), and
+    // one client can't mark everyone ready in a single write. Without
+    // sign-in the rules can't tell whose ID a mark is, so a client could
+    // still mark others one write at a time; per-player state on the room
+    // is #64. Otherwise a mark that was queued offline or on a slow network
+    // lands after the resume and counts the player as ready at the next
+    // break before they get there (#63).
     // Rooms without a phase keep the old anything-goes list.
     function isManagingMidQuizPlayers(affected) {
       let data = request.resource.data;

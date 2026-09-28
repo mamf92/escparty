@@ -96,6 +96,14 @@ describe("hasLeftBreak", () => {
         expect(hasLeftBreak("results", 9, 5)).toBe(true);
     });
 
+    it("stays on a snapshot from before this break (e.g. served from cache)", () => {
+        expect(hasLeftBreak("question", 4, 5)).toBe(false);
+    });
+
+    it("leaves on any question when the break isn't known", () => {
+        expect(hasLeftBreak("question", 0, -1)).toBe(true);
+    });
+
     it("stays for a room with no phase, or one still in the lobby", () => {
         expect(hasLeftBreak(undefined, 0, 5)).toBe(false);
         expect(hasLeftBreak("lobby", 0, 5)).toBe(false);

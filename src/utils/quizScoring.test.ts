@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    bestKnownScore,
     BASE_QUESTION_POINTS,
     MAX_TIME_BONUS,
     QUESTION_TIME_LIMIT_MS,
@@ -74,5 +75,23 @@ describe("calculateQuestionScore", () => {
                 calculateQuestionScore(ms),
             );
         }
+    });
+});
+
+describe("bestKnownScore", () => {
+    const players = [{ id: "p-1", score: 900 }, { id: "p-2", score: 300 }];
+
+    it("takes the room's score when the local copy is behind (a refresh starts at 0)", () => {
+        expect(bestKnownScore(0, players, "p-1")).toBe(900);
+    });
+
+    it("keeps the local score when it's ahead (a score write still in flight)", () => {
+        expect(bestKnownScore(800, players, "p-2")).toBe(800);
+    });
+
+    it("falls back to the local score without a room entry", () => {
+        expect(bestKnownScore(120, players, "p-3")).toBe(120);
+        expect(bestKnownScore(120, undefined, "p-1")).toBe(120);
+        expect(bestKnownScore(120, players, null)).toBe(120);
     });
 });

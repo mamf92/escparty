@@ -27,8 +27,8 @@ transactions are `updatePlayerScore`, `advanceQuestion` and
 
 Unit/component tests run on Vitest + React Testing Library. Covered today:
 `roomsFirestore.ts`, `QuizDataProvider.ts`, `quizScoring.ts` and
-`quizTiming.ts` (with per-file coverage floors), the `useResumeRoom` hook,
-plus one `Home.tsx` smoke test — every other page,
+`quizTiming.ts` (with per-file coverage floors), plus one `Home.tsx` smoke
+test — every other page,
 and `Quiz.tsx` itself, is uncovered. `npm test` now runs in `ci.yml`, but a
 red run doesn't yet block merge or deploy (see #57). See
 `docs/agent/testing.md` before assuming a given flow is covered.
@@ -45,8 +45,7 @@ has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz
 question loading), `quizScoring.ts` (the answer-scoring math, extracted from
 `Quiz.tsx` so it can be tested directly), `quizTiming.ts` (multiplayer
 question timing and what follows each question), and `pathUtils.ts`
-(base-path/env helpers). `src/hooks/` has `useResumeRoom.ts`, the host's
-mid-quiz Continue shared by the two break screens. Full layout:
+(base-path/env helpers). `src/hooks/` holds shared React hooks. Full layout:
 `docs/agent/architecture.md`.
 
 ## Design themes
