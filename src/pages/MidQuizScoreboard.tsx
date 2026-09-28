@@ -89,7 +89,6 @@ const MidQuizScoreboard = () => {
         // every mid-quiz break), or without router state from the room.
         currentQuestionIndex: room?.currentQuestionIndex ?? breakIndexRef.current ?? gameData.currentQuestionIndex,
         score: room ? bestKnownScore(gameData.score, room.players, gameData.playerId) : gameData.score,
-        players: room ? room.players : gameData.players,
         multiplayer: gameData.multiplayer,
         roomCode: gameData.roomCode,
         playerId: gameData.playerId
@@ -134,7 +133,9 @@ const MidQuizScoreboard = () => {
       const roomCode = gameData.roomCode;
       const playerId = gameData.playerId;
       if (!room || !roomCode || !playerId || markedRef.current) return;
-      if (room.phase !== "mid-scoreboard" || isObserverHost(room, playerId)) return;
+      // Only an observer host's Continue reads the marks; a playing host
+      // continues whenever, so in its room they'd be writes nobody reads.
+      if (room.phase !== "mid-scoreboard" || !room.hostIsObserver || isObserverHost(room, playerId)) return;
       markedRef.current = true;
       markPlayerAtMidQuiz(roomCode, playerId).catch(err => {
         console.error("Error marking player as ready at mid-quiz:", err);

@@ -42,22 +42,20 @@ describe("shouldObserve", () => {
         expect(shouldObserve({ ...room, phase: "results" }, "host-1")).toBe(false);
         expect(shouldObserve({ ...room, phase: "question" }, "p-2")).toBe(false);
     });
+
+    it("not for a room from before #61, which has no phase to follow", () => {
+        expect(shouldObserve(room, "host-1")).toBe(false);
+    });
 });
 
 describe("observerRouteState", () => {
-    it("hands over the room's position, the players without the observer, and who's viewing", () => {
-        const room = { hostId: "host-1", hostIsObserver: true, players, currentQuestionIndex: 5, difficulty: "hard" };
+    it("hands over the players without the observer, the room, and who's viewing", () => {
+        const room = { hostId: "host-1", hostIsObserver: true, players };
         expect(observerRouteState(room, "ABCD", "host-1")).toEqual({
-            currentQuestionIndex: 5,
-            difficulty: "hard",
             players: [players[1]],
             roomCode: "ABCD",
             playerId: "host-1",
         });
-    });
-
-    it("starts at question 0 when the room has no index", () => {
-        expect(observerRouteState({ hostId: "host-1", players }, "ABCD", null).currentQuestionIndex).toBe(0);
     });
 });
 

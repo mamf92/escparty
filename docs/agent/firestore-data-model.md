@@ -96,7 +96,8 @@ The lifecycle:
   `quizTiming.ts`; see `docs/agent/multiplayer-sync.md`). `setContinueReady` and its rules branch
   remain only so the exported API and old rooms don't break.
 - `playersAtMidQuiz` — array of player IDs who have reached the mid-quiz
-  scoreboard, built via `markPlayerAtMidQuiz` (`arrayUnion`) and cleared by
+  scoreboard (written only in rooms with an observer host, whose Continue
+  waits for them), built via `markPlayerAtMidQuiz` (`arrayUnion`) and cleared by
   `resumeAfterMidQuiz` in the same write that ends the break, so a
   half-failed resume can't leave stale marks for the next one. Among phase
   moves, only the resume may touch it (and only to clear it). On its own

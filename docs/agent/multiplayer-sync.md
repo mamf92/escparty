@@ -26,7 +26,8 @@ any of it, update this file in the same PR rather than leaving it stale.
    effect of the snapshot callback running on every subscribed client.
 3. **`Quiz.tsx`** — reads multiplayer context from router `location.state`
    if present, falling back to the `sessionStorage` `multiplayerGame` blob
-   (needed on refresh, since `location.state` doesn't survive one). In
+   only when there's no router state at all (a direct link, a new or
+   restored tab; `HashRouter` keeps router state across a refresh). In
    multiplayer, **the room drives progression** (#62): every client renders
    `Room.currentQuestionIndex` and derives its countdown from
    `Room.phaseStartedAt`, so all screens show the same question, and a tab
@@ -38,12 +39,16 @@ any of it, update this file in the same PR rather than leaving it stale.
    the quiz page) sends it to `/host-observer`, where it stays for the whole
    game: that screen doesn't follow the room to the results yet (#21). Only
    an observer that opens the lobby or quiz page after the game has ended
-   is sent on to the results (`shouldObserve` in `roomRoles.ts`). Without
-   router state the quiz page falls back to the `sessionStorage` blob, but
-   not when the router state says single player (#63). Single player still runs local timers. Details:
+   is sent on to the results (`shouldObserve` in `roomRoles.ts`). Any
+   router state, like single player's `{ multiplayer: false }`, skips the
+   `sessionStorage` fallback, so a leftover blob can't turn a later
+   single-player quiz into an old room (#63). Single player still runs
+   local timers. Details:
    `docs/agent/firestore-data-model.md`.
-4. **Mid-quiz** — `MidQuizScoreboard.tsx` marks each arriving player ready
-   via `markPlayerAtMidQuiz` (`arrayUnion`, since everyone arrives at once).
+4. **Mid-quiz** — in a room with an observer host, `MidQuizScoreboard.tsx`
+   marks each arriving player ready via `markPlayerAtMidQuiz` (`arrayUnion`,
+   since everyone arrives at once), because the observer's Continue waits
+   for every mark. A playing host's room doesn't need them.
    The host's continue calls `resumeAfterMidQuiz` (the room back to
    `phase: "question"` at the next question, clearing the ready marks), and
    that's the whole signal (#63): each scoreboard, the host's included,
@@ -57,7 +62,7 @@ any of it, update this file in the same PR rather than leaving it stale.
    `hostIsObserver` is true — the host watches without answering, and its
    Continue waits until every player is marked.
 5. **`QuizResults.tsx`** — final scoreboard, also recovers from
-   `sessionStorage` if `location.state` is missing (e.g., after a refresh).
+   `sessionStorage` if `location.state` is missing (a direct link, a new tab).
    Single-player scores are separately persisted to `localStorage`
    (`quizScores`) and read by `Scoreboard.tsx` — that path doesn't touch
    Firestore at all.
@@ -73,9 +78,11 @@ which one wins depends on the page:
   who's the host, and whether they only observe, comes from the room
   (`src/utils/roomRoles.ts`), because `localStorage` is shared by every tab
   and outlives the game.
-- `sessionStorage` — a `multiplayerGame` snapshot used specifically to
-  survive a page refresh where router `location.state` would otherwise be
-  lost.
+- `sessionStorage` — a `multiplayerGame` snapshot (room code, player ID,
+  difficulty; read via `readMultiplayerGame()` in `multiplayerSession.ts`)
+  for pages opened without router state: a direct link, a new or restored
+  tab. A refresh keeps router state (`HashRouter` stores it in
+  `history.state`).
 - `location.state` — the primary hand-off between pages on normal
   navigation; several pages fall back to `sessionStorage` when it's absent.
 

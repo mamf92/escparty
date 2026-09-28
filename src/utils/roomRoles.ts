@@ -25,17 +25,17 @@ export const isRoomHost = (
  * Whether `playerId` belongs on the observer screen (HostObserverView) right
  * now: the room's observer host, while the game is on. A finished room sends
  * the observer to the results like everyone else, which also clears a
- * leftover sessionStorage game. Lobby and the quiz page both route by this.
+ * leftover sessionStorage game, and a room from before #61 (no phase, so
+ * no break to continue from) goes to the quiz page's "start a new room"
+ * error instead. Lobby, the quiz page and the break screen route by this.
  */
 export const shouldObserve = (
     room: Pick<Room, "hostId" | "hostIsObserver" | "phase"> | null | undefined,
     playerId: string | null | undefined,
-): boolean => isObserverHost(room, playerId) && room?.phase !== "results";
+): boolean => isObserverHost(room, playerId) && !!room?.phase && room.phase !== "results";
 
 /** The router state HostObserverView expects; see observerRouteState. */
 export interface ObserverRouteState {
-    currentQuestionIndex: number;
-    difficulty?: string;
     players: Player[];
     roomCode: string;
     playerId: string | null;
@@ -47,12 +47,10 @@ export interface ObserverRouteState {
  * the observer screen needs, like `playerId` for its Continue.
  */
 export const observerRouteState = (
-    room: Pick<Room, "hostId" | "hostIsObserver" | "players" | "currentQuestionIndex" | "difficulty">,
+    room: Pick<Room, "hostId" | "hostIsObserver" | "players">,
     roomCode: string,
     playerId: string | null,
 ): ObserverRouteState => ({
-    currentQuestionIndex: room.currentQuestionIndex ?? 0,
-    difficulty: room.difficulty,
     players: playingPlayers(room),
     roomCode,
     playerId,

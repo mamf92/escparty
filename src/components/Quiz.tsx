@@ -7,15 +7,9 @@ import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
-import { readMultiplayerGame } from "../utils/multiplayerSession";
+import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
-interface MultiplayerGameData {
-  multiplayer: boolean;
-  roomCode: string;
-  playerId: string;
-  difficulty?: string;
-}
 
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -109,7 +103,7 @@ const Quiz = () => {
     }
 
     // Process multiplayer data
-    let multiplayerData: MultiplayerGameData | null = null;
+    let multiplayerData: MultiplayerSession | null = null;
 
     // First try to get multiplayer data from location state
     if (locationState?.multiplayer) {
@@ -141,7 +135,9 @@ const Quiz = () => {
       setLoadingStatus("Connecting to game room...");
 
       // Store multiplayer info in session storage (for page refresh recovery)
-      sessionStorage.setItem('multiplayerGame', JSON.stringify(multiplayerData));
+      // (with the difficulty, which pages opened without router state
+      // read back to find the right quiz)
+      sessionStorage.setItem('multiplayerGame', JSON.stringify({ ...multiplayerData, difficulty }));
 
       // Set up listener for room changes in multiplayer
       unsubscribeRoom = listenToRoom(multiplayerData.roomCode, (roomData) => {
