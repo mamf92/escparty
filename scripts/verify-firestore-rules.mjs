@@ -468,6 +468,8 @@ await expectAllowed("mark a player at the break with arrayUnion (markPlayerAtMid
 await expectAllowed("mark a second player at the break", () =>
   updateDoc(walker, { playersAtMidQuiz: arrayUnion("player-2") })
 );
+// A repeat arrayUnion changes nothing, so no key is affected; it's let
+// through as a no-op write, not by the mark branch.
 await expectAllowed("mark an already-marked player again (a no-op)", () =>
   updateDoc(walker, { playersAtMidQuiz: arrayUnion("player-2") })
 );

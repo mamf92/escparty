@@ -5,7 +5,7 @@ import { Player, Room, listenToRoom, markPlayerAtMidQuiz } from "../utils/roomsF
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { hasLeftBreak } from "../utils/quizTiming";
 import { bestKnownScore } from "../utils/quizScoring";
-import { isObserverHost, playingPlayers } from "../utils/roomRoles";
+import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -66,19 +66,20 @@ const MidQuizScoreboard = () => {
   // Check if host is observer and redirect if needed
   useEffect(() => {
     // Check if current user is the host and is an observer
-    if (isHost && hostIsObserver) {
+    if (hostIsObserver) {
       // Redirect to dedicated HostObserverView
       navigate("/host-observer", {
         state: {
           currentQuestionIndex: gameData.currentQuestionIndex,
           difficulty: gameData.difficulty,
           players: players,
-          roomCode: gameData.roomCode
+          roomCode: gameData.roomCode,
+          playerId: gameData.playerId
         },
         replace: true // no way back into the players' break screen
       });
     }
-  }, [isHost, hostIsObserver, navigate, gameData, players]);
+  }, [hostIsObserver, navigate, gameData, players]);
 
   // This player's score. Without router state (a refresh) gameData.score is
   // 0, so in multiplayer the room's copy wins when it's higher.
@@ -156,6 +157,31 @@ const MidQuizScoreboard = () => {
     // leave it saying "host" for a guest or a single player. Until the
     // snapshot arrives nobody gets the host's Continue.
 
+    // The latest snapshot, for a retried ready mark (below).
+    const latestRoomRef: { current: Room | null } = { current: null };
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const markIfInBreak = () => {
+      const room = latestRoomRef.current;
+      const roomCode = gameData.roomCode;
+      const playerId = gameData.playerId;
+      if (!room || !roomCode || !playerId || markedRef.current) return;
+      if (room.phase !== "mid-scoreboard" || isObserverHost(room, playerId)) return;
+      markedRef.current = true;
+      markPlayerAtMidQuiz(roomCode, playerId).catch(err => {
+        console.error("Error marking player as ready at mid-quiz:", err);
+        // Try again a couple of seconds later if the room is still in the
+        // break (an observer host's Continue waits for every mark). Not
+        // straight away: a refused write rolls back into a snapshot that can
+        // still show the break from the cache, which would just repeat the
+        // refusal. And not only on the next snapshot: a room at a break can
+        // go quiet.
+        retryTimer = setTimeout(() => {
+          markedRef.current = false;
+          markIfInBreak();
+        }, 2000);
+      });
+    };
+
     // Set up real-time listener if we have multiplayer details
     if (gameData.multiplayer && gameData.roomCode) {
       const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
@@ -164,9 +190,8 @@ const MidQuizScoreboard = () => {
           setPlayers(playingPlayers(room));
 
           // Who's the host, and whether they only observe, as the room has it.
-          const roomSaysHost = !!gameData.playerId && room.hostId === gameData.playerId;
           const observerHost = isObserverHost(room, gameData.playerId);
-          setIsHost(roomSaysHost);
+          setIsHost(isRoomHost(room, gameData.playerId));
           setHostIsObserver(observerHost);
           if (room.difficulty) roomDifficultyRef.current = room.difficulty;
 
@@ -179,15 +204,8 @@ const MidQuizScoreboard = () => {
           // break (the rules refuse a mark at any other time). An observer
           // host isn't a player: it only passes through here on its way to
           // HostObserverView.
-          if (room.phase === "mid-scoreboard" && !observerHost && gameData.playerId && !markedRef.current) {
-            markedRef.current = true;
-            markPlayerAtMidQuiz(gameData.roomCode, gameData.playerId).catch(err => {
-              console.error("Error marking player as ready at mid-quiz:", err);
-              // Try again on the next snapshot, if the room is still in the
-              // break (an observer host's Continue waits for every mark).
-              markedRef.current = false;
-            });
-          }
+          latestRoomRef.current = room;
+          markIfInBreak();
 
           // The room's state is the signal (#63): leave this break as soon
           // as the room isn't in it any more, however late this snapshot
@@ -205,7 +223,10 @@ const MidQuizScoreboard = () => {
         }
       });
 
-      return () => unsubscribe();
+      return () => {
+        unsubscribe();
+        clearTimeout(retryTimer);
+      };
     }
   }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, location.state, navigate]);
 

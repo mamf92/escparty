@@ -104,8 +104,8 @@ The lifecycle:
   while it's in `"mid-scoreboard"`, and only ones that keep every existing
   mark and add exactly one new player ID string as the last entry, as
   `arrayUnion` does (so one client can't mark everyone ready in one write;
-  the order of the existing marks isn't checked), or leave the list
-  unchanged. Without sign-in the
+  the order of the existing marks isn't checked). A repeated mark changes
+  nothing and goes through as a no-op write. Without sign-in the
   rules can't tell whose ID a mark is, so a client could still mark others
   one write at a time; per-player state on the room is #64. A mark queued
   offline or on a slow network that arrives after the resume is refused,

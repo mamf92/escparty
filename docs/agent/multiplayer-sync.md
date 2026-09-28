@@ -33,8 +33,12 @@ any of it, update this file in the same PR rather than leaving it stale.
    that was backgrounded or reloaded jumps straight to the room's current
    question and time. When a question's slot is over, any client ends it
    with `advanceQuestion` (one write lands, the rest are no-ops). When the
-   room's phase becomes `mid-scoreboard` or `results`, every client navigates
-   there. Single player still runs local timers. Details:
+   room's phase becomes `mid-scoreboard` or `results`, every player
+   navigates there. An observer host doesn't play: Lobby (or, failing that,
+   the quiz page) sends it to `/host-observer`, where it stays for the whole
+   game, except that a finished room sends it on to the results. Without
+   router state the quiz page falls back to the `sessionStorage` blob, but
+   not when the router state says single player (#63). Single player still runs local timers. Details:
    `docs/agent/firestore-data-model.md`.
 4. **Mid-quiz** — `MidQuizScoreboard.tsx` marks each arriving player ready
    via `markPlayerAtMidQuiz` (`arrayUnion`, since everyone arrives at once).

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, listenToRoom } from "../utils/roomsFirestore";
-import { playingPlayers } from "../utils/roomRoles";
+import { isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 
 const HostObserverView = () => {
@@ -14,14 +14,16 @@ const HostObserverView = () => {
         currentQuestionIndex: 0,
         difficulty: "easy",
         players: [],
-        roomCode: null
+        roomCode: null,
+        playerId: null
     };
 
     const [gameData, setGameData] = useState({
         currentQuestionIndex: locationState.currentQuestionIndex || 0,
         difficulty: locationState.difficulty || "easy",
         players: locationState.players || [],
-        roomCode: locationState.roomCode || null
+        roomCode: locationState.roomCode || null,
+        playerId: locationState.playerId || null
     });
 
     const [players, setPlayers] = useState<Player[]>(gameData.players);
@@ -40,6 +42,10 @@ const HostObserverView = () => {
     // that goes straight from one break to the next.
     const [roomStep, setRoomStep] = useState<string | null>(null);
     const inBreak = roomStep?.startsWith("mid-scoreboard:") ?? false;
+    // Continue resumes the room for everyone, so only the room's observer
+    // host gets it, checked against the room rather than whoever opened
+    // this page.
+    const [isRoomObserver, setIsRoomObserver] = useState(false);
     useEffect(() => {
         reset();
     }, [roomStep, reset]);
@@ -54,6 +60,7 @@ const HostObserverView = () => {
                     setGameData(prev => ({
                         ...prev,
                         roomCode: hostData.roomCode,
+                        playerId: hostData.playerId || prev.playerId,
                         difficulty: hostData.difficulty || prev.difficulty,
                         currentQuestionIndex: hostData.currentQuestionIndex || 0
                     }));
@@ -73,6 +80,7 @@ const HostObserverView = () => {
                     // Always update players array to ensure real-time score updates
                     setPlayers(filteredPlayers);
                     setRoomStep(`${room.phase}:${room.currentQuestionIndex ?? 0}`);
+                    setIsRoomObserver(isObserverHost(room, gameData.playerId));
 
                     // Update the players at mid-quiz array
                     if (room.playersAtMidQuiz) {
@@ -97,7 +105,7 @@ const HostObserverView = () => {
 
             return () => unsubscribe();
         }
-    }, [gameData.roomCode, location.state, navigate]);
+    }, [gameData.roomCode, gameData.playerId, location.state, navigate]);
 
     if (error) {
         return (
@@ -143,8 +151,10 @@ const HostObserverView = () => {
 
             <NextButton
                 onClick={resume}
-                disabled={resuming || !inBreak || (players.length > 0 && !allPlayersReady)}
-                title={!inBreak
+                disabled={resuming || !isRoomObserver || !inBreak || (players.length > 0 && !allPlayersReady)}
+                title={!isRoomObserver
+                    ? "Only the room's host can continue"
+                    : !inBreak
                     ? "Continue opens at the next mid-quiz break"
                     : !allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question"}
             >

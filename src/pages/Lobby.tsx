@@ -52,14 +52,17 @@ const Lobby = () => {
                     }));
 
                     // An observer host goes straight to its own screen rather
-                    // than loading the quiz only to be redirected from it.
-                    if (isObserverHost(roomData, storedPlayerId)) {
+                    // than loading the quiz only to be redirected from it,
+                    // unless the game is already over: the quiz page sends a
+                    // finished room on to the results, as for everyone else.
+                    if (isObserverHost(roomData, storedPlayerId) && roomData.phase !== "results") {
                         navigate("/host-observer", {
                             state: {
                                 currentQuestionIndex: roomData.currentQuestionIndex ?? 0,
                                 difficulty: roomData.difficulty,
                                 players: playingPlayers(roomData),
-                                roomCode: storedGameCode
+                                roomCode: storedGameCode,
+                                playerId: storedPlayerId
                             }
                         });
                         return;

@@ -217,7 +217,9 @@ service cloud.firestore {
     // is #64. Otherwise a mark that was queued offline or on a slow network
     // lands after the resume and counts the player as ready at the next
     // break before they get there (#63).
-    // Rooms without a phase keep the old anything-goes list.
+    // Rooms without a phase keep the old anything-goes list. (A mark sent
+    // again, e.g. after a refresh, changes nothing, so no field is affected
+    // and isUpdatingPlayerScores already lets it through.)
     function isManagingMidQuizPlayers(affected) {
       let data = request.resource.data;
       let marks = data.playersAtMidQuiz;
@@ -228,12 +230,10 @@ service cloud.firestore {
              marks is list &&
              (!('phase' in resource.data) ||
               (resource.data.phase == 'mid-scoreboard' &&
-               // Unchanged: a mark sent again, e.g. after a refresh.
-               (marks == before ||
-                (marks.size() == before.size() + 1 &&
-                 marks.hasAll(before) &&
-                 marks[marks.size() - 1] is string &&
-                 !before.hasAny([marks[marks.size() - 1]])))));
+               marks.size() == before.size() + 1 &&
+               marks.hasAll(before) &&
+               marks[marks.size() - 1] is string &&
+               !before.hasAny([marks[marks.size() - 1]])));
     }
 
     function isValidPlayer(player) {

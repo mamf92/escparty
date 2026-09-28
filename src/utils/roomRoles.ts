@@ -9,8 +9,14 @@ import type { Player, Room } from "./roomsFirestore";
 export const isObserverHost = (
     room: Pick<Room, "hostId" | "hostIsObserver"> | null | undefined,
     playerId: string | null | undefined,
-): boolean => !!room && !!playerId && room.hostIsObserver === true && room.hostId === playerId;
+): boolean => isRoomHost(room, playerId) && room?.hostIsObserver === true;
 
 /** The room's players, without the host when the host only observes. */
 export const playingPlayers = (room: Pick<Room, "hostId" | "hostIsObserver" | "players">): Player[] =>
     room.hostIsObserver ? room.players.filter(p => p.id !== room.hostId) : room.players;
+
+/** Whether `playerId` is this room's host (playing or observing). */
+export const isRoomHost = (
+    room: Pick<Room, "hostId"> | null | undefined,
+    playerId: string | null | undefined,
+): boolean => !!room && !!playerId && room.hostId === playerId;

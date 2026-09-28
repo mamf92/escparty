@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isObserverHost, playingPlayers } from "./roomRoles";
+import { isObserverHost, isRoomHost, playingPlayers } from "./roomRoles";
 
 const players = [
     { id: "host-1", name: "Host", score: 0 },
@@ -18,6 +18,15 @@ describe("isObserverHost", () => {
         expect(isObserverHost({ hostId: "host-1" }, "host-1")).toBe(false);
         expect(isObserverHost(null, "host-1")).toBe(false);
         expect(isObserverHost({ hostId: "host-1", hostIsObserver: true }, null)).toBe(false);
+    });
+});
+
+describe("isRoomHost", () => {
+    it("is true for the host whether or not they observe", () => {
+        expect(isRoomHost({ hostId: "host-1" }, "host-1")).toBe(true);
+        expect(isRoomHost({ hostId: "host-1" }, "p-2")).toBe(false);
+        expect(isRoomHost(undefined, "host-1")).toBe(false);
+        expect(isRoomHost({ hostId: "host-1" }, undefined)).toBe(false);
     });
 });
 

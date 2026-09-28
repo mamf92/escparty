@@ -87,11 +87,12 @@ const Quiz = () => {
         currentQuestionIndex: room.currentQuestionIndex ?? 0,
         difficulty,
         players: playingPlayers(room),
-        roomCode
+        roomCode,
+        playerId
       },
       replace: true // Replace history to prevent back navigation to the quiz page
     });
-  }, [isMultiplayer, observing, room, difficulty, roomCode, navigate]);
+  }, [isMultiplayer, observing, room, difficulty, roomCode, playerId, navigate]);
 
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes
@@ -127,8 +128,12 @@ const Quiz = () => {
         roomCode: locationState.roomCode || '',
         playerId: locationState.playerId || ''
       };
-    } else {
-      // If not in location state, check sessionStorage (for page refreshes or direct navigation)
+    } else if (!locationState) {
+      // No router state at all (a direct link, or a page that didn't pass
+      // any): fall back to sessionStorage. Not when the router state says
+      // single player: the blob outlives a multiplayer game in this tab, and
+      // reading it would turn a later single-player quiz back into that old
+      // room (#63).
       const storedData = sessionStorage.getItem('multiplayerGame');
       if (storedData) {
         try {
@@ -436,7 +441,7 @@ const Quiz = () => {
           totalQuestions: questions.length,
           currentQuestionIndex: room.currentQuestionIndex ?? 0, // the question after the break
           difficulty,
-          players: room.players,
+          players: playingPlayers(room),
           multiplayer: true,
           roomCode,
           playerId
