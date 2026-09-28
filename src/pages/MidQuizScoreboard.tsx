@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, markPlayerAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom, markPlayerAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -45,7 +45,6 @@ const MidQuizScoreboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [hostIsObserver, setHostIsObserver] = useState(gameData.hostIsObserver);
-  const [, setContinueReadyState] = useState(false);
 
   // Check if host is observer and redirect if needed
   useEffect(() => {
@@ -77,14 +76,13 @@ const MidQuizScoreboard = () => {
     // Case 1: Host in a multiplayer game
     if (isHost && gameData.multiplayer && gameData.roomCode) {
       try {
-        // Start the next question for the whole room (#62), then navigate
-        // (observer hosts are redirected elsewhere). continueReady is only
-        // for tabs still running an older bundle, and only after a real
-        // resume, so a double-click doesn't send a second signal.
-        const resumed = await resumeAfterMidQuiz(gameData.roomCode);
-        if (resumed) {
-          await setContinueReady(gameData.roomCode, true);
-        }
+        // Start the next question for the whole room, then navigate
+        // (observer hosts are redirected elsewhere). Players follow the
+        // room's phase back to the quiz (#63), so there's no separate
+        // signal to send. A resume that no-ops (a double-click, or the room
+        // already moved on) still sends the host back to the quiz, which
+        // follows whatever the room is doing.
+        await resumeAfterMidQuiz(gameData.roomCode);
         navigate(`/quiz/${gameData.difficulty}`, {
           state: {
             currentQuestionIndex: nextQuestionIndex, // The question after the break
@@ -96,20 +94,12 @@ const MidQuizScoreboard = () => {
             hostIsObserver: hostIsObserver // Current host's observer status
           }
         });
-        // Reset the continue flag after a short delay (host has navigated)
-        setTimeout(async () => {
-          try {
-            await setContinueReady(gameData.roomCode, false);
-          } catch (err) {
-            console.error("Error resetting continue flag after host navigation:", err);
-          }
-        }, 3000);
       } catch (err) {
         console.error("Error in host continue logic:", err);
-        setError("Failed to signal or navigate for continue");
+        setError("Failed to continue the quiz");
       }
     }
-    // Case 2: Participant in a multiplayer game (called via listener when continueReady is true)
+    // Case 2: Participant in a multiplayer game (called by the listener once the room resumes)
     else if (!isHost && gameData.multiplayer && gameData.roomCode) {
       navigate(`/quiz/${gameData.difficulty}`, {
         state: {
@@ -138,6 +128,10 @@ const MidQuizScoreboard = () => {
       });
     }
   }, [gameData, hostIsObserver, isHost, navigate, players, error, setError]);
+
+  // The effect below re-runs (e.g. when the host flag loads), but a player
+  // only needs marking once per break.
+  const markedAtBreakRef = useRef<string | null>(null);
 
   const continueQuizRef = useRef(continueQuiz);
   useEffect(() => {
@@ -169,7 +163,9 @@ const MidQuizScoreboard = () => {
 
     // Mark player as ready at mid-quiz if in multiplayer
     const markPlayerReady = async () => {
-      if (gameData.multiplayer && gameData.roomCode && gameData.playerId) {
+      const breakKey = `${gameData.roomCode}:${gameData.currentQuestionIndex}`;
+      if (gameData.multiplayer && gameData.roomCode && gameData.playerId && markedAtBreakRef.current !== breakKey) {
+        markedAtBreakRef.current = breakKey;
         try {
           await markPlayerAtMidQuiz(gameData.roomCode, gameData.playerId);
         } catch (err) {
@@ -208,22 +204,13 @@ const MidQuizScoreboard = () => {
           // `isUserHost`, not the `isHost` state: this listener can be set up
           // (and fire) before that state updates, which would treat the host
           // as a player below.
-          if (room.phase) {
-            // The room drives the return (#62): players go back as soon as it
-            // has resumed, whether or not they saw the continueReady flag
-            // (missed window, backgrounded tab). A stale continueReady left
-            // over from the last break is ignored, so it can't bounce players
-            // to the quiz while the room is still in the break.
-            if (!isUserHost && room.phase === "question" &&
-                (room.currentQuestionIndex ?? 0) >= gameData.currentQuestionIndex) {
-              continueQuizRef.current();
-            }
-          } else if (room.continueReady) {
-            // Rooms from before #61 have no phase: keep the old signal.
-            setContinueReadyState(true);
-            if (!isUserHost) {
-              continueQuizRef.current();
-            }
+          // The room's phase is the signal (#63): players go back as soon as
+          // the room is on the question after the break, however late this
+          // snapshot arrives (a throttled background tab, a slow network).
+          // It's a state, not a moment, so there's no window to miss.
+          if (!isUserHost && room.phase === "question" &&
+              (room.currentQuestionIndex ?? 0) >= gameData.currentQuestionIndex) {
+            continueQuizRef.current();
           }
         } else {
           setError("Game room no longer exists");

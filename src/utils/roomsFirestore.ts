@@ -37,7 +37,7 @@ export interface Room {
     createdAt: Timestamp | FieldValue;
     players: Player[];
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
-    continueReady?: boolean; // Flag to indicate if host has signaled to continue to next question
+    continueReady?: boolean; // Unused since #63 (players follow `phase`); old rooms may still carry it
     playersAtMidQuiz?: string[]; // Array of playerIds that have reached the mid-quiz scoreboard
     // Shared progression state (#61). Optional because rooms created before
     // these fields existed don't have them.
@@ -441,11 +441,10 @@ export const generateRoomCode = (): string => {
 };
 
 /**
- * Join a room by room code
- * @returns boolean indicating if joining was successful
- */
-/**
  * Signal to continue to the next question
+ * @deprecated Nothing calls this since #63: players return from the break by
+ * following `room.phase` (see resumeAfterMidQuiz). Kept so the exported API
+ * doesn't change outside a coordinated migration.
  */
 export const setContinueReady = async (roomCode: string, continueReady: boolean): Promise<void> => {
     console.log(`Setting continue ready state for room ${roomCode} to ${continueReady}`);
@@ -492,6 +491,8 @@ export const markPlayerAtMidQuiz = async (roomCode: string, playerId: string): P
 
 /**
  * Reset the players at mid-quiz array
+ * @deprecated Nothing calls this since #62: resumeAfterMidQuiz clears the
+ * marks in the same write that resumes the room.
  */
 export const resetPlayersAtMidQuiz = async (roomCode: string): Promise<void> => {
     console.log(`Resetting players at mid-quiz for room ${roomCode}`);

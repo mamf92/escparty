@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, resumeAfterMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom, resumeAfterMidQuiz } from "../utils/roomsFirestore";
 
 const HostObserverView = () => {
     const location = useLocation();
@@ -24,7 +24,6 @@ const HostObserverView = () => {
 
     const [players, setPlayers] = useState<Player[]>(gameData.players);
     const [error, setError] = useState<string | null>(null);
-    const [, setContinueReadyState] = useState(false);
     const [playersAtMidQuiz, setPlayersAtMidQuiz] = useState<string[]>([]);
     const [allPlayersReady, setAllPlayersReady] = useState<boolean>(false);
 
@@ -36,32 +35,16 @@ const HostObserverView = () => {
 
         if (gameData.roomCode) {
             try {
-                // Start the next question for the whole room (#62); the
-                // observer host doesn't navigate to the quiz itself. Nothing
-                // else to do if the room wasn't in a break (a double-click, a
-                // second host tab, or continue pressed mid-block): don't send
-                // a signal or clear the ready marks for a break that isn't on.
-                const resumed = await resumeAfterMidQuiz(gameData.roomCode);
-                if (!resumed) {
-                    return;
-                }
-                // continueReady is only for tabs still running an older bundle.
-                // (The resume already cleared playersAtMidQuiz for the next break.)
-                await setContinueReady(gameData.roomCode, true);
-
-                // Reset the continue flag after a short delay
-                setTimeout(async () => {
-                    try {
-                        await setContinueReady(gameData.roomCode, false);
-                    } catch (err) {
-                        console.error("Error resetting continue flag for observer host:", err);
-                    }
-                }, 3000);
-
+                // Start the next question for the whole room; the observer
+                // host doesn't navigate to the quiz itself. Players follow
+                // the room's phase back to the quiz (#63), and the same write
+                // clears the ready marks for the next break. It no-ops if the
+                // room wasn't in a break (a double-click, a second host tab).
+                await resumeAfterMidQuiz(gameData.roomCode);
                 setError(null); // Clear any local errors
             } catch (err) {
                 console.error("Error in host continue logic:", err);
-                setError("Failed to signal continue");
+                setError("Failed to continue the quiz");
             }
         }
     }, [gameData.roomCode, navigate, error]);
@@ -115,11 +98,6 @@ const HostObserverView = () => {
                     } else {
                         setPlayersAtMidQuiz([]);
                         setAllPlayersReady(false);
-                    }
-
-                    // Check if continue is ready (for UI feedback)
-                    if (room.continueReady) {
-                        setContinueReadyState(true);
                     }
                 } else {
                     setError("Game room no longer exists");

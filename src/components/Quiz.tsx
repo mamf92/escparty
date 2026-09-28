@@ -52,10 +52,9 @@ const Quiz = () => {
   // In multiplayer the room drives progression (#62): every client shows
   // room.currentQuestionIndex and times it from room.phaseStartedAt, so they
   // stay in lockstep and a backgrounded tab catches up on return. Single
-  // player keeps the local timers below. A multiplayer room without a phase
-  // (created before #61) falls back to the local timers too.
+  // player keeps the local timers below.
   const sharedClock = isMultiplayer && !!room?.phase;
-  const localClock = !isMultiplayer || (room !== null && !room.phase);
+  const localClock = !isMultiplayer;
   const roomStartMs = startedAtMillis(room?.phaseStartedAt);
   // This player's score as the room has it.
   const storedScore = room?.players.find(p => p.id === playerId)?.score ?? 0;
@@ -266,7 +265,7 @@ const Quiz = () => {
     };
   }, [difficulty, navigate, location]);
 
-  // Timer effect for question countdown (single player, and phase-less rooms)
+  // Timer effect for question countdown (single player only)
   useEffect(() => {
     if (quizCompleted || loading || !localClock) return;
 
@@ -329,6 +328,15 @@ const Quiz = () => {
   }, [showFeedback, localClock]);
 
   // --- Shared, room-driven progression (multiplayer) ---
+
+  // A room created before #61 has no phase to follow, and the old local-timer
+  // path for it is gone (#63). Rooms only live for one game, so this only
+  // catches a tab left open from before the upgrade.
+  useEffect(() => {
+    if (isMultiplayer && room && !room.phase) {
+      setError("This room was set up by an older version of the app. Start a new room to play.");
+    }
+  }, [isMultiplayer, room]);
 
   // Refs so the 100ms tick below reads current values without restarting.
   const isSubmittedRef = useRef(isSubmitted);
@@ -515,7 +523,7 @@ const Quiz = () => {
     setTimeLeft(FEEDBACK_MS / 1000);
   };
 
-  // Function to automatically move to the next question
+  // Local clock only: move on once the feedback time is over
   const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       if ((currentQuestionIndex + 1) % MID_QUIZ_EVERY === 0) {
@@ -525,9 +533,9 @@ const Quiz = () => {
             totalQuestions: questions.length,
             currentQuestionIndex: currentQuestionIndex + 1,
             difficulty,
-            players: isMultiplayer && room ? room.players : [{ name: "Player 1", score }],
-            multiplayer: isMultiplayer,
-            roomCode,
+            players: [{ name: "Player 1", score }],
+            multiplayer: false,
+            roomCode: null,
             playerId
           }
         });
@@ -545,26 +553,24 @@ const Quiz = () => {
     } else {
       const difficultyLevel = difficulty ?? "easy";
 
-      if (!isMultiplayer) {
-        const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-        const newScore = {
-          score,
-          total: questions.length,
-          difficulty: difficultyLevel,
-          date: new Date().toISOString()
-        };
-        localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
-      }
+      const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
+      const newScore = {
+        score,
+        total: questions.length,
+        difficulty: difficultyLevel,
+        date: new Date().toISOString()
+      };
+      localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
 
       navigate("/results", {
         state: {
           score,
           totalQuestions: questions.length,
           difficulty,
-          multiplayer: isMultiplayer,
-          roomCode,
+          multiplayer: false,
+          roomCode: null,
           playerId,
-          players: isMultiplayer && room ? room.players : null
+          players: null
         }
       });
     }

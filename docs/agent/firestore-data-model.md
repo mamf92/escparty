@@ -58,7 +58,8 @@ The lifecycle:
   → `"question"` at the same index, with a fresh `phaseStartedAt`, clearing
   `playersAtMidQuiz`. A no-op outside the break.
 - All three are optional on `Room`: rooms created before #61 don't have
-  them, and `Quiz.tsx` falls back to its local timers for such a room.
+  them. Since #63 `Quiz.tsx` no longer plays such a room (its local-timer
+  fallback is gone) and shows a "start a new room" error instead.
 - `phaseStartedAt` reads as `null` in a snapshot whose `serverTimestamp()`
   write is still pending (the writer's own listener sees that local
   snapshot first). `Quiz.tsx` counts from "now" until the real value lands.
@@ -88,16 +89,23 @@ The lifecycle:
 
 ## Progression flags
 
-- `continueReady` — host-set boolean signaling "advance to the next
-  question" to observer-mode hosts. Reset by the host, not automatically.
+- `continueReady` — unused since #63. It was the host's "continue" signal,
+  set to `true` and reset 3s later, so a client whose snapshot arrived late
+  missed it and stayed stuck at the break (#23). Players now return when
+  `phase` goes back to `"question"`. `setContinueReady` and its rules branch
+  remain only so the exported API and old rooms don't break.
 - `playersAtMidQuiz` — array of player IDs who have reached the mid-quiz
   scoreboard, built via `markPlayerAtMidQuiz` (`arrayUnion`) and cleared by
   `resumeAfterMidQuiz` in the same write that ends the break, so a
   half-failed resume can't leave stale marks for the next one. Among phase
-  moves, only the resume may touch it (and only to clear it); the separate
-  `isManagingMidQuizPlayers` branch still accepts any list on its own, which
-  `markPlayerAtMidQuiz` and older bundles' `resetPlayersAtMidQuiz` rely on. `resetPlayersAtMidQuiz` still exists but
-  nothing calls it any more.
+  moves, only the resume may touch it (and only to clear it). On its own
+  (`isManagingMidQuizPlayers`, #63), a room with a phase only accepts marks
+  while it's in `"mid-scoreboard"`, and only ones that add: a mark queued
+  offline or on a slow network that arrives after the resume is refused,
+  so it can't count a player as ready at the next break before they get
+  there. Rooms without a phase still accept any list.
+  `resetPlayersAtMidQuiz` still exists but nothing calls it, and in a room
+  with a phase the rules now refuse it.
 
 ## Security rules
 

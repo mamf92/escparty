@@ -37,13 +37,15 @@ any of it, update this file in the same PR rather than leaving it stale.
 4. **Mid-quiz** — `MidQuizScoreboard.tsx` marks each arriving player ready
    via `markPlayerAtMidQuiz` (`arrayUnion`, since everyone arrives at once).
    The host's continue calls `resumeAfterMidQuiz` (the room back to
-   `phase: "question"` at the next question, clearing the ready marks), then
-   still flips
-   `Room.continueReady` with its fixed 3s reset, which rung 3 (#63)
-   replaces. A player who misses that window goes back anyway, because the
-   scoreboard also returns to the quiz as soon as the room's phase is
-   `question` again. `HostObserverView.tsx` is the host-only screen when
-   `hostIsObserver` is true — the host watches without answering.
+   `phase: "question"` at the next question, clearing the ready marks), and
+   that's the whole signal (#63): each scoreboard returns to the quiz once
+   its snapshot shows the room on the question after the break, however
+   late that snapshot arrives. The old `continueReady` flag was set and
+   reset 3s later, so a throttled or offline client could miss it and get
+   stuck (#23). The rules refuse a ready mark that arrives after the
+   resume. `HostObserverView.tsx` is the host-only screen when
+   `hostIsObserver` is true — the host watches without answering, and its
+   Continue waits until every player is marked.
 5. **`QuizResults.tsx`** — final scoreboard, also recovers from
    `sessionStorage` if `location.state` is missing (e.g., after a refresh).
    Single-player scores are separately persisted to `localStorage`
@@ -68,6 +70,6 @@ which one wins depends on the page:
 
 ## Server-authoritative progression
 
-Landed in #62; see step 3 above and `docs/agent/firestore-data-model.md`.
-The mid-quiz handshake (`continueReady`) is still the old fixed-delay flag
-until #63.
+Landed in #62, with the mid-quiz return following it since #63; see steps
+3 and 4 above and `docs/agent/firestore-data-model.md`. A multiplayer room
+without a phase (created before #61) can't be played any more.

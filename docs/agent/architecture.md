@@ -47,8 +47,9 @@ plan that also removes the ad hoc storage it would duplicate.
 ## `src/utils/`
 
 - `roomsFirestore.ts` — the entire Firestore API surface: room/player CRUD,
-  the `onSnapshot`-based `listenToRoom`, and progression flags
-  (`continueReady`, `playersAtMidQuiz`). See
+  the `onSnapshot`-based `listenToRoom`, the phase moves
+  (`advanceQuestion`, `resumeAfterMidQuiz`) and the mid-quiz ready marks
+  (`playersAtMidQuiz`). See
   `docs/agent/firestore-data-model.md` for the data shape and which writes
   are safe. Its exported function signatures are on the do-not-change list
   in `CLAUDE.md`.

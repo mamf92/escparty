@@ -142,8 +142,9 @@ open at the time of writing:
   moved to `src/utils/quizScoring.ts` and the multiplayer timing to
   `src/utils/quizTiming.ts`, and both are tested directly; the component's
   own effects (the local timers, following the room, phase navigation) are
-  not tested at all. Rung 2 (#62) was checked by hand with two browsers
-  against the emulator; a committed version of that is #68. Don't read "scoring is covered" as "the quiz is covered".
+  not tested at all. Rungs 2 and 3 (#62, #63) were checked by hand with two
+  browsers against the emulator, including a client offline across the
+  host's continue; a committed version of that is #68. Don't read "scoring is covered" as "the quiz is covered".
 - **No e2e runner.** Playwright is #55.
 - **Test failures don't block merge or deploy yet.** `npm test` runs in
   `ci.yml`, but nothing requires it to pass before merge (branch protection,

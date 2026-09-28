@@ -90,9 +90,9 @@ rules, ask before making it rather than guessing.
   wired in; don't add to it without a migration plan.
 - In multiplayer, `Room.phase`/`currentQuestionIndex`/`phaseStartedAt` are
   **the** source of truth for which question is showing (#62). Don't
-  reintroduce a locally incremented index or a local countdown there. The
-  mid-quiz `continueReady` flag is still the old fixed-delay handshake until
-  #63.
+  reintroduce a locally incremented index or a local countdown there, or a
+  timed signal like the old `continueReady` flag (#63): clients react to the
+  room's state, which a slow client can't miss.
 - Writes several clients make at once must not be a plain read-modify-write.
   `updatePlayerScore`, `advanceQuestion` and `resumeAfterMidQuiz` are
   transactions and `markPlayerAtMidQuiz` is an `arrayUnion` — all players

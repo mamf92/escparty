@@ -203,7 +203,8 @@ await expectDenied("update score + forge hostId in same write", () =>
   })
 );
 
-// 8. Legitimate: mid-quiz flag and continueReady
+// 8. Legitimate: mid-quiz flag and continueReady (a room without a phase,
+// which keeps the old rules; phase rooms are case 12)
 const flag = freshRoom("FLAG");
 await createRoom(flag.roomRef, flag.roomCode);
 await expectAllowed("set continueReady", () =>
@@ -428,6 +429,9 @@ await expectDenied("advance + rewrite scores in the same write", () =>
     players: [{ id: "host-1", name: "Host", score: 9999 }],
   })
 );
+await expectDenied("mark a player at the break while the room is on a question (a late, queued mark)", () =>
+  updateDoc(resumeTooSoon, { playersAtMidQuiz: arrayUnion("player-2") })
+);
 await expectDenied("resume from a mid-quiz break the room isn't in", () =>
   updateDoc(resumeTooSoon, { phase: "question", phaseStartedAt: serverTimestamp() })
 );
@@ -455,12 +459,23 @@ await expectAllowed("take the mid-quiz break after question 5 (4 -> break at 5)"
 await expectDenied("leave the break onto a different question", () =>
   updateDoc(walker, advanceTo("question", 6))
 );
-await updateDoc(walker, { playersAtMidQuiz: arrayUnion("host-1", "player-2") });
+await expectAllowed("mark players at the break with arrayUnion (markPlayerAtMidQuiz)", () =>
+  updateDoc(walker, { playersAtMidQuiz: arrayUnion("host-1", "player-2") })
+);
+await expectDenied("clear the ready marks during the break without resuming", () =>
+  updateDoc(walker, { playersAtMidQuiz: [] })
+);
+await expectDenied("drop another player's ready mark", () =>
+  updateDoc(walker, { playersAtMidQuiz: ["host-1"] })
+);
 await expectDenied("resume while rewriting who is at the break", () =>
   updateDoc(walker, { phase: "question", phaseStartedAt: serverTimestamp(), playersAtMidQuiz: ["host-1"] })
 );
 await expectAllowed("resume after the mid-quiz break, clearing the ready marks (break at 5 -> question 5)", () =>
   updateDoc(walker, { phase: "question", phaseStartedAt: serverTimestamp(), playersAtMidQuiz: [] })
+);
+await expectDenied("a ready mark that lands after the resume (queued offline)", () =>
+  updateDoc(walker, { playersAtMidQuiz: arrayUnion("player-2") })
 );
 await expectDenied("end the resumed question immediately", () =>
   updateDoc(walker, advanceTo("question", 6))

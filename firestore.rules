@@ -204,12 +204,22 @@ service cloud.firestore {
              data.continueReady is bool;
     }
 
+    // A player marking itself ready at the mid-quiz break
+    // (markPlayerAtMidQuiz). In a room with a phase (#61), marks only count
+    // while the room is in the break, and a mark only ever adds: clearing
+    // them is the resume's job (isAdvancingPhase). Otherwise a mark that was
+    // queued offline or on a slow network lands after the resume and counts
+    // the player as ready at the next break before they get there (#63).
+    // Rooms without a phase keep the old anything-goes list.
     function isManagingMidQuizPlayers(affected) {
       let data = request.resource.data;
 
       return affected.hasOnly(['playersAtMidQuiz']) &&
              'playersAtMidQuiz' in data &&
-             data.playersAtMidQuiz is list;
+             data.playersAtMidQuiz is list &&
+             (!('phase' in resource.data) ||
+              (resource.data.phase == 'mid-scoreboard' &&
+               data.playersAtMidQuiz.hasAll(resource.data.get('playersAtMidQuiz', []))));
     }
 
     function isValidPlayer(player) {
