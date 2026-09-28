@@ -84,6 +84,26 @@ means the change didn't break the build; it says nothing about whether the
 change is the right one. Waiting on review is not a bottleneck to route
 around by self-merging — it's the point of having the rule.
 
+### When an agent may merge its own PR
+
+The repo owner has approved agents merging a PR they opened, without
+waiting for a person, when **all** of these hold on the PR's current head:
+
+1. Every CI check is green, and there's no merge conflict.
+2. A `code-review` pass at `high` effort ran on the final diff, and its
+   findings were posted on the PR (`/code-review high --comment`), so the
+   owner can read them later.
+3. Every Important (🔴) finding is fixed, or answered on the PR with why
+   it isn't one. No review thread is left unresolved.
+4. The PR doesn't change the guardrails themselves: this section,
+   `.claude/settings.json`, or anything under `.github/workflows/`. Those
+   still need the owner to merge.
+
+After merging, the agent leaves a one-line comment on the PR saying it
+merged under this rule. `.claude/settings.json` allows the GitHub merge
+tool so agent sessions can act on this; the conditions above are what make
+a merge allowed, not the setting.
+
 ## Secrets
 
 Never commit runtime secrets to source. Firebase config belongs in

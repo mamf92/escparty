@@ -45,7 +45,9 @@ doing the work directly.
    review, or an agent-driven one (the `code-review` skill, or GitHub's
    Claude Approvals check where the repo has it configured). Never skip
    both. If you are the one who opened the PR, don't also be the only
-   reviewer of it in any way that substitutes for an independent pass.
+   reviewer of it in any way that substitutes for an independent pass —
+   except under the conditions in `CONTRIBUTING.md` section 8 ("When an
+   agent may merge its own PR"), which the owner has approved.
 
 7. **Fix what review and CI raise.** A red or conflicted PR is work now,
    not something to wait out — it is never "waiting on review" while it's
@@ -67,7 +69,8 @@ doing the work directly.
    is right. Don't self-merge a non-trivial change because CI is green and
    review is merely pending. Don't merge with an unresolved review comment
    still open, even if it looks minor — resolve it or get explicit sign-off
-   that it's deferred, then merge.
+   that it's deferred, then merge. Merging a PR you opened yourself is
+   allowed only when every condition in `CONTRIBUTING.md` section 8 holds.
 
 ## Keep the agent docs fresh — enforced here, not by memory
 
