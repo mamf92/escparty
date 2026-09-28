@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 import { listenToRoom, Room, setRoomDifficulty, startGame } from "../utils/roomsFirestore";
+import { isObserverHost, playingPlayers } from "../utils/roomRoles";
 
 const Lobby = () => {
     const [room, setRoom] = useState<Room | null>(null);
@@ -49,6 +50,20 @@ const Lobby = () => {
                         playerId: storedPlayerId,
                         difficulty: roomData.difficulty
                     }));
+
+                    // An observer host goes straight to its own screen rather
+                    // than loading the quiz only to be redirected from it.
+                    if (isObserverHost(roomData, storedPlayerId)) {
+                        navigate("/host-observer", {
+                            state: {
+                                currentQuestionIndex: roomData.currentQuestionIndex ?? 0,
+                                difficulty: roomData.difficulty,
+                                players: playingPlayers(roomData),
+                                roomCode: storedGameCode
+                            }
+                        });
+                        return;
+                    }
 
                     navigate(`/quiz/${roomData.difficulty}`, {
                         state: {
@@ -120,7 +135,7 @@ const Lobby = () => {
         );
     }
 
-    const visiblePlayers = room?.players.filter(player => !(room.hostIsObserver && player.id === room.hostId)) ?? [];
+    const visiblePlayers = room ? playingPlayers(room) : [];
 
     return (
         <Container>

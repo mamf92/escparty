@@ -6,6 +6,7 @@ import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
+import { isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
@@ -70,13 +71,14 @@ const Quiz = () => {
     : { question: "", options: [], correctAnswer: "" };
 
   // An observer host watches from HostObserverView instead of playing. Who
-  // that is comes from the room, not from localStorage "isHost": that's
-  // shared by every tab and outlives a game, so it can say "host" for a
-  // guest (who'd be bounced out of the quiz) or "not host" for the real one
-  // (who'd end up playing).
-  const isObserverHost = !!room && !!playerId && room.hostIsObserver === true && room.hostId === playerId;
+  // that is comes from the room (roomRoles.ts), not from localStorage
+  // "isHost". Only while the game is on: a finished room (e.g. rejoined from
+  // a leftover sessionStorage blob when this tab later starts another quiz)
+  // sends the observer to the results like everyone else, which also clears
+  // that blob.
+  const observing = isObserverHost(room, playerId) && room?.phase !== "results";
   useEffect(() => {
-    if (!isMultiplayer || !isObserverHost || !room || leftQuizRef.current) return;
+    if (!isMultiplayer || !observing || !room || leftQuizRef.current) return;
     // Claims the one navigation away from this page, so the phase effect
     // below can't send the observer to the players' break or results.
     leftQuizRef.current = true;
@@ -84,12 +86,12 @@ const Quiz = () => {
       state: {
         currentQuestionIndex: room.currentQuestionIndex ?? 0,
         difficulty,
-        players: room.players.filter(p => p.id !== room.hostId), // the observer isn't a player
+        players: playingPlayers(room),
         roomCode
       },
       replace: true // Replace history to prevent back navigation to the quiz page
     });
-  }, [isMultiplayer, isObserverHost, room, difficulty, roomCode, navigate]);
+  }, [isMultiplayer, observing, room, difficulty, roomCode, navigate]);
 
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes
@@ -308,7 +310,7 @@ const Quiz = () => {
   // moment (spread per player) and only steps in if the room hasn't moved
   // on, e.g. the leader closed their tab.
   const advanceLeaderId = useMemo(() => room
-    ? (room.hostIsObserver ? room.players.filter(p => p.id !== room.hostId) : [{ id: room.hostId }])
+    ? (room.hostIsObserver ? playingPlayers(room) : [{ id: room.hostId }])
         .map(p => p.id).sort()[0]
     : undefined, [room]);
 
@@ -424,7 +426,7 @@ const Quiz = () => {
   // room's copy of this player's score if it's higher: a player coming back
   // from a refresh or a locked phone may not have picked it back up yet.
   useEffect(() => {
-    if (!sharedClock || !room || loading || isObserverHost || leftQuizRef.current) return;
+    if (!sharedClock || !room || loading || observing || leftQuizRef.current) return;
     const bestScore = bestKnownScore(score, room.players, playerId);
     if (room.phase === "mid-scoreboard") {
       leftQuizRef.current = true;
@@ -454,7 +456,7 @@ const Quiz = () => {
         }
       });
     }
-  }, [sharedClock, room, loading, isObserverHost, score, questions.length, difficulty, roomCode, playerId, navigate]);
+  }, [sharedClock, room, loading, observing, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
   // Lock the current question: no more answers, show its feedback.
   const lockQuestion = ({ hideTimer }: { hideTimer: boolean }) => {

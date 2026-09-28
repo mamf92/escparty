@@ -10,8 +10,9 @@ any of it, update this file in the same PR rather than leaving it stale.
 
 1. **`MultiplayerLobby.tsx`** — host creates a room (`createRoom`, generates
    a 4-letter code) or a player joins one (`joinRoom`). Both paths write
-   `playerId`, `playerName`, `gameCode`, `isHost` (and `hostIsObserver` for
-   the host) to `localStorage`, then navigate to `/lobby`.
+   `playerId`, `playerName`, `gameCode` and `isHost` to `localStorage`, then
+   navigate to `/lobby`. Whether the host only observes is stored on the
+   room (`Room.hostIsObserver`) and nowhere else.
 2. **`Lobby.tsx`** — reads those `localStorage` values back out, then opens
    one `onSnapshot` listener via `listenToRoom(gameCode, callback)`. The host
    picks a difficulty (`setRoomDifficulty`) and starts the game
@@ -19,7 +20,8 @@ any of it, update this file in the same PR rather than leaving it stale.
    `phase: "question"` in the same write; see
    `docs/agent/firestore-data-model.md`). Every client's listener fires
    on that write; each one independently stashes a `multiplayerGame` blob in
-   `sessionStorage` and navigates itself to `/quiz/:difficulty`. There is no
+   `sessionStorage` and navigates itself to `/quiz/:difficulty` (an observer
+   host goes to `/host-observer` instead). There is no
    single "go" signal beyond the `started` flag — navigation is a side
    effect of the snapshot callback running on every subscribed client.
 3. **`Quiz.tsx`** — reads multiplayer context from router `location.state`
@@ -60,7 +62,11 @@ Three different persistence mechanisms are in play simultaneously, and
 which one wins depends on the page:
 
 - `localStorage` — identity that should survive across the whole multiplayer
-  session (`playerId`, `playerName`, `gameCode`, `isHost`, `hostIsObserver`).
+  session (`playerId`, `playerName`, `gameCode`, `isHost`). Since #63 the
+  quiz and break screens don't trust `isHost` for anything that matters:
+  who's the host, and whether they only observe, comes from the room
+  (`src/utils/roomRoles.ts`), because `localStorage` is shared by every tab
+  and outlives the game.
 - `sessionStorage` — a `multiplayerGame` snapshot used specifically to
   survive a page refresh where router `location.state` would otherwise be
   lost.

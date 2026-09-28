@@ -78,6 +78,11 @@ plan that also removes the ad hoc storage it would duplicate.
   (but not `isProductionPreview`). The Vite `base` config (`/` on Vercel,
   `/escparty/` for any other production build) flows through `getAssetPath`.
 
+- `roomRoles.ts` — who's who in a room, read from the room itself (#63):
+  `isObserverHost(room, playerId)` and `playingPlayers(room)` (the players
+  without an observing host). Replaces the `localStorage` guesses pages
+  used to make. 100% coverage floor.
+
 ## `src/hooks/`
 
 - `useResumeRoom.ts` — the host's Continue at a mid-quiz break (#63), used

@@ -5,6 +5,7 @@ import { Player, Room, listenToRoom, markPlayerAtMidQuiz } from "../utils/roomsF
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { hasLeftBreak } from "../utils/quizTiming";
 import { bestKnownScore } from "../utils/quizScoring";
+import { isObserverHost, playingPlayers } from "../utils/roomRoles";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -107,11 +108,7 @@ const MidQuizScoreboard = () => {
         players: room ? room.players : gameData.players,
         multiplayer: gameData.multiplayer,
         roomCode: gameData.roomCode,
-        playerId: gameData.playerId,
-        // Only players come back to the quiz (observer hosts stay on
-        // HostObserverView), and true here would send them straight back
-        // to this page.
-        hostIsObserver: false
+        playerId: gameData.playerId
       }
     });
   }, [gameData, navigate]);
@@ -163,17 +160,12 @@ const MidQuizScoreboard = () => {
     if (gameData.multiplayer && gameData.roomCode) {
       const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
         if (room) {
-          // Filter out host from players list if host is in observer mode
-          const filteredPlayers = room.hostIsObserver
-            ? room.players.filter(player => player.id !== room.hostId)
-            : room.players;
-
           // Always update players array to ensure real-time score updates
-          setPlayers(filteredPlayers);
+          setPlayers(playingPlayers(room));
 
           // Who's the host, and whether they only observe, as the room has it.
           const roomSaysHost = !!gameData.playerId && room.hostId === gameData.playerId;
-          const observerHost = roomSaysHost && room.hostIsObserver === true;
+          const observerHost = isObserverHost(room, gameData.playerId);
           setIsHost(roomSaysHost);
           setHostIsObserver(observerHost);
           if (room.difficulty) roomDifficultyRef.current = room.difficulty;
@@ -191,6 +183,9 @@ const MidQuizScoreboard = () => {
             markedRef.current = true;
             markPlayerAtMidQuiz(gameData.roomCode, gameData.playerId).catch(err => {
               console.error("Error marking player as ready at mid-quiz:", err);
+              // Try again on the next snapshot, if the room is still in the
+              // break (an observer host's Continue waits for every mark).
+              markedRef.current = false;
             });
           }
 

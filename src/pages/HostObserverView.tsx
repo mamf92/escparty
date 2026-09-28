@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, RoomPhase, listenToRoom } from "../utils/roomsFirestore";
+import { Player, listenToRoom } from "../utils/roomsFirestore";
+import { playingPlayers } from "../utils/roomRoles";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 
 const HostObserverView = () => {
@@ -34,11 +35,14 @@ const HostObserverView = () => {
     const { resume, resuming, resumeError, reset } = useResumeRoom(gameData.roomCode);
     // This screen stays up for the whole quiz, so Continue only works while
     // the room is actually in a break, and any Continue state or message
-    // from the last break is dropped as soon as the room moves on.
-    const [roomPhase, setRoomPhase] = useState<RoomPhase | undefined>(undefined);
+    // from the last break is dropped as soon as the room moves on. Keyed on
+    // the phase and the index together: a locked phone can get one snapshot
+    // that goes straight from one break to the next.
+    const [roomStep, setRoomStep] = useState<string | null>(null);
+    const inBreak = roomStep?.startsWith("mid-scoreboard:") ?? false;
     useEffect(() => {
         reset();
-    }, [roomPhase, reset]);
+    }, [roomStep, reset]);
 
     useEffect(() => {
         // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -64,12 +68,11 @@ const HostObserverView = () => {
         if (gameData.roomCode) {
             const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
                 if (room) {
-                    // Filter out host from players list (since host is in observer mode)
-                    const filteredPlayers = room.players.filter(player => player.id !== room.hostId);
+                    const filteredPlayers = playingPlayers(room);
 
                     // Always update players array to ensure real-time score updates
                     setPlayers(filteredPlayers);
-                    setRoomPhase(room.phase);
+                    setRoomStep(`${room.phase}:${room.currentQuestionIndex ?? 0}`);
 
                     // Update the players at mid-quiz array
                     if (room.playersAtMidQuiz) {
@@ -140,8 +143,8 @@ const HostObserverView = () => {
 
             <NextButton
                 onClick={resume}
-                disabled={resuming || roomPhase !== "mid-scoreboard" || (players.length > 0 && !allPlayersReady)}
-                title={roomPhase !== "mid-scoreboard"
+                disabled={resuming || !inBreak || (players.length > 0 && !allPlayersReady)}
+                title={!inBreak
                     ? "Continue opens at the next mid-quiz break"
                     : !allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question"}
             >
