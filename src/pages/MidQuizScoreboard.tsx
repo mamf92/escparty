@@ -76,6 +76,11 @@ const MidQuizScoreboard = () => {
     }
   }, [isHost, hostIsObserver, navigate, gameData, players]);
 
+  // This player's score. Without router state (a refresh) gameData.score is
+  // 0, so in multiplayer the room's copy wins when it's higher.
+  const roomScore = players.find(p => p.id === gameData.playerId)?.score ?? 0;
+  const myScore = gameData.multiplayer ? Math.max(gameData.score, roomScore) : gameData.score;
+
   // Back to the quiz after the break. In multiplayer the quiz page follows
   // the room from there: onto its current question, or straight on to the
   // next break or the results if the room has already moved past this one.
@@ -91,7 +96,7 @@ const MidQuizScoreboard = () => {
         // break (it used to be incremented again here, which skipped a
         // question at every mid-quiz break).
         currentQuestionIndex: gameData.currentQuestionIndex,
-        score: gameData.score,
+        score: myScore,
         players: gameData.multiplayer ? players : gameData.players,
         multiplayer: gameData.multiplayer,
         roomCode: gameData.roomCode,
@@ -99,7 +104,7 @@ const MidQuizScoreboard = () => {
         hostIsObserver: gameData.multiplayer ? hostIsObserver : false
       }
     });
-  }, [gameData, hostIsObserver, navigate, players]);
+  }, [gameData, hostIsObserver, navigate, players, myScore]);
 
   const continueQuiz = useCallback(async () => {
     if (error) {
@@ -158,14 +163,11 @@ const MidQuizScoreboard = () => {
       }
     }
 
-    // A first guess at whether this user is the host, for the first render.
-    // The room's snapshot below overrides it: localStorage is shared by
-    // every tab, so another tab joining a room can rewrite it.
-    const isUserHost = localStorage.getItem("isHost") === "true";
-    setIsHost(isUserHost);
-    if (isUserHost) {
-      setHostIsObserver(localStorage.getItem("hostIsObserver") === "true");
-    }
+    // Whether this user is the host (and only observes) comes from the
+    // room's snapshot below, never from localStorage: that's shared by
+    // every tab and outlives the game, so another tab, or an old game, can
+    // leave it saying "host" for a guest or a single player. Until the
+    // snapshot arrives nobody gets the host's Continue.
 
     // Set up real-time listener if we have multiplayer details
     if (gameData.multiplayer && gameData.roomCode) {
@@ -235,7 +237,7 @@ const MidQuizScoreboard = () => {
   return (
     <Container>
       <Title>📊 Mid-Quiz Scoreboard</Title>
-      <Score>You scored {gameData.score} so far!</Score>
+      <Score>You scored {myScore} so far!</Score>
       <ScoreTitle>🏆 Current Standings</ScoreTitle>
       <ScoreTable>
         <thead>

@@ -26,6 +26,11 @@ const HostObserverView = () => {
     const [error, setError] = useState<string | null>(null);
     const [playersAtMidQuiz, setPlayersAtMidQuiz] = useState<string[]>([]);
     const [allPlayersReady, setAllPlayersReady] = useState<boolean>(false);
+    // Continue in flight, or failed with a message and a retry. Only the
+    // host can resume the room, so a failure must never strand it on the
+    // dead-end error page with every player waiting at the break.
+    const [resuming, setResuming] = useState(false);
+    const [continueError, setContinueError] = useState<string | null>(null);
 
     const continueQuiz = useCallback(async () => {
         if (error) {
@@ -33,21 +38,24 @@ const HostObserverView = () => {
             return;
         }
 
-        if (gameData.roomCode) {
+        if (gameData.roomCode && !resuming) {
+            setResuming(true);
+            setContinueError(null);
             try {
                 // Start the next question for the whole room; the observer
                 // host doesn't navigate to the quiz itself. Players follow
                 // the room's phase back to the quiz (#63), and the same write
                 // clears the ready marks for the next break. It no-ops if the
-                // room wasn't in a break (a double-click, a second host tab).
+                // room wasn't in a break (a second host tab).
                 await resumeAfterMidQuiz(gameData.roomCode);
-                setError(null); // Clear any local errors
             } catch (err) {
                 console.error("Error in host continue logic:", err);
-                setError("Failed to continue the quiz");
+                setContinueError("Couldn't continue the quiz. Check your connection and try again.");
+            } finally {
+                setResuming(false);
             }
         }
-    }, [gameData.roomCode, navigate, error]);
+    }, [gameData.roomCode, navigate, error, resuming]);
 
     useEffect(() => {
         // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -148,11 +156,12 @@ const HostObserverView = () => {
 
             <NextButton
                 onClick={continueQuiz}
-                disabled={players.length > 0 && !allPlayersReady}
+                disabled={resuming || (players.length > 0 && !allPlayersReady)}
                 title={!allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question"}
             >
-                Continue Quiz
+                {resuming ? "Continuing..." : "Continue Quiz"}
             </NextButton>
+            {continueError && <ErrorMessage>{continueError}</ErrorMessage>}
         </Container>
     );
 };

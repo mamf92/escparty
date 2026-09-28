@@ -471,6 +471,12 @@ await expectAllowed("mark a second player at the break", () =>
 await expectAllowed("mark an already-marked player again (a no-op)", () =>
   updateDoc(walker, { playersAtMidQuiz: arrayUnion("player-2") })
 );
+await expectDenied("mark something that isn't a player ID", () =>
+  updateDoc(walker, { playersAtMidQuiz: arrayUnion(12345) })
+);
+await expectDenied("slip a mark in ahead of the existing ones", () =>
+  updateDoc(walker, { playersAtMidQuiz: ["player-3", "host-1", "player-2"] })
+);
 await expectDenied("clear the ready marks during the break without resuming", () =>
   updateDoc(walker, { playersAtMidQuiz: [] })
 );

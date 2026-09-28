@@ -153,8 +153,9 @@ service cloud.firestore {
 
       return affected.hasOnly(['phase', 'currentQuestionIndex', 'phaseStartedAt', 'playersAtMidQuiz']) &&
              // A phase move may only touch the ready marks to clear them, and
-             // only when resuming (isManagingMidQuizPlayers is the separate,
-             // looser branch for marking and resetting them on their own).
+             // only when resuming. This is the only way to clear them in a
+             // room with a phase: isManagingMidQuizPlayers only lets a player
+             // add their own mark, during the break.
              (!affected.hasAny(['playersAtMidQuiz']) ||
               (existingData.phase == 'mid-scoreboard' &&
                data.playersAtMidQuiz is list &&
@@ -206,22 +207,29 @@ service cloud.firestore {
 
     // A player marking itself ready at the mid-quiz break
     // (markPlayerAtMidQuiz). In a room with a phase (#61), marks only count
-    // while the room is in the break, and a mark only ever adds, one player
-    // per write: clearing them is the resume's job (isAdvancingPhase), and
-    // one client can't mark everyone ready at once. Otherwise a mark that
-    // was queued offline or on a slow network lands after the resume and
-    // counts the player as ready at the next break before they get there
-    // (#63). Rooms without a phase keep the old anything-goes list.
+    // while the room is in the break, and a write may only append one
+    // player ID (a string) to the end of the list, which is what arrayUnion
+    // does: clearing them is the resume's job (isAdvancingPhase), and one
+    // client can't mark everyone ready at once. Otherwise a mark that was
+    // queued offline or on a slow network lands after the resume and counts
+    // the player as ready at the next break before they get there (#63).
+    // Rooms without a phase keep the old anything-goes list.
     function isManagingMidQuizPlayers(affected) {
       let data = request.resource.data;
+      let marks = data.playersAtMidQuiz;
+      let before = resource.data.get('playersAtMidQuiz', []);
 
       return affected.hasOnly(['playersAtMidQuiz']) &&
              'playersAtMidQuiz' in data &&
-             data.playersAtMidQuiz is list &&
+             marks is list &&
              (!('phase' in resource.data) ||
               (resource.data.phase == 'mid-scoreboard' &&
-               data.playersAtMidQuiz.hasAll(resource.data.get('playersAtMidQuiz', [])) &&
-               data.playersAtMidQuiz.size() <= resource.data.get('playersAtMidQuiz', []).size() + 1));
+               // Unchanged: a mark sent again, e.g. after a refresh.
+               (marks == before ||
+                (marks.size() == before.size() + 1 &&
+                 marks.hasAll(before) &&
+                 marks[marks.size() - 1] is string &&
+                 !before.hasAny([marks[marks.size() - 1]])))));
     }
 
     function isValidPlayer(player) {
