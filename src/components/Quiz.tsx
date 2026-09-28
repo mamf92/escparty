@@ -6,7 +6,7 @@ import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
-import { isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
@@ -612,7 +612,7 @@ const Quiz = () => {
   if (error || legacyRoom) {
     return (
       <ErrorContainer>
-        <ErrorMessage>{error ?? "This room was set up by an older version of the app. Start a new room to play."}</ErrorMessage>
+        <ErrorMessage>{error ?? LEGACY_ROOM_MESSAGE}</ErrorMessage>
         <RetryButton onClick={() => navigate("/")}>
           Back to Home
         </RetryButton>

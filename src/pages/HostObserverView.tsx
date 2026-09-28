@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, Room, listenToRoom } from "../utils/roomsFirestore";
-import { ObserverRouteState, isObserverHost, playingPlayers } from "../utils/roomRoles";
+import { LEGACY_ROOM_MESSAGE, ObserverRouteState, isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 
@@ -55,7 +55,9 @@ const HostObserverView = () => {
     useEffect(() => {
         if (!roomCode) return;
         const unsubscribe = listenToRoom(roomCode, (snapshot) => {
-            if (snapshot) {
+            if (snapshot && !snapshot.phase) {
+                setError(LEGACY_ROOM_MESSAGE); // no phase: no break to continue from
+            } else if (snapshot) {
                 setRoom(snapshot);
             } else {
                 setError("Game room no longer exists");
@@ -75,15 +77,21 @@ const HostObserverView = () => {
         );
     }
 
+    // Why Continue is (or isn't) available, in the same order as the
+    // disabled check below.
     const continueHint = !room
         ? "Connecting to the room..."
         : !isRoomObserver
         ? "Only the room's host can continue"
-        : room?.phase === "results"
+        : room.phase === "results"
         ? "The quiz is over"
         : !inBreak
         ? "Continue is for the mid-quiz break"
-        : !allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question";
+        : players.length > 0 && !allPlayersReady
+        ? "Wait for all players to reach the mid-quiz scoreboard"
+        : resuming
+        ? "Continuing..."
+        : "Continue to the next question";
 
     return (
         <Container>

@@ -429,7 +429,7 @@ await expectDenied("advance + rewrite scores in the same write", () =>
     players: [{ id: "host-1", name: "Host", score: 9999 }],
   })
 );
-await expectDenied("mark a player at the break while the room is on a question (a late, queued mark)", () =>
+await expectDenied("mark a player ready while the room is on a question, not in a break", () =>
   updateDoc(resumeTooSoon, { playersAtMidQuiz: arrayUnion("player-2") })
 );
 await expectDenied("resume from a mid-quiz break the room isn't in", () =>

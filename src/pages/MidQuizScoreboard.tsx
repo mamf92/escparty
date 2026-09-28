@@ -5,8 +5,8 @@ import { Player, Room, listenToRoom, markPlayerAtMidQuiz } from "../utils/roomsF
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { hasLeftBreak } from "../utils/quizTiming";
 import { bestKnownScore } from "../utils/quizScoring";
-import { isObserverHost, isRoomHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
-import { readMultiplayerGame } from "../utils/multiplayerSession";
+import { LEGACY_ROOM_MESSAGE, isObserverHost, isRoomHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { readStoredGame } from "../utils/multiplayerSession";
 
 const MidQuizScoreboard = () => {
   const location = useLocation();
@@ -24,17 +24,14 @@ const MidQuizScoreboard = () => {
     playerId: null
   };
 
-  // Set while working out gameData below: a stored game that can't be read
-  // is an error, not a quiet switch to single player.
-  const storedGameUnreadable = useRef(false);
-
   // Router state from the page that brought us here; without any (a direct
   // link, a new or restored tab) this tab's stored multiplayer game, read
   // up front so the very first render already knows it's multiplayer (and
-  // doesn't offer a single-player Continue to a guest).
+  // doesn't offer a single-player Continue to a guest). A stored game that
+  // can't be read is an error, not a quiet switch to single player.
+  const [stored] = useState(() => (location.state ? { game: null, unreadable: false } : readStoredGame()));
   const [gameData] = useState(() => {
-    const session = location.state ? null : readMultiplayerGame();
-    storedGameUnreadable.current = !location.state && !session && sessionStorage.getItem("multiplayerGame") !== null;
+    const session = stored.game;
     return {
       score: locationState.score || 0,
       totalQuestions: locationState.totalQuestions || 0,
@@ -49,7 +46,7 @@ const MidQuizScoreboard = () => {
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(
-    storedGameUnreadable.current ? "Unable to retrieve game data. Please return to the lobby." : null
+    stored.unreadable ? "Unable to retrieve game data. Please return to the lobby." : null
   );
   // Whether this user is the host: set only from the room's snapshot (see
   // the listener below).
@@ -87,6 +84,9 @@ const MidQuizScoreboard = () => {
     if (leftBreakRef.current) return;
     leftBreakRef.current = true;
     navigate(`/quiz/${room?.difficulty ?? gameData.difficulty}`, {
+      // Replace: Back from the quiz shouldn't land on a break that's over
+      // (it would only send the player forward again).
+      replace: true,
       state: {
         // The index of the question after the break: the room's, or in
         // single player the one the quiz handed over (it used to be
@@ -161,6 +161,12 @@ const MidQuizScoreboard = () => {
         if (room) {
           // Always update players array to ensure real-time score updates
           setPlayers(playingPlayers(room));
+
+          // A room from before #61 has no phase to follow (see Quiz.tsx).
+          if (!room.phase) {
+            setError(LEGACY_ROOM_MESSAGE);
+            return;
+          }
 
           // Who's the host, as the room has it. An observer host isn't a
           // player: while the game is on it only passes through here on its

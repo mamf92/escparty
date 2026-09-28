@@ -55,3 +55,11 @@ export const observerRouteState = (
     roomCode,
     playerId,
 });
+
+/**
+ * What every multiplayer screen shows for a room created before #61: it has
+ * no phase to follow, and the old fixed-delay path for it is gone (#63).
+ * Rooms only live for one game, so this only catches a tab left open from
+ * before the upgrade.
+ */
+export const LEGACY_ROOM_MESSAGE = "This room was set up by an older version of the app. Start a new room to play.";

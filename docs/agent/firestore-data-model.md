@@ -113,7 +113,9 @@ The lifecycle:
   so it can't count a player as ready at the next break before they get
   there. Rooms without a phase still accept any list.
   `resetPlayersAtMidQuiz` still exists but nothing calls it, and in a room
-  with a phase the rules now refuse it.
+  with a phase the rules refuse it whenever it would actually clear marks
+  (writing `[]` over an already empty list changes nothing and goes
+  through as a no-op).
 
 ## Security rules
 

@@ -2,20 +2,14 @@ import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, listenToRoom } from "../utils/roomsFirestore";
+import { isObserverHost, playingPlayers } from "../utils/roomRoles";
+import { readMultiplayerGame } from "../utils/multiplayerSession";
 
 interface ScoreEntry {
   score: number;
   total: number;
   date: string;
   difficulty?: string;
-}
-
-interface MultiplayerGameData {
-  multiplayer: boolean;
-  roomCode: string;
-  playerId: string;
-  difficulty?: string;
-  hostIsObserver?: boolean;
 }
 
 const QuizResults = () => {
@@ -45,23 +39,22 @@ const QuizResults = () => {
   const [winner, setWinner] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>(gameData.players || []);
+  // An observer host never played, so it gets the standings without a
+  // score. Decided from the room once it arrives; the quiz page's router
+  // flag only covers the first render.
+  const [isObserver, setIsObserver] = useState<boolean>(!!location.state?.observer);
 
   useEffect(() => {
     // Try to recover multiplayer data from sessionStorage if not in location state
     if (!location.state && !gameData.multiplayer) {
-      const storedData = sessionStorage.getItem('multiplayerGame');
-      if (storedData) {
-        try {
-          const multiplayerData = JSON.parse(storedData) as MultiplayerGameData;
-          setGameData(prev => ({
-            ...prev,
-            multiplayer: true,
-            roomCode: multiplayerData.roomCode,
-            playerId: multiplayerData.playerId
-          }));
-        } catch (e) {
-          console.error("Error parsing multiplayer data from sessionStorage:", e);
-        }
+      const multiplayerData = readMultiplayerGame();
+      if (multiplayerData) {
+        setGameData(prev => ({
+          ...prev,
+          multiplayer: true,
+          roomCode: multiplayerData.roomCode,
+          playerId: multiplayerData.playerId
+        }));
       }
     }
 
@@ -87,12 +80,9 @@ const QuizResults = () => {
       // Set up one final listen to get the final scores
       const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
         if (room) {
-          // Filter out host from players list if host is in observer mode
-          const filteredPlayers = room.hostIsObserver
-            ? room.players.filter(player => player.id !== room.hostId)
-            : room.players;
-
+          const filteredPlayers = playingPlayers(room);
           setPlayers(filteredPlayers);
+          setIsObserver(isObserverHost(room, gameData.playerId));
 
           // Calculate winner from filtered players list
           if (filteredPlayers.length > 0) {
@@ -122,9 +112,7 @@ const QuizResults = () => {
   return (
     <Container>
       <Title>🎉 Quiz Completed! 🎤</Title>
-      {/* An observer host never played (it reaches this page only from a
-          finished room, #63), so it gets the standings without a score. */}
-      {!location.state?.observer && <Score>You scored {gameData.score}!</Score>}
+      {!isObserver && <Score>You scored {gameData.score}!</Score>}
       {winner && <WinnerText>{winner}</WinnerText>}
       {error && <ErrorText>{error}</ErrorText>}
 
