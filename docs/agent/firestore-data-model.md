@@ -74,9 +74,10 @@ The lifecycle:
   snapshot (#62), can't clobber each other. `advanceQuestion` and
   `resumeAfterMidQuiz` are transactions (see above). `updatePlayerScore` runs inside a `runTransaction` —
   Firestore retries it on a conflicting concurrent write, so two
-  near-simultaneous score updates for the same player (e.g. `submitAnswer`
-  and `handleTimeUp` in `Quiz.tsx` both firing near a question's deadline)
-  can't silently drop one of them the way a plain read-modify-write would.
+  near-simultaneous score updates for the same player (e.g. an answer's
+  write and a time's-up repair write in `Quiz.tsx` near a question's
+  deadline) can't silently drop one of them the way a plain
+  read-modify-write would.
 - **Don't add a manual read-modify-write.** `markPlayerAtMidQuiz` used to
   be one (`getDoc` then `updateDoc` with a recomputed array); once #62 put
   every player at the break at the same moment, concurrent calls dropped
@@ -92,8 +93,10 @@ The lifecycle:
 - `playersAtMidQuiz` — array of player IDs who have reached the mid-quiz
   scoreboard, built via `markPlayerAtMidQuiz` (`arrayUnion`) and cleared by
   `resumeAfterMidQuiz` in the same write that ends the break, so a
-  half-failed resume can't leave stale marks for the next one. The rules
-  only let a resume clear it. `resetPlayersAtMidQuiz` still exists but
+  half-failed resume can't leave stale marks for the next one. Among phase
+  moves, only the resume may touch it (and only to clear it); the separate
+  `isManagingMidQuizPlayers` branch still accepts any list on its own, which
+  `markPlayerAtMidQuiz` and older bundles' `resetPlayersAtMidQuiz` rely on. `resetPlayersAtMidQuiz` still exists but
   nothing calls it any more.
 
 ## Security rules

@@ -36,7 +36,7 @@ red run doesn't yet block merge or deploy (see #57). See
 ## Where things live
 
 `src/pages/` holds most screens; `src/components/` currently has only
-`MobileFrame.tsx` (the phone-frame chrome) and `Quiz.tsx` (728 lines — the
+`MobileFrame.tsx` (the phone-frame chrome) and `Quiz.tsx` (~920 lines — the
 biggest single file in the app, despite the folder name most "components"
 are pages). `src/fabric-ui/` is a self-contained WebGL rendering module for
 the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one

@@ -154,7 +154,7 @@ open at the time of writing:
   and `.github/pull_request_template.md` still treat "no tests for a new
   component" as a known gap to note rather than a blocking finding. #58
   flips that; don't hand-wire it before then.
-- **Pre-existing debt.** `Quiz.tsx` (728 lines, the multiplayer branching
+- **Pre-existing debt.** `Quiz.tsx` (~920 lines, the multiplayer branching
   logic) and `src/fabric-ui/` are the obvious first targets — tracked as #59.
 
 Until #58 lands, treat a PR checklist item about tests honestly: say what is

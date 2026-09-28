@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import styled from "styled-components";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
@@ -335,6 +335,7 @@ const Quiz = () => {
   const advanceInFlightRef = useRef(false);
   const leftQuizRef = useRef(false);
   const markTimeUpRef = useRef<() => void>(() => { });
+  const lockQuestionRef = useRef<(options: { hideTimer: boolean }) => void>(() => { });
 
   // Whoever ends a question first wins and everyone else's attempt is a
   // no-op, but each attempt is a transaction on the same document. So one
@@ -342,10 +343,11 @@ const Quiz = () => {
   // first player by ID when the host only observes. Everyone else waits a
   // moment (spread per player) and only steps in if the room hasn't moved
   // on, e.g. the leader closed their tab.
-  const advanceLeaderId = room
+  const advanceLeaderId = useMemo(() => room
     ? (room.hostIsObserver ? room.players.filter(p => p.id !== room.hostId) : [{ id: room.hostId }])
         .map(p => p.id).sort()[0]
-    : undefined;
+    : undefined, [room]);
+  const storedScore = room?.players.find(p => p.id === playerId)?.score ?? 0;
   const advanceGraceMs = playerId && playerId === advanceLeaderId
     ? 0
     : 1500 + ([...(playerId ?? "")].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 1000);
@@ -393,10 +395,9 @@ const Quiz = () => {
     if (!sharedClock || room?.phase !== "question") return;
     if ((room.currentQuestionIndex ?? 0) !== currentQuestionIndex) return;
     if (answeredIndex >= currentQuestionIndex && !isSubmitted) {
-      isSubmittedRef.current = true;
-      setIsSubmitted(true);
-      setIsTimerVisible(false);
-      setShowFeedback(true);
+      // Keep the timer: its points display would read 0 for a question
+      // that was scored before the refresh.
+      lockQuestionRef.current({ hideTimer: false });
     }
   }, [sharedClock, room?.phase, room?.currentQuestionIndex, currentQuestionIndex, answeredIndex, isSubmitted]);
 
@@ -482,19 +483,32 @@ const Quiz = () => {
     }
   }, [sharedClock, room, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
-  // Time's up without an answer (both clocks): lock the question and show
-  // feedback with 0 points. The score didn't change, so nothing to write:
-  // an unchanged-score write from every timed-out player at once only
-  // competes with real score writes on the room document.
-  const markTimeUp = () => {
+  // Lock the current question: no more answers, show its feedback.
+  const lockQuestion = ({ hideTimer }: { hideTimer: boolean }) => {
     isSubmittedRef.current = true;
     setIsSubmitted(true);
-    setIsTimerVisible(false);
-    setCurrentQuestionPoints(0);
     setShowFeedback(true);
+    if (hideTimer) setIsTimerVisible(false);
+  };
+
+  // Time's up without an answer (both clocks): lock the question with 0
+  // points. Normally the score didn't change, so nothing is written (an
+  // unchanged-score write from every timed-out player at once only competes
+  // with real score writes). But if an earlier score write failed, the room
+  // is behind this client, and this is the chance to repair it.
+  const markTimeUp = () => {
+    lockQuestion({ hideTimer: true });
+    setCurrentQuestionPoints(0);
     rememberAnswered(currentQuestionIndex);
+
+    if (isMultiplayer && roomCode && playerId && score > storedScore) {
+      void updatePlayerScore(roomCode, playerId, score).catch(error => {
+        console.error("Failed to update score:", error);
+      });
+    }
   };
   markTimeUpRef.current = markTimeUp;
+  lockQuestionRef.current = lockQuestion;
 
   // Local clock only: time's up, then 5 seconds of feedback
   const handleTimeUp = () => {
@@ -567,9 +581,20 @@ const Quiz = () => {
     if (!answer) return;
     if (sharedClock && roomStartMs !== null && !questionClock(roomStartMs, Date.now()).answeringOpen) return;
 
+    const answeredQuestion = currentQuestionIndex;
     setIsSubmitted(true);
     setIsTimerVisible(false); // Hide timer when answer is submitted
-    rememberAnswered(currentQuestionIndex);
+
+    // Show feedback right away, before awaiting any score write: if the
+    // write is slow and the room moves on meanwhile, a late
+    // setShowFeedback(true) would land on (and lock) the next question.
+    // Locally: remaining question time PLUS 5 seconds; in multiplayer the
+    // shared tick counts down to the slot's end.
+    setShowFeedback(true);
+    if (!sharedClock) {
+      const feedbackTime = Math.min(timeLeft, QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
+      setTimeLeft(feedbackTime);
+    }
 
     // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
@@ -585,10 +610,14 @@ const Quiz = () => {
       const newScore = score + pointsForAnswer;
       setScore(newScore);
 
-      // If multiplayer, update score in Firestore
+      // If multiplayer, update score in Firestore. The question only counts
+      // as answered once the score is safely stored: a refresh while the
+      // write is in flight drops it, and the player should get to answer
+      // again rather than find the question locked with the points lost.
       if (isMultiplayer && roomCode && playerId) {
         try {
           await updatePlayerScore(roomCode, playerId, newScore);
+          rememberAnswered(answeredQuestion);
         } catch (error) {
           console.error("Failed to update score:", error);
         }
@@ -596,14 +625,7 @@ const Quiz = () => {
     } else {
       // If answer is incorrect, set points to 0
       setCurrentQuestionPoints(0);
-    }
-
-    // Show feedback after submission. Locally: remaining question time PLUS
-    // 5 seconds; in multiplayer the shared tick counts down to the slot's end.
-    setShowFeedback(true);
-    if (!sharedClock) {
-      const feedbackTime = Math.min(timeLeft, QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
-      setTimeLeft(feedbackTime);
+      rememberAnswered(answeredQuestion);
     }
   };
 

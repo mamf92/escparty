@@ -152,7 +152,9 @@ service cloud.firestore {
       let existingData = resource.data;
 
       return affected.hasOnly(['phase', 'currentQuestionIndex', 'phaseStartedAt', 'playersAtMidQuiz']) &&
-             // The ready marks may only be cleared, and only by the resume.
+             // A phase move may only touch the ready marks to clear them, and
+             // only when resuming (isManagingMidQuizPlayers is the separate,
+             // looser branch for marking and resetting them on their own).
              (!affected.hasAny(['playersAtMidQuiz']) ||
               (existingData.phase == 'mid-scoreboard' &&
                data.playersAtMidQuiz is list &&
