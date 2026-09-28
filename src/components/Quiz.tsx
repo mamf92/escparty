@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
 import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
-import { loadQuizData, filterEnabledQuestions, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
+import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
@@ -224,6 +224,15 @@ const Quiz = () => {
         if (!quizData || !Array.isArray(quizData)) {
           console.error("❌ Quiz data is not in expected format:", quizData);
           setError("Quiz data format is invalid");
+          setLoading(false);
+          return;
+        }
+
+        // In multiplayer, a client that could only load the small built-in
+        // bank would be on different questions from everyone else, and its
+        // shorter quiz could end the game for the whole room. Stop here.
+        if (multiplayerData?.multiplayer && isFallbackQuizData(quizData)) {
+          setError("Couldn't load this quiz's questions. Check your connection and reload the page to rejoin.");
           setLoading(false);
           return;
         }

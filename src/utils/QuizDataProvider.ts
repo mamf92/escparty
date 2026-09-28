@@ -77,6 +77,16 @@ const fallbackQuizData: Record<QuizDifficulty, QuizQuestion[]> = {
     ]
 };
 
+/**
+ * Whether `questions` is the small hardcoded bank `loadQuizData` falls back
+ * to when both the bundled import and the fetch fail. In multiplayer a
+ * client on it has different questions (and a different count) from the
+ * rest of the room, so it mustn't play along, let alone end the quiz for
+ * everyone. Pass the array `loadQuizData` returned, before filtering.
+ */
+export const isFallbackQuizData = (questions: QuizQuestion[]): boolean =>
+    (Object.values(fallbackQuizData) as QuizQuestion[][]).includes(questions);
+
 // Map difficulty levels to file names
 const difficultyToFileName = {
     'easy': 'escBeginnerQuiz.json',
