@@ -57,6 +57,8 @@ const Quiz = () => {
   const sharedClock = isMultiplayer && !!room?.phase;
   const localClock = !isMultiplayer || (room !== null && !room.phase);
   const roomStartMs = startedAtMillis(room?.phaseStartedAt);
+  // This player's score as the room has it.
+  const storedScore = room?.players.find(p => p.id === playerId)?.score ?? 0;
 
   // Calculate current question based on currentQuestionIndex and questions array
   const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
@@ -347,7 +349,7 @@ const Quiz = () => {
     ? (room.hostIsObserver ? room.players.filter(p => p.id !== room.hostId) : [{ id: room.hostId }])
         .map(p => p.id).sort()[0]
     : undefined, [room]);
-  const storedScore = room?.players.find(p => p.id === playerId)?.score ?? 0;
+
   const advanceGraceMs = playerId && playerId === advanceLeaderId
     ? 0
     : 1500 + ([...(playerId ?? "")].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 1000);
@@ -356,7 +358,11 @@ const Quiz = () => {
   // sessionStorage so a refresh can't reopen it and score it a second time.
   const answeredKey = roomCode ? `answeredQuestion:${roomCode}` : null;
   const rememberAnswered = (index: number) => {
-    if (sharedClock && answeredKey) sessionStorage.setItem(answeredKey, String(index));
+    if (!sharedClock || !answeredKey) return;
+    // Only ever move forward: a slow score write for an earlier question
+    // can resolve after a later one was answered.
+    const current = Number(sessionStorage.getItem(answeredKey) ?? -1);
+    if (index > current) sessionStorage.setItem(answeredKey, String(index));
   };
   const answeredIndex = answeredKey ? Number(sessionStorage.getItem(answeredKey) ?? -1) : -1;
 
@@ -365,12 +371,11 @@ const Quiz = () => {
   // refuses a write lower than what's stored, so every later answer would
   // otherwise be dropped.
   useEffect(() => {
-    if (!sharedClock || !room || !playerId) return;
-    const stored = room.players.find(p => p.id === playerId)?.score ?? 0;
-    if (stored > score) {
-      setScore(stored);
+    if (!sharedClock || !playerId) return;
+    if (storedScore > score) {
+      setScore(storedScore);
     }
-  }, [sharedClock, room, playerId, score]);
+  }, [sharedClock, playerId, storedScore, score]);
 
   // Follow the room onto its current question. This is the only place the
   // question index changes in multiplayer.
@@ -492,20 +497,14 @@ const Quiz = () => {
   };
 
   // Time's up without an answer (both clocks): lock the question with 0
-  // points. Normally the score didn't change, so nothing is written (an
+  // points. The score didn't change, so nothing is written: an
   // unchanged-score write from every timed-out player at once only competes
-  // with real score writes). But if an earlier score write failed, the room
-  // is behind this client, and this is the chance to repair it.
+  // with real score writes. (A failed answer write is retried where it
+  // fails, in submitAnswer.)
   const markTimeUp = () => {
     lockQuestion({ hideTimer: true });
     setCurrentQuestionPoints(0);
     rememberAnswered(currentQuestionIndex);
-
-    if (isMultiplayer && roomCode && playerId && score > storedScore) {
-      void updatePlayerScore(roomCode, playerId, score).catch(error => {
-        console.error("Failed to update score:", error);
-      });
-    }
   };
   markTimeUpRef.current = markTimeUp;
   lockQuestionRef.current = lockQuestion;
@@ -582,15 +581,13 @@ const Quiz = () => {
     if (sharedClock && roomStartMs !== null && !questionClock(roomStartMs, Date.now()).answeringOpen) return;
 
     const answeredQuestion = currentQuestionIndex;
-    setIsSubmitted(true);
-    setIsTimerVisible(false); // Hide timer when answer is submitted
+    lockQuestion({ hideTimer: true }); // also flags the ref the shared tick reads
 
-    // Show feedback right away, before awaiting any score write: if the
-    // write is slow and the room moves on meanwhile, a late
-    // setShowFeedback(true) would land on (and lock) the next question.
+    // Feedback shows right away (lockQuestion above), before awaiting any
+    // score write: if the write is slow and the room moves on meanwhile, a
+    // late setShowFeedback(true) would land on (and lock) the next question.
     // Locally: remaining question time PLUS 5 seconds; in multiplayer the
     // shared tick counts down to the slot's end.
-    setShowFeedback(true);
     if (!sharedClock) {
       const feedbackTime = Math.min(timeLeft, QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
       setTimeLeft(feedbackTime);
@@ -614,12 +611,19 @@ const Quiz = () => {
       // as answered once the score is safely stored: a refresh while the
       // write is in flight drops it, and the player should get to answer
       // again rather than find the question locked with the points lost.
+      // A failed write is retried a couple of times, since nothing else
+      // would repair it: the room (and every scoreboard built from it)
+      // would keep the lower score.
       if (isMultiplayer && roomCode && playerId) {
-        try {
-          await updatePlayerScore(roomCode, playerId, newScore);
-          rememberAnswered(answeredQuestion);
-        } catch (error) {
-          console.error("Failed to update score:", error);
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            await updatePlayerScore(roomCode, playerId, newScore);
+            rememberAnswered(answeredQuestion);
+            break;
+          } catch (error) {
+            console.error(`Failed to update score (attempt ${attempt} of 3):`, error);
+            if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
         }
       }
     } else {
