@@ -36,7 +36,7 @@ any of it, update this file in the same PR rather than leaving it stale.
    with `advanceQuestion` (one write lands, the rest are no-ops). When the
    room's phase becomes `mid-scoreboard` or `results`, every player
    navigates there. An observer host doesn't play: Lobby (or, failing that,
-   the quiz page) sends it to `/host-observer`, where it stays for the whole
+   the quiz page or the break screen) sends it to `/host-observer`, where it stays for the whole
    game: that screen doesn't follow the room to the results yet (#21). Only
    an observer that opens the lobby or quiz page after the game has ended
    is sent on to the results (`shouldObserve` in `roomRoles.ts`). Any

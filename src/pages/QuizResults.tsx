@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Player, listenToRoom } from "../utils/roomsFirestore";
 import { isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
+import { bestKnownScore } from "../utils/quizScoring";
 
 interface ScoreEntry {
   score: number;
@@ -26,13 +27,20 @@ const QuizResults = () => {
     playerId: null
   };
 
-  const [gameData, setGameData] = useState({
-    score: locationState.score || 0,
-    totalQuestions: locationState.totalQuestions || 0,
-    multiplayer: locationState.multiplayer || false,
-    roomCode: locationState.roomCode || null,
-    playerId: locationState.playerId || null,
-    players: locationState.players || []
+  // Without router state (a direct link, a new tab) this tab's stored
+  // multiplayer game, read up front so the first render (and the effect
+  // below) already knows it's multiplayer rather than showing single-player
+  // history.
+  const [gameData] = useState(() => {
+    const session = location.state ? null : readMultiplayerGame();
+    return {
+      score: locationState.score || 0,
+      totalQuestions: locationState.totalQuestions || 0,
+      multiplayer: session ? true : (locationState.multiplayer || false),
+      roomCode: session?.roomCode ?? (locationState.roomCode || null),
+      playerId: session?.playerId ?? (locationState.playerId || null),
+      players: locationState.players || []
+    };
   });
 
   const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
@@ -45,19 +53,6 @@ const QuizResults = () => {
   const [isObserver, setIsObserver] = useState<boolean>(!!location.state?.observer);
 
   useEffect(() => {
-    // Try to recover multiplayer data from sessionStorage if not in location state
-    if (!location.state && !gameData.multiplayer) {
-      const multiplayerData = readMultiplayerGame();
-      if (multiplayerData) {
-        setGameData(prev => ({
-          ...prev,
-          multiplayer: true,
-          roomCode: multiplayerData.roomCode,
-          playerId: multiplayerData.playerId
-        }));
-      }
-    }
-
     // Clear session storage data as we're at the end of the game
     sessionStorage.removeItem('multiplayerGame');
 
@@ -112,7 +107,11 @@ const QuizResults = () => {
   return (
     <Container>
       <Title>🎉 Quiz Completed! 🎤</Title>
-      {!isObserver && <Score>You scored {gameData.score}!</Score>}
+      {!isObserver && (
+        <Score>
+          You scored {gameData.multiplayer ? bestKnownScore(gameData.score, players, gameData.playerId) : gameData.score}!
+        </Score>
+      )}
       {winner && <WinnerText>{winner}</WinnerText>}
       {error && <ErrorText>{error}</ErrorText>}
 
@@ -137,7 +136,7 @@ const QuizResults = () => {
               </tr>
             </thead>
             <tbody>
-              {players.sort((a: Player, b: Player) => b.score - a.score).map((player: Player) => (
+              {[...players].sort((a: Player, b: Player) => b.score - a.score).map((player: Player) => (
                 <tr key={player.id}>
                   <td>{player.name}{player.id === gameData.playerId ? " (You)" : ""}</td>
                   <td>{player.score}</td>

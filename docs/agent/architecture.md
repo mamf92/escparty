@@ -90,8 +90,10 @@ plan that also removes the ad hoc storage it would duplicate.
 
 - `multiplayerSession.ts` — `readMultiplayerGame()`, this tab's stored
   multiplayer game (`sessionStorage` `multiplayerGame`: room code, player
-  ID, difficulty) for pages opened without router state (#63). Used by the
-  quiz page, the break screen and the observer screen. 100% coverage floor.
+  ID, difficulty) for pages opened without router state (#63), and
+  `readStoredGame()`, which also tells "nothing stored" from "stored but
+  unreadable" and never throws. Used by the quiz page, the break screen,
+  the observer screen and the results page. 100% coverage floor.
 
 ## `src/hooks/`
 
