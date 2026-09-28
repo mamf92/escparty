@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, resumeAfterMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom } from "../utils/roomsFirestore";
+import { useResumeRoom } from "../hooks/useResumeRoom";
 
 const HostObserverView = () => {
     const location = useLocation();
@@ -26,36 +27,19 @@ const HostObserverView = () => {
     const [error, setError] = useState<string | null>(null);
     const [playersAtMidQuiz, setPlayersAtMidQuiz] = useState<string[]>([]);
     const [allPlayersReady, setAllPlayersReady] = useState<boolean>(false);
-    // Continue in flight, or failed with a message and a retry. Only the
-    // host can resume the room, so a failure must never strand it on the
-    // dead-end error page with every player waiting at the break.
-    const [resuming, setResuming] = useState(false);
-    const [continueError, setContinueError] = useState<string | null>(null);
+    // Start the next question for the whole room; the observer host doesn't
+    // navigate to the quiz itself. Players follow the room's phase back to
+    // the quiz (#63), and the same write clears the ready marks for the next
+    // break.
+    const { resume, resuming, resumeError } = useResumeRoom(gameData.roomCode);
 
     const continueQuiz = useCallback(async () => {
         if (error) {
             navigate("/multiplayer");
             return;
         }
-
-        if (gameData.roomCode && !resuming) {
-            setResuming(true);
-            setContinueError(null);
-            try {
-                // Start the next question for the whole room; the observer
-                // host doesn't navigate to the quiz itself. Players follow
-                // the room's phase back to the quiz (#63), and the same write
-                // clears the ready marks for the next break. It no-ops if the
-                // room wasn't in a break (a second host tab).
-                await resumeAfterMidQuiz(gameData.roomCode);
-            } catch (err) {
-                console.error("Error in host continue logic:", err);
-                setContinueError("Couldn't continue the quiz. Check your connection and try again.");
-            } finally {
-                setResuming(false);
-            }
-        }
-    }, [gameData.roomCode, navigate, error, resuming]);
+        await resume();
+    }, [navigate, error, resume]);
 
     useEffect(() => {
         // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -161,7 +145,7 @@ const HostObserverView = () => {
             >
                 {resuming ? "Continuing..." : "Continue Quiz"}
             </NextButton>
-            {continueError && <ErrorMessage>{continueError}</ErrorMessage>}
+            {resumeError && <ErrorMessage>{resumeError}</ErrorMessage>}
         </Container>
     );
 };

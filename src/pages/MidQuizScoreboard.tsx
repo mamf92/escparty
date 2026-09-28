@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, markPlayerAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
+import { Player, Room, listenToRoom, markPlayerAtMidQuiz } from "../utils/roomsFirestore";
+import { useResumeRoom } from "../hooks/useResumeRoom";
 import { hasLeftBreak } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
@@ -46,10 +47,11 @@ const MidQuizScoreboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [hostIsObserver, setHostIsObserver] = useState(gameData.hostIsObserver);
-  // The host's Continue: in flight until the room resumes and the listener
-  // takes everyone back, or failed with a message and a retry.
-  const [resuming, setResuming] = useState(false);
-  const [continueError, setContinueError] = useState<string | null>(null);
+  // The host's Continue. Nobody navigates on it: everyone, the host
+  // included, goes back when the listener below sees the room resumed
+  // (#63). That also covers a second host tab, or a resume whose reply got
+  // lost.
+  const { resume, resuming, resumeError } = useResumeRoom(gameData.multiplayer ? gameData.roomCode : null);
 
   // Which break this is: the index of the question after it. Router state
   // carries it; after a refresh there's none, so it's taken from the room's
@@ -84,27 +86,35 @@ const MidQuizScoreboard = () => {
   // Back to the quiz after the break. In multiplayer the quiz page follows
   // the room from there: onto its current question, or straight on to the
   // next break or the results if the room has already moved past this one.
+  // In multiplayer it's called from the room listener with that snapshot,
+  // so everything it hands on comes from the room rather than from state
+  // the same snapshot is still updating.
   const leftBreakRef = useRef(false);
-  const returnToQuiz = useCallback(() => {
+  const returnToQuiz = useCallback((room?: Room) => {
     // Once only: a second snapshot before this page unmounts would navigate
     // again, and the quiz page reloads on every navigation.
     if (leftBreakRef.current) return;
     leftBreakRef.current = true;
-    navigate(`/quiz/${roomDifficultyRef.current ?? gameData.difficulty}`, {
+    const roomPlayers = room?.players ?? players;
+    const roomScoreNow = roomPlayers.find(p => p.id === gameData.playerId)?.score ?? 0;
+    navigate(`/quiz/${room?.difficulty ?? roomDifficultyRef.current ?? gameData.difficulty}`, {
       state: {
-        // The quiz already hands us the index of the question after the
-        // break (it used to be incremented again here, which skipped a
-        // question at every mid-quiz break).
-        currentQuestionIndex: gameData.currentQuestionIndex,
-        score: myScore,
-        players: gameData.multiplayer ? players : gameData.players,
+        // The index of the question after the break: the quiz hands it over
+        // (it used to be incremented again here, which skipped a question at
+        // every mid-quiz break), or after a refresh it comes from the room.
+        currentQuestionIndex: room?.currentQuestionIndex ?? breakIndexRef.current ?? gameData.currentQuestionIndex,
+        score: gameData.multiplayer ? Math.max(gameData.score, roomScoreNow) : gameData.score,
+        players: gameData.multiplayer ? roomPlayers : gameData.players,
         multiplayer: gameData.multiplayer,
         roomCode: gameData.roomCode,
         playerId: gameData.playerId,
-        hostIsObserver: gameData.multiplayer ? hostIsObserver : false
+        // Only players come back to the quiz (observer hosts stay on
+        // HostObserverView), and true here would send them straight back
+        // to this page.
+        hostIsObserver: false
       }
     });
-  }, [gameData, hostIsObserver, navigate, players, myScore]);
+  }, [gameData, navigate, players]);
 
   const continueQuiz = useCallback(async () => {
     if (error) {
@@ -117,23 +127,10 @@ const MidQuizScoreboard = () => {
       return;
     }
 
-    // The host starts the next question for the whole room. It doesn't
-    // navigate here: everyone, the host included, goes back when the
-    // listener below sees the room resumed (#63). That also covers a
-    // second host tab, or a resume whose reply got lost. The button stays
-    // disabled meanwhile, so repeated taps don't queue more transactions.
-    if (isHost && gameData.roomCode && !resuming) {
-      setResuming(true);
-      setContinueError(null);
-      try {
-        await resumeAfterMidQuiz(gameData.roomCode);
-      } catch (err) {
-        console.error("Error in host continue logic:", err);
-        setContinueError("Couldn't continue the quiz. Check your connection and try again.");
-        setResuming(false);
-      }
+    if (isHost) {
+      await resume();
     }
-  }, [gameData.multiplayer, gameData.roomCode, isHost, navigate, error, returnToQuiz, resuming]);
+  }, [gameData.multiplayer, isHost, navigate, error, returnToQuiz, resume]);
 
   const returnToQuizRef = useRef(returnToQuiz);
   useEffect(() => {
@@ -212,7 +209,7 @@ const MidQuizScoreboard = () => {
           // gets this player there, via the quiz page. Observer hosts stay
           // on HostObserverView instead.
           if (!observerHost && hasLeftBreak(room.phase, roomIndex, breakIndexRef.current ?? -1)) {
-            returnToQuizRef.current();
+            returnToQuizRef.current(room);
           }
         } else {
           setError("Game room no longer exists");
@@ -264,7 +261,7 @@ const MidQuizScoreboard = () => {
           <NextButton onClick={continueQuiz} disabled={resuming}>
             {resuming ? "Continuing..." : "Continue Quiz"}
           </NextButton>
-          {continueError && <ErrorMessage>{continueError}</ErrorMessage>}
+          {resumeError && <ErrorMessage>{resumeError}</ErrorMessage>}
         </>
       ) : (
         <WaitingMessage>Waiting for the host to continue...</WaitingMessage>

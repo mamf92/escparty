@@ -1,0 +1,53 @@
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useResumeRoom } from "./useResumeRoom";
+
+const mocks = vi.hoisted(() => ({ resumeAfterMidQuiz: vi.fn() }));
+vi.mock("../utils/roomsFirestore", () => ({ resumeAfterMidQuiz: mocks.resumeAfterMidQuiz }));
+
+describe("useResumeRoom", () => {
+    beforeEach(() => {
+        mocks.resumeAfterMidQuiz.mockReset();
+        vi.spyOn(console, "error").mockImplementation(() => { });
+    });
+
+    it("resumes the room and is idle again afterwards", async () => {
+        mocks.resumeAfterMidQuiz.mockResolvedValue(true);
+        const { result } = renderHook(() => useResumeRoom("ABCD"));
+        await act(() => result.current.resume());
+        expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledWith("ABCD");
+        expect(result.current.resuming).toBe(false);
+        expect(result.current.resumeError).toBeNull();
+    });
+
+    it("ignores a second tap while a resume is in flight", async () => {
+        let finish: (value: boolean) => void = () => { };
+        mocks.resumeAfterMidQuiz.mockReturnValue(new Promise<boolean>((resolve) => { finish = resolve; }));
+        const { result } = renderHook(() => useResumeRoom("ABCD"));
+        let first: Promise<void> = Promise.resolve();
+        act(() => {
+            first = result.current.resume();
+            void result.current.resume(); // same render: the state still says idle
+        });
+        expect(result.current.resuming).toBe(true);
+        await act(async () => { finish(true); await first; });
+        expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows a retryable error when the resume fails, and a retry clears it", async () => {
+        mocks.resumeAfterMidQuiz.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(true);
+        const { result } = renderHook(() => useResumeRoom("ABCD"));
+        await act(() => result.current.resume());
+        expect(result.current.resumeError).toMatch(/try again/);
+        expect(result.current.resuming).toBe(false);
+        await act(() => result.current.resume());
+        expect(result.current.resumeError).toBeNull();
+        expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing without a room", async () => {
+        const { result } = renderHook(() => useResumeRoom(null));
+        await act(() => result.current.resume());
+        expect(mocks.resumeAfterMidQuiz).not.toHaveBeenCalled();
+    });
+});

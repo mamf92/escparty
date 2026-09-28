@@ -135,7 +135,8 @@ open at the time of writing:
   `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts`, the
   extracted scoring math in `src/utils/quizScoring.ts` and the multiplayer
   timing in `src/utils/quizTiming.ts` have unit tests with a coverage floor
-  (#56, #62). `src/pages/Home.test.tsx` is still the only
+  (#56, #62); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
+  floor. `src/pages/Home.test.tsx` is still the only
   component test — every other page and `Quiz.tsx` itself are uncovered,
   which is #59.
 - **`Quiz.tsx` is covered only where it was extracted.** The scoring formula

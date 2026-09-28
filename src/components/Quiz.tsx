@@ -459,12 +459,13 @@ const Quiz = () => {
   }, [sharedClock, loading, room?.phase, room?.currentQuestionIndex, roomStartMs, currentQuestionIndex, roomCode, questions.length, advanceGraceMs]);
 
   // When the room leaves the question phase, everyone goes where it went.
-  // Waits for the questions to load, so the next page gets the real
-  // question count, and hands on the room's copy of this player's score if
-  // it's higher: a player coming back from a refresh or a locked phone may
-  // not have picked it back up yet.
+  // Waits for the question load to finish (not to succeed: a player whose
+  // load failed still follows the room to the results), so the next page
+  // gets the real question count when there is one, and hands on the
+  // room's copy of this player's score if it's higher: a player coming back
+  // from a refresh or a locked phone may not have picked it back up yet.
   useEffect(() => {
-    if (!sharedClock || !room || loading || questions.length === 0 || leftQuizRef.current) return;
+    if (!sharedClock || !room || loading || leftQuizRef.current) return;
     const bestScore = Math.max(score, storedScore);
     if (room.phase === "mid-scoreboard") {
       leftQuizRef.current = true;

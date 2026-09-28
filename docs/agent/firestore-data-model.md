@@ -103,7 +103,9 @@ The lifecycle:
   (`isManagingMidQuizPlayers`, #63), a room with a phase only accepts marks
   while it's in `"mid-scoreboard"`, and only ones that append a single
   player ID string, as `arrayUnion` does (so one client can't mark everyone
-  ready in one write), or leave the list unchanged: a mark queued
+  ready in one write), or leave the list unchanged. Without sign-in the
+  rules can't tell whose ID a mark is, so a client could still mark others
+  one write at a time; per-player state on the room is #64. A mark queued
   offline or on a slow network that arrives after the resume is refused,
   so it can't count a player as ready at the next break before they get
   there. Rooms without a phase still accept any list.

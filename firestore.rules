@@ -154,8 +154,8 @@ service cloud.firestore {
       return affected.hasOnly(['phase', 'currentQuestionIndex', 'phaseStartedAt', 'playersAtMidQuiz']) &&
              // A phase move may only touch the ready marks to clear them, and
              // only when resuming. This is the only way to clear them in a
-             // room with a phase: isManagingMidQuizPlayers only lets a player
-             // add their own mark, during the break.
+             // room with a phase: isManagingMidQuizPlayers only lets a write
+             // append one mark, during the break.
              (!affected.hasAny(['playersAtMidQuiz']) ||
               (existingData.phase == 'mid-scoreboard' &&
                data.playersAtMidQuiz is list &&
@@ -210,7 +210,10 @@ service cloud.firestore {
     // while the room is in the break, and a write may only append one
     // player ID (a string) to the end of the list, which is what arrayUnion
     // does: clearing them is the resume's job (isAdvancingPhase), and one
-    // client can't mark everyone ready at once. Otherwise a mark that was
+    // client can't mark everyone ready in a single write. (Without sign-in
+    // the rules can't tell whose ID a mark is, so a client could still mark
+    // others one write at a time; per-player state on the room is #64.)
+    // Otherwise a mark that was
     // queued offline or on a slow network lands after the resume and counts
     // the player as ready at the next break before they get there (#63).
     // Rooms without a phase keep the old anything-goes list.

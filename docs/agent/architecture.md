@@ -78,6 +78,15 @@ plan that also removes the ad hoc storage it would duplicate.
   (but not `isProductionPreview`). The Vite `base` config (`/` on Vercel,
   `/escparty/` for any other production build) flows through `getAssetPath`.
 
+## `src/hooks/`
+
+- `useResumeRoom.ts` — the host's Continue at a mid-quiz break (#63), used
+  by `MidQuizScoreboard.tsx` and `HostObserverView.tsx`: calls
+  `resumeAfterMidQuiz`, ignores a second tap while one is in flight, and
+  turns a failure into a retryable message. It never navigates; every
+  screen follows the room's phase instead. Tested in
+  `useResumeRoom.test.ts`.
+
 ## `src/firebase.ts`
 
 Firebase app + Firestore init from `VITE_FIREBASE_*` env vars. Connects to
