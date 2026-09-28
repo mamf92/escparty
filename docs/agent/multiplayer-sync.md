@@ -38,9 +38,11 @@ any of it, update this file in the same PR rather than leaving it stale.
    via `markPlayerAtMidQuiz` (`arrayUnion`, since everyone arrives at once).
    The host's continue calls `resumeAfterMidQuiz` (the room back to
    `phase: "question"` at the next question, clearing the ready marks), and
-   that's the whole signal (#63): each scoreboard returns to the quiz once
-   its snapshot shows the room on the question after the break, however
-   late that snapshot arrives. The old `continueReady` flag was set and
+   that's the whole signal (#63): each scoreboard, the host's included,
+   returns to the quiz as soon as its snapshot shows the room out of this
+   break, however late that snapshot arrives. If the room has already
+   reached the results (a phone locked through the rest of the quiz), the
+   quiz page sends the player straight on there. The old `continueReady` flag was set and
    reset 3s later, so a throttled or offline client could miss it and get
    stuck (#23). The rules refuse a ready mark that arrives after the
    resume. `HostObserverView.tsx` is the host-only screen when

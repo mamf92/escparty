@@ -62,81 +62,60 @@ const MidQuizScoreboard = () => {
     }
   }, [isHost, hostIsObserver, navigate, gameData, players]);
 
+  // Back to the quiz after the break. In multiplayer the quiz page follows
+  // the room from there: onto its current question, or straight on to the
+  // next break or the results if the room has already moved past this one.
+  const leftBreakRef = useRef(false);
+  const returnToQuiz = useCallback(() => {
+    // Once only: a second snapshot before this page unmounts would navigate
+    // again, and the quiz page reloads on every navigation.
+    if (leftBreakRef.current) return;
+    leftBreakRef.current = true;
+    navigate(`/quiz/${gameData.difficulty}`, {
+      state: {
+        // The quiz already hands us the index of the question after the
+        // break (it used to be incremented again here, which skipped a
+        // question at every mid-quiz break).
+        currentQuestionIndex: gameData.currentQuestionIndex,
+        score: gameData.score,
+        players: gameData.multiplayer ? players : gameData.players,
+        multiplayer: gameData.multiplayer,
+        roomCode: gameData.roomCode,
+        playerId: gameData.playerId,
+        hostIsObserver: gameData.multiplayer ? hostIsObserver : false
+      }
+    });
+  }, [gameData, hostIsObserver, navigate, players]);
+
   const continueQuiz = useCallback(async () => {
     if (error) {
       navigate("/multiplayer");
       return;
     }
 
-    // The quiz already hands us the index of the question after the break
-    // (it used to be incremented again here, which skipped a question at
-    // every mid-quiz break).
-    const nextQuestionIndex = gameData.currentQuestionIndex;
+    if (!gameData.multiplayer) {
+      returnToQuiz();
+      return;
+    }
 
-    // Case 1: Host in a multiplayer game
-    if (isHost && gameData.multiplayer && gameData.roomCode) {
+    // The host starts the next question for the whole room. It doesn't
+    // navigate here: everyone, the host included, goes back when the
+    // listener below sees the room resumed (#63). That also covers a
+    // double-click, a second host tab, or a resume whose reply got lost.
+    if (isHost && gameData.roomCode) {
       try {
-        // Start the next question for the whole room, then navigate
-        // (observer hosts are redirected elsewhere). Players follow the
-        // room's phase back to the quiz (#63), so there's no separate
-        // signal to send. A resume that no-ops (a double-click, or the room
-        // already moved on) still sends the host back to the quiz, which
-        // follows whatever the room is doing.
         await resumeAfterMidQuiz(gameData.roomCode);
-        navigate(`/quiz/${gameData.difficulty}`, {
-          state: {
-            currentQuestionIndex: nextQuestionIndex, // The question after the break
-            score: gameData.score, // Host's score (might be 0 if not playing)
-            players, // Live players list from Firestore
-            multiplayer: gameData.multiplayer,
-            roomCode: gameData.roomCode,
-            playerId: gameData.playerId, // Host's ID
-            hostIsObserver: hostIsObserver // Current host's observer status
-          }
-        });
       } catch (err) {
         console.error("Error in host continue logic:", err);
         setError("Failed to continue the quiz");
       }
     }
-    // Case 2: Participant in a multiplayer game (called by the listener once the room resumes)
-    else if (!isHost && gameData.multiplayer && gameData.roomCode) {
-      navigate(`/quiz/${gameData.difficulty}`, {
-        state: {
-          currentQuestionIndex: nextQuestionIndex, // The question after the break
-          score: gameData.score, // Participant's current score from gameData
-          players, // Live players list from Firestore
-          multiplayer: gameData.multiplayer,
-          roomCode: gameData.roomCode,
-          playerId: gameData.playerId, // Participant's ID
-          hostIsObserver: gameData.hostIsObserver // Overall room's host observer status
-        }
-      });
-    }
-    // Case 3: Single-player game
-    else if (!gameData.multiplayer) {
-      navigate(`/quiz/${gameData.difficulty}`, {
-        state: {
-          currentQuestionIndex: nextQuestionIndex, // The question after the break
-          score: gameData.score,
-          players: gameData.players, // Initial players list for single player
-          multiplayer: false,
-          roomCode: null,
-          playerId: gameData.playerId,
-          hostIsObserver: false
-        }
-      });
-    }
-  }, [gameData, hostIsObserver, isHost, navigate, players, error, setError]);
+  }, [gameData.multiplayer, gameData.roomCode, isHost, navigate, error, returnToQuiz]);
 
-  // The effect below re-runs (e.g. when the host flag loads), but a player
-  // only needs marking once per break.
-  const markedAtBreakRef = useRef<string | null>(null);
-
-  const continueQuizRef = useRef(continueQuiz);
+  const returnToQuizRef = useRef(returnToQuiz);
   useEffect(() => {
-    continueQuizRef.current = continueQuiz;
-  }, [continueQuiz]);
+    returnToQuizRef.current = returnToQuiz;
+  }, [returnToQuiz]);
 
   useEffect(() => {
     // If we don't have location state but we're on this page, try to recover from sessionStorage
@@ -161,11 +140,15 @@ const MidQuizScoreboard = () => {
       }
     }
 
-    // Mark player as ready at mid-quiz if in multiplayer
+    // Check if current user is the host
+    const isUserHost = localStorage.getItem("isHost") === "true";
+    const isObserverHost = isUserHost && localStorage.getItem("hostIsObserver") === "true";
+
+    // Mark player as ready at mid-quiz if in multiplayer. An observer host
+    // isn't a player, and only passes through here on its way to
+    // HostObserverView.
     const markPlayerReady = async () => {
-      const breakKey = `${gameData.roomCode}:${gameData.currentQuestionIndex}`;
-      if (gameData.multiplayer && gameData.roomCode && gameData.playerId && markedAtBreakRef.current !== breakKey) {
-        markedAtBreakRef.current = breakKey;
+      if (gameData.multiplayer && gameData.roomCode && gameData.playerId && !isObserverHost) {
         try {
           await markPlayerAtMidQuiz(gameData.roomCode, gameData.playerId);
         } catch (err) {
@@ -176,8 +159,6 @@ const MidQuizScoreboard = () => {
 
     markPlayerReady();
 
-    // Check if current user is the host
-    const isUserHost = localStorage.getItem("isHost") === "true";
     setIsHost(isUserHost);
     if (isUserHost) {
       const observerStatus = localStorage.getItem("hostIsObserver") === "true";
@@ -201,16 +182,17 @@ const MidQuizScoreboard = () => {
             setHostIsObserver(room.hostIsObserver);
           }
 
-          // `isUserHost`, not the `isHost` state: this listener can be set up
-          // (and fire) before that state updates, which would treat the host
-          // as a player below.
-          // The room's phase is the signal (#63): players go back as soon as
-          // the room is on the question after the break, however late this
-          // snapshot arrives (a throttled background tab, a slow network).
-          // It's a state, not a moment, so there's no window to miss.
-          if (!isUserHost && room.phase === "question" &&
-              (room.currentQuestionIndex ?? 0) >= gameData.currentQuestionIndex) {
-            continueQuizRef.current();
+          // The room's state is the signal (#63): leave this break as soon
+          // as the room isn't in it any more, however late this snapshot
+          // arrives (a throttled background tab, a locked phone, a slow
+          // network). It's a state, not a moment, so there's no window to
+          // miss, and a snapshot that skips straight to the next break or
+          // the results still gets this player there, via the quiz page.
+          // Observer hosts stay on HostObserverView instead.
+          const stillInThisBreak = room.phase === "mid-scoreboard" &&
+            (room.currentQuestionIndex ?? 0) <= gameData.currentQuestionIndex;
+          if (!isObserverHost && room.phase && room.phase !== "lobby" && !stillInThisBreak) {
+            returnToQuizRef.current();
           }
         } else {
           setError("Game room no longer exists");
@@ -220,7 +202,7 @@ const MidQuizScoreboard = () => {
 
       return () => unsubscribe();
     }
-  }, [gameData.multiplayer, gameData.roomCode, location.state, navigate, isHost]);
+  }, [gameData.multiplayer, gameData.roomCode, location.state, navigate]);
 
   if (error) {
     return (
