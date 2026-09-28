@@ -27,8 +27,8 @@ transactions are `updatePlayerScore`, `advanceQuestion` and
 
 Unit/component tests run on Vitest + React Testing Library. Covered today:
 `roomsFirestore.ts`, `QuizDataProvider.ts`, `quizScoring.ts` and
-`quizTiming.ts` (with per-file coverage floors), plus one `Home.tsx` smoke
-test — every other page,
+`quizTiming.ts`, `roomRoles.ts`, `multiplayerSession.ts` (with per-file coverage floors), the `useResumeRoom` hook
+(no floor), plus one `Home.tsx` smoke test — every other page,
 and `Quiz.tsx` itself, is uncovered. `npm test` now runs in `ci.yml`, but a
 red run doesn't yet block merge or deploy (see #57). See
 `docs/agent/testing.md` before assuming a given flow is covered.
@@ -36,7 +36,7 @@ red run doesn't yet block merge or deploy (see #57). See
 ## Where things live
 
 `src/pages/` holds most screens; `src/components/` currently has only
-`MobileFrame.tsx` (the phone-frame chrome) and `Quiz.tsx` (~920 lines — the
+`MobileFrame.tsx` (the phone-frame chrome) and `Quiz.tsx` (~880 lines — the
 biggest single file in the app, despite the folder name most "components"
 are pages). `src/fabric-ui/` is a self-contained WebGL rendering module for
 the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one
@@ -44,8 +44,10 @@ file, `useGameStore.ts`, which is dead code (see Landmines). `src/utils/`
 has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz
 question loading), `quizScoring.ts` (the answer-scoring math, extracted from
 `Quiz.tsx` so it can be tested directly), `quizTiming.ts` (multiplayer
-question timing and what follows each question), and `pathUtils.ts`
-(base-path/env helpers). Full layout:
+question timing and what follows each question), `roomRoles.ts` (who's the
+host/observer, from the room), `multiplayerSession.ts` (this tab's stored
+game), and `pathUtils.ts`
+(base-path/env helpers). `src/hooks/` holds shared React hooks. Full layout:
 `docs/agent/architecture.md`.
 
 ## Design themes
@@ -90,9 +92,9 @@ rules, ask before making it rather than guessing.
   wired in; don't add to it without a migration plan.
 - In multiplayer, `Room.phase`/`currentQuestionIndex`/`phaseStartedAt` are
   **the** source of truth for which question is showing (#62). Don't
-  reintroduce a locally incremented index or a local countdown there. The
-  mid-quiz `continueReady` flag is still the old fixed-delay handshake until
-  #63.
+  reintroduce a locally incremented index or a local countdown there, or a
+  timed signal like the old `continueReady` flag (#63): clients react to the
+  room's state, which a slow client can't miss.
 - Writes several clients make at once must not be a plain read-modify-write.
   `updatePlayerScore`, `advanceQuestion` and `resumeAfterMidQuiz` are
   transactions and `markPlayerAtMidQuiz` is an `arrayUnion` — all players

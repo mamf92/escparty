@@ -3,6 +3,7 @@ import {
     FEEDBACK_MS,
     QUESTION_MS,
     QUESTION_SLOT_MS,
+    hasLeftBreak,
     phaseAfterQuestion,
     questionClock,
     startedAtMillis,
@@ -77,5 +78,34 @@ describe("startedAtMillis", () => {
         expect(startedAtMillis(null)).toBeNull();
         expect(startedAtMillis(undefined)).toBeNull();
         expect(startedAtMillis({ _methodName: "serverTimestamp" })).toBeNull();
+    });
+});
+
+describe("hasLeftBreak", () => {
+    it("stays while the room is still in this break", () => {
+        expect(hasLeftBreak("mid-scoreboard", 5, 5)).toBe(false);
+    });
+
+    it("leaves once the room is back on a question", () => {
+        expect(hasLeftBreak("question", 5, 5)).toBe(true);
+        expect(hasLeftBreak("question", 7, 5)).toBe(true);
+    });
+
+    it("leaves if the room already reached a later break or the results (a late snapshot)", () => {
+        expect(hasLeftBreak("mid-scoreboard", 10, 5)).toBe(true);
+        expect(hasLeftBreak("results", 9, 5)).toBe(true);
+    });
+
+    it("stays on a snapshot from before this break (e.g. served from cache)", () => {
+        expect(hasLeftBreak("question", 4, 5)).toBe(false);
+    });
+
+    it("leaves on any question when the break isn't known", () => {
+        expect(hasLeftBreak("question", 0, -1)).toBe(true);
+    });
+
+    it("stays for a room with no phase, or one still in the lobby", () => {
+        expect(hasLeftBreak(undefined, 0, 5)).toBe(false);
+        expect(hasLeftBreak("lobby", 0, 5)).toBe(false);
     });
 });

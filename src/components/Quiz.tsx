@@ -5,16 +5,11 @@ import { FaHome } from "react-icons/fa";
 import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
-import { calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
+import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
+import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
-interface MultiplayerGameData {
-  multiplayer: boolean;
-  roomCode: string;
-  playerId: string;
-  difficulty?: string;
-  hostIsObserver?: boolean;
-}
 
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -25,7 +20,6 @@ const Quiz = () => {
     multiplayer?: boolean;
     roomCode?: string;
     playerId?: string;
-    hostIsObserver?: boolean;
   } | null;
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(locationState?.currentQuestionIndex || 0);
@@ -52,81 +46,38 @@ const Quiz = () => {
   // In multiplayer the room drives progression (#62): every client shows
   // room.currentQuestionIndex and times it from room.phaseStartedAt, so they
   // stay in lockstep and a backgrounded tab catches up on return. Single
-  // player keeps the local timers below. A multiplayer room without a phase
-  // (created before #61) falls back to the local timers too.
+  // player keeps the local timers below.
   const sharedClock = isMultiplayer && !!room?.phase;
-  const localClock = !isMultiplayer || (room !== null && !room.phase);
+  // A room created before #61 has no phase to follow, and the old local-timer
+  // path for it is gone (#63). Rooms only live for one game, so this only
+  // catches a tab left open from before the upgrade.
+  const legacyRoom = isMultiplayer && room !== null && !room.phase;
   const roomStartMs = startedAtMillis(room?.phaseStartedAt);
   // This player's score as the room has it.
   const storedScore = room?.players.find(p => p.id === playerId)?.score ?? 0;
+  // Set once this page navigates away for good (to the observer view, a
+  // break or the results), so only one of those navigations happens.
+  const leftQuizRef = useRef(false);
 
   // Calculate current question based on currentQuestionIndex and questions array
   const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
     ? questions[currentQuestionIndex]
     : { question: "", options: [], correctAnswer: "" };
 
-  const hostIsObserverFromLocation = locationState?.hostIsObserver;
-
+  // An observer host watches from HostObserverView instead of playing,
+  // while the game is on (shouldObserve in roomRoles.ts). Who that is comes
+  // from the room, not from localStorage "isHost".
+  const observing = shouldObserve(room, playerId);
   useEffect(() => {
-    // This effect handles redirection for an observing host.
-    // It depends on data being loaded and relevant states being set.
-    if (
-      hostIsObserverFromLocation &&
-      localStorage.getItem("isHost") === "true" &&
-      isMultiplayer &&
-      !loading &&
-      roomCode &&
-      playerId &&
-      difficulty &&
-      room &&
-      room.players &&
-      questions &&
-      questions.length > 0
-    ) {
-      navigate("/mid-quiz-scoreboard", {
-        state: {
-          score,
-          totalQuestions: questions.length,
-          currentQuestionIndex,
-          difficulty,
-          players: room.players,
-          multiplayer: true,
-          roomCode,
-          playerId,
-          hostIsObserver: true,
-        },
-        replace: true, // Replace history to prevent back navigation to the quiz page
-      });
-    }
-  }, [
-    hostIsObserverFromLocation,
-    isMultiplayer,
-    loading,
-    roomCode,
-    playerId,
-    difficulty,
-    room,
-    questions,
-    score,
-    currentQuestionIndex,
-    navigate,
-  ]);
-
-  useEffect(() => {
-    // If the current user is a host in observer mode, redirect to the mid-quiz scoreboard
-    if (locationState?.hostIsObserver && localStorage.getItem("isHost") === "true" && roomCode && playerId && difficulty) {
-      navigate("/mid-quiz-scoreboard", {
-        state: {
-          multiplayer: true, // Host observer implies a multiplayer context
-          roomCode: roomCode,
-          playerId: playerId,
-          difficulty: difficulty,
-          hostIsObserver: true, // Explicitly set for the scoreboard
-        },
-        replace: true // Replace the current entry in history
-      });
-    }
-  }, [locationState, roomCode, playerId, difficulty, navigate]);
+    if (!isMultiplayer || !observing || !room || !roomCode || leftQuizRef.current) return;
+    // Claims the one navigation away from this page, so the phase effect
+    // below can't send the observer to the players' break or results.
+    leftQuizRef.current = true;
+    navigate("/host-observer", {
+      state: observerRouteState(room, roomCode, playerId),
+      replace: true // Replace history to prevent back navigation to the quiz page
+    });
+  }, [isMultiplayer, observing, room, roomCode, playerId, navigate]);
 
   useEffect(() => {
     // Clear any previous errors when component mounts or difficulty changes
@@ -152,7 +103,7 @@ const Quiz = () => {
     }
 
     // Process multiplayer data
-    let multiplayerData: MultiplayerGameData | null = null;
+    let multiplayerData: MultiplayerSession | null = null;
 
     // First try to get multiplayer data from location state
     if (locationState?.multiplayer) {
@@ -162,16 +113,15 @@ const Quiz = () => {
         roomCode: locationState.roomCode || '',
         playerId: locationState.playerId || ''
       };
-    } else {
-      // If not in location state, check sessionStorage (for page refreshes or direct navigation)
-      const storedData = sessionStorage.getItem('multiplayerGame');
-      if (storedData) {
-        try {
-          multiplayerData = JSON.parse(storedData) as MultiplayerGameData;
-          console.log("📱 Multiplayer data found in sessionStorage:", multiplayerData);
-        } catch (e) {
-          console.error("❌ Error parsing multiplayer data from sessionStorage:", e);
-        }
+    } else if (!locationState) {
+      // No router state at all (a direct link, or a page that didn't pass
+      // any): fall back to sessionStorage. Not when the router state says
+      // single player: the blob outlives a multiplayer game in this tab, and
+      // reading it would turn a later single-player quiz back into that old
+      // room (#63).
+      multiplayerData = readMultiplayerGame();
+      if (multiplayerData) {
+        console.log("📱 Multiplayer data found in sessionStorage:", multiplayerData);
       }
     }
 
@@ -185,7 +135,9 @@ const Quiz = () => {
       setLoadingStatus("Connecting to game room...");
 
       // Store multiplayer info in session storage (for page refresh recovery)
-      sessionStorage.setItem('multiplayerGame', JSON.stringify(multiplayerData));
+      // (with the difficulty, which pages opened without router state
+      // read back to find the right quiz)
+      sessionStorage.setItem('multiplayerGame', JSON.stringify({ ...multiplayerData, difficulty }));
 
       // Set up listener for room changes in multiplayer
       unsubscribeRoom = listenToRoom(multiplayerData.roomCode, (roomData) => {
@@ -266,9 +218,9 @@ const Quiz = () => {
     };
   }, [difficulty, navigate, location]);
 
-  // Timer effect for question countdown (single player, and phase-less rooms)
+  // Timer effect for question countdown (single player only)
   useEffect(() => {
-    if (quizCompleted || loading || !localClock) return;
+    if (quizCompleted || loading || isMultiplayer) return;
 
     // Only start a new timer if we're in question mode (not feedback mode)
     if (!showFeedback) {
@@ -305,11 +257,11 @@ const Quiz = () => {
         clearInterval(uiTimer);
       };
     }
-  }, [currentQuestionIndex, quizCompleted, loading, showFeedback, localClock]);
+  }, [currentQuestionIndex, quizCompleted, loading, showFeedback, isMultiplayer]);
 
   // Separate effect for feedback timer that automatically moves to next question
   useEffect(() => {
-    if (showFeedback && localClock) {
+    if (showFeedback && !isMultiplayer) {
       // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
       const feedbackTimer = setInterval(() => {
         setTimeLeft(prev => {
@@ -326,7 +278,7 @@ const Quiz = () => {
         clearInterval(feedbackTimer);
       };
     }
-  }, [showFeedback, localClock]);
+  }, [showFeedback, isMultiplayer]);
 
   // --- Shared, room-driven progression (multiplayer) ---
 
@@ -335,7 +287,6 @@ const Quiz = () => {
   isSubmittedRef.current = isSubmitted;
   const lastAdvanceAttemptRef = useRef(0);
   const advanceInFlightRef = useRef(false);
-  const leftQuizRef = useRef(false);
   const markTimeUpRef = useRef<() => void>(() => { });
   const lockQuestionRef = useRef<(options: { hideTimer: boolean }) => void>(() => { });
 
@@ -346,7 +297,7 @@ const Quiz = () => {
   // moment (spread per player) and only steps in if the room hasn't moved
   // on, e.g. the leader closed their tab.
   const advanceLeaderId = useMemo(() => room
-    ? (room.hostIsObserver ? room.players.filter(p => p.id !== room.hostId) : [{ id: room.hostId }])
+    ? (room.hostIsObserver ? playingPlayers(room) : [{ id: room.hostId }])
         .map(p => p.id).sort()[0]
     : undefined, [room]);
 
@@ -456,17 +407,23 @@ const Quiz = () => {
   }, [sharedClock, loading, room?.phase, room?.currentQuestionIndex, roomStartMs, currentQuestionIndex, roomCode, questions.length, advanceGraceMs]);
 
   // When the room leaves the question phase, everyone goes where it went.
+  // Waits for the question load to finish (not to succeed: a player whose
+  // load failed still follows the room to the results), so the next page
+  // gets the real question count when there is one, and hands on the
+  // room's copy of this player's score if it's higher: a player coming back
+  // from a refresh or a locked phone may not have picked it back up yet.
   useEffect(() => {
-    if (!sharedClock || !room || leftQuizRef.current) return;
+    if (!sharedClock || !room || loading || observing || leftQuizRef.current) return;
+    const bestScore = bestKnownScore(score, room.players, playerId);
     if (room.phase === "mid-scoreboard") {
       leftQuizRef.current = true;
       navigate("/mid-quiz-scoreboard", {
         state: {
-          score,
+          score: bestScore,
           totalQuestions: questions.length,
           currentQuestionIndex: room.currentQuestionIndex ?? 0, // the question after the break
           difficulty,
-          players: room.players,
+          players: playingPlayers(room),
           multiplayer: true,
           roomCode,
           playerId
@@ -476,17 +433,18 @@ const Quiz = () => {
       leftQuizRef.current = true;
       navigate("/results", {
         state: {
-          score,
+          score: bestScore,
           totalQuestions: questions.length,
           difficulty,
           multiplayer: true,
           roomCode,
           playerId,
-          players: room.players
+          players: playingPlayers(room),
+          observer: isObserverHost(room, playerId) // shown the standings without a score
         }
       });
     }
-  }, [sharedClock, room, score, questions.length, difficulty, roomCode, playerId, navigate]);
+  }, [sharedClock, room, loading, observing, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
   // Lock the current question: no more answers, show its feedback.
   const lockQuestion = ({ hideTimer }: { hideTimer: boolean }) => {
@@ -515,7 +473,7 @@ const Quiz = () => {
     setTimeLeft(FEEDBACK_MS / 1000);
   };
 
-  // Function to automatically move to the next question
+  // Local clock only: move on once the feedback time is over
   const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       if ((currentQuestionIndex + 1) % MID_QUIZ_EVERY === 0) {
@@ -525,9 +483,9 @@ const Quiz = () => {
             totalQuestions: questions.length,
             currentQuestionIndex: currentQuestionIndex + 1,
             difficulty,
-            players: isMultiplayer && room ? room.players : [{ name: "Player 1", score }],
-            multiplayer: isMultiplayer,
-            roomCode,
+            players: [{ name: "Player 1", score }],
+            multiplayer: false,
+            roomCode: null,
             playerId
           }
         });
@@ -545,26 +503,24 @@ const Quiz = () => {
     } else {
       const difficultyLevel = difficulty ?? "easy";
 
-      if (!isMultiplayer) {
-        const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-        const newScore = {
-          score,
-          total: questions.length,
-          difficulty: difficultyLevel,
-          date: new Date().toISOString()
-        };
-        localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
-      }
+      const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
+      const newScore = {
+        score,
+        total: questions.length,
+        difficulty: difficultyLevel,
+        date: new Date().toISOString()
+      };
+      localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
 
       navigate("/results", {
         state: {
           score,
           totalQuestions: questions.length,
           difficulty,
-          multiplayer: isMultiplayer,
-          roomCode,
+          multiplayer: false,
+          roomCode: null,
           playerId,
-          players: isMultiplayer && room ? room.players : null
+          players: null
         }
       });
     }
@@ -653,10 +609,10 @@ const Quiz = () => {
   }
 
   // Render error state
-  if (error) {
+  if (error || legacyRoom) {
     return (
       <ErrorContainer>
-        <ErrorMessage>{error}</ErrorMessage>
+        <ErrorMessage>{error ?? LEGACY_ROOM_MESSAGE}</ErrorMessage>
         <RetryButton onClick={() => navigate("/")}>
           Back to Home
         </RetryButton>

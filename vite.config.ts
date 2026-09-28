@@ -40,6 +40,8 @@ export default defineConfig(({ mode }) => {
           'src/utils/QuizDataProvider.ts',
           'src/utils/quizScoring.ts',
           'src/utils/quizTiming.ts',
+          'src/utils/roomRoles.ts',
+          'src/utils/multiplayerSession.ts',
         ],
         thresholds: {
           // Per-file floors, keyed by the file they guard. `npm run
@@ -52,6 +54,18 @@ export default defineConfig(({ mode }) => {
             lines: 100,
           },
           'src/utils/quizTiming.ts': {
+            statements: 100,
+            branches: 100,
+            functions: 100,
+            lines: 100,
+          },
+          'src/utils/roomRoles.ts': {
+            statements: 100,
+            branches: 100,
+            functions: 100,
+            lines: 100,
+          },
+          'src/utils/multiplayerSession.ts': {
             statements: 100,
             branches: 100,
             functions: 100,

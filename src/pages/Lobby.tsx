@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 import { listenToRoom, Room, setRoomDifficulty, startGame } from "../utils/roomsFirestore";
+import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 
 const Lobby = () => {
     const [room, setRoom] = useState<Room | null>(null);
@@ -40,24 +41,33 @@ const Lobby = () => {
 
                 // Check if game has started
                 if (roomData.started) {
-                    // Save essentials to sessionStorage to persist through page refresh 
-                    // Only pass hostIsObserver=true if the current user is the host and host is observer
-                    const isCurrentUserObserver = storedIsHost && roomData.hostIsObserver || false;
-
+                    // Save essentials to sessionStorage to persist through page refresh.
+                    // (Whether this user is an observer host isn't passed on: the quiz
+                    // and break screens read it from the room, #63.)
                     sessionStorage.setItem("multiplayerGame", JSON.stringify({
                         multiplayer: true,
                         roomCode: storedGameCode,
                         playerId: storedPlayerId,
-                        difficulty: roomData.difficulty,
-                        hostIsObserver: isCurrentUserObserver
+                        difficulty: roomData.difficulty
                     }));
+
+                    // An observer host goes straight to its own screen rather
+                    // than loading the quiz only to be redirected from it
+                    // (unless the game is already over: the quiz page sends a
+                    // finished room on to the results, as for everyone else).
+                    if (shouldObserve(roomData, storedPlayerId)) {
+                        navigate("/host-observer", {
+                            state: observerRouteState(roomData, storedGameCode, storedPlayerId),
+                            replace: true // Back from the observer screen skips this started lobby
+                        });
+                        return;
+                    }
 
                     navigate(`/quiz/${roomData.difficulty}`, {
                         state: {
                             multiplayer: true,
                             roomCode: storedGameCode,
-                            playerId: storedPlayerId,
-                            hostIsObserver: isCurrentUserObserver
+                            playerId: storedPlayerId
                         }
                     });
                 }
@@ -123,7 +133,7 @@ const Lobby = () => {
         );
     }
 
-    const visiblePlayers = room?.players.filter(player => !(room.hostIsObserver && player.id === room.hostId)) ?? [];
+    const visiblePlayers = room ? playingPlayers(room) : [];
 
     return (
         <Container>

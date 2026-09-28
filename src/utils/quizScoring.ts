@@ -36,3 +36,16 @@ export const calculateTimeBonus = (timeLeftMs: number): number => {
  */
 export const calculateQuestionScore = (timeLeftMs: number): number =>
     BASE_QUESTION_POINTS + calculateTimeBonus(timeLeftMs);
+
+/**
+ * A multiplayer player's score as best known: the local copy, or the room's
+ * when it's higher. A page opened without router state (a direct link, a new
+ * tab) starts its local copy at 0, and a score write can land after a page
+ * handed its score on, while the room holds the real score (and
+ * `updatePlayerScore` never lowers it), so the higher one is always right.
+ */
+export const bestKnownScore = (
+    localScore: number,
+    players: ReadonlyArray<{ id: string; score: number }> | undefined,
+    playerId: string | null | undefined,
+): number => Math.max(localScore, players?.find(p => p.id === playerId)?.score ?? 0);

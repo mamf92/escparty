@@ -62,7 +62,8 @@ const MultiplayerLobby = () => {
       localStorage.setItem("playerName", hostName);
       localStorage.setItem("gameCode", newGameCode);
       localStorage.setItem("isHost", "true");
-      localStorage.setItem("hostIsObserver", String(hostIsObserver));
+      // Whether the host only observes lives on the room (hostIsObserver),
+      // which every page reads; a localStorage copy would outlive this game.
 
       // Update state and navigate
       setGameCode(newGameCode);

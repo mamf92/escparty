@@ -2,20 +2,15 @@ import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, listenToRoom } from "../utils/roomsFirestore";
+import { isObserverHost, playingPlayers } from "../utils/roomRoles";
+import { readMultiplayerGame } from "../utils/multiplayerSession";
+import { bestKnownScore } from "../utils/quizScoring";
 
 interface ScoreEntry {
   score: number;
   total: number;
   date: string;
   difficulty?: string;
-}
-
-interface MultiplayerGameData {
-  multiplayer: boolean;
-  roomCode: string;
-  playerId: string;
-  difficulty?: string;
-  hostIsObserver?: boolean;
 }
 
 const QuizResults = () => {
@@ -32,39 +27,32 @@ const QuizResults = () => {
     playerId: null
   };
 
-  const [gameData, setGameData] = useState({
-    score: locationState.score || 0,
-    totalQuestions: locationState.totalQuestions || 0,
-    multiplayer: locationState.multiplayer || false,
-    roomCode: locationState.roomCode || null,
-    playerId: locationState.playerId || null,
-    players: locationState.players || []
+  // Without router state (a direct link, a new tab) this tab's stored
+  // multiplayer game, read up front so the first render (and the effect
+  // below) already knows it's multiplayer rather than showing single-player
+  // history.
+  const [gameData] = useState(() => {
+    const session = location.state ? null : readMultiplayerGame();
+    return {
+      score: locationState.score || 0,
+      totalQuestions: locationState.totalQuestions || 0,
+      multiplayer: session ? true : (locationState.multiplayer || false),
+      roomCode: session?.roomCode ?? (locationState.roomCode || null),
+      playerId: session?.playerId ?? (locationState.playerId || null),
+      players: locationState.players || []
+    };
   });
 
   const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
   const [winner, setWinner] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>(gameData.players || []);
+  // An observer host never played, so it gets the standings without a
+  // score. Decided from the room once it arrives; the quiz page's router
+  // flag only covers the first render.
+  const [isObserver, setIsObserver] = useState<boolean>(!!location.state?.observer);
 
   useEffect(() => {
-    // Try to recover multiplayer data from sessionStorage if not in location state
-    if (!location.state && !gameData.multiplayer) {
-      const storedData = sessionStorage.getItem('multiplayerGame');
-      if (storedData) {
-        try {
-          const multiplayerData = JSON.parse(storedData) as MultiplayerGameData;
-          setGameData(prev => ({
-            ...prev,
-            multiplayer: true,
-            roomCode: multiplayerData.roomCode,
-            playerId: multiplayerData.playerId
-          }));
-        } catch (e) {
-          console.error("Error parsing multiplayer data from sessionStorage:", e);
-        }
-      }
-    }
-
     // Clear session storage data as we're at the end of the game
     sessionStorage.removeItem('multiplayerGame');
 
@@ -87,12 +75,9 @@ const QuizResults = () => {
       // Set up one final listen to get the final scores
       const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
         if (room) {
-          // Filter out host from players list if host is in observer mode
-          const filteredPlayers = room.hostIsObserver
-            ? room.players.filter(player => player.id !== room.hostId)
-            : room.players;
-
+          const filteredPlayers = playingPlayers(room);
           setPlayers(filteredPlayers);
+          setIsObserver(isObserverHost(room, gameData.playerId));
 
           // Calculate winner from filtered players list
           if (filteredPlayers.length > 0) {
@@ -114,15 +99,22 @@ const QuizResults = () => {
         }
       });
 
-      // Clean up listener after 2 seconds - we just need a snapshot of final scores
-      setTimeout(() => unsubscribe(), 2000);
+      // Listen while this page is open rather than for a fixed 2s: on a
+      // slow network the first snapshot can take longer, and the standings,
+      // this player's score and whether they only observed (#63) all come
+      // from it.
+      return () => unsubscribe();
     }
   }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, location.state]);
 
   return (
     <Container>
       <Title>🎉 Quiz Completed! 🎤</Title>
-      <Score>You scored {gameData.score}!</Score>
+      {!isObserver && (
+        <Score>
+          You scored {gameData.multiplayer ? bestKnownScore(gameData.score, players, gameData.playerId) : gameData.score}!
+        </Score>
+      )}
       {winner && <WinnerText>{winner}</WinnerText>}
       {error && <ErrorText>{error}</ErrorText>}
 
@@ -147,7 +139,7 @@ const QuizResults = () => {
               </tr>
             </thead>
             <tbody>
-              {players.sort((a: Player, b: Player) => b.score - a.score).map((player: Player) => (
+              {[...players].sort((a: Player, b: Player) => b.score - a.score).map((player: Player) => (
                 <tr key={player.id}>
                   <td>{player.name}{player.id === gameData.playerId ? " (You)" : ""}</td>
                   <td>{player.score}</td>

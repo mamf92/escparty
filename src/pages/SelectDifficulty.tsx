@@ -5,7 +5,9 @@ const SelectDifficulty = () => {
   const navigate = useNavigate();
 
   const handleSelect = (difficulty: string) => {
-    navigate(`/quiz/${difficulty}`);
+    // Explicitly single player, so the quiz doesn't pick up a multiplayer
+    // game this tab played earlier from sessionStorage.
+    navigate(`/quiz/${difficulty}`, { state: { multiplayer: false } });
   };
 
   return (

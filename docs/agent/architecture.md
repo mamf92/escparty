@@ -18,7 +18,7 @@ reusable piece:
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui`).
-- `Quiz.tsx` — ~920 lines, the largest file in the app. Handles single-player
+- `Quiz.tsx` — ~880 lines, the largest file in the app. Handles single-player
   and multiplayer quiz flow, answer selection/scoring, and the multiplayer
   progression timer. A change here is rarely "just a component change" —
   read `docs/agent/multiplayer-sync.md` first if the change touches
@@ -47,8 +47,9 @@ plan that also removes the ad hoc storage it would duplicate.
 ## `src/utils/`
 
 - `roomsFirestore.ts` — the entire Firestore API surface: room/player CRUD,
-  the `onSnapshot`-based `listenToRoom`, and progression flags
-  (`continueReady`, `playersAtMidQuiz`). See
+  the `onSnapshot`-based `listenToRoom`, the phase moves
+  (`advanceQuestion`, `resumeAfterMidQuiz`) and the mid-quiz ready marks
+  (`playersAtMidQuiz`). See
   `docs/agent/firestore-data-model.md` for the data shape and which writes
   are safe. Its exported function signatures are on the do-not-change list
   in `CLAUDE.md`.
@@ -61,11 +62,15 @@ plan that also removes the ad hoc storage it would duplicate.
 - `quizScoring.ts` — the answer-scoring math (`500` base plus a time bonus
   of up to `500`, linear in the time left and rounded down), extracted from
   `Quiz.tsx` so the rule players actually see can be unit-tested without
-  rendering the component. Pure functions, no React, no Firestore.
+  rendering the component, plus `bestKnownScore` (a multiplayer player's
+  local score or the room's, whichever is higher, #63). Pure functions, no
+  React, no Firestore.
 - `quizTiming.ts` — multiplayer question timing (#62): the 10s + 5s slot,
   `phaseAfterQuestion` (next question, mid-quiz break after every 5th, or
-  results) and `questionClock` (where a question is, given its
-  `phaseStartedAt`). Pure functions, shared by `Quiz.tsx` and
+  results), `questionClock` (where a question is, given its
+  `phaseStartedAt`) and `hasLeftBreak` (whether a player at a mid-quiz
+  break should move on, #63). Pure functions, shared by `Quiz.tsx`,
+  `MidQuizScoreboard.tsx` and
   `advanceQuestion` in `roomsFirestore.ts`; `firestore.rules` hardcodes the
   same 15s slot.
 - `pathUtils.ts` — environment detection (`isDevelopmentEnvironment`,
@@ -74,6 +79,30 @@ plan that also removes the ad hoc storage it would duplicate.
   `QuizDataProvider.ts` uses `isDevelopmentEnvironment` and `getAssetPath`
   (but not `isProductionPreview`). The Vite `base` config (`/` on Vercel,
   `/escparty/` for any other production build) flows through `getAssetPath`.
+
+- `roomRoles.ts` — who's who in a room, read from the room itself (#63):
+  `isRoomHost`, `isObserverHost`, `shouldObserve` (whether to route to the
+  observer screen: the observer host, while the game is on) and
+  `playingPlayers(room)` (the players without an observing host), plus
+  `observerRouteState`, the router state every redirect to
+  `/host-observer` hands over. Replaces the `localStorage` guesses pages
+  used to make. 100% coverage floor.
+
+- `multiplayerSession.ts` — `readMultiplayerGame()`, this tab's stored
+  multiplayer game (`sessionStorage` `multiplayerGame`: room code, player
+  ID, difficulty) for pages opened without router state (#63), and
+  `readStoredGame()`, which also tells "nothing stored" from "stored but
+  unreadable" and never throws. Used by the quiz page, the break screen,
+  the observer screen and the results page. 100% coverage floor.
+
+## `src/hooks/`
+
+- `useResumeRoom.ts` — the host's Continue at a mid-quiz break (#63), used
+  by `MidQuizScoreboard.tsx` and `HostObserverView.tsx`: calls
+  `resumeAfterMidQuiz`, ignores a second tap while one is in flight, and
+  turns a failure into a retryable message. It never navigates; every
+  screen follows the room's phase instead. Tested in
+  `useResumeRoom.test.ts`.
 
 ## `src/firebase.ts`
 

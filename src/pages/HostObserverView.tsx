@@ -1,135 +1,71 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, resumeAfterMidQuiz } from "../utils/roomsFirestore";
+import { Player, Room, listenToRoom } from "../utils/roomsFirestore";
+import { LEGACY_ROOM_MESSAGE, ObserverRouteState, isObserverHost, playingPlayers } from "../utils/roomRoles";
+import { useResumeRoom } from "../hooks/useResumeRoom";
+import { readMultiplayerGame } from "../utils/multiplayerSession";
 
 const HostObserverView = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Try to get data from location state first
-    const locationState = location.state || {
-        currentQuestionIndex: 0,
-        difficulty: "easy",
-        players: [],
-        roomCode: null
-    };
+    // Where this screen is and who's viewing: from the redirect that brought
+    // us here (observerRouteState), with anything missing filled from this
+    // tab's sessionStorage game. Router state survives a refresh, but one
+    // from an older version of the app may lack playerId, and without it
+    // the Continue below could never be enabled.
+    // The session's playerId only counts for the same room: this tab may have
+    // played a later game since an old history entry was made.
+    const routeState = (location.state ?? {}) as Partial<ObserverRouteState>;
+    const [session] = useState(readMultiplayerGame);
+    const roomCode = routeState.roomCode ?? session?.roomCode ?? null;
+    const playerId = routeState.playerId
+        ?? (session && session.roomCode === roomCode ? session.playerId : null);
 
-    const [gameData, setGameData] = useState({
-        currentQuestionIndex: locationState.currentQuestionIndex || 0,
-        difficulty: locationState.difficulty || "easy",
-        players: locationState.players || [],
-        roomCode: locationState.roomCode || null
-    });
+    // Everything below is derived from the latest snapshot.
+    const [room, setRoom] = useState<Room | null>(null);
+    // No room to watch (opened in a new tab, or this tab's stored game is
+    // gone or unreadable): say so, with the way back, rather than showing
+    // an empty table.
+    const [error, setError] = useState<string | null>(
+        roomCode ? null : "Unable to find this game. Please return to the lobby."
+    );
+    const players = room ? playingPlayers(room) : (routeState.players ?? []);
+    const playersAtMidQuiz = room?.playersAtMidQuiz ?? [];
+    const allPlayersReady = players.length > 0 && players.every(player => playersAtMidQuiz.includes(player.id));
+    const inBreak = room?.phase === "mid-scoreboard";
+    // Continue resumes the room for everyone, so only the room's observer
+    // host gets it, checked against the room rather than whoever opened
+    // this page.
+    const isRoomObserver = isObserverHost(room, playerId);
 
-    const [players, setPlayers] = useState<Player[]>(gameData.players);
-    const [error, setError] = useState<string | null>(null);
-    const [, setContinueReadyState] = useState(false);
-    const [playersAtMidQuiz, setPlayersAtMidQuiz] = useState<string[]>([]);
-    const [allPlayersReady, setAllPlayersReady] = useState<boolean>(false);
-
-    const continueQuiz = useCallback(async () => {
-        if (error) {
-            navigate("/multiplayer");
-            return;
-        }
-
-        if (gameData.roomCode) {
-            try {
-                // Start the next question for the whole room (#62); the
-                // observer host doesn't navigate to the quiz itself. Nothing
-                // else to do if the room wasn't in a break (a double-click, a
-                // second host tab, or continue pressed mid-block): don't send
-                // a signal or clear the ready marks for a break that isn't on.
-                const resumed = await resumeAfterMidQuiz(gameData.roomCode);
-                if (!resumed) {
-                    return;
-                }
-                // continueReady is only for tabs still running an older bundle.
-                // (The resume already cleared playersAtMidQuiz for the next break.)
-                await setContinueReady(gameData.roomCode, true);
-
-                // Reset the continue flag after a short delay
-                setTimeout(async () => {
-                    try {
-                        await setContinueReady(gameData.roomCode, false);
-                    } catch (err) {
-                        console.error("Error resetting continue flag for observer host:", err);
-                    }
-                }, 3000);
-
-                setError(null); // Clear any local errors
-            } catch (err) {
-                console.error("Error in host continue logic:", err);
-                setError("Failed to signal continue");
-            }
-        }
-    }, [gameData.roomCode, navigate, error]);
-
-    const continueQuizRef = useRef(continueQuiz);
+    // Start the next question for the whole room; the observer host doesn't
+    // navigate to the quiz itself. Players follow the room's phase back to
+    // the quiz (#63), and the same write clears the ready marks for the next
+    // break. This screen stays up for the whole quiz, so any Continue state
+    // or message is dropped as soon as the room moves on, keyed on the phase
+    // and the index together: a locked phone can get one snapshot that goes
+    // straight from one break to the next.
+    const { resume, resuming, resumeError, reset } = useResumeRoom(roomCode);
     useEffect(() => {
-        continueQuizRef.current = continueQuiz;
-    }, [continueQuiz]);
+        reset();
+    }, [room?.phase, room?.currentQuestionIndex, reset]);
 
     useEffect(() => {
-        // If we don't have location state but we're on this page, try to recover from sessionStorage
-        if (!location.state) {
-            const storedData = sessionStorage.getItem('multiplayerGame');
-            if (storedData) {
-                try {
-                    const hostData = JSON.parse(storedData);
-                    setGameData(prev => ({
-                        ...prev,
-                        roomCode: hostData.roomCode,
-                        difficulty: hostData.difficulty || prev.difficulty,
-                        currentQuestionIndex: hostData.currentQuestionIndex || 0
-                    }));
-                } catch (e) {
-                    console.error("Error parsing host observer data from sessionStorage:", e);
-                    setError("Unable to retrieve game data. Please return to the lobby.");
-                }
+        if (!roomCode) return;
+        const unsubscribe = listenToRoom(roomCode, (snapshot) => {
+            if (snapshot && !snapshot.phase) {
+                setError(LEGACY_ROOM_MESSAGE); // no phase: no break to continue from
+            } else if (snapshot) {
+                setRoom(snapshot);
+            } else {
+                setError("Game room no longer exists");
+                setTimeout(() => navigate("/multiplayer"), 2000);
             }
-        }
-
-        // Set up real-time listener if we have a room code
-        if (gameData.roomCode) {
-            const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
-                if (room) {
-                    // Filter out host from players list (since host is in observer mode)
-                    const filteredPlayers = room.players.filter(player => player.id !== room.hostId);
-
-                    // Always update players array to ensure real-time score updates
-                    setPlayers(filteredPlayers);
-
-                    // Update the players at mid-quiz array
-                    if (room.playersAtMidQuiz) {
-                        setPlayersAtMidQuiz(room.playersAtMidQuiz);
-
-                        // Check if all players are at the mid-quiz scoreboard
-                        // We compare the players array (excluding host) with the players at mid-quiz array
-                        const allReady = filteredPlayers.length > 0 &&
-                            filteredPlayers.every(player =>
-                                room.playersAtMidQuiz?.includes(player.id)
-                            );
-                        setAllPlayersReady(allReady);
-                    } else {
-                        setPlayersAtMidQuiz([]);
-                        setAllPlayersReady(false);
-                    }
-
-                    // Check if continue is ready (for UI feedback)
-                    if (room.continueReady) {
-                        setContinueReadyState(true);
-                    }
-                } else {
-                    setError("Game room no longer exists");
-                    setTimeout(() => navigate("/multiplayer"), 2000);
-                }
-            });
-
-            return () => unsubscribe();
-        }
-    }, [gameData.roomCode, location.state, navigate]);
+        });
+        return () => unsubscribe();
+    }, [roomCode, navigate]);
 
     if (error) {
         return (
@@ -140,6 +76,22 @@ const HostObserverView = () => {
             </Container>
         );
     }
+
+    // Why Continue is (or isn't) available, in the same order as the
+    // disabled check below.
+    const continueHint = !room
+        ? "Connecting to the room..."
+        : !isRoomObserver
+        ? "Only the room's host can continue"
+        : room.phase === "results"
+        ? "The quiz is over"
+        : !inBreak
+        ? "Continue is for the mid-quiz break"
+        : players.length > 0 && !allPlayersReady
+        ? "Wait for all players to reach the mid-quiz scoreboard"
+        : resuming
+        ? "Continuing..."
+        : "Continue to the next question";
 
     return (
         <Container>
@@ -153,7 +105,7 @@ const HostObserverView = () => {
                     </tr>
                 </thead>
                 <tbody>
-                    {players
+                    {[...players]
                         .sort((a: Player, b: Player) => b.score - a.score)
                         .map((player: Player) => (
                             <tr key={player.id}>
@@ -174,12 +126,13 @@ const HostObserverView = () => {
             </WaitingMessage>
 
             <NextButton
-                onClick={continueQuiz}
-                disabled={players.length > 0 && !allPlayersReady}
-                title={!allPlayersReady && players.length > 0 ? "Wait for all players to reach the mid-quiz scoreboard" : "Continue to the next question"}
+                onClick={resume}
+                disabled={resuming || !isRoomObserver || !inBreak || (players.length > 0 && !allPlayersReady)}
+                title={continueHint}
             >
-                Continue Quiz
+                {resuming ? "Continuing..." : "Continue Quiz"}
             </NextButton>
+            {resumeError && <ErrorMessage>{resumeError}</ErrorMessage>}
         </Container>
     );
 };
