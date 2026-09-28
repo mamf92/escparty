@@ -24,15 +24,25 @@ any of it, update this file in the same PR rather than leaving it stale.
    effect of the snapshot callback running on every subscribed client.
 3. **`Quiz.tsx`** — reads multiplayer context from router `location.state`
    if present, falling back to the `sessionStorage` `multiplayerGame` blob
-   (needed on refresh, since `location.state` doesn't survive one). Question
-   progression is driven by a **client-local timer per browser tab**, not by
-   any Firestore field. This means two players' screens can legitimately be
-   on different questions if their timers drift; that's a known limitation,
-   not a bug to "fix" by guessing at a quick patch — see the section below.
+   (needed on refresh, since `location.state` doesn't survive one). In
+   multiplayer, **the room drives progression** (#62): every client renders
+   `Room.currentQuestionIndex` and derives its countdown from
+   `Room.phaseStartedAt`, so all screens show the same question, and a tab
+   that was backgrounded or reloaded jumps straight to the room's current
+   question and time. When a question's slot is over, any client ends it
+   with `advanceQuestion` (one write lands, the rest are no-ops). When the
+   room's phase becomes `mid-scoreboard` or `results`, every client navigates
+   there. Single player still runs local timers. Details:
+   `docs/agent/firestore-data-model.md`.
 4. **Mid-quiz** — `MidQuizScoreboard.tsx` marks each arriving player ready
-   via `markPlayerAtMidQuiz` (race-prone read-modify-write, see the
-   firestore doc) and reads `Room.continueReady` to know when the host has
-   signaled to proceed. `HostObserverView.tsx` is the host-only screen when
+   via `markPlayerAtMidQuiz` (`arrayUnion`, since everyone arrives at once).
+   The host's continue calls `resumeAfterMidQuiz` (the room back to
+   `phase: "question"` at the next question, clearing the ready marks), then
+   still flips
+   `Room.continueReady` with its fixed 3s reset, which rung 3 (#63)
+   replaces. A player who misses that window goes back anyway, because the
+   scoreboard also returns to the quiz as soon as the room's phase is
+   `question` again. `HostObserverView.tsx` is the host-only screen when
    `hostIsObserver` is true — the host watches without answering.
 5. **`QuizResults.tsx`** — final scoreboard, also recovers from
    `sessionStorage` if `location.state` is missing (e.g., after a refresh).
@@ -56,13 +66,8 @@ which one wins depends on the page:
 `useGameStore.ts` (Zustand) is not part of this — it's dead code, see
 `CLAUDE.md`.
 
-## If you're asked to add server-authoritative progression
+## Server-authoritative progression
 
-That's the fix for the "different players see different questions" class of
-bug. The `Room` fields for it landed in #61 (their current state is in
-`docs/agent/firestore-data-model.md`). What's left is
-a transaction-safe write pattern for advancing them and listener-driven
-progression on the client instead of a local timer (#62). This is
-a real architecture change — update `docs/agent/firestore-data-model.md` and
-this file in the same PR, and check the PR template's architecture-change
-box.
+Landed in #62; see step 3 above and `docs/agent/firestore-data-model.md`.
+The mid-quiz handshake (`continueReady`) is still the old fixed-delay flag
+until #63.

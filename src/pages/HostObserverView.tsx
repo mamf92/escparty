@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, resetPlayersAtMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom, setContinueReady, resumeAfterMidQuiz } from "../utils/roomsFirestore";
 
 const HostObserverView = () => {
     const location = useLocation();
@@ -36,11 +36,18 @@ const HostObserverView = () => {
 
         if (gameData.roomCode) {
             try {
-                // Observer host signals continue but doesn't navigate themselves to quiz
+                // Start the next question for the whole room (#62); the
+                // observer host doesn't navigate to the quiz itself. Nothing
+                // else to do if the room wasn't in a break (a double-click, a
+                // second host tab, or continue pressed mid-block): don't send
+                // a signal or clear the ready marks for a break that isn't on.
+                const resumed = await resumeAfterMidQuiz(gameData.roomCode);
+                if (!resumed) {
+                    return;
+                }
+                // continueReady is only for tabs still running an older bundle.
+                // (The resume already cleared playersAtMidQuiz for the next break.)
                 await setContinueReady(gameData.roomCode, true);
-
-                // Reset the players at mid-quiz array to prepare for the next mid-quiz break
-                await resetPlayersAtMidQuiz(gameData.roomCode);
 
                 // Reset the continue flag after a short delay
                 setTimeout(async () => {

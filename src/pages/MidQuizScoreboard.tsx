@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, markPlayerAtMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom, setContinueReady, markPlayerAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -69,16 +69,25 @@ const MidQuizScoreboard = () => {
       return;
     }
 
-    const nextQuestionIndex = gameData.currentQuestionIndex + 1;
+    // The quiz already hands us the index of the question after the break
+    // (it used to be incremented again here, which skipped a question at
+    // every mid-quiz break).
+    const nextQuestionIndex = gameData.currentQuestionIndex;
 
     // Case 1: Host in a multiplayer game
     if (isHost && gameData.multiplayer && gameData.roomCode) {
       try {
-        // Active host signals and navigates (observer hosts are redirected elsewhere)
-        await setContinueReady(gameData.roomCode, true);
+        // Start the next question for the whole room (#62), then navigate
+        // (observer hosts are redirected elsewhere). continueReady is only
+        // for tabs still running an older bundle, and only after a real
+        // resume, so a double-click doesn't send a second signal.
+        const resumed = await resumeAfterMidQuiz(gameData.roomCode);
+        if (resumed) {
+          await setContinueReady(gameData.roomCode, true);
+        }
         navigate(`/quiz/${gameData.difficulty}`, {
           state: {
-            currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+            currentQuestionIndex: nextQuestionIndex, // The question after the break
             score: gameData.score, // Host's score (might be 0 if not playing)
             players, // Live players list from Firestore
             multiplayer: gameData.multiplayer,
@@ -104,7 +113,7 @@ const MidQuizScoreboard = () => {
     else if (!isHost && gameData.multiplayer && gameData.roomCode) {
       navigate(`/quiz/${gameData.difficulty}`, {
         state: {
-          currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+          currentQuestionIndex: nextQuestionIndex, // The question after the break
           score: gameData.score, // Participant's current score from gameData
           players, // Live players list from Firestore
           multiplayer: gameData.multiplayer,
@@ -118,7 +127,7 @@ const MidQuizScoreboard = () => {
     else if (!gameData.multiplayer) {
       navigate(`/quiz/${gameData.difficulty}`, {
         state: {
-          currentQuestionIndex: nextQuestionIndex, // Use the incremented index
+          currentQuestionIndex: nextQuestionIndex, // The question after the break
           score: gameData.score,
           players: gameData.players, // Initial players list for single player
           multiplayer: false,
@@ -192,16 +201,27 @@ const MidQuizScoreboard = () => {
           setPlayers(filteredPlayers);
 
           // Update hostIsObserver if it exists in the room data
-          if (room.hostIsObserver !== undefined && isHost) {
+          if (room.hostIsObserver !== undefined && isUserHost) {
             setHostIsObserver(room.hostIsObserver);
           }
 
-          // Check if continue is ready
-          if (room.continueReady) {
+          // `isUserHost`, not the `isHost` state: this listener can be set up
+          // (and fire) before that state updates, which would treat the host
+          // as a player below.
+          if (room.phase) {
+            // The room drives the return (#62): players go back as soon as it
+            // has resumed, whether or not they saw the continueReady flag
+            // (missed window, backgrounded tab). A stale continueReady left
+            // over from the last break is ignored, so it can't bounce players
+            // to the quiz while the room is still in the break.
+            if (!isUserHost && room.phase === "question" &&
+                (room.currentQuestionIndex ?? 0) >= gameData.currentQuestionIndex) {
+              continueQuizRef.current();
+            }
+          } else if (room.continueReady) {
+            // Rooms from before #61 have no phase: keep the old signal.
             setContinueReadyState(true);
-
-            // If not host, continue automatically when host signals
-            if (!isHost && room.continueReady) {
+            if (!isUserHost) {
               continueQuizRef.current();
             }
           }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Player, Room } from "./roomsFirestore";
 import {
     addPlayerToRoom,
+    advanceQuestion,
     createRoom,
     generateRoomCode,
     getRoom,
@@ -9,6 +10,7 @@ import {
     listenToRoom,
     markPlayerAtMidQuiz,
     resetPlayersAtMidQuiz,
+    resumeAfterMidQuiz,
     setContinueReady,
     setRoomDifficulty,
     startGame,
@@ -91,9 +93,8 @@ const refFor = (roomCode: string) => ({ __ref: `rooms/${roomCode}` });
 const givenTransactionSees = (room: Room | null) => {
     const update = vi.fn();
     mocks.runTransaction.mockImplementation(
-        async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<void>) => {
-            await updateFunction({ get: async () => snapshotOf(room), update });
-        },
+        async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) =>
+            updateFunction({ get: async () => snapshotOf(room), update }),
     );
     return update;
 };
@@ -425,59 +426,33 @@ describe("updatePlayerScore", () => {
 });
 
 describe("markPlayerAtMidQuiz", () => {
-    it("adds the player to an empty (absent) list", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith()));
-
+    it("adds the player server-side with arrayUnion, without reading the room first", async () => {
         await markPlayerAtMidQuiz("ABCD", "p-1");
 
+        expect(mocks.getDoc).not.toHaveBeenCalled();
         expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), {
-            playersAtMidQuiz: ["p-1"],
+            playersAtMidQuiz: { __arrayUnion: ["p-1"] },
         });
     });
 
-    it("appends to an existing list without dropping who's already there", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ playersAtMidQuiz: ["p-1"] })));
-
-        await markPlayerAtMidQuiz("ABCD", "p-2");
-
-        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), {
-            playersAtMidQuiz: ["p-1", "p-2"],
-        });
-    });
-
-    it("doesn't write again for a player already marked", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ playersAtMidQuiz: ["p-1"] })));
-
-        await markPlayerAtMidQuiz("ABCD", "p-1");
-
-        expect(mocks.updateDoc).not.toHaveBeenCalled();
-    });
-
-    it("fails for a room that doesn't exist", async () => {
-        mocks.getDoc.mockResolvedValue(snapshotOf(null));
-
-        await expect(markPlayerAtMidQuiz("ZZZZ", "p-1")).rejects.toThrow(
-            "Failed to mark player as ready: Room ZZZZ does not exist",
-        );
-    });
-
-    it("loses one of two concurrent marks — the known race, not a fix", async () => {
-        // This pins the *current* behaviour so the race is visible in the
-        // suite rather than only in a doc: two clients that read the same
-        // snapshot each write an array missing the other's player, so the
-        // second write silently drops the first. Fixing it (arrayUnion or a
-        // transaction) is #64 — delete this test when that lands, don't
-        // loosen it.
-        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ playersAtMidQuiz: [] })));
-
+    it("sends each concurrent mark as its own arrayUnion, so none drops another", async () => {
+        // Since #62 every player reaches the break on the same snapshot. With
+        // a read-modify-write, two marks read the same list and the second
+        // write dropped the first; arrayUnion merges on the server instead.
         await Promise.all([markPlayerAtMidQuiz("ABCD", "p-1"), markPlayerAtMidQuiz("ABCD", "p-2")]);
 
-        expect(mocks.updateDoc).toHaveBeenCalledTimes(2);
         expect(mocks.updateDoc.mock.calls.map((call) => call[1])).toEqual([
-            { playersAtMidQuiz: ["p-1"] },
-            { playersAtMidQuiz: ["p-2"] },
+            { playersAtMidQuiz: { __arrayUnion: ["p-1"] } },
+            { playersAtMidQuiz: { __arrayUnion: ["p-2"] } },
         ]);
-        // If this ever becomes arrayUnion, the second write would carry both.
+    });
+
+    it("wraps a failed write, e.g. a room that doesn't exist", async () => {
+        mocks.updateDoc.mockRejectedValue(new Error("No document to update"));
+
+        await expect(markPlayerAtMidQuiz("ZZZZ", "p-1")).rejects.toThrow(
+            "Failed to mark player as ready: No document to update",
+        );
     });
 });
 
@@ -502,6 +477,112 @@ describe("startGame", () => {
 
         await expect(startGame("ABCD")).rejects.toThrow("Failed to start game: denied");
         expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("advanceQuestion", () => {
+    const onQuestion = (index: number) =>
+        roomWith({ started: true, phase: "question", currentQuestionIndex: index });
+
+    it("moves the room to the next question with a fresh server-side start", async () => {
+        const update = givenTransactionSees(onQuestion(0));
+
+        await expect(advanceQuestion("ABCD", 0, 15)).resolves.toBe(true);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "question",
+            currentQuestionIndex: 1,
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
+    it("takes the mid-quiz break after every fifth question", async () => {
+        const update = givenTransactionSees(onQuestion(4));
+
+        await advanceQuestion("ABCD", 4, 15);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "mid-scoreboard",
+            currentQuestionIndex: 5,
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
+    it("ends the quiz after the last question", async () => {
+        const update = givenTransactionSees(onQuestion(14));
+
+        await advanceQuestion("ABCD", 14, 15);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "results",
+            currentQuestionIndex: 14,
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
+    it("is a no-op when another client already advanced past this question", async () => {
+        // Every client whose clock runs out calls this; only the first write lands.
+        const update = givenTransactionSees(onQuestion(3));
+
+        await expect(advanceQuestion("ABCD", 2, 15)).resolves.toBe(false);
+
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op outside the question phase", async () => {
+        const update = givenTransactionSees(
+            roomWith({ started: true, phase: "mid-scoreboard", currentQuestionIndex: 5 }),
+        );
+
+        await expect(advanceQuestion("ABCD", 5, 15)).resolves.toBe(false);
+
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("wraps a missing room or a rules denial with its own context", async () => {
+        givenTransactionSees(null);
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow(
+            "Failed to advance question: Room ABCD does not exist",
+        );
+
+        mocks.runTransaction.mockRejectedValueOnce(new Error("permission-denied"));
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow(
+            "Failed to advance question: permission-denied",
+        );
+    });
+});
+
+describe("resumeAfterMidQuiz", () => {
+    it("starts the question the break points at, keeping its index", async () => {
+        const update = givenTransactionSees(
+            roomWith({ started: true, phase: "mid-scoreboard", currentQuestionIndex: 5 }),
+        );
+
+        await expect(resumeAfterMidQuiz("ABCD")).resolves.toBe(true);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "question",
+            phaseStartedAt: SERVER_TIMESTAMP,
+            playersAtMidQuiz: [],
+        });
+    });
+
+    it("is a no-op unless the room is in the break (a double-click can't restart a question)", async () => {
+        const update = givenTransactionSees(
+            roomWith({ started: true, phase: "question", currentQuestionIndex: 5 }),
+        );
+
+        await expect(resumeAfterMidQuiz("ABCD")).resolves.toBe(false);
+
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("wraps a missing room with its own context", async () => {
+        givenTransactionSees(null);
+
+        await expect(resumeAfterMidQuiz("ABCD")).rejects.toThrow(
+            "Failed to resume quiz: Room ABCD does not exist",
+        );
     });
 });
 
@@ -636,10 +717,14 @@ describe("when Firebase never initialized", () => {
             "Firebase not initialized",
         );
         await expect(resetPlayersAtMidQuiz("ABCD")).rejects.toThrow("Firebase not initialized");
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow("Firebase not initialized");
+        await expect(resumeAfterMidQuiz("ABCD")).rejects.toThrow("Firebase not initialized");
     });
 
     it("reaches Firestore for none of them", async () => {
         await expect(startGame("ABCD")).rejects.toThrow();
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow();
+        await expect(resumeAfterMidQuiz("ABCD")).rejects.toThrow();
 
         expect(mocks.setDoc).not.toHaveBeenCalled();
         expect(mocks.updateDoc).not.toHaveBeenCalled();

@@ -66,6 +66,16 @@ function freshRoom(prefix) {
   return { roomCode, roomRef };
 }
 
+// The one start write firestore.rules accepts (since #62): flip `started`
+// and move the room into question 0 in the same write.
+const startWrite = (overrides = {}) => ({
+  started: true,
+  phase: "question",
+  currentQuestionIndex: 0,
+  phaseStartedAt: serverTimestamp(),
+  ...overrides,
+});
+
 async function createRoom(roomRef, id) {
   await setDoc(roomRef, {
     id,
@@ -137,7 +147,7 @@ await expectAllowed("set difficulty alone", () =>
   updateDoc(diff2.roomRef, { difficulty: "easy" })
 );
 await expectAllowed("start game after difficulty set", () =>
-  updateDoc(diff2.roomRef, { started: true })
+  updateDoc(diff2.roomRef, startWrite())
 );
 
 // 5b. Malicious: re-set difficulty after it's already been set once
@@ -158,7 +168,7 @@ await expectDenied("list the entire rooms collection with no code", async () => 
 const score1 = freshRoom("SCORE");
 await createRoom(score1.roomRef, score1.roomCode);
 await updateDoc(score1.roomRef, { difficulty: "medium" });
-await updateDoc(score1.roomRef, { started: true });
+await updateDoc(score1.roomRef, startWrite());
 await expectAllowed("update player score after start", () =>
   updateDoc(score1.roomRef, {
     players: [{ id: "host-1", name: "Host", score: 500 }],
@@ -174,7 +184,7 @@ await expectAllowed("update player score after start", () =>
 const score1b = freshRoom("SCOREB");
 await createRoom(score1b.roomRef, score1b.roomCode);
 await updateDoc(score1b.roomRef, { difficulty: "medium" });
-await updateDoc(score1b.roomRef, { started: true });
+await updateDoc(score1b.roomRef, startWrite());
 await expectDenied("update players with malformed entry during active game", () =>
   updateDoc(score1b.roomRef, {
     players: [{ id: "host-1", name: "Host" }], // no score
@@ -185,7 +195,7 @@ await expectDenied("update players with malformed entry during active game", () 
 const score2 = freshRoom("SCORE2");
 await createRoom(score2.roomRef, score2.roomCode);
 await updateDoc(score2.roomRef, { difficulty: "medium" });
-await updateDoc(score2.roomRef, { started: true });
+await updateDoc(score2.roomRef, startWrite());
 await expectDenied("update score + forge hostId in same write", () =>
   updateDoc(score2.roomRef, {
     players: [{ id: "host-1", name: "Host", score: 500 }],
@@ -202,6 +212,9 @@ await expectAllowed("set continueReady", () =>
 await expectAllowed("set playersAtMidQuiz", () =>
   updateDoc(flag.roomRef, { playersAtMidQuiz: ["host-1"] })
 );
+await expectAllowed("mark a player at the break with arrayUnion (markPlayerAtMidQuiz)", () =>
+  updateDoc(flag.roomRef, { playersAtMidQuiz: arrayUnion("player-2") })
+);
 await expectAllowed("reset playersAtMidQuiz to empty", () =>
   updateDoc(flag.roomRef, { playersAtMidQuiz: [] })
 );
@@ -210,14 +223,14 @@ await expectAllowed("reset playersAtMidQuiz to empty", () =>
 const forge = freshRoom("FORGE");
 await createRoom(forge.roomRef, forge.roomCode);
 await expectDenied("forge started=true with no difficulty set", () =>
-  updateDoc(forge.roomRef, { started: true })
+  updateDoc(forge.roomRef, startWrite())
 );
 
 // 10. Malicious: add a player after the game has already started
 const started = freshRoom("STARTED");
 await createRoom(started.roomRef, started.roomCode);
 await updateDoc(started.roomRef, { difficulty: "easy" });
-await updateDoc(started.roomRef, { started: true });
+await updateDoc(started.roomRef, startWrite());
 await expectDenied("add player after game started", () =>
   updateDoc(started.roomRef, {
     players: arrayUnion({ id: "late-joiner", name: "Late", score: 0 }),
@@ -240,13 +253,6 @@ async function createRoomWithPhase(roomRef, id, overrides = {}) {
     ...overrides,
   });
 }
-const startWrite = (overrides = {}) => ({
-  started: true,
-  phase: "question",
-  currentQuestionIndex: 0,
-  phaseStartedAt: serverTimestamp(),
-  ...overrides,
-});
 const backdated = Timestamp.fromMillis(Date.now() - 60_000);
 
 const phase1 = freshRoom("PHASE");
@@ -258,12 +264,12 @@ await expectAllowed("start game with phase fields in the same write", () =>
   updateDoc(phase1.roomRef, startWrite())
 );
 
-// 11b. Legacy started-only write still works on a room created with the new
-// fields (a cached pre-#61 client, or startGame's permission-denied fallback).
+// 11b. The legacy started-only start (pre-#61 clients) is refused since #62:
+// a game started that way would have no phase for clients to follow.
 const phase2 = freshRoom("PHASELEGACY");
 await createRoomWithPhase(phase2.roomRef, phase2.roomCode);
 await updateDoc(phase2.roomRef, { difficulty: "easy" });
-await expectAllowed("start game with started only on a phase-aware room", () =>
+await expectDenied("start game with started only (legacy write)", () =>
   updateDoc(phase2.roomRef, { started: true })
 );
 
@@ -368,6 +374,96 @@ await expectDenied("phase fields riding on a score update", () =>
     players: [{ id: "host-1", name: "Host", score: 500 }],
     ...skipToResults,
   })
+);
+
+// 12. Moving between phases (#62): question -> next question / mid-quiz
+// break / results, and resuming after the break. The rules only let a
+// question end once its 15s slot is over, measured against the server's
+// real clock, so these cases have to wait it out. One room walks questions
+// 1-5 to reach the first mid-quiz boundary; the others test single moves.
+const SLOT_MS = 15_000;
+const waitForSlot = () => new Promise((resolve) => setTimeout(resolve, SLOT_MS + 1_000));
+const advanceTo = (phase, currentQuestionIndex, overrides = {}) => ({
+  phase,
+  currentQuestionIndex,
+  phaseStartedAt: serverTimestamp(),
+  ...overrides,
+});
+async function startedRoom(prefix) {
+  const room = await readyToStart(prefix);
+  await updateDoc(room, startWrite());
+  return room;
+}
+
+const walker = await startedRoom("PHASEWALK");
+const early = await startedRoom("PHASEEARLY");
+const skip = await startedRoom("PHASESKIP");
+const wrongBreak = await startedRoom("PHASEBRK");
+const toResults = await startedRoom("PHASERES");
+const forgedClock = await startedRoom("PHASECLK");
+const piggyScore = await startedRoom("PHASEPIG");
+const resumeTooSoon = await startedRoom("PHASERSM");
+
+await expectDenied("end a question before its 15s slot is over", () =>
+  updateDoc(early, advanceTo("question", 1))
+);
+
+await waitForSlot();
+
+await expectDenied("skip a question (0 -> 2)", () =>
+  updateDoc(skip, advanceTo("question", 2))
+);
+await expectDenied("take the mid-quiz break off a multiple of 5 (0 -> break at 1)", () =>
+  updateDoc(wrongBreak, advanceTo("mid-scoreboard", 1))
+);
+await expectDenied("advance with a client-chosen phaseStartedAt", () =>
+  updateDoc(forgedClock, advanceTo("question", 1, { phaseStartedAt: backdated }))
+);
+await expectDenied("clear the ready marks while ending a question", () =>
+  updateDoc(piggyScore, { ...advanceTo("question", 1), playersAtMidQuiz: [] })
+);
+await expectDenied("advance + rewrite scores in the same write", () =>
+  updateDoc(piggyScore, {
+    ...advanceTo("question", 1),
+    players: [{ id: "host-1", name: "Host", score: 9999 }],
+  })
+);
+await expectDenied("resume from a mid-quiz break the room isn't in", () =>
+  updateDoc(resumeTooSoon, { phase: "question", phaseStartedAt: serverTimestamp() })
+);
+await expectAllowed("end the quiz after a question (-> results)", () =>
+  updateDoc(toResults, advanceTo("results", 0))
+);
+await expectDenied("move on from results", () =>
+  updateDoc(toResults, advanceTo("question", 1))
+);
+
+await expectAllowed("advance to the next question once the slot is over (0 -> 1)", () =>
+  updateDoc(walker, advanceTo("question", 1))
+);
+for (const next of [2, 3, 4]) {
+  await waitForSlot();
+  await updateDoc(walker, advanceTo("question", next));
+}
+await waitForSlot();
+await expectDenied("skip the mid-quiz break (4 -> question 5)", () =>
+  updateDoc(walker, advanceTo("question", 5))
+);
+await expectAllowed("take the mid-quiz break after question 5 (4 -> break at 5)", () =>
+  updateDoc(walker, advanceTo("mid-scoreboard", 5))
+);
+await expectDenied("leave the break onto a different question", () =>
+  updateDoc(walker, advanceTo("question", 6))
+);
+await updateDoc(walker, { playersAtMidQuiz: arrayUnion("host-1", "player-2") });
+await expectDenied("resume while rewriting who is at the break", () =>
+  updateDoc(walker, { phase: "question", phaseStartedAt: serverTimestamp(), playersAtMidQuiz: ["host-1"] })
+);
+await expectAllowed("resume after the mid-quiz break, clearing the ready marks (break at 5 -> question 5)", () =>
+  updateDoc(walker, { phase: "question", phaseStartedAt: serverTimestamp(), playersAtMidQuiz: [] })
+);
+await expectDenied("end the resumed question immediately", () =>
+  updateDoc(walker, advanceTo("question", 6))
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);

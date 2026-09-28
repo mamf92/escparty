@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { QuizQuestion } from "./QuizDataProvider";
-import { filterEnabledQuestions, loadQuizData } from "./QuizDataProvider";
+import { filterEnabledQuestions, isFallbackQuizData, loadQuizData } from "./QuizDataProvider";
 
 // `loadQuizData` has three tiers and two orderings: in development it tries a
 // bundled `import()` first and falls back to fetching from /quizdata, in
@@ -99,6 +99,16 @@ describe("loadQuizData in development", () => {
         // The hardcoded hard bank, not the imported or fetched ones.
         expect(questions.map((question) => question.id)).toEqual([21, 22]);
         expect(questions[0].question).toMatch(/Dana International/);
+        expect(isFallbackQuizData(questions)).toBe(true);
+    });
+
+    it("doesn't mistake a real bank, or a filtered copy of the fallback, for the fallback", async () => {
+        expect(isFallbackQuizData(await loadQuizData("easy"))).toBe(false);
+
+        fetchMock.mockRejectedValue(new Error("offline"));
+        const fallback = await loadQuizData("hard");
+        // Checked on the array loadQuizData returned, before filtering.
+        expect(isFallbackQuizData(filterEnabledQuestions(fallback))).toBe(false);
     });
 });
 

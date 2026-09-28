@@ -34,59 +34,70 @@ interface Player {
 }
 ```
 
-**`phase` / `currentQuestionIndex` / `phaseStartedAt` are written but not
-yet read (#61, rung 1 of #60).** They're the server-authoritative
-progression state the rest of Epic #60 builds on. Today:
+**`phase` / `currentQuestionIndex` / `phaseStartedAt` drive multiplayer
+progression (#61 added them, #62 made clients follow them).** In a
+multiplayer quiz, every client shows `currentQuestionIndex` and derives its
+countdown from `phaseStartedAt`; nothing is counted down locally. Timing
+constants and the "what comes next" logic live in `src/utils/quizTiming.ts`.
+The lifecycle:
 
 - `createRoom` writes `phase: "lobby"`, `currentQuestionIndex: 0`,
   `phaseStartedAt: serverTimestamp()`.
 - `startGame` writes `started: true` plus `phase: "question"`,
   `currentQuestionIndex: 0`, `phaseStartedAt: serverTimestamp()` in one
-  `updateDoc`. There's no started-only fallback. The rules that accept this
-  write deploy on the same merge as the client (see "Deploying rules"
-  below). The only exposure is the minute or so between Vercel serving the
-  new bundle and the rules deploy finishing, when a start gets
-  `permission-denied`.
-- `"mid-scoreboard"` and `"results"` are in the type but nothing writes them
-  yet. Nor does anything advance `currentQuestionIndex` past 0; that's #62.
-- All three are optional on `Room`. Rooms created before #61 don't have
-  them, and a room started by a tab still running a pre-#61 bundle stays
-  `phase: "lobby"` after `started` flips. So until #62, `started` is still
-  the only reliable "game is on" signal.
+  `updateDoc`.
+- `advanceQuestion(roomCode, fromIndex, totalQuestions)` ends a question
+  once its 15s slot (10s answering + 5s feedback) is over. Any client may
+  call it, including when the host is an observer who never runs the quiz.
+  It runs in a transaction that only advances if the room is still on
+  `fromIndex`, so racing clients produce one write and a string of no-ops.
+  It moves to the next question, to `"mid-scoreboard"` after every 5th
+  question (with `currentQuestionIndex` already pointing at the question
+  after the break), or to `"results"` after the last one.
+- `resumeAfterMidQuiz(roomCode)` is the host's continue: `"mid-scoreboard"`
+  → `"question"` at the same index, with a fresh `phaseStartedAt`, clearing
+  `playersAtMidQuiz`. A no-op outside the break.
+- All three are optional on `Room`: rooms created before #61 don't have
+  them, and `Quiz.tsx` falls back to its local timers for such a room.
 - `phaseStartedAt` reads as `null` in a snapshot whose `serverTimestamp()`
-  write is still pending. The writer's own listener sees that local
-  snapshot first, so readers (#62) must handle `null`, or read with
-  `serverTimestamps: "estimate"`.
-
-Clients still don't consume any of this: question progression during a
-multiplayer quiz is still each client's own local timer. If you're
-debugging players seeing different questions at different times, that's
-why; see `docs/agent/multiplayer-sync.md`.
+  write is still pending (the writer's own listener sees that local
+  snapshot first). `Quiz.tsx` counts from "now" until the real value lands.
+- Clients compare `phaseStartedAt` (server time) against their own clock.
+  A phone whose clock is off by a second or two shows a correspondingly
+  shorter or longer countdown; the advance itself is still gated on the
+  server's clock (see the rules below), so the room never moves early.
 
 ## Which writes are safe vs. race-prone
 
-- **Safe:** `addPlayerToRoom` uses `arrayUnion` — concurrent joins can't
-  clobber each other. `updatePlayerScore` runs inside a `runTransaction` —
+- **Safe:** `addPlayerToRoom` and `markPlayerAtMidQuiz` use `arrayUnion` —
+  concurrent joins, and every player reaching the mid-quiz break on the same
+  snapshot (#62), can't clobber each other. `advanceQuestion` and
+  `resumeAfterMidQuiz` are transactions (see above). `updatePlayerScore` runs inside a `runTransaction` —
   Firestore retries it on a conflicting concurrent write, so two
-  near-simultaneous score updates for the same player (e.g. `submitAnswer`
-  and `handleTimeUp` in `Quiz.tsx` both firing near a question's deadline)
-  can't silently drop one of them the way a plain read-modify-write would.
-- **Race-prone:** `markPlayerAtMidQuiz` still does a manual read-modify-write
-  (`getDoc` then `updateDoc` with a recomputed array). Two near-simultaneous
-  calls for different players can read the same snapshot and each overwrite
-  the other's change, silently dropping one player's mid-quiz-ready flag. If
-  you're adding a new field that multiple clients might write concurrently,
-  use `arrayUnion`/`arrayRemove` where the shape allows it, or a transaction
-  (see `updatePlayerScore` for the pattern) — don't add another manual
-  read-modify-write.
+  near-simultaneous score updates for the same player (e.g. an answer's
+  write and a time's-up repair write in `Quiz.tsx` near a question's
+  deadline) can't silently drop one of them the way a plain
+  read-modify-write would.
+- **Don't add a manual read-modify-write.** `markPlayerAtMidQuiz` used to
+  be one (`getDoc` then `updateDoc` with a recomputed array); once #62 put
+  every player at the break at the same moment, concurrent calls dropped
+  each other's IDs and an observer host's Continue never enabled. If you're
+  adding a field several clients might write concurrently, use
+  `arrayUnion`/`arrayRemove` where the shape allows it, or a transaction
+  (see `updatePlayerScore` for the pattern).
 
 ## Progression flags
 
 - `continueReady` — host-set boolean signaling "advance to the next
   question" to observer-mode hosts. Reset by the host, not automatically.
 - `playersAtMidQuiz` — array of player IDs who have reached the mid-quiz
-  scoreboard, built via `markPlayerAtMidQuiz` (race-prone, see above) and
-  cleared by `resetPlayersAtMidQuiz`.
+  scoreboard, built via `markPlayerAtMidQuiz` (`arrayUnion`) and cleared by
+  `resumeAfterMidQuiz` in the same write that ends the break, so a
+  half-failed resume can't leave stale marks for the next one. Among phase
+  moves, only the resume may touch it (and only to clear it); the separate
+  `isManagingMidQuizPlayers` branch still accepts any list on its own, which
+  `markPlayerAtMidQuiz` and older bundles' `resetPlayersAtMidQuiz` rely on. `resetPlayersAtMidQuiz` still exists but
+  nothing calls it any more.
 
 ## Security rules
 
@@ -139,21 +150,31 @@ It's the `github-rules-deployer` service account, with Firebase Rules Admin
 and Service Usage Consumer only, so it can't touch room data. Plus the
 `FIREBASE_PROJECT_ID` repo variable.
 
-### Progression fields (#61)
+### Progression fields (#61, #62)
 
-`isValidRoomCreation` accepts the three
-fields as optional, but when present they must be `phase == 'lobby'`,
-`currentQuestionIndex == 0` and `phaseStartedAt == request.time`.
-`isStartingGame` accepts either the legacy started-only write (kept only
-so tabs still running a pre-#61 bundle can start a game; #62 should drop it
-once clients read `phase`) or exactly `started` + the three fields, with `phase == 'question'`,
-`currentQuestionIndex == 0` and `phaseStartedAt == request.time`. Pinning
-the timestamp to `request.time` means a client can't back-date the clock
-that #62 will pace questions against. No other update branch admits these
-keys (each one is `hasOnly` its own fields), so they can't be forged
-alongside another write. Covered by case 11 of
-`scripts/verify-firestore-rules.mjs`.
+`isValidRoomCreation` accepts the three fields as optional, but when
+present they must be `phase == 'lobby'`, `currentQuestionIndex == 0` and
+`phaseStartedAt == request.time`. `isStartingGame` accepts exactly
+`started` + the three fields, with `phase == 'question'`,
+`currentQuestionIndex == 0` and `phaseStartedAt == request.time`. The
+legacy started-only start is no longer accepted (#62): a game started that
+way would have no phase for clients to follow.
 
+`isAdvancingPhase` covers every later move, mirroring `phaseAfterQuestion`
+in `quizTiming.ts`: question N → question N+1 (N+1 not a multiple of 5),
+question N → `mid-scoreboard` at N+1 (N+1 a multiple of 5), question N →
+`results`, and `mid-scoreboard` N → question N (which may also clear
+`playersAtMidQuiz` to `[]`, and is the only move that may). A question can't be ended
+before `phaseStartedAt + 15s`, measured on the server's clock, so no client
+can cut a question short or race ahead. The 15s is hardcoded there; keep it
+in sync with `QUESTION_SLOT_MS`. Rules can't see how many questions a quiz
+has, so `results` is accepted from any question.
+
+`phaseStartedAt` is always pinned to `request.time`, and no other update
+branch admits these keys (each is `hasOnly` its own fields), so they can't
+be back-dated or forged alongside another write. Covered by cases 11 and 12
+of `scripts/verify-firestore-rules.mjs`. Case 12 waits out real 15s slots,
+so the script takes about two minutes.
 
 **Two real bugs found and fixed in the rules imported from the Firebase
 console** (verified against the real emulator before and after — see

@@ -113,6 +113,7 @@ Coverage `include` therefore lists exactly the files with a floor:
 | File | Floor |
 | --- | --- |
 | `src/utils/quizScoring.ts` | 100% statements / branches / functions / lines |
+| `src/utils/quizTiming.ts` | 100% statements / branches / functions / lines |
 | `src/utils/roomsFirestore.ts` | 100% statements / branches / functions / lines |
 | `src/utils/QuizDataProvider.ts` | 98% statements & lines, 96% branches, 100% functions |
 
@@ -131,15 +132,18 @@ The unit harness is the first rung of the test-coverage epic (#53). Still
 open at the time of writing:
 
 - **Covered so far: the data/logic layer, not the screens.**
-  `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts` and the
-  extracted scoring math in `src/utils/quizScoring.ts` have unit tests with
-  a coverage floor (#56). `src/pages/Home.test.tsx` is still the only
+  `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts`, the
+  extracted scoring math in `src/utils/quizScoring.ts` and the multiplayer
+  timing in `src/utils/quizTiming.ts` have unit tests with a coverage floor
+  (#56, #62). `src/pages/Home.test.tsx` is still the only
   component test — every other page and `Quiz.tsx` itself are uncovered,
   which is #59.
 - **`Quiz.tsx` is covered only where it was extracted.** The scoring formula
-  moved to `src/utils/quizScoring.ts` and is tested directly; the component's
-  own timer, question progression and multiplayer branching are not tested
-  at all. Don't read "scoring is covered" as "the quiz is covered".
+  moved to `src/utils/quizScoring.ts` and the multiplayer timing to
+  `src/utils/quizTiming.ts`, and both are tested directly; the component's
+  own effects (the local timers, following the room, phase navigation) are
+  not tested at all. Rung 2 (#62) was checked by hand with two browsers
+  against the emulator; a committed version of that is #68. Don't read "scoring is covered" as "the quiz is covered".
 - **No e2e runner.** Playwright is #55.
 - **Test failures don't block merge or deploy yet.** `npm test` runs in
   `ci.yml`, but nothing requires it to pass before merge (branch protection,
@@ -150,7 +154,7 @@ open at the time of writing:
   and `.github/pull_request_template.md` still treat "no tests for a new
   component" as a known gap to note rather than a blocking finding. #58
   flips that; don't hand-wire it before then.
-- **Pre-existing debt.** `Quiz.tsx` (728 lines, the multiplayer branching
+- **Pre-existing debt.** `Quiz.tsx` (~920 lines, the multiplayer branching
   logic) and `src/fabric-ui/` are the obvious first targets — tracked as #59.
 
 Until #58 lands, treat a PR checklist item about tests honestly: say what is
