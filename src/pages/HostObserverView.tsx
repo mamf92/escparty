@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, listenToRoom, resumeAfterMidQuiz } from "../utils/roomsFirestore";
@@ -48,11 +48,6 @@ const HostObserverView = () => {
             }
         }
     }, [gameData.roomCode, navigate, error]);
-
-    const continueQuizRef = useRef(continueQuiz);
-    useEffect(() => {
-        continueQuizRef.current = continueQuiz;
-    }, [continueQuiz]);
 
     useEffect(() => {
         // If we don't have location state but we're on this page, try to recover from sessionStorage

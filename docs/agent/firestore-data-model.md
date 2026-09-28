@@ -91,8 +91,9 @@ The lifecycle:
 
 - `continueReady` — unused since #63. It was the host's "continue" signal,
   set to `true` and reset 3s later, so a client whose snapshot arrived late
-  missed it and stayed stuck at the break (#23). Players now return when
-  `phase` goes back to `"question"`. `setContinueReady` and its rules branch
+  missed it and stayed stuck at the break (#23). Players now leave the
+  break as soon as the room isn't in it any more (`hasLeftBreak` in
+  `quizTiming.ts`; see `docs/agent/multiplayer-sync.md`). `setContinueReady` and its rules branch
   remain only so the exported API and old rooms don't break.
 - `playersAtMidQuiz` — array of player IDs who have reached the mid-quiz
   scoreboard, built via `markPlayerAtMidQuiz` (`arrayUnion`) and cleared by
@@ -100,7 +101,8 @@ The lifecycle:
   half-failed resume can't leave stale marks for the next one. Among phase
   moves, only the resume may touch it (and only to clear it). On its own
   (`isManagingMidQuizPlayers`, #63), a room with a phase only accepts marks
-  while it's in `"mid-scoreboard"`, and only ones that add: a mark queued
+  while it's in `"mid-scoreboard"`, and only ones that add a single player
+  (so one client can't mark everyone ready): a mark queued
   offline or on a slow network that arrives after the resume is refused,
   so it can't count a player as ready at the next break before they get
   there. Rooms without a phase still accept any list.

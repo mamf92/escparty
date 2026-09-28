@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, listenToRoom, markPlayerAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
+import { hasLeftBreak } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -45,6 +46,19 @@ const MidQuizScoreboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [hostIsObserver, setHostIsObserver] = useState(gameData.hostIsObserver);
+  // The host's Continue: in flight until the room resumes and the listener
+  // takes everyone back, or failed with a message and a retry.
+  const [resuming, setResuming] = useState(false);
+  const [continueError, setContinueError] = useState<string | null>(null);
+
+  // Which break this is: the index of the question after it. Router state
+  // carries it; after a refresh there's none, so it's taken from the room's
+  // first snapshot instead (0 would read as "the room is past this break").
+  const breakIndexRef = useRef<number | null>(location.state ? gameData.currentQuestionIndex : null);
+  // The room's own difficulty, so a refreshed page (no router state) goes
+  // back to the right quiz rather than the "easy" default.
+  const roomDifficultyRef = useRef<string | null>(null);
+  const markedRef = useRef(false);
 
   // Check if host is observer and redirect if needed
   useEffect(() => {
@@ -71,7 +85,7 @@ const MidQuizScoreboard = () => {
     // again, and the quiz page reloads on every navigation.
     if (leftBreakRef.current) return;
     leftBreakRef.current = true;
-    navigate(`/quiz/${gameData.difficulty}`, {
+    navigate(`/quiz/${roomDifficultyRef.current ?? gameData.difficulty}`, {
       state: {
         // The quiz already hands us the index of the question after the
         // break (it used to be incremented again here, which skipped a
@@ -101,16 +115,20 @@ const MidQuizScoreboard = () => {
     // The host starts the next question for the whole room. It doesn't
     // navigate here: everyone, the host included, goes back when the
     // listener below sees the room resumed (#63). That also covers a
-    // double-click, a second host tab, or a resume whose reply got lost.
-    if (isHost && gameData.roomCode) {
+    // second host tab, or a resume whose reply got lost. The button stays
+    // disabled meanwhile, so repeated taps don't queue more transactions.
+    if (isHost && gameData.roomCode && !resuming) {
+      setResuming(true);
+      setContinueError(null);
       try {
         await resumeAfterMidQuiz(gameData.roomCode);
       } catch (err) {
         console.error("Error in host continue logic:", err);
-        setError("Failed to continue the quiz");
+        setContinueError("Couldn't continue the quiz. Check your connection and try again.");
+        setResuming(false);
       }
     }
-  }, [gameData.multiplayer, gameData.roomCode, isHost, navigate, error, returnToQuiz]);
+  }, [gameData.multiplayer, gameData.roomCode, isHost, navigate, error, returnToQuiz, resuming]);
 
   const returnToQuizRef = useRef(returnToQuiz);
   useEffect(() => {
@@ -140,29 +158,13 @@ const MidQuizScoreboard = () => {
       }
     }
 
-    // Check if current user is the host
+    // A first guess at whether this user is the host, for the first render.
+    // The room's snapshot below overrides it: localStorage is shared by
+    // every tab, so another tab joining a room can rewrite it.
     const isUserHost = localStorage.getItem("isHost") === "true";
-    const isObserverHost = isUserHost && localStorage.getItem("hostIsObserver") === "true";
-
-    // Mark player as ready at mid-quiz if in multiplayer. An observer host
-    // isn't a player, and only passes through here on its way to
-    // HostObserverView.
-    const markPlayerReady = async () => {
-      if (gameData.multiplayer && gameData.roomCode && gameData.playerId && !isObserverHost) {
-        try {
-          await markPlayerAtMidQuiz(gameData.roomCode, gameData.playerId);
-        } catch (err) {
-          console.error("Error marking player as ready at mid-quiz:", err);
-        }
-      }
-    };
-
-    markPlayerReady();
-
     setIsHost(isUserHost);
     if (isUserHost) {
-      const observerStatus = localStorage.getItem("hostIsObserver") === "true";
-      setHostIsObserver(observerStatus);
+      setHostIsObserver(localStorage.getItem("hostIsObserver") === "true");
     }
 
     // Set up real-time listener if we have multiplayer details
@@ -177,21 +179,37 @@ const MidQuizScoreboard = () => {
           // Always update players array to ensure real-time score updates
           setPlayers(filteredPlayers);
 
-          // Update hostIsObserver if it exists in the room data
-          if (room.hostIsObserver !== undefined && isUserHost) {
-            setHostIsObserver(room.hostIsObserver);
+          // Who's the host, and whether they only observe, as the room has it.
+          const roomSaysHost = !!gameData.playerId && room.hostId === gameData.playerId;
+          const observerHost = roomSaysHost && room.hostIsObserver === true;
+          setIsHost(roomSaysHost);
+          setHostIsObserver(observerHost);
+          if (room.difficulty) roomDifficultyRef.current = room.difficulty;
+
+          const roomIndex = room.currentQuestionIndex ?? 0;
+          if (breakIndexRef.current === null && room.phase === "mid-scoreboard") {
+            breakIndexRef.current = roomIndex;
+          }
+
+          // Mark this player ready, once, while the room is actually in the
+          // break (the rules refuse a mark at any other time). An observer
+          // host isn't a player: it only passes through here on its way to
+          // HostObserverView.
+          if (room.phase === "mid-scoreboard" && !observerHost && gameData.playerId && !markedRef.current) {
+            markedRef.current = true;
+            markPlayerAtMidQuiz(gameData.roomCode, gameData.playerId).catch(err => {
+              console.error("Error marking player as ready at mid-quiz:", err);
+            });
           }
 
           // The room's state is the signal (#63): leave this break as soon
           // as the room isn't in it any more, however late this snapshot
           // arrives (a throttled background tab, a locked phone, a slow
           // network). It's a state, not a moment, so there's no window to
-          // miss, and a snapshot that skips straight to the next break or
-          // the results still gets this player there, via the quiz page.
-          // Observer hosts stay on HostObserverView instead.
-          const stillInThisBreak = room.phase === "mid-scoreboard" &&
-            (room.currentQuestionIndex ?? 0) <= gameData.currentQuestionIndex;
-          if (!isObserverHost && room.phase && room.phase !== "lobby" && !stillInThisBreak) {
+          // miss, and a snapshot that skips straight to the results still
+          // gets this player there, via the quiz page. Observer hosts stay
+          // on HostObserverView instead.
+          if (!observerHost && hasLeftBreak(room.phase, roomIndex, breakIndexRef.current ?? -1)) {
             returnToQuizRef.current();
           }
         } else {
@@ -202,7 +220,7 @@ const MidQuizScoreboard = () => {
 
       return () => unsubscribe();
     }
-  }, [gameData.multiplayer, gameData.roomCode, location.state, navigate]);
+  }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, location.state, navigate]);
 
   if (error) {
     return (
@@ -240,9 +258,12 @@ const MidQuizScoreboard = () => {
 
       {/* Only show continue button for the host in multiplayer mode, or for anyone in single-player */}
       {(isHost || !gameData.multiplayer) ? (
-        <NextButton onClick={continueQuiz}>
-          {"Continue Quiz"}
-        </NextButton>
+        <>
+          <NextButton onClick={continueQuiz} disabled={resuming}>
+            {resuming ? "Continuing..." : "Continue Quiz"}
+          </NextButton>
+          {continueError && <ErrorMessage>{continueError}</ErrorMessage>}
+        </>
       ) : (
         <WaitingMessage>Waiting for the host to continue...</WaitingMessage>
       )}

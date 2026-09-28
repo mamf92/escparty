@@ -459,8 +459,17 @@ await expectAllowed("take the mid-quiz break after question 5 (4 -> break at 5)"
 await expectDenied("leave the break onto a different question", () =>
   updateDoc(walker, advanceTo("question", 6))
 );
-await expectAllowed("mark players at the break with arrayUnion (markPlayerAtMidQuiz)", () =>
+await expectDenied("mark several players ready in one write", () =>
   updateDoc(walker, { playersAtMidQuiz: arrayUnion("host-1", "player-2") })
+);
+await expectAllowed("mark a player at the break with arrayUnion (markPlayerAtMidQuiz)", () =>
+  updateDoc(walker, { playersAtMidQuiz: arrayUnion("host-1") })
+);
+await expectAllowed("mark a second player at the break", () =>
+  updateDoc(walker, { playersAtMidQuiz: arrayUnion("player-2") })
+);
+await expectAllowed("mark an already-marked player again (a no-op)", () =>
+  updateDoc(walker, { playersAtMidQuiz: arrayUnion("player-2") })
 );
 await expectDenied("clear the ready marks during the break without resuming", () =>
   updateDoc(walker, { playersAtMidQuiz: [] })

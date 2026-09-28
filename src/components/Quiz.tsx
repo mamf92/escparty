@@ -55,6 +55,10 @@ const Quiz = () => {
   // player keeps the local timers below.
   const sharedClock = isMultiplayer && !!room?.phase;
   const localClock = !isMultiplayer;
+  // A room created before #61 has no phase to follow, and the old local-timer
+  // path for it is gone (#63). Rooms only live for one game, so this only
+  // catches a tab left open from before the upgrade.
+  const legacyRoom = isMultiplayer && room !== null && !room.phase;
   const roomStartMs = startedAtMillis(room?.phaseStartedAt);
   // This player's score as the room has it.
   const storedScore = room?.players.find(p => p.id === playerId)?.score ?? 0;
@@ -329,15 +333,6 @@ const Quiz = () => {
 
   // --- Shared, room-driven progression (multiplayer) ---
 
-  // A room created before #61 has no phase to follow, and the old local-timer
-  // path for it is gone (#63). Rooms only live for one game, so this only
-  // catches a tab left open from before the upgrade.
-  useEffect(() => {
-    if (isMultiplayer && room && !room.phase) {
-      setError("This room was set up by an older version of the app. Start a new room to play.");
-    }
-  }, [isMultiplayer, room]);
-
   // Refs so the 100ms tick below reads current values without restarting.
   const isSubmittedRef = useRef(isSubmitted);
   isSubmittedRef.current = isSubmitted;
@@ -464,13 +459,18 @@ const Quiz = () => {
   }, [sharedClock, loading, room?.phase, room?.currentQuestionIndex, roomStartMs, currentQuestionIndex, roomCode, questions.length, advanceGraceMs]);
 
   // When the room leaves the question phase, everyone goes where it went.
+  // Waits for the questions to load, so the next page gets the real
+  // question count, and hands on the room's copy of this player's score if
+  // it's higher: a player coming back from a refresh or a locked phone may
+  // not have picked it back up yet.
   useEffect(() => {
-    if (!sharedClock || !room || leftQuizRef.current) return;
+    if (!sharedClock || !room || loading || questions.length === 0 || leftQuizRef.current) return;
+    const bestScore = Math.max(score, storedScore);
     if (room.phase === "mid-scoreboard") {
       leftQuizRef.current = true;
       navigate("/mid-quiz-scoreboard", {
         state: {
-          score,
+          score: bestScore,
           totalQuestions: questions.length,
           currentQuestionIndex: room.currentQuestionIndex ?? 0, // the question after the break
           difficulty,
@@ -484,7 +484,7 @@ const Quiz = () => {
       leftQuizRef.current = true;
       navigate("/results", {
         state: {
-          score,
+          score: bestScore,
           totalQuestions: questions.length,
           difficulty,
           multiplayer: true,
@@ -494,7 +494,7 @@ const Quiz = () => {
         }
       });
     }
-  }, [sharedClock, room, score, questions.length, difficulty, roomCode, playerId, navigate]);
+  }, [sharedClock, room, loading, score, storedScore, questions.length, difficulty, roomCode, playerId, navigate]);
 
   // Lock the current question: no more answers, show its feedback.
   const lockQuestion = ({ hideTimer }: { hideTimer: boolean }) => {
@@ -659,10 +659,10 @@ const Quiz = () => {
   }
 
   // Render error state
-  if (error) {
+  if (error || legacyRoom) {
     return (
       <ErrorContainer>
-        <ErrorMessage>{error}</ErrorMessage>
+        <ErrorMessage>{error ?? "This room was set up by an older version of the app. Start a new room to play."}</ErrorMessage>
         <RetryButton onClick={() => navigate("/")}>
           Back to Home
         </RetryButton>
