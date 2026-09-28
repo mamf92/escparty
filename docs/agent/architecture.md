@@ -18,7 +18,7 @@ reusable piece:
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui`).
-- `Quiz.tsx` — ~920 lines, the largest file in the app. Handles single-player
+- `Quiz.tsx` — ~880 lines, the largest file in the app. Handles single-player
   and multiplayer quiz flow, answer selection/scoring, and the multiplayer
   progression timer. A change here is rarely "just a component change" —
   read `docs/agent/multiplayer-sync.md` first if the change touches

@@ -6,7 +6,7 @@ import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
-import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
@@ -439,7 +439,8 @@ const Quiz = () => {
           multiplayer: true,
           roomCode,
           playerId,
-          players: playingPlayers(room)
+          players: playingPlayers(room),
+          observer: isObserverHost(room, playerId) // shown the standings without a score
         }
       });
     }

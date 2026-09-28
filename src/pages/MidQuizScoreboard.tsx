@@ -24,12 +24,17 @@ const MidQuizScoreboard = () => {
     playerId: null
   };
 
+  // Set while working out gameData below: a stored game that can't be read
+  // is an error, not a quiet switch to single player.
+  const storedGameUnreadable = useRef(false);
+
   // Router state from the page that brought us here; without any (a direct
   // link, a new or restored tab) this tab's stored multiplayer game, read
   // up front so the very first render already knows it's multiplayer (and
   // doesn't offer a single-player Continue to a guest).
   const [gameData] = useState(() => {
     const session = location.state ? null : readMultiplayerGame();
+    storedGameUnreadable.current = !location.state && !session && sessionStorage.getItem("multiplayerGame") !== null;
     return {
       score: locationState.score || 0,
       totalQuestions: locationState.totalQuestions || 0,
@@ -43,7 +48,9 @@ const MidQuizScoreboard = () => {
   });
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    storedGameUnreadable.current ? "Unable to retrieve game data. Please return to the lobby." : null
+  );
   // Whether this user is the host: set only from the room's snapshot (see
   // the listener below).
   const [isHost, setIsHost] = useState(false);
@@ -58,9 +65,6 @@ const MidQuizScoreboard = () => {
   // tab) it's taken from the room's first snapshot instead (0 would read as
   // "the room is past this break").
   const breakIndexRef = useRef<number | null>(location.state ? gameData.currentQuestionIndex : null);
-  // The room's own difficulty, so a page opened without router state goes
-  // back to the right quiz rather than the "easy" default.
-  const roomDifficultyRef = useRef<string | null>(null);
   const markedRef = useRef(false);
 
   // This player's score. Without router state gameData.score is 0, and a
@@ -82,12 +86,12 @@ const MidQuizScoreboard = () => {
     // again, and the quiz page reloads on every navigation.
     if (leftBreakRef.current) return;
     leftBreakRef.current = true;
-    navigate(`/quiz/${room?.difficulty ?? roomDifficultyRef.current ?? gameData.difficulty}`, {
+    navigate(`/quiz/${room?.difficulty ?? gameData.difficulty}`, {
       state: {
-        // The index of the question after the break: the quiz hands it over
-        // (it used to be incremented again here, which skipped a question at
-        // every mid-quiz break), or without router state from the room.
-        currentQuestionIndex: room?.currentQuestionIndex ?? breakIndexRef.current ?? gameData.currentQuestionIndex,
+        // The index of the question after the break: the room's, or in
+        // single player the one the quiz handed over (it used to be
+        // incremented again here, which skipped a question at every break).
+        currentQuestionIndex: room?.currentQuestionIndex ?? gameData.currentQuestionIndex,
         score: room ? bestKnownScore(gameData.score, room.players, gameData.playerId) : gameData.score,
         multiplayer: gameData.multiplayer,
         roomCode: gameData.roomCode,
@@ -106,11 +110,6 @@ const MidQuizScoreboard = () => {
       await resume();
     }
   }, [gameData.multiplayer, isHost, returnToQuiz, resume]);
-
-  const returnToQuizRef = useRef(returnToQuiz);
-  useEffect(() => {
-    returnToQuizRef.current = returnToQuiz;
-  }, [returnToQuiz]);
 
   useEffect(() => {
     // Whether this user is the host (and only observes) comes from the
@@ -136,6 +135,9 @@ const MidQuizScoreboard = () => {
       // Only an observer host's Continue reads the marks; a playing host
       // continues whenever, so in its room they'd be writes nobody reads.
       if (room.phase !== "mid-scoreboard" || !room.hostIsObserver || isObserverHost(room, playerId)) return;
+      // Only for this screen's break: a late snapshot can already show a
+      // later one, and this player isn't there yet (hasLeftBreak moves it on).
+      if ((room.currentQuestionIndex ?? 0) !== breakIndexRef.current) return;
       markedRef.current = true;
       markPlayerAtMidQuiz(roomCode, playerId).catch(err => {
         console.error("Error marking player as ready at mid-quiz:", err);
@@ -175,7 +177,6 @@ const MidQuizScoreboard = () => {
             }
             return;
           }
-          if (room.difficulty) roomDifficultyRef.current = room.difficulty;
 
           const roomIndex = room.currentQuestionIndex ?? 0;
           if (breakIndexRef.current === null && room.phase === "mid-scoreboard") {
@@ -194,7 +195,7 @@ const MidQuizScoreboard = () => {
           // miss, and a snapshot that skips straight to the results still
           // gets this player there, via the quiz page.
           if (hasLeftBreak(room.phase, roomIndex, breakIndexRef.current ?? -1)) {
-            returnToQuizRef.current(room);
+            returnToQuiz(room);
           }
         } else {
           setError("Game room no longer exists");
@@ -208,7 +209,7 @@ const MidQuizScoreboard = () => {
         clearTimeout(retryTimer);
       };
     }
-  }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, navigate]);
+  }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, navigate, returnToQuiz]);
 
   if (error) {
     return (

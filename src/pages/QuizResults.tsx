@@ -122,7 +122,9 @@ const QuizResults = () => {
   return (
     <Container>
       <Title>🎉 Quiz Completed! 🎤</Title>
-      <Score>You scored {gameData.score}!</Score>
+      {/* An observer host never played (it reaches this page only from a
+          finished room, #63), so it gets the standings without a score. */}
+      {!location.state?.observer && <Score>You scored {gameData.score}!</Score>}
       {winner && <WinnerText>{winner}</WinnerText>}
       {error && <ErrorText>{error}</ErrorText>}
 

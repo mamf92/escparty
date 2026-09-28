@@ -25,7 +25,12 @@ const HostObserverView = () => {
 
     // Everything below is derived from the latest snapshot.
     const [room, setRoom] = useState<Room | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    // No room to watch (opened in a new tab, or this tab's stored game is
+    // gone or unreadable): say so, with the way back, rather than showing
+    // an empty table.
+    const [error, setError] = useState<string | null>(
+        roomCode ? null : "Unable to find this game. Please return to the lobby."
+    );
     const players = room ? playingPlayers(room) : (routeState.players ?? []);
     const playersAtMidQuiz = room?.playersAtMidQuiz ?? [];
     const allPlayersReady = players.length > 0 && players.every(player => playersAtMidQuiz.includes(player.id));
@@ -70,7 +75,9 @@ const HostObserverView = () => {
         );
     }
 
-    const continueHint = !isRoomObserver
+    const continueHint = !room
+        ? "Connecting to the room..."
+        : !isRoomObserver
         ? "Only the room's host can continue"
         : room?.phase === "results"
         ? "The quiz is over"
