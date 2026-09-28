@@ -99,8 +99,11 @@ const QuizResults = () => {
         }
       });
 
-      // Clean up listener after 2 seconds - we just need a snapshot of final scores
-      setTimeout(() => unsubscribe(), 2000);
+      // Listen while this page is open rather than for a fixed 2s: on a
+      // slow network the first snapshot can take longer, and the standings,
+      // this player's score and whether they only observed (#63) all come
+      // from it.
+      return () => unsubscribe();
     }
   }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, location.state]);
 
