@@ -68,7 +68,9 @@ service cloud.firestore {
         // Setting continue ready state
         isSettingContinueReady(affected) ||
         // Managing mid-quiz players
-        isManagingMidQuizPlayers(affected)
+        isManagingMidQuizPlayers(affected) ||
+        // Moving between question / mid-quiz break / results
+        isAdvancingPhase(affected)
       );
     }
 
@@ -120,21 +122,57 @@ service cloud.firestore {
       let data = request.resource.data;
       let existingData = resource.data;
 
-      return data.started == true &&
+      // Starting moves the room into its first question in the same write.
+      // phaseStartedAt must be the server's request time, so no client can
+      // back-date the clock that questions are paced against. (The legacy
+      // started-only write from before #61 is no longer accepted: a game
+      // started that way would have no phase for clients to follow.)
+      return affected.hasOnly(['started', 'phase', 'currentQuestionIndex', 'phaseStartedAt']) &&
+             data.started == true &&
              existingData.started == false &&
              'difficulty' in existingData &&
+             data.phase == 'question' &&
+             data.currentQuestionIndex == 0 &&
+             data.phaseStartedAt == request.time;
+    }
+
+    // Moving a started room from one phase to the next (#62). Mirrors
+    // phaseAfterQuestion in src/utils/quizTiming.ts:
+    //   question N -> question N+1          (N+1 not a multiple of 5)
+    //   question N -> mid-scoreboard at N+1 (N+1 a multiple of 5)
+    //   question N -> results               (index unchanged)
+    //   mid-scoreboard N -> question N      (host resumes after the break)
+    // A question can't be ended before its 15s slot (QUESTION_SLOT_MS) is
+    // over, so no client can cut one short or race ahead; phaseStartedAt is
+    // always the server's request time. Rules can't see how many questions
+    // a quiz has, so "results" is allowed from any question.
+    function isAdvancingPhase(affected) {
+      let data = request.resource.data;
+      let existingData = resource.data;
+
+      return affected.hasOnly(['phase', 'currentQuestionIndex', 'phaseStartedAt']) &&
+             existingData.started == true &&
+             'phase' in existingData &&
+             'currentQuestionIndex' in existingData &&
+             'phaseStartedAt' in existingData &&
+             data.phaseStartedAt == request.time &&
+             data.currentQuestionIndex is int &&
              (
-               // Clients that predate #61 flip `started` alone. Kept so a
-               // cached old bundle can still start a game.
-               affected.hasOnly(['started']) ||
-               // Current clients also move the room into its first question
-               // in the same write. phaseStartedAt must be the server's
-               // request time, so no client can back-date the timestamp that
-               // question timing will be paced against.
-               (affected.hasOnly(['started', 'phase', 'currentQuestionIndex', 'phaseStartedAt']) &&
+               (existingData.phase == 'question' &&
+                request.time >= existingData.phaseStartedAt + duration.value(15, 's') &&
+                (
+                  (data.phase == 'question' &&
+                   data.currentQuestionIndex == existingData.currentQuestionIndex + 1 &&
+                   data.currentQuestionIndex % 5 != 0) ||
+                  (data.phase == 'mid-scoreboard' &&
+                   data.currentQuestionIndex == existingData.currentQuestionIndex + 1 &&
+                   data.currentQuestionIndex % 5 == 0) ||
+                  (data.phase == 'results' &&
+                   data.currentQuestionIndex == existingData.currentQuestionIndex)
+                )) ||
+               (existingData.phase == 'mid-scoreboard' &&
                 data.phase == 'question' &&
-                data.currentQuestionIndex == 0 &&
-                data.phaseStartedAt == request.time)
+                data.currentQuestionIndex == existingData.currentQuestionIndex)
              );
     }
 

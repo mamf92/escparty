@@ -39,12 +39,19 @@ export default defineConfig(({ mode }) => {
           'src/utils/roomsFirestore.ts',
           'src/utils/QuizDataProvider.ts',
           'src/utils/quizScoring.ts',
+          'src/utils/quizTiming.ts',
         ],
         thresholds: {
           // Per-file floors, keyed by the file they guard. `npm run
           // test:coverage` fails if any of these regresses. It isn't a CI
           // check yet — wiring the suite into CI is #57.
           'src/utils/quizScoring.ts': {
+            statements: 100,
+            branches: 100,
+            functions: 100,
+            lines: 100,
+          },
+          'src/utils/quizTiming.ts': {
             statements: 100,
             branches: 100,
             functions: 100,

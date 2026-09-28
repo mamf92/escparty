@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, resetPlayersAtMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom, setContinueReady, resetPlayersAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
 
 const HostObserverView = () => {
     const location = useLocation();
@@ -36,7 +36,9 @@ const HostObserverView = () => {
 
         if (gameData.roomCode) {
             try {
-                // Observer host signals continue but doesn't navigate themselves to quiz
+                // Start the next question for the whole room (#62), then signal
+                // continue; the observer host doesn't navigate to the quiz itself
+                await resumeAfterMidQuiz(gameData.roomCode);
                 await setContinueReady(gameData.roomCode, true);
 
                 // Reset the players at mid-quiz array to prepare for the next mid-quiz break

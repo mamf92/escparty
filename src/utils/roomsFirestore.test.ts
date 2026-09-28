@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Player, Room } from "./roomsFirestore";
 import {
     addPlayerToRoom,
+    advanceQuestion,
     createRoom,
     generateRoomCode,
     getRoom,
@@ -9,6 +10,7 @@ import {
     listenToRoom,
     markPlayerAtMidQuiz,
     resetPlayersAtMidQuiz,
+    resumeAfterMidQuiz,
     setContinueReady,
     setRoomDifficulty,
     startGame,
@@ -91,9 +93,8 @@ const refFor = (roomCode: string) => ({ __ref: `rooms/${roomCode}` });
 const givenTransactionSees = (room: Room | null) => {
     const update = vi.fn();
     mocks.runTransaction.mockImplementation(
-        async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<void>) => {
-            await updateFunction({ get: async () => snapshotOf(room), update });
-        },
+        async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) =>
+            updateFunction({ get: async () => snapshotOf(room), update }),
     );
     return update;
 };
@@ -505,6 +506,111 @@ describe("startGame", () => {
     });
 });
 
+describe("advanceQuestion", () => {
+    const onQuestion = (index: number) =>
+        roomWith({ started: true, phase: "question", currentQuestionIndex: index });
+
+    it("moves the room to the next question with a fresh server-side start", async () => {
+        const update = givenTransactionSees(onQuestion(0));
+
+        await expect(advanceQuestion("ABCD", 0, 15)).resolves.toBe(true);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "question",
+            currentQuestionIndex: 1,
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
+    it("takes the mid-quiz break after every fifth question", async () => {
+        const update = givenTransactionSees(onQuestion(4));
+
+        await advanceQuestion("ABCD", 4, 15);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "mid-scoreboard",
+            currentQuestionIndex: 5,
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
+    it("ends the quiz after the last question", async () => {
+        const update = givenTransactionSees(onQuestion(14));
+
+        await advanceQuestion("ABCD", 14, 15);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "results",
+            currentQuestionIndex: 14,
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
+    it("is a no-op when another client already advanced past this question", async () => {
+        // Every client whose clock runs out calls this; only the first write lands.
+        const update = givenTransactionSees(onQuestion(3));
+
+        await expect(advanceQuestion("ABCD", 2, 15)).resolves.toBe(false);
+
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op outside the question phase", async () => {
+        const update = givenTransactionSees(
+            roomWith({ started: true, phase: "mid-scoreboard", currentQuestionIndex: 5 }),
+        );
+
+        await expect(advanceQuestion("ABCD", 5, 15)).resolves.toBe(false);
+
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("wraps a missing room or a rules denial with its own context", async () => {
+        givenTransactionSees(null);
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow(
+            "Failed to advance question: Room ABCD does not exist",
+        );
+
+        mocks.runTransaction.mockRejectedValueOnce(new Error("permission-denied"));
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow(
+            "Failed to advance question: permission-denied",
+        );
+    });
+});
+
+describe("resumeAfterMidQuiz", () => {
+    it("starts the question the break points at, keeping its index", async () => {
+        const update = givenTransactionSees(
+            roomWith({ started: true, phase: "mid-scoreboard", currentQuestionIndex: 5 }),
+        );
+
+        await expect(resumeAfterMidQuiz("ABCD")).resolves.toBe(true);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "question",
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
+    it("is a no-op unless the room is in the break (a double-click can't restart a question)", async () => {
+        const update = givenTransactionSees(
+            roomWith({ started: true, phase: "question", currentQuestionIndex: 5 }),
+        );
+
+        await expect(resumeAfterMidQuiz("ABCD")).resolves.toBe(false);
+
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("wraps a missing room with its own context", async () => {
+        givenTransactionSees(null);
+
+        await expect(resumeAfterMidQuiz("ABCD")).rejects.toThrow(
+            "Failed to resume quiz: Room ABCD does not exist",
+        );
+    });
+});
+
 describe("the single-field room writes", () => {
 
     it("setRoomDifficulty writes only `difficulty`", async () => {
@@ -636,10 +742,14 @@ describe("when Firebase never initialized", () => {
             "Firebase not initialized",
         );
         await expect(resetPlayersAtMidQuiz("ABCD")).rejects.toThrow("Firebase not initialized");
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow("Firebase not initialized");
+        await expect(resumeAfterMidQuiz("ABCD")).rejects.toThrow("Firebase not initialized");
     });
 
     it("reaches Firestore for none of them", async () => {
         await expect(startGame("ABCD")).rejects.toThrow();
+        await expect(advanceQuestion("ABCD", 0, 15)).rejects.toThrow();
+        await expect(resumeAfterMidQuiz("ABCD")).rejects.toThrow();
 
         expect(mocks.setDoc).not.toHaveBeenCalled();
         expect(mocks.updateDoc).not.toHaveBeenCalled();

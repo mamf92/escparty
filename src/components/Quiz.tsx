@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
-import { updatePlayerScore, listenToRoom, Room } from "../utils/roomsFirestore";
+import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
+import { QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -47,6 +48,15 @@ const Quiz = () => {
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
+
+  // In multiplayer the room drives progression (#62): every client shows
+  // room.currentQuestionIndex and times it from room.phaseStartedAt, so they
+  // stay in lockstep and a backgrounded tab catches up on return. Single
+  // player keeps the local timers below. A multiplayer room without a phase
+  // (created before #61) falls back to the local timers too.
+  const sharedClock = isMultiplayer && !!room?.phase;
+  const localClock = !isMultiplayer || (room !== null && !room.phase);
+  const roomStartMs = startedAtMillis(room?.phaseStartedAt);
 
   // Calculate current question based on currentQuestionIndex and questions array
   const currentQuestion = !loading && questions.length > 0 && currentQuestionIndex < questions.length
@@ -128,8 +138,7 @@ const Quiz = () => {
       baseUrl: import.meta.env.BASE_URL,
       currentUrl: window.location.href,
       difficulty,
-      isLocationStatePresent: !!location.state,
-      currentQuestionIndex
+      isLocationStatePresent: !!location.state
     });
 
     // Handle case when difficulty is undefined or invalid
@@ -231,9 +240,6 @@ const Quiz = () => {
         setQuestions(filteredQuestions);
         setLoading(false);
 
-        // We now use the state initialized at the component level
-        // instead of trying to retrieve it from localStorage
-        console.log(`Using question index: ${currentQuestionIndex}, score: ${score}`);
       })
       .catch((error) => {
         console.error("❌ Error loading quiz data:", error);
@@ -247,9 +253,11 @@ const Quiz = () => {
       unsubscribeRoom();
       console.log("🧹 Quiz component unmounting, cleaned up listeners");
     };
-  }, [difficulty, navigate, location, currentQuestionIndex, score]);  // Timer effect for question countdown
+  }, [difficulty, navigate, location]);
+
+  // Timer effect for question countdown (single player, and phase-less rooms)
   useEffect(() => {
-    if (quizCompleted || loading) return;
+    if (quizCompleted || loading || !localClock) return;
 
     // Only start a new timer if we're in question mode (not feedback mode)
     if (!showFeedback) {
@@ -286,9 +294,11 @@ const Quiz = () => {
         clearInterval(uiTimer);
       };
     }
-  }, [currentQuestionIndex, quizCompleted, loading, showFeedback]);  // Separate effect for feedback timer that automatically moves to next question
+  }, [currentQuestionIndex, quizCompleted, loading, showFeedback, localClock]);
+
+  // Separate effect for feedback timer that automatically moves to next question
   useEffect(() => {
-    if (showFeedback) {
+    if (showFeedback && localClock) {
       // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
       const feedbackTimer = setInterval(() => {
         setTimeLeft(prev => {
@@ -305,7 +315,120 @@ const Quiz = () => {
         clearInterval(feedbackTimer);
       };
     }
-  }, [showFeedback]);
+  }, [showFeedback, localClock]);
+
+  // --- Shared, room-driven progression (multiplayer) ---
+
+  // Refs so the 100ms tick below reads current values without restarting.
+  const isSubmittedRef = useRef(isSubmitted);
+  isSubmittedRef.current = isSubmitted;
+  const scoreRef = useRef(score);
+  scoreRef.current = score;
+  const lastAdvanceAttemptRef = useRef(0);
+  const leftQuizRef = useRef(false);
+
+  // Follow the room onto its current question. This is the only place the
+  // question index changes in multiplayer.
+  useEffect(() => {
+    if (!sharedClock || room?.phase !== "question") return;
+    const roomIndex = room.currentQuestionIndex ?? 0;
+    if (roomIndex !== currentQuestionIndex) {
+      setCurrentQuestionIndex(roomIndex);
+      setSelectedAnswer(null);
+      setIsSubmitted(false);
+      setShowFeedback(false);
+      setIsTimerVisible(true);
+      setCurrentQuestionPoints(0);
+      setTimeLeft(QUESTION_MS / 1000);
+      setTimeLeftMs(QUESTION_MS);
+    }
+  }, [sharedClock, room?.phase, room?.currentQuestionIndex, currentQuestionIndex]);
+
+  // The countdown every client shows, derived from the room's start time
+  // rather than counted down locally, and the shared advance once the
+  // question's slot (answering + feedback) is over.
+  useEffect(() => {
+    if (!sharedClock || loading || room?.phase !== "question") return;
+    if ((room.currentQuestionIndex ?? 0) !== currentQuestionIndex) return; // wait for the sync above
+    if (!roomCode || questions.length === 0) return;
+
+    // While our own write's serverTimestamp() is pending it reads as null;
+    // count from now until the confirmed value arrives a moment later.
+    const startMs = roomStartMs ?? Date.now();
+    const index = currentQuestionIndex;
+
+    const tick = () => {
+      const now = Date.now();
+      const clock = questionClock(startMs, now);
+      setTimeLeftMs(clock.timeLeftMs);
+
+      if (clock.answeringOpen && !isSubmittedRef.current) {
+        setTimeLeft(Math.ceil(clock.timeLeftMs / 1000));
+      } else {
+        if (!isSubmittedRef.current) {
+          // Time's up without an answer: same as handleTimeUp, minus its timer.
+          isSubmittedRef.current = true;
+          setIsSubmitted(true);
+          setIsTimerVisible(false);
+          setCurrentQuestionPoints(0);
+          setShowFeedback(true);
+          if (playerId) {
+            void updatePlayerScore(roomCode, playerId, scoreRef.current).catch(error => {
+              console.error("Failed to update score:", error);
+            });
+          }
+        }
+        setTimeLeft(Math.max(0, Math.ceil((QUESTION_SLOT_MS - clock.elapsedMs) / 1000)));
+      }
+
+      // Any client may end the question; the transaction makes the extra
+      // attempts no-ops, and the rules turn away a too-early one (a fast
+      // local clock), so just retry once a second until the room moves on.
+      if (clock.slotOver && now - lastAdvanceAttemptRef.current >= 1000) {
+        lastAdvanceAttemptRef.current = now;
+        void advanceQuestion(roomCode, index, questions.length).catch(error => {
+          console.warn("Advancing the question didn't go through yet, retrying:", error);
+        });
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 100);
+    return () => clearInterval(interval);
+  }, [sharedClock, loading, room?.phase, room?.currentQuestionIndex, roomStartMs, currentQuestionIndex, roomCode, playerId, questions.length]);
+
+  // When the room leaves the question phase, everyone goes where it went.
+  useEffect(() => {
+    if (!sharedClock || !room || leftQuizRef.current) return;
+    if (room.phase === "mid-scoreboard") {
+      leftQuizRef.current = true;
+      navigate("/mid-quiz-scoreboard", {
+        state: {
+          score,
+          totalQuestions: questions.length,
+          currentQuestionIndex: room.currentQuestionIndex ?? 0, // the question after the break
+          difficulty,
+          players: room.players,
+          multiplayer: true,
+          roomCode,
+          playerId
+        }
+      });
+    } else if (room.phase === "results") {
+      leftQuizRef.current = true;
+      navigate("/results", {
+        state: {
+          score,
+          totalQuestions: questions.length,
+          difficulty,
+          multiplayer: true,
+          roomCode,
+          playerId,
+          players: room.players
+        }
+      });
+    }
+  }, [sharedClock, room, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
   // Function to handle when the time is up but before showing feedback
   const handleTimeUp = () => {
@@ -399,6 +522,7 @@ const Quiz = () => {
 
   const submitAnswer = async (answer: string) => {
     if (!answer) return;
+    if (sharedClock && roomStartMs !== null && !questionClock(roomStartMs, Date.now()).answeringOpen) return;
 
     setIsSubmitted(true);
     setIsTimerVisible(false); // Hide timer when answer is submitted
@@ -430,11 +554,13 @@ const Quiz = () => {
       setCurrentQuestionPoints(0);
     }
 
-    // Show feedback after submission
-    // Add remaining question time PLUS 5 seconds for feedback
-    const feedbackTime = Math.min(timeLeft, 10) + 5;
+    // Show feedback after submission. Locally: remaining question time PLUS
+    // 5 seconds; in multiplayer the shared tick counts down to the slot's end.
     setShowFeedback(true);
-    setTimeLeft(feedbackTime);
+    if (!sharedClock) {
+      const feedbackTime = Math.min(timeLeft, 10) + 5;
+      setTimeLeft(feedbackTime);
+    }
   };
 
   const restartQuiz = () => {

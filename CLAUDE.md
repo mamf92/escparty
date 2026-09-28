@@ -85,10 +85,11 @@ rules, ask before making it rather than guessing.
   `MultiplayerLobby.tsx`, `Lobby.tsx`, `Quiz.tsx`, `MidQuizScoreboard.tsx`,
   `HostObserverView.tsx`, and `QuizResults.tsx`. Don't assume the store is
   wired in; don't add to it without a migration plan.
-- The Firestore `Room` doc now *writes* `phase`/`currentQuestionIndex`/
-  `phaseStartedAt` (#61), but **nothing reads them yet** — question
-  progression during a multiplayer quiz is still driven client-locally (each
-  client runs its own timer) until #62 switches clients over.
+- In multiplayer, `Room.phase`/`currentQuestionIndex`/`phaseStartedAt` are
+  **the** source of truth for which question is showing (#62). Don't
+  reintroduce a locally incremented index or a local countdown there. The
+  mid-quiz `continueReady` flag is still the old fixed-delay handshake until
+  #63.
 - `markPlayerAtMidQuiz` is a manual read-modify-write with no transaction and
   is race-prone under concurrent writers. `updatePlayerScore` used to be the
   same but now runs inside a Firestore transaction — don't revert it back to

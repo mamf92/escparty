@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom, setContinueReady, markPlayerAtMidQuiz } from "../utils/roomsFirestore";
+import { Player, listenToRoom, setContinueReady, markPlayerAtMidQuiz, resumeAfterMidQuiz } from "../utils/roomsFirestore";
 
 interface MultiplayerGameData {
   multiplayer: boolean;
@@ -69,12 +69,17 @@ const MidQuizScoreboard = () => {
       return;
     }
 
-    const nextQuestionIndex = gameData.currentQuestionIndex + 1;
+    // The quiz already hands us the index of the question after the break
+    // (it used to be incremented again here, which skipped a question at
+    // every mid-quiz break).
+    const nextQuestionIndex = gameData.currentQuestionIndex;
 
     // Case 1: Host in a multiplayer game
     if (isHost && gameData.multiplayer && gameData.roomCode) {
       try {
-        // Active host signals and navigates (observer hosts are redirected elsewhere)
+        // Start the next question for the whole room (#62), then signal and
+        // navigate (observer hosts are redirected elsewhere)
+        await resumeAfterMidQuiz(gameData.roomCode);
         await setContinueReady(gameData.roomCode, true);
         navigate(`/quiz/${gameData.difficulty}`, {
           state: {
@@ -194,6 +199,14 @@ const MidQuizScoreboard = () => {
           // Update hostIsObserver if it exists in the room data
           if (room.hostIsObserver !== undefined && isHost) {
             setHostIsObserver(room.hostIsObserver);
+          }
+
+          // The room already resumed (#62): a player who missed the
+          // continueReady window, or was backgrounded, goes straight back.
+          if (!isHost && room.phase === "question" &&
+              (room.currentQuestionIndex ?? 0) >= gameData.currentQuestionIndex) {
+            continueQuizRef.current();
+            return;
           }
 
           // Check if continue is ready

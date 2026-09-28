@@ -11,6 +11,7 @@ import {
     FieldValue
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { phaseAfterQuestion } from "./quizTiming";
 
 // Define room and player interfaces
 export interface Player {
@@ -21,9 +22,10 @@ export interface Player {
 }
 
 /**
- * Which stage of the quiz a room is in. Server-authoritative: written only by
- * createRoom/startGame (and, from rung 2 of #60 on, the progression writes),
- * never derived per client. No page reads it yet — see #61.
+ * Which stage of the quiz a room is in. Server-authoritative: written by
+ * createRoom/startGame and the progression writes below (advanceQuestion,
+ * resumeAfterMidQuiz), never derived per client. In multiplayer, Quiz.tsx
+ * renders whatever question this says (#62).
  */
 export type RoomPhase = "lobby" | "question" | "mid-scoreboard" | "results";
 
@@ -293,6 +295,90 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
     } catch (error) {
         console.error("Error updating player score:", error);
         throw new Error(`Failed to update score: ${(error as Error).message}`);
+    }
+};
+
+/**
+ * End the question the room is on and move it to whatever comes next: the
+ * next question, the mid-quiz break, or the results (see phaseAfterQuestion).
+ *
+ * Any client may call this once the question's slot is over — the observer
+ * host never runs the quiz, so it can't be host-only. It runs in a
+ * transaction and only advances if the room is still on `fromIndex` in the
+ * question phase, so when several clients race to end the same question,
+ * one write lands and the rest are no-ops. firestore.rules rejects the write
+ * until QUESTION_SLOT_MS after phaseStartedAt, so a client with a fast clock
+ * gets permission-denied and should simply try again a moment later.
+ *
+ * @returns true if this call advanced the room, false if it had already moved on.
+ */
+export const advanceQuestion = async (roomCode: string, fromIndex: number, totalQuestions: number): Promise<boolean> => {
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+
+    try {
+        const roomRef = doc(db, "rooms", roomCode);
+        return await runTransaction(db, async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists()) {
+                throw new Error(`Room ${roomCode} does not exist`);
+            }
+
+            const room = roomDoc.data() as Room;
+            if (room.phase !== "question" || room.currentQuestionIndex !== fromIndex) {
+                return false;
+            }
+
+            const next = phaseAfterQuestion(fromIndex, totalQuestions);
+            transaction.update(roomRef, {
+                phase: next.phase,
+                currentQuestionIndex: next.currentQuestionIndex,
+                phaseStartedAt: serverTimestamp(),
+            });
+            return true;
+        });
+    } catch (error) {
+        console.error("Error advancing question:", error);
+        throw new Error(`Failed to advance question: ${(error as Error).message}`);
+    }
+};
+
+/**
+ * Leave the mid-quiz break: start the question the room is already pointing
+ * at (the break's currentQuestionIndex is the next question). A no-op unless
+ * the room is actually in the break, so a double-click or a second host tab
+ * can't restart a question that's already running.
+ *
+ * @returns true if this call resumed the quiz, false if it wasn't in the break.
+ */
+export const resumeAfterMidQuiz = async (roomCode: string): Promise<boolean> => {
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+
+    try {
+        const roomRef = doc(db, "rooms", roomCode);
+        return await runTransaction(db, async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists()) {
+                throw new Error(`Room ${roomCode} does not exist`);
+            }
+
+            const room = roomDoc.data() as Room;
+            if (room.phase !== "mid-scoreboard") {
+                return false;
+            }
+
+            transaction.update(roomRef, {
+                phase: "question",
+                phaseStartedAt: serverTimestamp(),
+            });
+            return true;
+        });
+    } catch (error) {
+        console.error("Error resuming after mid-quiz:", error);
+        throw new Error(`Failed to resume quiz: ${(error as Error).message}`);
     }
 };
 
