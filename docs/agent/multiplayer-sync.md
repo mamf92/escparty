@@ -5,6 +5,8 @@ results flow, or when debugging players seeing inconsistent quiz state.
 
 This absorbs today's actual behavior; if a future quiz-flow rework changes
 any of it, update this file in the same PR rather than leaving it stale.
+Why this runs on Firestore listeners and not WebSockets:
+`docs/agent/adr/0001-firestore-vs-websockets.md`.
 
 ## The flow, page by page
 

@@ -16,6 +16,8 @@ import {
     startGame,
     updatePlayerScore,
     ScoreWriteRejected,
+    JoinRejected,
+    MAX_PLAYERS,
 } from "./roomsFirestore";
 
 // The Firebase client SDK is mocked rather than pointed at the emulator: the
@@ -274,6 +276,64 @@ describe("addPlayerToRoom", () => {
             "Security rules prevented joining the room",
         );
     });
+    it("reports a start that raced the join as started, not as a rules error (#64)", async () => {
+        mocks.getDoc
+            .mockResolvedValueOnce(snapshotOf(roomWith()))
+            .mockResolvedValueOnce(snapshotOf(roomWith({ started: true })));
+        mocks.updateDoc.mockRejectedValue(
+            Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
+        );
+
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).rejects.toThrow("Game has already started");
+    });
+
+    it("reports a room that filled up or vanished mid-join, and a rejoin that landed anyway", async () => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        mocks.updateDoc.mockRejectedValue(denied);
+        const full = Array.from({ length: MAX_PLAYERS }, (_, i) => player(`p-${i + 10}`, `P${i}`));
+
+        mocks.getDoc.mockResolvedValueOnce(snapshotOf(roomWith())).mockResolvedValueOnce(snapshotOf(roomWith({ players: full })));
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).rejects.toMatchObject({ reason: "full" });
+
+        mocks.getDoc.mockResolvedValueOnce(snapshotOf(roomWith())).mockResolvedValueOnce(snapshotOf(null));
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).rejects.toMatchObject({ reason: "not-found" });
+
+        mocks.getDoc.mockResolvedValueOnce(snapshotOf(roomWith())).mockResolvedValueOnce(snapshotOf(roomWith({ players: [player("p-2", "Ida")] })));
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).resolves.toBeUndefined();
+    });
+
+    it("keeps the rules refusal when the re-read fails too", async () => {
+        mocks.updateDoc.mockRejectedValue(Object.assign(new Error("denied"), { code: "permission-denied" }));
+        mocks.getDoc.mockResolvedValueOnce(snapshotOf(roomWith())).mockRejectedValueOnce(new Error("offline"));
+
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).rejects.toThrow("Security rules prevented joining the room");
+    });
+
+    it("turns a full room away before writing", async () => {
+        const full = Array.from({ length: MAX_PLAYERS }, (_, i) => player(`p-${i + 10}`, `P${i}`));
+        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ players: full })));
+
+        const rejection = await addPlayerToRoom("ABCD", "p-2", "Ida").catch((error: unknown) => error);
+        expect(rejection).toBeInstanceOf(JoinRejected);
+        expect(rejection).toMatchObject({ reason: "full", message: "The room is full (32 players)" });
+        expect(mocks.updateDoc).not.toHaveBeenCalled();
+        await expect(joinRoom("ABCD", "p-2", "Ida")).rejects.toThrow("Failed to join room: The room is full (32 players)");
+    });
+
+    it("lets a player already in the room back in after the start", async () => {
+        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({ started: true, players: [player("p-2", "Ida")] })));
+
+        await expect(joinRoom("ABCD", "p-2", "Ida")).resolves.toBe(true);
+        expect(mocks.updateDoc).not.toHaveBeenCalled();
+    });
+
+    it("passes on any other write failure", async () => {
+        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith()));
+        mocks.updateDoc.mockRejectedValue(new Error("offline"));
+
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).rejects.toThrow("offline");
+        expect(mocks.getDoc).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("joinRoom", () => {
@@ -282,6 +342,17 @@ describe("joinRoom", () => {
 
         await expect(joinRoom("ZZZZ", "p-2", "Ida")).resolves.toBe(false);
         expect(mocks.updateDoc).not.toHaveBeenCalled();
+    });
+
+    it("returns false when the host started the game mid-join", async () => {
+        mocks.getDoc
+            .mockResolvedValueOnce(snapshotOf(roomWith()))
+            .mockResolvedValueOnce(snapshotOf(roomWith({ started: true })));
+        mocks.updateDoc.mockRejectedValue(
+            Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
+        );
+
+        await expect(joinRoom("ABCD", "p-2", "Ida")).resolves.toBe(false);
     });
 
     it("returns false when the game has already started", async () => {

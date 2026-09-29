@@ -148,6 +148,8 @@ const MultiplayerLobby = () => {
         alert("Game not found! Please check the code and try again.");
       } else if (err.message.includes('already started')) {
         alert("This game has already started!");
+      } else if (err.message.includes('room is full')) {
+        alert("This game is full. Ask the host to start a new one.");
       } else {
         alert("Failed to join game. Please try again.");
       }
