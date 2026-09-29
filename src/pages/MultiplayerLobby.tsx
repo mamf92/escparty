@@ -117,26 +117,27 @@ const MultiplayerLobby = () => {
     setLoading(true);
     try {
       // Back into a game this device was already in (a closed tab, a
-      // dead phone, #65): the same player ID and name, so the room lets
-      // them in again even after the start and their score carries on.
-      // Otherwise a new ID and a free Eurovision winner's name.
+      // restarted browser, #65): the same player ID and name, so the room
+      // lets them in again even after the start and their score carries on.
+      // Asked first, since every tab on this device shares that identity and
+      // someone else may be joining from it. Otherwise a new ID and a free
+      // Eurovision winner's name.
       const code = joinCode.toUpperCase();
-      const sameGame = localStorage.getItem("gameCode") === code;
-      const storedId = sameGame ? localStorage.getItem("playerId") : null;
-      const storedName = sameGame ? localStorage.getItem("playerName") : null;
-      const rejoining = !!storedId && !!storedName;
-      const playerId = storedId && storedName ? storedId : uuidv4();
-      const randomName = storedId && storedName ? storedName : await getUniquePlayerName(code, ESC_WINNERS);
+      const storedId = localStorage.getItem("playerId");
+      const storedName = localStorage.getItem("playerName");
+      const rejoin = localStorage.getItem("gameCode") === code && !!storedId && !!storedName &&
+        window.confirm(`You were in this game as ${storedName}. Rejoin as ${storedName}? (Cancel joins as someone new.)`);
+      const playerId = rejoin ? storedId : uuidv4();
+      const randomName = rejoin ? storedName : await getUniquePlayerName(code, ESC_WINNERS);
 
       // Join the room in Firestore
-      const joined = await joinRoom(joinCode.toUpperCase(), playerId, randomName);
+      const joined = await joinRoom(code, playerId, randomName);
 
       if (joined) {
         // Save user info in local storage
         localStorage.setItem("playerId", playerId);
         localStorage.setItem("playerName", randomName);
-        localStorage.setItem("gameCode", joinCode.toUpperCase());
-        if (!rejoining) localStorage.setItem("isHost", "false");
+        localStorage.setItem("gameCode", code);
 
         // Navigate to lobby
         navigate("/lobby");

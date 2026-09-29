@@ -6,6 +6,9 @@ import { LEGACY_ROOM_MESSAGE, ObserverRouteState, isObserverHost, playingPlayers
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 
+/** How long the break waits for every player before Continue can go on without some. */
+export const MISSING_PLAYER_GRACE_MS = 20_000;
+
 const HostObserverView = () => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -49,6 +52,18 @@ const HostObserverView = () => {
     // and the index together: a locked phone can get one snapshot that goes
     // straight from one break to the next.
     const { resume, resuming, resumeError, reset } = useResumeRoom(roomCode);
+
+    // A player whose phone died never reaches the break (#65, #23), so after
+    // a grace period Continue goes on without whoever is missing. Not at
+    // once: the phones need a moment to write their marks.
+    const [waitedLongEnough, setWaitedLongEnough] = useState(false);
+    const breakKey = inBreak ? `${room?.currentQuestionIndex}` : null;
+    useEffect(() => {
+        setWaitedLongEnough(false);
+        if (breakKey === null) return;
+        const timer = setTimeout(() => setWaitedLongEnough(true), MISSING_PLAYER_GRACE_MS);
+        return () => clearTimeout(timer);
+    }, [breakKey]);
     useEffect(() => {
         reset();
     }, [room?.phase, room?.currentQuestionIndex, reset]);
@@ -99,8 +114,10 @@ const HostObserverView = () => {
         ? "The quiz is over"
         : !inBreak
         ? "Continue is for the mid-quiz break"
-        : players.length > 0 && !allPlayersReady
+        : players.length > 0 && !allPlayersReady && !waitedLongEnough
         ? "Wait for all players to reach the mid-quiz scoreboard"
+        : players.length > 0 && !allPlayersReady
+        ? "Continue without the players still missing"
         : resuming
         ? "Continuing..."
         : "Continue to the next question";
@@ -139,20 +156,13 @@ const HostObserverView = () => {
 
             <NextButton
                 onClick={resume}
-                disabled={resuming || !isRoomObserver || !inBreak || (players.length > 0 && !allPlayersReady)}
+                disabled={resuming || !isRoomObserver || !inBreak || (players.length > 0 && !allPlayersReady && !waitedLongEnough)}
                 title={continueHint}
             >
-                {resuming ? "Continuing..." : "Continue Quiz"}
+                {resuming ? "Continuing..." : inBreak && players.length > 0 && !allPlayersReady ? "Continue without them" : "Continue Quiz"}
             </NextButton>
-            {/* A player whose phone died never reaches the break (#65, #23):
-                the host can go on without them, on purpose. */}
-            {isRoomObserver && inBreak && players.length > 0 && !allPlayersReady && (
-                <>
-                    <WaitingMessage>Still waiting for {missing.join(", ")}.</WaitingMessage>
-                    <NextButton onClick={resume} disabled={resuming}>
-                        Continue without them
-                    </NextButton>
-                </>
+            {isRoomObserver && inBreak && !allPlayersReady && missing.length > 0 && (
+                <WaitingMessage>Still waiting for {missing.join(", ")}.</WaitingMessage>
             )}
             {resumeError && <ErrorMessage>{resumeError}</ErrorMessage>}
         </Container>

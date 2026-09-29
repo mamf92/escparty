@@ -152,6 +152,27 @@ describe("Lobby", () => {
     expect(screen.queryByRole("button", { name: /Take Lordi/ })).not.toBeInTheDocument();
   });
 
+  it("takes a guest who leaves out of the room", async () => {
+    as("p2", "Loreen");
+    mocks.removePlayerFromRoom.mockRejectedValueOnce(new Error("offline"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    renderLobby();
+    act(() => mocks.onRoom(room({ readyPlayers: ["p2"] })));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Leave the waiting room" }));
+    expect(mocks.removePlayerFromRoom).toHaveBeenCalledWith("ABBA", loreen);
+    // Leaves even when that write fails.
+    expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
+  it("lets the host leave without touching the room", async () => {
+    as("host", "Martin");
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Leave the waiting room" }));
+    expect(mocks.removePlayerFromRoom).not.toHaveBeenCalled();
+    expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
   it("tells a player the host took them out", async () => {
     as("p3", "Lordi");
     renderLobby();

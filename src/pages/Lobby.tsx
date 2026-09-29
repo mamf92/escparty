@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { listenToRoom, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
@@ -34,6 +34,8 @@ const Lobby = () => {
     const [room, setRoom] = useState<Room | null | undefined>(undefined);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // A second tap in the same render can't see `busy` yet.
+    const inFlight = useRef(false);
     const [pickError, setPickError] = useState<string | null>(null);
     const [selected, setSelected] = useState<string | null>(null);
     const roomQuizTitle = useQuizTitle(room?.difficulty);
@@ -75,7 +77,23 @@ const Lobby = () => {
         });
     }, [identity, navigate]);
 
-    const leave = <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Leave the waiting room</CalmLink>;
+    // A guest who leaves takes themselves out, so the host's start gate
+    // doesn't count them as present (and ready). Leaving goes ahead even if
+    // that write fails; the host can still take them out.
+    const leaveRoom = async () => {
+        const self = room && identity && room.hostId !== identity.playerId && !room.started
+            ? room.players.find(p => p.id === identity.playerId)
+            : undefined;
+        if (self && identity) {
+            try {
+                await removePlayerFromRoom(identity.gameCode, self);
+            } catch (err) {
+                console.error("Couldn't leave the room:", err);
+            }
+        }
+        navigate("/multiplayer");
+    };
+    const leave = <CalmLink type="button" onClick={leaveRoom}>Leave the waiting room</CalmLink>;
 
     if (!identity) {
         return (
@@ -123,39 +141,35 @@ const Lobby = () => {
     const amReady = ready.includes(playerId);
     const chosen = isHost ? room.players.find(p => p.id === selected && p.id !== room.hostId) : undefined;
 
-    /** One write at a time; a failure leaves a note and the page usable. */
-    const run = async (what: string, write: () => Promise<void>) => {
-        if (busy) return;
+    /**
+     * One write at a time; a failure leaves a note and the page usable,
+     * unless `onError` handles it. (The quiz pick is one-shot in the rules,
+     * so a double tap's second write would be denied.)
+     */
+    const run = async (what: string, write: () => Promise<void>, onError?: (err: unknown) => void) => {
+        if (inFlight.current) return;
+        inFlight.current = true;
         setBusy(true);
         setPickError(null);
         try {
             await write();
         } catch (err) {
             console.error(`Couldn't ${what}:`, err);
-            setPickError(`Couldn't ${what}. Try again.`);
+            if (onError) onError(err);
+            else setPickError(`Couldn't ${what}. Try again.`);
         } finally {
+            inFlight.current = false;
             setBusy(false);
         }
     };
 
-    const handleSelectQuiz = async (quizKey: string) => {
-        // One write at a time: firestore.rules treats the quiz (the room's
-        // `difficulty`, see quizCatalog.ts) as a one-shot field, so a second
-        // write from a double tap would be denied. Nothing was written if the
-        // quiz couldn't be read, so the host can pick again.
-        if (busy) return;
-        setBusy(true);
-        setPickError(null);
-        try {
-            await setRoomQuiz(gameCode, quizKey);
-        } catch (err) {
-            console.error("Error setting difficulty:", err);
-            if (String(err).includes("Failed to set difficulty")) setError("Failed to set difficulty");
-            else setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
-        } finally {
-            setBusy(false);
-        }
-    };
+    // The room's `difficulty` names the quiz (quizCatalog.ts). Nothing was
+    // written if the quiz couldn't be read, so the host can pick again; a
+    // refused write is a dead end as before.
+    const handleSelectQuiz = (quizKey: string) => run("set the quiz", () => setRoomQuiz(gameCode, quizKey), (err) => {
+        if (String(err).includes("Failed to set difficulty")) setError("Failed to set difficulty");
+        else setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+    });
 
     const status = (id: string) => {
         if (id === room.hostId) return "Host";

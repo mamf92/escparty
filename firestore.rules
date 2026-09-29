@@ -271,7 +271,10 @@ service cloud.firestore {
     }
 
     // removePlayerFromRoom: exactly one entry leaves the lobby (never the
-    // host, who stays first), and its ready mark may go with it.
+    // host, who stays first), and at most one ready mark goes with it. Like
+    // every room write there's no sign-in to check who asks (see
+    // docs/agent/firestore-data-model.md), so anyone with the code could
+    // remove a guest, who can join again with the code.
     function isRemovingPlayer(affected) {
       let data = request.resource.data;
       let existingData = resource.data;
@@ -283,7 +286,8 @@ service cloud.firestore {
              existingData.players.hasAll(data.players) &&
              data.players[0].id == existingData.hostId &&
              data.get('readyPlayers', []) is list &&
-             existingData.get('readyPlayers', []).hasAll(data.get('readyPlayers', []));
+             existingData.get('readyPlayers', []).hasAll(data.get('readyPlayers', [])) &&
+             data.get('readyPlayers', []).size() >= existingData.get('readyPlayers', []).size() - 1;
     }
 
     function isSettingContinueReady(affected) {

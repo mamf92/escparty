@@ -67,8 +67,10 @@ Why this runs on Firestore listeners and not WebSockets:
    stuck (#23). The rules refuse a ready mark that arrives after the
    resume. `HostObserverView.tsx` is the host-only screen when
    `hostIsObserver` is true — the host watches without answering, and its
-   Continue waits until every player is marked, naming who's missing, with
-   "Continue without them" for a player whose phone died (#65).
+   Continue waits until every player is marked, naming who's missing; after
+   20 seconds of a break (`MISSING_PLAYER_GRACE_MS`) it becomes "Continue
+   without them", for a player whose phone died (#65). A guest who taps
+   "Leave the waiting room" takes themselves out of the lobby.
 5. **`QuizResults.tsx`** — the finale (#67): the room's final standings,
    revealed a tap at a time (everyone below the podium, then 3rd, 2nd and
    1st; ties together, `finale.ts`), with no motion, in the Calm style. It

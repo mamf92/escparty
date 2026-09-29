@@ -91,8 +91,11 @@ re-reads the room to say why, as a `JoinRejected` with a `reason`
 (`not-found`, `started`, `full`), rather than a rules error (#64).
 `joinRoom` answers `false` for the first two. A player already in the room
 (the same ID) is let back in even after the start; the join screen reuses
-this device's stored ID and name when the code typed is the game it was
-last in, so a closed tab or dead phone rejoins as the same player (#65).
+this device's stored ID and name, after asking, when the code typed is the
+game it was last in, so a closed tab or a restarted browser rejoins as the
+same player (#65). The identity lives in that device's localStorage only:
+from another device you join as someone new, which after the start is
+refused.
 
 In the lobby (#65), each guest toggles a ready mark (`setPlayerReady`,
 `arrayUnion`/`arrayRemove` on `readyPlayers`), and the host can take a

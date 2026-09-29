@@ -25,13 +25,11 @@ transactions are `updatePlayerScore`, `advanceQuestion` and
 - `npm run preview` — serve the production build locally.
 - `npm run emulators` — start the local Firestore emulator (needs a JDK).
 
-Unit/component tests run on Vitest + React Testing Library. Covered today:
-`roomsFirestore.ts`, `QuizDataProvider.ts`, `quizScoring.ts` and
-`quizTiming.ts`, `roomRoles.ts`, `multiplayerSession.ts` (with per-file coverage floors), the `useResumeRoom` hook
-(no floor), plus a `Home.tsx` smoke test and `Quiz.tsx`'s answer selection and failed
-score writes — every
-other page is uncovered, and `npm test` fails for a new page, component
-or hook without a test file (`src/test/testFiles.test.ts`). `npm test` now runs in `ci.yml`, but a
+Unit/component tests run on Vitest + React Testing Library. The Firestore
+API and the quiz logic have per-file coverage floors, and every page,
+component and hook has a test file except the debt listed in
+`src/test/testFiles.test.ts` (#59); `npm test` fails for a new one without
+a test file. `npm test` now runs in `ci.yml`, but a
 red run doesn't yet block merge or deploy (see #57). See
 `docs/agent/testing.md` before assuming a given flow is covered.
 

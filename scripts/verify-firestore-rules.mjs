@@ -875,6 +875,13 @@ await expectDenied("a ready mark that isn't an id", () =>
 await expectDenied("a ready mark riding along with the quiz pick", () =>
   updateDoc(lobby.roomRef, { readyPlayers: arrayUnion("p-3"), difficulty: "easy" })
 );
+await updateDoc(lobby.roomRef, { readyPlayers: arrayUnion("p-3") });
+await expectDenied("remove a player and wipe everyone's ready marks", () =>
+  updateDoc(lobby.roomRef, {
+    players: arrayRemove({ id: "p-2", name: "Loreen", score: 0 }),
+    readyPlayers: [],
+  })
+);
 await expectAllowed("the host removes a player and their ready mark", () =>
   updateDoc(lobby.roomRef, {
     players: arrayRemove({ id: "p-2", name: "Loreen", score: 0 }),
@@ -892,8 +899,8 @@ await expectDenied("swap a player for someone else while removing", () =>
 );
 await updateDoc(lobby.roomRef, { difficulty: "easy" });
 await updateDoc(lobby.roomRef, startWrite());
-await expectDenied("mark ready after the start", () =>
-  updateDoc(lobby.roomRef, { readyPlayers: arrayUnion("p-3") })
+await expectDenied("change a ready mark after the start", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: arrayRemove("p-3") })
 );
 await expectDenied("remove a player after the start", () =>
   updateDoc(lobby.roomRef, { players: arrayRemove({ id: "p-3", name: "Lordi", score: 0 }) })
