@@ -29,7 +29,7 @@ describe("isKnownQuizKey", () => {
 
 describe("quizTitle", () => {
     it("names classic sets and templates", () => {
-        expect(quizTitle("medium")).toBe("Medium");
+        expect(quizTitle("medium")).toBe("Classic: Medium");
         expect(quizTitle("t-nordic-nights")).toBe("Nordic Nights");
         expect(quizTitle(undefined)).toBe("Not chosen");
         expect(quizTitle("t-gone")).toBe("Unknown quiz");

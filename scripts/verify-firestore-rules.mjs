@@ -182,6 +182,24 @@ for (const [label, value] of [
   );
 }
 
+// 5f. A room may be created with its quiz already named, but only a real
+// quiz key: creation used to accept any string, leaving the room stuck on a
+// quiz no client can play (difficulty is one-shot).
+const preset = freshRoom("PRESET");
+await expectAllowed("create a room with a premade quiz already named", () =>
+  setDoc(preset.roomRef, {
+    id: preset.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }], difficulty: "t-quick-fire",
+  })
+);
+const bogus = freshRoom("BOGUS");
+await expectDenied("create a room with a bogus quiz key", () =>
+  setDoc(bogus.roomRef, {
+    id: bogus.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }], difficulty: "bogus",
+  })
+);
+
 // 5c. Malicious: list/enumerate the whole rooms collection with no code
 await expectDenied("list the entire rooms collection with no code", async () => {
   const snap = await getDocs(collection(db, "rooms"));

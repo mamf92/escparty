@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import "../fabric-ui/lycra-surface.css";
 import "../fabric-ui/calm.css";
+import "../styles/calm-page.css";
 import "./scoreboard-calm.css";
 import { quizTitle } from "../utils/quizCatalog";
 
@@ -120,7 +121,7 @@ const Scoreboard = () => {
     }, [scoreHistory, sortKey]);
 
     return (
-        <Page className="scoreboard-calm">
+        <Page className="calm-page scoreboard-calm">
             <Header>
                 <Title>Scoreboard</Title>
                 <Subtitle>

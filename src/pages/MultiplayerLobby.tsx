@@ -46,8 +46,16 @@ const MultiplayerLobby = () => {
   // A quiz picked in the library before coming here (#72): the new room
   // starts with it chosen, and the host can start straight away.
   const location = useLocation();
-  const pickedQuiz = (location.state as { quizKey?: string } | null)?.quizKey;
-  const quizKey = isKnownQuizKey(pickedQuiz) ? pickedQuiz : null;
+  const [quizKey, setQuizKey] = useState(() => {
+    const picked = (location.state as { quizKey?: string } | null)?.quizKey;
+    return isKnownQuizKey(picked) ? picked : null;
+  });
+  // The pick is for one new room: drop it from this history entry, so
+  // coming Back here later doesn't preset the next room with it.
+  const forgetPickedQuiz = () => {
+    setQuizKey(null);
+    if (location.state) navigate(location.pathname, { replace: true, state: null });
+  };
 
   // Function to create game with host as observer
   const createGame = async (hostIsObserver: boolean) => {
@@ -78,6 +86,7 @@ const MultiplayerLobby = () => {
 
       // Update state and navigate
       setGameCode(newGameCode);
+      forgetPickedQuiz();
       navigate("/lobby");
     } catch (error) {
       console.error("Error creating game:", error);
@@ -146,6 +155,8 @@ const MultiplayerLobby = () => {
   };
 
   const handleShowJoinForm = () => {
+    // Joining someone else's room: the quiz picked for hosting doesn't apply.
+    forgetPickedQuiz();
     setShowJoinForm(true);
   };
 

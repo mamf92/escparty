@@ -57,8 +57,11 @@ plan that also removes the ad hoc storage it would duplicate.
 - `questionBank.ts` — every built-in question tagged with a difficulty and
   a category (#71, #72): the classic 30 plus the newer ones, current to the
   2026 contest and Burgas 2027. Tested for playability and unique ids.
-- `quizTemplates.ts` — the premade quizzes, each a fixed list of bank ids
-  and its own mid-quiz scoreboard setting.
+  Loaded lazily by `quizCatalog.loadQuiz`, so it stays out of the main chunk:
+  don't import it statically from a page.
+- `quizTemplates.ts` — the premade quizzes, each a spelled-out list of bank
+  ids (so it doesn't import the bank) and its own mid-quiz scoreboard
+  setting, which applies solo only until rooms carry a break setting.
 
 ## `src/utils/`
 

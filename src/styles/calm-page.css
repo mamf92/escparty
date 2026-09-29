@@ -1,17 +1,35 @@
 /*
-  The Calm surface on a live page inside the phone frame, shared by every
-  screen built after the scoreboard (quiz library, quiz builder, scoreboard
-  party). Same adaptations scoreboard-calm.css makes for its screen, which
-  it documents in full; calm.css and the vendored lycra-surface.css stay
-  untouched.
+  The Calm surface on a live page inside the phone frame: the Scoreboard
+  and every screen built after it (quiz library, quiz builder, scoreboard
+  party) carry the `calm-page` class. calm.css and the vendored
+  lycra-surface.css stay untouched; anything specific to one screen lives
+  in that screen's own stylesheet (scoreboard-calm.css).
 */
 
-/* The ground fills the frame instead of calm.css's viewport-sized card. */
+/*
+  calm.css sizes .calm-ground at min(92vw, 35rem), which is right for the
+  full-bleed fabric-ui demo and wrong inside the 375px phone frame: 92vw
+  resolves against the viewport, not the frame, so the card overflows its
+  container. The ground fills the frame instead.
+*/
 .calm-page .calm-ground {
   width: 100%;
   padding: 1.25rem 1rem;
-  /* Pools mirrored top and bottom so a tall card doesn't become a
-     brightness ramp (see scoreboard-calm.css). */
+
+  /*
+    The ground is re-pooled for a tall card.
+
+    calm.css puts its two bright pools at 12% 4% and 78% 12% and its darkest at
+    88% 96%. On the demo's near-square 560px card that reads as even. On a
+    ~350x1100 list it becomes a monotonic top-to-bottom brightness ramp, and
+    measured against the real render that ramp swamped the elevation it is
+    supposed to sit behind: the scoreboard's proud row came out DARKER than
+    three of the rows at rest, purely because it sat lower down the card.
+
+    Same three hues, same "dark, non-flat ground" the backdrop-filter needs,
+    but the pools are mirrored top and bottom so vertical position carries no
+    brightness of its own and the shadows are left to say everything.
+  */
   background:
     radial-gradient(80% 28% at 10% 8%, #3a1a63 0%, transparent 62%),
     radial-gradient(80% 28% at 90% 92%, #3a1a63 0%, transparent 62%),
@@ -20,9 +38,19 @@
     #190c31;
 }
 
-/* No marker gutter: only the quiz screen has marks to put in it. */
+/*
+  No marker gutter.
+
+  calm.css reserves 3.5rem on the left of the pane for the correct and wrong
+  glyphs. That emptiness is load-bearing on the quiz screen because something
+  lands in it. Nothing is ever marked on these screens, so the same 56px
+  would just be dead asymmetry on a 335px card.
+*/
 .calm-page .calm-ground .lycra-pane {
-  padding: 1.5rem 1.25rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+
+  /* The pane may be an <ol>, for a list that reads as a list. */
   margin: 0;
   list-style: none;
 }

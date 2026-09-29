@@ -3,9 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { QUIZ_CHOICES } from "../utils/quizCatalog";
 
-const breakLabel = (breakEvery: number) =>
-    breakEvery === 0 ? "no breaks" : `scoreboard every ${breakEvery}`;
-
 /**
  * Every premade quiz (#72): pick one, then play it solo or host a room
  * with it. A labelled choice list on the Calm surface: the quizzes are the
@@ -35,11 +32,11 @@ const QuizLibrary = () => {
                         >
                             <span className="calm-row">
                                 <span>{option.title}</span>
-                                <span className="calm-sub">
-                                    {option.questionCount === null ? "10 questions" : `${option.questionCount} questions`}
-                                </span>
+                                {option.questionCount !== null && (
+                                    <span className="calm-sub">{option.questionCount} questions</span>
+                                )}
                             </span>
-                            <span className="calm-sub">{option.tagline} · {breakLabel(option.breakEvery)}</span>
+                            <span className="calm-sub">{option.tagline}</span>
                         </button>
                     ))}
                 </div>
