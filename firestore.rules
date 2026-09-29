@@ -37,6 +37,7 @@ service cloud.firestore {
              data.players[0].id == data.hostId &&
              // Optional fields validation
              (!('difficulty' in data) || isQuizKey(data.difficulty)) &&
+             (!('breakEvery' in data) || isBreakEvery(data.breakEvery)) &&
              (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
              (!('continueReady' in data) || data.continueReady is bool) &&
              (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list) &&
@@ -83,18 +84,30 @@ service cloud.firestore {
       // caller is actually the host, so this is the closest enforceable
       // proxy for "only the host sets difficulty, and only once."
       // `difficulty` names the quiz: see isQuizKey.
-      return affected.hasOnly(['difficulty']) &&
+      // The quiz's break setting (breakEvery) may ride along, once.
+      return affected.hasOnly(['difficulty', 'breakEvery']) &&
              !('difficulty' in existingData) &&
+             !('breakEvery' in existingData) &&
              'difficulty' in data &&
              isQuizKey(data.difficulty) &&
+             (!('breakEvery' in data) || isBreakEvery(data.breakEvery)) &&
              existingData.started == false;
     }
 
     // What a room's `difficulty` may name (src/utils/quizCatalog.ts): a
-    // classic difficulty, or a premade quiz as `t-` plus its template id (#72).
+    // classic difficulty, a premade quiz as `t-` plus its template id (#72),
+    // or a saved custom quiz as `c-` plus its quizzes/ document id (#77).
     function isQuizKey(value) {
       return value is string &&
-             (value in ['easy', 'medium', 'hard'] || value.matches('t-[a-z0-9-]{1,40}'));
+             (value in ['easy', 'medium', 'hard'] ||
+              value.matches('t-[a-z0-9-]{1,40}') ||
+              value.matches('c-[A-Za-z0-9]{20}'));
+    }
+
+    // How often a room's mid-quiz break comes: after every Nth question, or
+    // never (0). BREAK_CHOICES in src/utils/quizModel.ts.
+    function isBreakEvery(value) {
+      return value in [0, 3, 4, 5, 10];
     }
 
     function isAddingPlayer(affected) {
@@ -179,10 +192,10 @@ service cloud.firestore {
                 (
                   (data.phase == 'question' &&
                    data.currentQuestionIndex == existingData.currentQuestionIndex + 1 &&
-                   data.currentQuestionIndex % 5 != 0) ||
+                   !isBreakBefore(data.currentQuestionIndex, existingData.get('breakEvery', 5))) ||
                   (data.phase == 'mid-scoreboard' &&
                    data.currentQuestionIndex == existingData.currentQuestionIndex + 1 &&
-                   data.currentQuestionIndex % 5 == 0) ||
+                   isBreakBefore(data.currentQuestionIndex, existingData.get('breakEvery', 5))) ||
                   (data.phase == 'results' &&
                    data.currentQuestionIndex == existingData.currentQuestionIndex)
                 )) ||
@@ -190,6 +203,13 @@ service cloud.firestore {
                 data.phase == 'question' &&
                 data.currentQuestionIndex == existingData.currentQuestionIndex)
              );
+    }
+
+    // Whether the mid-quiz break comes before question `index`, for a room
+    // breaking every `every` questions (0: never; rooms without the field
+    // break every 5). Same arithmetic as phaseAfterQuestion in quizTiming.ts.
+    function isBreakBefore(index, every) {
+      return every > 0 && index % every == 0;
     }
 
     function isUpdatingPlayerScores(affected) {
@@ -295,6 +315,34 @@ service cloud.firestore {
         isValidPlayerAt(players, 26) && isValidPlayerAt(players, 27) &&
         isValidPlayerAt(players, 28) && isValidPlayerAt(players, 29) &&
         isValidPlayerAt(players, 30) && isValidPlayerAt(players, 31);
+    }
+
+    // Saved custom quizzes (#76). There is no sign-in, so a quiz's random
+    // document id is what lets someone read it: the app only ever gets one
+    // by id (to play or host it), never lists the collection. A saved quiz
+    // never changes, so every player in a room plays the same questions;
+    // editing saves a new one. Each question's shape is checked by the
+    // client (quizModel.questionProblems) when it loads the quiz, since
+    // rules can't loop over a 50-entry list.
+    match /quizzes/{quizId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isValidQuiz();
+      allow update, delete: if false;
+    }
+
+    function isValidQuiz() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['title', 'breakEvery', 'questions', 'createdAt']) &&
+             data.keys().hasAll(['title', 'breakEvery', 'questions', 'createdAt']) &&
+             data.title is string &&
+             data.title.size() > 0 &&
+             data.title.size() <= 60 &&
+             isBreakEvery(data.breakEvery) &&
+             data.questions is list &&
+             data.questions.size() > 0 &&
+             data.questions.size() <= 50 &&
+             data.createdAt == request.time;
     }
 
     // Default deny all other collections and documents

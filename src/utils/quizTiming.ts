@@ -8,7 +8,10 @@ export const QUESTION_MS = 10_000; // time to answer
 export const FEEDBACK_MS = 5_000; // answer feedback before the next question
 export const QUESTION_SLOT_MS = QUESTION_MS + FEEDBACK_MS;
 
-/** A mid-quiz scoreboard break follows every Nth question. */
+/**
+ * A mid-quiz scoreboard break follows every Nth question, unless the room
+ * says otherwise (`Room.breakEvery`, where 0 means never).
+ */
 export const MID_QUIZ_EVERY = 5;
 
 export interface PhaseAfterQuestion {
@@ -19,14 +22,20 @@ export interface PhaseAfterQuestion {
 /**
  * What the room moves to once question `index` (0-based) of `totalQuestions`
  * is over: the next question, the mid-quiz break before it, or the results.
+ * `breakEvery` is the room's break setting (0: no breaks); firestore.rules
+ * checks the same arithmetic in isAdvancingPhase.
  */
-export const phaseAfterQuestion = (index: number, totalQuestions: number): PhaseAfterQuestion => {
+export const phaseAfterQuestion = (
+    index: number,
+    totalQuestions: number,
+    breakEvery: number = MID_QUIZ_EVERY,
+): PhaseAfterQuestion => {
     if (index >= totalQuestions - 1) {
         return { phase: "results", currentQuestionIndex: index };
     }
     const next = index + 1;
     return {
-        phase: next % MID_QUIZ_EVERY === 0 ? "mid-scoreboard" : "question",
+        phase: breakEvery > 0 && next % breakEvery === 0 ? "mid-scoreboard" : "question",
         currentQuestionIndex: next,
     };
 };

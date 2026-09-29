@@ -30,6 +30,13 @@ describe("phaseAfterQuestion", () => {
     it("treats an index past the end as finished", () => {
         expect(phaseAfterQuestion(20, 15)).toEqual({ phase: "results", currentQuestionIndex: 20 });
     });
+
+    it("follows the room's break setting", () => {
+        expect(phaseAfterQuestion(3, 12, 4)).toEqual({ phase: "mid-scoreboard", currentQuestionIndex: 4 });
+        expect(phaseAfterQuestion(4, 12, 4)).toEqual({ phase: "question", currentQuestionIndex: 5 });
+        expect(phaseAfterQuestion(4, 12, 0)).toEqual({ phase: "question", currentQuestionIndex: 5 });
+        expect(phaseAfterQuestion(11, 12, 0)).toEqual({ phase: "results", currentQuestionIndex: 11 });
+    });
 });
 
 describe("questionClock", () => {

@@ -23,6 +23,7 @@ import {
   serverTimestamp,
   Timestamp,
   collection,
+  getDoc,
   getDocs,
 } from "firebase/firestore";
 
@@ -200,6 +201,58 @@ await expectDenied("create a room with a bogus quiz key", () =>
   })
 );
 
+// 5g. The quiz's break setting rides along with the quiz key, once (#75),
+// and custom quizzes are named `c-` plus their 20-character document id.
+const brk = freshRoom("BRK");
+await createRoom(brk.roomRef, brk.roomCode);
+await expectAllowed("set a custom quiz with its break setting", () =>
+  updateDoc(brk.roomRef, { difficulty: "c-AbCdEfGhIjKlMnOpQrSt", breakEvery: 4 })
+);
+await expectDenied("change the break setting after the quiz is set", () =>
+  updateDoc(brk.roomRef, { breakEvery: 0 })
+);
+const brkBad = freshRoom("BRKBAD");
+await createRoom(brkBad.roomRef, brkBad.roomCode);
+await expectDenied("set a break setting that isn't a choice", () =>
+  updateDoc(brkBad.roomRef, { difficulty: "easy", breakEvery: 7 })
+);
+await expectDenied("set a custom quiz key of the wrong length", () =>
+  updateDoc(brkBad.roomRef, { difficulty: "c-short" })
+);
+const brkAlone = freshRoom("BRKALONE");
+await createRoom(brkAlone.roomRef, brkAlone.roomCode);
+await expectDenied("set the break setting without a quiz", () =>
+  updateDoc(brkAlone.roomRef, { breakEvery: 3 })
+);
+
+// 5h. Saved custom quizzes (#76): readable by id, never listed, never changed.
+const quizRef = doc(collection(db, "quizzes"));
+const aQuiz = (overrides = {}) => ({
+  title: "Jedward's Revenge",
+  breakEvery: 5,
+  questions: [{ id: "q1", question: "Who?", options: ["A", "B"], correctAnswer: "A", source: "custom" }],
+  createdAt: serverTimestamp(),
+  ...overrides,
+});
+await expectAllowed("save a custom quiz", () => setDoc(quizRef, aQuiz()));
+await expectAllowed("read a custom quiz by id", () => getDoc(quizRef));
+await expectDenied("list the quizzes collection", async () => {
+  const snap = await getDocs(collection(db, "quizzes"));
+  if (snap.size > 0) throw { code: "unexpectedly-succeeded", size: snap.size };
+});
+await expectDenied("change a saved quiz", () => updateDoc(quizRef, { title: "Hijacked" }));
+for (const [label, overrides] of [
+  ["no questions", { questions: [] }],
+  ["51 questions", { questions: Array.from({ length: 51 }, () => aQuiz().questions[0]) }],
+  ["an empty title", { title: "" }],
+  ["a 61-character title", { title: "x".repeat(61) }],
+  ["a break setting that isn't a choice", { breakEvery: 6 }],
+  ["a client-chosen createdAt", { createdAt: Timestamp.fromMillis(0) }],
+  ["an extra field", { ownerId: "someone" }],
+]) {
+  await expectDenied(`save a quiz with ${label}`, () => setDoc(doc(collection(db, "quizzes")), aQuiz(overrides)));
+}
+
 // 5c. Malicious: list/enumerate the whole rooms collection with no code
 await expectDenied("list the entire rooms collection with no code", async () => {
   const snap = await getDocs(collection(db, "rooms"));
@@ -343,10 +396,10 @@ await expectDenied("create room with a client-chosen phaseStartedAt", () =>
 // Each room is set up *before* expectDenied, so a denial during setup (say,
 // a regression that stops phase-aware rooms being created) fails loudly
 // instead of passing as "the start was denied".
-async function readyToStart(prefix) {
+async function readyToStart(prefix, quiz = { difficulty: "easy" }) {
   const room = freshRoom(prefix);
   await createRoomWithPhase(room.roomRef, room.roomCode);
-  await updateDoc(room.roomRef, { difficulty: "easy" });
+  await updateDoc(room.roomRef, quiz);
   return room.roomRef;
 }
 const evilD = await readyToStart("PHASEEVILD");
@@ -432,8 +485,8 @@ const advanceTo = (phase, currentQuestionIndex, overrides = {}) => ({
   phaseStartedAt: serverTimestamp(),
   ...overrides,
 });
-async function startedRoom(prefix) {
-  const room = await readyToStart(prefix);
+async function startedRoom(prefix, quiz) {
+  const room = await readyToStart(prefix, quiz);
   await updateDoc(room, startWrite());
   return room;
 }
@@ -446,6 +499,9 @@ const toResults = await startedRoom("PHASERES");
 const forgedClock = await startedRoom("PHASECLK");
 const piggyScore = await startedRoom("PHASEPIG");
 const resumeTooSoon = await startedRoom("PHASERSM");
+// Rooms with their own break setting (#75) walk alongside `walker`.
+const every3 = await startedRoom("PHASE3", { difficulty: "t-nul-points", breakEvery: 3 });
+const never = await startedRoom("PHASE0", { difficulty: "t-quick-fire", breakEvery: 0 });
 
 await expectDenied("end a question before its 15s slot is over", () =>
   updateDoc(early, advanceTo("question", 1))
@@ -487,11 +543,29 @@ await expectDenied("move on from results", () =>
 await expectAllowed("advance to the next question once the slot is over (0 -> 1)", () =>
   updateDoc(walker, advanceTo("question", 1))
 );
+await updateDoc(every3, advanceTo("question", 1));
+await updateDoc(never, advanceTo("question", 1));
 for (const next of [2, 3, 4]) {
   await waitForSlot();
   await updateDoc(walker, advanceTo("question", next));
+  if (next === 2) await updateDoc(every3, advanceTo("question", 2));
+  if (next === 3) {
+    await expectDenied("skip the break in a room breaking every 3 (2 -> question 3)", () =>
+      updateDoc(every3, advanceTo("question", 3))
+    );
+    await expectAllowed("take the break after question 3 in a room breaking every 3", () =>
+      updateDoc(every3, advanceTo("mid-scoreboard", 3))
+    );
+  }
+  await updateDoc(never, advanceTo("question", next));
 }
 await waitForSlot();
+await expectDenied("take a break in a room with no breaks (4 -> break at 5)", () =>
+  updateDoc(never, advanceTo("mid-scoreboard", 5))
+);
+await expectAllowed("go straight on in a room with no breaks (4 -> question 5)", () =>
+  updateDoc(never, advanceTo("question", 5))
+);
 await expectDenied("skip the mid-quiz break (4 -> question 5)", () =>
   updateDoc(walker, advanceTo("question", 5))
 );

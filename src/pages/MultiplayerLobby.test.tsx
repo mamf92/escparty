@@ -41,7 +41,7 @@ describe("MultiplayerLobby", () => {
     await user.click(screen.getByText("Host & Play"));
 
     expect(createRoom).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String), false);
-    expect(setRoomDifficulty).toHaveBeenCalledWith("ABBA", "t-nordic-nights");
+    expect(setRoomDifficulty).toHaveBeenCalledWith("ABBA", "t-nordic-nights", 5);
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
   });
 

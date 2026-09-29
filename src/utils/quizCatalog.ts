@@ -5,12 +5,15 @@
  * `difficulty` field carry:
  *   - `easy` / `medium` / `hard` — the classic sets (QuizDataProvider)
  *   - `t-<templateId>` — a premade quiz from the bank (quizTemplates.ts)
+ *   - `c-<quizId>` — a saved custom quiz (customQuizzes.ts)
  * `firestore.rules` accepts only these shapes for a room (a `t-` key that
- * no template names still passes the rules; `isKnownQuizKey` catches it).
+ * no template names still passes the rules; `isKnownQuizKey` catches it,
+ * and a `c-` key whose quiz is gone fails when it loads).
  */
 import { QUIZ_TEMPLATES, quizTemplate, type QuizTemplate } from "../data/quizTemplates";
 import { loadQuizData, type QuizDifficulty, type QuizQuestion } from "./QuizDataProvider";
-import { DEFAULT_BREAK_EVERY, toPlayable, type BreakEvery } from "./quizModel";
+import { customQuizId, fetchCustomQuiz, isCustomQuizKey, knownCustomTitle } from "./customQuizzes";
+import { DEFAULT_BREAK_EVERY, toPlayable, type AnyQuestion, type BankQuestion, type BreakEvery } from "./quizModel";
 
 export const CLASSIC_KEYS: QuizDifficulty[] = ["easy", "medium", "hard"];
 const TEMPLATE_PREFIX = "t-";
@@ -24,7 +27,7 @@ const templateFor = (key: string): QuizTemplate | undefined =>
 
 /** Whether a key names a quiz this build can play. */
 export const isKnownQuizKey = (key: string | undefined | null): key is string =>
-    !!key && (isClassicKey(key) || templateFor(key) !== undefined);
+    !!key && (isClassicKey(key) || templateFor(key) !== undefined || isCustomQuizKey(key));
 
 const CLASSIC_TITLES: Record<QuizDifficulty, string> = {
     easy: "Classic: Easy",
@@ -32,11 +35,25 @@ const CLASSIC_TITLES: Record<QuizDifficulty, string> = {
     hard: "Classic: Hard",
 };
 
-/** A human title for a key: "Classic: Medium", "Nordic Nights". */
+/**
+ * A human title for a key: "Classic: Medium", "Nordic Nights". A custom
+ * quiz's title is only known here if this device saved it; `useQuizTitle`
+ * reads it for everyone else.
+ */
 export const quizTitle = (key: string | undefined | null): string => {
     if (!key) return "Not chosen";
     if (isClassicKey(key)) return CLASSIC_TITLES[key];
+    if (isCustomQuizKey(key)) return knownCustomTitle(customQuizId(key)) ?? "Custom quiz";
     return templateFor(key)?.title ?? "Unknown quiz";
+};
+
+/** A key's title, reading a custom quiz from Firestore when needed. */
+export const fetchQuizTitle = async (key: string | undefined | null): Promise<string> => {
+    if (key && isCustomQuizKey(key)) {
+        const quiz = await fetchCustomQuiz(customQuizId(key)).catch(() => null);
+        if (quiz) return quiz.title;
+    }
+    return quizTitle(key);
 };
 
 export interface LoadedQuiz {
@@ -50,6 +67,11 @@ export interface LoadedQuiz {
 export const loadQuiz = async (key: string): Promise<LoadedQuiz> => {
     if (isClassicKey(key)) {
         return { questions: await loadQuizData(key), breakEvery: DEFAULT_BREAK_EVERY, classic: true };
+    }
+    if (isCustomQuizKey(key)) {
+        const quiz = await fetchCustomQuiz(customQuizId(key));
+        if (!quiz || quiz.questions.length === 0) throw new Error("This quiz isn't saved any more.");
+        return { questions: quiz.questions.map(toPlayable), breakEvery: quiz.breakEvery, classic: false };
     }
     const template = templateFor(key);
     if (!template) throw new Error(`Unknown quiz: ${key}`);
@@ -80,3 +102,39 @@ export const QUIZ_CHOICES: { key: string; title: string; tagline: string; questi
         breakEvery: template.breakEvery,
     })),
 ];
+
+/**
+ * How often a key's mid-quiz break comes, for a room about to play it.
+ * Custom quizzes are read from Firestore; if that fails, the default.
+ */
+export const quizBreakEvery = async (key: string): Promise<BreakEvery> => {
+    if (isCustomQuizKey(key)) {
+        const quiz = await fetchCustomQuiz(customQuizId(key)).catch(() => null);
+        return quiz?.breakEvery ?? DEFAULT_BREAK_EVERY;
+    }
+    return templateFor(key)?.breakEvery ?? DEFAULT_BREAK_EVERY;
+};
+
+/**
+ * A quiz as the builder starts from it: its title, break setting and the
+ * questions with their bank metadata, for copying a premade quiz or
+ * editing a saved one. Rejects for an unknown key or a missing quiz.
+ */
+export const loadQuizForEditing = async (key: string): Promise<{ title: string; breakEvery: BreakEvery; questions: AnyQuestion[] }> => {
+    if (isCustomQuizKey(key)) {
+        const quiz = await fetchCustomQuiz(customQuizId(key));
+        if (!quiz) throw new Error("This quiz isn't saved any more.");
+        return quiz;
+    }
+    const { BANK_QUESTIONS, bankQuestion } = await import("../data/questionBank");
+    if (isClassicKey(key)) {
+        const questions = BANK_QUESTIONS.filter(question => question.difficulty === key && question.id.startsWith("classic-"));
+        return { title: CLASSIC_TITLES[key], breakEvery: DEFAULT_BREAK_EVERY, questions };
+    }
+    const template = templateFor(key);
+    if (!template) throw new Error(`Unknown quiz: ${key}`);
+    const questions = template.questionIds
+        .map(id => bankQuestion(id))
+        .filter((question): question is BankQuestion => question !== undefined);
+    return { title: template.title, breakEvery: template.breakEvery, questions };
+};

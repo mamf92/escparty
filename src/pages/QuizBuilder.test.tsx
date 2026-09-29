@@ -1,0 +1,207 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Route, Routes, useLocation, type InitialEntry } from "react-router-dom";
+import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
+import QuizBuilder from "./QuizBuilder";
+
+const mocks = vi.hoisted(() => ({ saveCustomQuiz: vi.fn(), fetchCustomQuiz: vi.fn() }));
+vi.mock("../utils/customQuizzes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/customQuizzes")>()),
+  saveCustomQuiz: mocks.saveCustomQuiz,
+  fetchCustomQuiz: mocks.fetchCustomQuiz,
+}));
+
+const ID = "AbCdEfGhIjKlMnOpQrSt";
+
+const ShowLocation = () => {
+  const location = useLocation();
+  return <p>at {location.pathname} with {JSON.stringify(location.state)}</p>;
+};
+
+const renderBuilder = (entry: InitialEntry = "/quizzes/new") =>
+  renderWithProviders(
+    <Routes>
+      <Route path="/quizzes/new" element={<QuizBuilder />} />
+      <Route path="/quizzes/edit/:quizId" element={<QuizBuilder />} />
+      <Route path="*" element={<ShowLocation />} />
+    </Routes>,
+    { initialEntries: [entry] },
+  );
+
+const questionList = () => screen.getByRole("radiogroup", { name: "Questions in this quiz" });
+
+const writeQuestion = async (user: ReturnType<typeof userEvent.setup>, text: string, answers: string[], correct: string) => {
+  await user.click(screen.getByRole("button", { name: "Write a question" }));
+  await user.type(screen.getByLabelText("Question"), text);
+  for (const [index, answer] of answers.entries()) {
+    if (index >= 2) await user.click(screen.getByRole("button", { name: "Add another answer" }));
+    await user.type(screen.getByLabelText(`Answer ${index + 1}`), answer);
+  }
+  await user.click(screen.getByRole("radio", { name: correct }));
+  await user.click(screen.getByRole("button", { name: "Add to the quiz" }));
+};
+
+describe("QuizBuilder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.saveCustomQuiz.mockResolvedValue(ID);
+  });
+
+  it("won't save an empty quiz, and says why", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    expect(screen.getByText(/No questions yet/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save quiz" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Give the quiz a name. Add at least one question.");
+    expect(mocks.saveCustomQuiz).not.toHaveBeenCalled();
+  });
+
+  it("builds a quiz from the bank and your own question, and saves it", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await user.type(screen.getByLabelText("Name"), "Jedward's Revenge");
+    await user.selectOptions(screen.getByLabelText("Scoreboard break"), "3");
+
+    await user.click(screen.getByRole("button", { name: "Add from the bank" }));
+    await user.selectOptions(await screen.findByLabelText("Category"), "nordic");
+    await user.selectOptions(screen.getByLabelText("Difficulty"), "easy");
+    const bank = await screen.findByRole("group", { name: "Bank questions" });
+    const melodi = within(bank).getByRole("button", { name: /Norway's national Eurovision selection/ });
+    await user.click(melodi);
+    expect(melodi).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/1 question in your quiz/)).toBeInTheDocument();
+    // Tapping again takes it out; a third tap puts it back.
+    await user.click(melodi);
+    expect(melodi).toHaveAttribute("aria-pressed", "false");
+    await user.click(melodi);
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    await writeQuestion(user, "Who sang 'Lipstick'?", ["Bros", "Jedward", "Zig and Zag"], "Jedward");
+
+    const rows = within(questionList()).getAllByRole("radio");
+    expect(rows.map(row => row.textContent)).toEqual([
+      expect.stringContaining("1. What is Norway's national Eurovision selection called?Bank · Nordic nights"),
+      expect.stringContaining("2. Who sang 'Lipstick'?Yours"),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "Save quiz" }));
+
+    expect(mocks.saveCustomQuiz).toHaveBeenCalledWith({
+      title: "Jedward's Revenge",
+      breakEvery: 3,
+      questions: [
+        expect.objectContaining({ id: "w-e-13", source: "bank" }),
+        expect.objectContaining({ source: "custom", question: "Who sang 'Lipstick'?", options: ["Bros", "Jedward", "Zig and Zag"], correctAnswer: "Jedward" }),
+      ],
+    }, undefined);
+    expect(await screen.findByText(`at /quizzes with {"picked":"c-${ID}"}`)).toBeInTheDocument();
+  });
+
+  it("checks a written question before adding it", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await user.click(screen.getByRole("button", { name: "Write a question" }));
+    await user.type(screen.getByLabelText("Answer 1"), "Same");
+    await user.type(screen.getByLabelText("Answer 2"), "same");
+    await user.click(screen.getByRole("button", { name: "Add to the quiz" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Write the question. Two answers are the same. Mark which answer is correct.");
+
+    // Up to six answers, and back down to two.
+    for (let i = 0; i < 4; i++) await user.click(screen.getByRole("button", { name: "Add another answer" }));
+    expect(screen.queryByRole("button", { name: "Add another answer" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Answer 6" }));
+    await user.click(screen.getByRole("button", { name: "Remove the last answer" }));
+    expect(screen.getAllByRole("radio").every(radio => radio.getAttribute("aria-checked") === "false")).toBe(true);
+    for (let i = 0; i < 3; i++) await user.click(screen.getByRole("button", { name: "Remove the last answer" }));
+    expect(screen.queryByRole("button", { name: "Remove the last answer" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Back to your quiz"));
+    expect(screen.getByText(/No questions yet/)).toBeInTheDocument();
+  });
+
+  it("reorders, edits and takes out questions", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await writeQuestion(user, "First?", ["A", "B"], "A");
+    await writeQuestion(user, "Second?", ["C", "D"], "D");
+
+    await user.click(within(questionList()).getByRole("radio", { name: /Second\?/ }));
+    expect(screen.queryByRole("button", { name: "Move down" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Move up" }));
+    expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("1. Second?");
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Question")).toHaveValue("Second?");
+    expect(screen.getByRole("radio", { name: "D" })).toHaveAttribute("aria-checked", "true");
+    await user.clear(screen.getByLabelText("Question"));
+    await user.type(screen.getByLabelText("Question"), "Second, edited?");
+    await user.click(screen.getByRole("button", { name: "Keep these changes" }));
+    expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("1. Second, edited?");
+
+    await user.click(within(questionList()).getByRole("radio", { name: /First\?/ }));
+    await user.click(screen.getByRole("button", { name: "Take out" }));
+    expect(within(questionList()).getAllByRole("radio")).toHaveLength(1);
+  });
+
+  it("starts from a premade quiz, where an edited bank question becomes yours", async () => {
+    const user = userEvent.setup();
+    renderBuilder({ pathname: "/quizzes/new", state: { fromKey: "t-quick-fire" } });
+
+    expect(await screen.findByDisplayValue("Quick Fire (my version)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Scoreboard break")).toHaveValue("0");
+    const rows = within(questionList()).getAllByRole("radio");
+    expect(rows).toHaveLength(10);
+
+    await user.click(rows[0]);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.type(screen.getByLabelText("Question"), " Really?");
+    await user.click(screen.getByRole("button", { name: "Keep these changes" }));
+    expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("Really?Yours");
+  });
+
+  it("edits a saved quiz, saving the new version in its place", async () => {
+    const user = userEvent.setup();
+    mocks.fetchCustomQuiz.mockResolvedValue({
+      id: ID,
+      title: "Mine",
+      breakEvery: 4,
+      questions: [{ id: "q1", question: "Who?", options: ["A", "B"], correctAnswer: "A", source: "custom" }],
+    });
+    renderBuilder(`/quizzes/edit/${ID}`);
+
+    expect(await screen.findByDisplayValue("Mine")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Edit quiz" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save quiz" }));
+    expect(mocks.saveCustomQuiz).toHaveBeenCalledWith(expect.objectContaining({ title: "Mine", breakEvery: 4 }), ID);
+  });
+
+  it("starts empty when the quiz to start from can't be loaded", async () => {
+    mocks.fetchCustomQuiz.mockResolvedValue(null);
+    renderBuilder(`/quizzes/edit/${ID}`);
+    expect(await screen.findByRole("status")).toHaveTextContent("That quiz couldn't be loaded");
+    expect(screen.getByText(/No questions yet/)).toBeInTheDocument();
+  });
+
+  it("says so when saving fails, and lets you try again", async () => {
+    const user = userEvent.setup();
+    mocks.saveCustomQuiz.mockRejectedValueOnce(new Error("offline"));
+    renderBuilder();
+    await user.type(screen.getByLabelText("Name"), "Offline quiz");
+    await writeQuestion(user, "Q?", ["A", "B"], "A");
+
+    await user.click(screen.getByRole("button", { name: "Save quiz" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("couldn't be saved");
+
+    await user.click(screen.getByRole("button", { name: "Save quiz" }));
+    expect(await screen.findByText(/at \/quizzes/)).toBeInTheDocument();
+  });
+
+  it("leaves for the library", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await user.click(screen.getByText("Back to the quiz library"));
+    expect(screen.getByText("at /quizzes with null")).toBeInTheDocument();
+  });
+});
