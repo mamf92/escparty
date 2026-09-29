@@ -29,8 +29,8 @@ Unit/component tests run on Vitest + React Testing Library. The Firestore
 API and the quiz logic have per-file coverage floors, and every page,
 component and hook has a test file except the debt listed in
 `src/test/testFiles.test.ts` (#59); `npm test` fails for a new one without
-a test file. `npm test` now runs in `ci.yml`, but a
-red run doesn't yet block merge or deploy (see #57). See
+a test file. CI runs `npm run test:coverage` (the floors included), but a
+red run doesn't yet block merge (branch protection, #49). See
 `docs/agent/testing.md` before assuming a given flow is covered.
 
 ## Where things live

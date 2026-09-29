@@ -6,18 +6,31 @@ as part of `ci.yml` — see "Known gaps" below for what's still missing.
 
 ## Commands
 
-- `npm test` — run the unit/component suite once (`vitest run`). This is the
-  command `ci.yml` runs on every PR and push to `main`.
+- `npm test` — run the unit/component suite once (`vitest run`).
 - `npm run test:watch` — the same suite in watch mode while developing.
 - `npm run test:coverage` — the same run plus a coverage report, and the
-  per-file floors described under "The coverage floor" below. Not part of
-  `npm test`, so an ordinary run stays fast.
+  per-file floors described under "The coverage floor" below. `ci.yml`
+  runs this on its Node 22 leg on every PR and push to `main` (#57), and
+  plain `npm test` on Node 24; `npm test` skips coverage, so an ordinary
+  local run stays fast.
 
-`npm run lint`, `npm run build`, and now `npm test` run in CI
-(`.github/workflows/ci.yml`) on every PR and push to `main`. A red test run
-fails the workflow, but nothing yet stops it from merging (that's branch
-protection, #49) or from deploying (Vercel's GitHub integration deploys
-`main` independently of this workflow's result — see #57 for the plan there).
+`npm run lint`, `npm run build` and the tests (with the coverage floors on
+Node 22) run in CI (`.github/workflows/ci.yml`) on every PR and push to
+`main`. A red test run, or a file under its coverage floor, fails the
+workflow.
+
+**The deploy gate (#57, decided):** branch protection on `main`, not
+Vercel's Ignored Build Step. Vercel deploys whatever lands on `main`, and it
+can't see this workflow's result, so the way to keep a red build off `main`
+is to require these checks before merging (#49): `build (22.x)` and
+`build (24.x)` (build, lint, tests, coverage floors) and `gitleaks`, with
+"Require branches to be up to date before merging" on, so two PRs that
+are each green can't land a red `main` together. Don't require `Verify
+rules against the emulator`: `firestore-rules.yml` only runs on PRs that
+touch the rules or their scripts, so a required check would wait forever
+on every other PR (it already blocks the rules deploy itself). Turning
+this on is a repository setting only the owner can change; until then a
+red run fails visibly but doesn't block the merge button.
 
 ## Where tests live
 
@@ -125,8 +138,10 @@ ever calling it.
 
 Adding a file to the list is how coverage gets ratcheted up (#59 tracks the
 backlog); **lowering a floor to make a run go green is not** — cover the new
-branch instead. `npm run test:coverage` itself is still not a CI check —
-`ci.yml` runs the faster `npm test` — a coverage-diff gate is tracked in #57.
+branch instead. CI runs `npm run test:coverage`, so a PR that drops a
+covered file under its floor fails. Nothing stops a PR from lowering a
+floor in `vite.config.ts` or dropping a file from the list, so a reviewer
+has to; a coverage-diff gate that would catch that is still open in #57.
 
 ## Known gaps
 
@@ -154,11 +169,9 @@ open at the time of writing:
   the emulator; a committed version of that is #68. Don't read "scoring is
   covered" as "the quiz is covered".
 - **No e2e runner.** Playwright is #55.
-- **Test failures don't block merge or deploy yet.** `npm test` runs in
-  `ci.yml`, but nothing requires it to pass before merge (branch protection,
-  #49) or before Vercel deploys `main` (no workflow chains to Vercel's
-  GitHub integration today — #57 tracks the coverage-diff gate and the
-  Vercel/branch-protection decision).
+- **Test failures don't block merge yet.** CI fails on them, but requiring
+  the checks before merge is branch protection (#49), a setting only the
+  owner can turn on; see "The deploy gate" above for the check names.
 - **New pages, components and hooks need a test file.**
   `src/test/testFiles.test.ts` fails `npm test` when a module under
   `src/pages`, `src/components` or `src/hooks`, or a component (`.tsx`)
