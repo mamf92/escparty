@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import styled from "styled-components";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
-import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils/roomsFirestore";
+import { updatePlayerScore, listenToRoom, advanceQuestion, Room, ScoreWriteRejected } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
@@ -39,6 +39,7 @@ const Quiz = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(true);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
+  const [scoreSyncError, setScoreSyncError] = useState<string | null>(null); // A multiplayer score write that failed for good
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
@@ -571,14 +572,33 @@ const Quiz = () => {
       // would repair it: the room (and every scoreboard built from it)
       // would keep the lower score.
       if (isMultiplayer && roomCode && playerId) {
+        let scoreToSave = newScore;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
-            await updatePlayerScore(roomCode, playerId, newScore);
+            await updatePlayerScore(roomCode, playerId, scoreToSave);
             rememberAnswered(answeredQuestion);
+            setScoreSyncError(null);
             break;
           } catch (error) {
             console.error(`Failed to update score (attempt ${attempt} of 3):`, error);
+            if (error instanceof ScoreWriteRejected) {
+              // The room already holds more than this tab knew (it hadn't
+              // picked the room's score up yet): add this answer's points
+              // to the room's score instead, rather than drop them.
+              if (error.reason === "lower-score" && error.currentScore !== undefined && attempt < 3) {
+                scoreToSave = error.currentScore + pointsForAnswer;
+                setScore(scoreToSave);
+                continue;
+              }
+              // Retrying can't fix a room that doesn't know this player, or
+              // is gone: say so once instead of failing quietly (#131).
+              if (error.reason !== "lower-score") {
+                setScoreSyncError("Your score isn't being saved to this room. Ask the host to start a new game.");
+                break;
+              }
+            }
             if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            else setScoreSyncError("Your score couldn't reach the room. Check your connection.");
           }
         }
       }
@@ -644,6 +664,7 @@ const Quiz = () => {
           points!
         </PointsDisplay>
       )}
+      {scoreSyncError && <SyncWarning role="alert">{scoreSyncError}</SyncWarning>}
       <QuestionText>{currentQuestion.question}</QuestionText>
       <OptionsContainer>
         {currentQuestion.options.map((option) => (
@@ -862,6 +883,12 @@ const ErrorContainer = styled.div`
   padding: 2.5rem 1.25rem; /* 40px 20px */
   background: ${({ theme }) => theme.colors.magnolia};
   border-radius: 0; /* Changed from 10px to match square design */
+`;
+
+const SyncWarning = styled.p`
+  color: ${({ theme }) => theme.colors.incorrectRed};
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
 `;
 
 const ErrorMessage = styled.p`

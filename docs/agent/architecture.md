@@ -77,8 +77,8 @@ plan that also removes the ad hoc storage it would duplicate.
   `isProductionPreview`) plus the base-path helper `getAssetPath`.
   `firebase.ts` uses both detection functions (but no base-path helper);
   `QuizDataProvider.ts` uses `isDevelopmentEnvironment` and `getAssetPath`
-  (but not `isProductionPreview`). The Vite `base` config (`/` on Vercel,
-  `/escparty/` for any other production build) flows through `getAssetPath`.
+  (but not `isProductionPreview`). The Vite `base` config (`/` everywhere since
+  #125) flows through `getAssetPath`.
 
 - `roomRoles.ts` — who's who in a room, read from the room itself (#63):
   `isRoomHost`, `isObserverHost`, `shouldObserve` (whether to route to the

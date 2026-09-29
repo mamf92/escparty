@@ -120,12 +120,15 @@ const directImportQuizData = async (difficulty: QuizDifficulty): Promise<QuizQue
                 break;
         }
 
-        // Use Promise.race with a timeout to avoid hanging
+        // Use Promise.race with a timeout to avoid hanging, and clear the
+        // timer once the race is decided either way (#132).
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
         const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Import timeout after 5 seconds')), 5000);
+            timeoutId = setTimeout(() => reject(new Error('Import timeout after 5 seconds')), 5000);
         });
 
-        const quizData = (await Promise.race([importPromise, timeoutPromise])) as { default?: unknown };
+        const quizData = (await Promise.race([importPromise, timeoutPromise])
+            .finally(() => clearTimeout(timeoutId))) as { default?: unknown };
 
         if (quizData?.default && Array.isArray(quizData.default)) {
             console.log('✅ Successfully loaded quiz data via direct import:', quizData.default.length, 'questions');
@@ -150,17 +153,17 @@ const fetchQuizData = async (difficulty: QuizDifficulty): Promise<QuizQuestion[]
 
     console.log(`🔍 Fetching quiz from public path: ${publicPath}`);
 
-    try {
-        // Use fetch with timeout to avoid hanging
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+    // Use fetch with timeout to avoid hanging. The 5s covers the response
+    // and reading its body, so a body that stalls can't hang the load
+    // either, and the timer is cleared however it ends (#132).
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+    const readQuizFile = async (): Promise<QuizQuestion[]> => {
         const response = await fetch(publicPath, {
             signal: controller.signal,
             headers: { 'Cache-Control': 'no-cache' } // Avoid caching issues
         });
-
-        clearTimeout(timeoutId);
 
         console.log(`📋 Fetch response status: ${response.status} ${response.statusText}`);
 
@@ -177,6 +180,10 @@ const fetchQuizData = async (difficulty: QuizDifficulty): Promise<QuizQuestion[]
 
         console.log('✅ Successfully loaded quiz data from public directory:', data.length, 'questions');
         return data;
+    };
+
+    try {
+        return await readQuizFile().finally(() => clearTimeout(timeoutId));
     } catch (error) {
         console.error('❌ Error fetching from public directory:', error);
         throw error;

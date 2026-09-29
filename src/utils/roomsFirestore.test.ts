@@ -15,6 +15,7 @@ import {
     setRoomDifficulty,
     startGame,
     updatePlayerScore,
+    ScoreWriteRejected,
 } from "./roomsFirestore";
 
 // The Firebase client SDK is mocked rather than pointed at the emulator: the
@@ -247,16 +248,18 @@ describe("addPlayerToRoom", () => {
         expect(mocks.updateDoc).not.toHaveBeenCalled();
     });
 
-    it("is a no-op when the name is taken, even by a different player id", async () => {
-        // Names are the only thing other players see on the scoreboard, so a
-        // second "Ida" is treated as the same person rejoining.
+    it("adds a second player who drew a name already in the room under their own ID (#131)", async () => {
+        // Only the ID identifies a player: skipping on a name match left the
+        // newcomer's ID out of the room, and every score they sent was lost.
         mocks.getDoc.mockResolvedValue(
             snapshotOf(roomWith({ players: [player("p-2", "Ida")] })),
         );
 
         await addPlayerToRoom("ABCD", "p-99", "Ida");
 
-        expect(mocks.updateDoc).not.toHaveBeenCalled();
+        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
+        const added = (mocks.updateDoc.mock.calls[0][1] as { players: { __arrayUnion: Player[] } }).players.__arrayUnion[0];
+        expect(added).toMatchObject({ id: "p-99", name: "Ida", score: 0 });
     });
 
     it("translates a rules rejection into a message about security rules", async () => {
@@ -295,6 +298,17 @@ describe("joinRoom", () => {
 
         await expect(joinRoom("ABCD", "p-2", "Ida")).resolves.toBe(true);
         expect(mocks.updateDoc).not.toHaveBeenCalled();
+    });
+
+    it("adds a newcomer who drew a name already in the room under their own ID (#131)", async () => {
+        mocks.getDoc.mockResolvedValue(
+            snapshotOf(roomWith({ players: [player("p-2", "Ida")] })),
+        );
+
+        await expect(joinRoom("ABCD", "p-99", "Ida")).resolves.toBe(true);
+        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
+        const added = (mocks.updateDoc.mock.calls[0][1] as { players: { __arrayUnion: Player[] } }).players.__arrayUnion[0];
+        expect(added).toMatchObject({ id: "p-99", name: "Ida" });
     });
 
     it("adds a new player and reports success", async () => {
@@ -402,6 +416,26 @@ describe("updatePlayerScore", () => {
         expect(update).toHaveBeenCalledTimes(1);
     });
 
+    it("marks a write the room turns down with a reason, so callers needn't parse messages", async () => {
+        givenTransactionSees(roomWith({ players: [player("p-1", "Martin", 500)] }));
+
+        await expect(updatePlayerScore("ABCD", "p-1", 100)).rejects.toMatchObject({
+            name: "ScoreWriteRejected",
+            reason: "lower-score",
+            currentScore: 500,
+        });
+        await expect(updatePlayerScore("ABCD", "ghost", 900)).rejects.toMatchObject({ reason: "unknown-player" });
+        await expect(updatePlayerScore("ABCD", "p-1", -1)).rejects.toBeInstanceOf(ScoreWriteRejected);
+    });
+
+    it("passes on a failure that isn't the room's answer (e.g. offline) as a plain error", async () => {
+        mocks.runTransaction.mockRejectedValue(new Error("offline"));
+
+        const failure = updatePlayerScore("ABCD", "p-1", 500);
+        await expect(failure).rejects.toThrow("Failed to update score: offline");
+        await expect(failure).rejects.not.toBeInstanceOf(ScoreWriteRejected);
+    });
+
     it("fails when the room disappeared under the transaction", async () => {
         givenTransactionSees(null);
 
@@ -410,18 +444,13 @@ describe("updatePlayerScore", () => {
         );
     });
 
-    it("writes the player list back unchanged for an unknown player id", async () => {
-        // Documented, not endorsed: a score write for someone who isn't in the
-        // room resolves successfully and rewrites the array as-is rather than
-        // reporting the mistake. Worth knowing before trusting a resolved
-        // promise as proof the score landed.
+    it("rejects a score for a player who isn't in the room, writing nothing (#131)", async () => {
         const update = givenTransactionSees(roomWith({ players: [player("p-1", "Martin", 500)] }));
 
-        await updatePlayerScore("ABCD", "ghost", 900);
-
-        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
-            players: [{ id: "p-1", name: "Martin", score: 500 }],
-        });
+        await expect(updatePlayerScore("ABCD", "ghost", 900)).rejects.toThrow(
+            "Failed to update score: Room ABCD has no player ghost",
+        );
+        expect(update).not.toHaveBeenCalled();
     });
 });
 
@@ -758,3 +787,4 @@ describe("generateRoomCode", () => {
         expect(generateRoomCode()).toBe("ZZZZ");
     });
 });
+

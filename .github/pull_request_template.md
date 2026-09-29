@@ -13,12 +13,16 @@ Closes #<!-- issue number -->
   - [ ] If checked above: the matching file(s) in `docs/agent/` were
         updated in this PR (`architecture.md`, `firestore-data-model.md`,
         `multiplayer-sync.md`, or `theming.md` as applicable).
+- [ ] This PR adds or changes a Firestore field or collection.
+  - [ ] If checked above: `firestore.rules` constrains it (or the PR says
+        why it doesn't need to), and `scripts/verify-firestore-rules.mjs`
+        covers the new write. Merging a rules change deploys it.
 
 ## Test checklist
 
-<!-- There is no test suite yet — see docs/agent/testing.md. Leave these
-     unchecked with a note until that changes; don't check them to make the
-     template look complete. -->
+<!-- Vitest runs in CI (`npm test`), and src/test/testFiles.test.ts fails
+     when a new page, component or hook has no test file. See
+     docs/agent/testing.md. -->
 
 - [ ] This PR adds or changes a component/page/hook.
   - [ ] Unit tests were added or updated.

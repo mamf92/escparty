@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, type InitialEntry } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
 import { theme } from "../styles/theme";
@@ -18,8 +18,11 @@ const Providers = ({ children }: { children: ReactNode }) => (
 );
 
 export type RenderWithProvidersOptions = Omit<RenderOptions, "wrapper"> & {
-  /** Initial history entries for the router, e.g. `["/lobby"]`. */
-  initialEntries?: string[];
+  /**
+   * Initial history entries for the router, e.g. `["/lobby"]`, or a location
+   * with router state: `[{ pathname: "/quiz/easy", state: { ... } }]`.
+   */
+  initialEntries?: InitialEntry[];
 };
 
 /**

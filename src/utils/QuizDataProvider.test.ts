@@ -61,7 +61,7 @@ beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => { });
     vi.spyOn(console, "error").mockImplementation(() => { });
 
-    mocks.getAssetPath.mockImplementation((path: string) => `/escparty/${path}`);
+    mocks.getAssetPath.mockImplementation((path: string) => `/${path}`);
     mocks.isDevelopmentEnvironment.mockReturnValue(false);
 
     fetchMock = vi.fn().mockResolvedValue(okResponse(FETCHED));
@@ -88,7 +88,7 @@ describe("loadQuizData in development", () => {
         await expect(loadQuizData("hard")).resolves.toEqual(FETCHED);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(mocks.getAssetPath).toHaveBeenCalledWith("quizdata/escAdvancedQuiz.json");
-        expect(fetchMock.mock.calls[0][0]).toBe("/escparty/quizdata/escAdvancedQuiz.json");
+        expect(fetchMock.mock.calls[0][0]).toBe("/quizdata/escAdvancedQuiz.json");
     });
 
     it("falls back to the hardcoded bank when both the import and the fetch fail", async () => {
@@ -136,6 +136,24 @@ describe("loadQuizData in production", () => {
         fetchMock.mockRejectedValue(new Error("DNS failure"));
 
         await expect(loadQuizData("easy")).resolves.toEqual(IMPORTED_EASY);
+    });
+
+    it("clears the fetch's abort timer when the fetch rejects (#132)", async () => {
+        const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+        const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+        fetchMock.mockRejectedValue(new Error("DNS failure"));
+
+        await loadQuizData("easy");
+
+        // Every 5s timer armed while loading (the fetch's abort timer, and
+        // the bundled import's race timeout) is cleared again.
+        const fiveSecondTimers = setTimeoutSpy.mock.calls
+            .map((call, index) => ({ delay: call[1], id: setTimeoutSpy.mock.results[index].value }))
+            .filter(timer => timer.delay === 5000);
+        expect(fiveSecondTimers.length).toBeGreaterThan(0);
+        for (const timer of fiveSecondTimers) {
+            expect(clearTimeoutSpy).toHaveBeenCalledWith(timer.id);
+        }
     });
 
     it("treats a 404 as a failed fetch, not as empty data", async () => {
