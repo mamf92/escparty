@@ -68,6 +68,16 @@ The lifecycle:
   shorter or longer countdown; the advance itself is still gated on the
   server's clock (see the rules below), so the room never moves early.
 
+## Joining and player names
+
+`addPlayerToRoom` treats a player as already in the room only by ID. A
+guest who draws a name someone already has joins as that name's next Roman
+numeral (`distinctPlayerName`: "Loreen II"), so scoreboards can tell them
+apart; the lobby shows the room's copy of the name. `updatePlayerScore`
+throws `ScoreWriteRejected` with a `reason` (`invalid-score`, `no-room`,
+`unknown-player`, `lower-score`) when the room turns a write down for good,
+so callers don't retry it or parse messages (#131).
+
 ## Which writes are safe vs. race-prone
 
 - **Safe:** `addPlayerToRoom` and `markPlayerAtMidQuiz` use `arrayUnion` —

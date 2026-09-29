@@ -50,6 +50,35 @@ export interface Room {
 }
 
 /**
+ * A score write the room turned down for a reason another attempt can't
+ * change (#131). `reason` says which, so callers don't parse messages.
+ */
+export class ScoreWriteRejected extends Error {
+    constructor(
+        public readonly reason: "invalid-score" | "no-room" | "unknown-player" | "lower-score",
+        message: string,
+    ) {
+        super(message);
+        this.name = "ScoreWriteRejected";
+    }
+}
+
+/**
+ * The name a joining player shows under: their drawn name, or, when someone
+ * in the room already has it, the same name with the next Roman numeral
+ * ("Loreen II", "Loreen III"), so every scoreboard can tell them apart.
+ */
+export const distinctPlayerName = (name: string, players: Pick<Player, "name">[]): string => {
+    const taken = new Set(players.map(player => player.name));
+    if (!taken.has(name)) return name;
+    const numerals = ["II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+    for (const numeral of numerals) {
+        if (!taken.has(`${name} ${numeral}`)) return `${name} ${numeral}`;
+    }
+    return `${name} ${players.length + 1}`;
+};
+
+/**
  * Debug utility to check if Firebase is properly initialized
  */
 export const checkFirebaseInitialization = () => {
@@ -179,7 +208,7 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
         
         const newPlayer = {
             id: playerId,
-            name: playerName,
+            name: distinctPlayerName(playerName, currentRoom.players),
             score: 0,
             joinedAt: currentTime
         };
@@ -259,7 +288,7 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
     // This is client-side validation only, not a security boundary — see
     // docs/agent/firestore-data-model.md for the actual trust boundary.
     if (!Number.isFinite(score) || score < 0) {
-        throw new Error(`Refusing to write invalid score ${score} for player ${playerId}`);
+        throw new ScoreWriteRejected("invalid-score", `Refusing to write invalid score ${score} for player ${playerId}`);
     }
 
     try {
@@ -273,7 +302,7 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
             const roomDoc = await transaction.get(roomRef);
 
             if (!roomDoc.exists()) {
-                throw new Error(`Room ${roomCode} does not exist`);
+                throw new ScoreWriteRejected("no-room", `Room ${roomCode} does not exist`);
             }
 
             const room = roomDoc.data() as Room;
@@ -281,10 +310,11 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
             // An unknown player (a stale or regenerated ID) would otherwise
             // rewrite the array unchanged and report success (#131).
             if (!existingPlayer) {
-                throw new Error(`Room ${roomCode} has no player ${playerId}`);
+                throw new ScoreWriteRejected("unknown-player", `Room ${roomCode} has no player ${playerId}`);
             }
             if (score < existingPlayer.score) {
-                throw new Error(
+                throw new ScoreWriteRejected(
+                    "lower-score",
                     `Refusing to lower score for player ${playerId} in room ${roomCode} (${existingPlayer.score} -> ${score})`
                 );
             }
@@ -301,6 +331,9 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
         console.log(`Score updated for player ${playerId} in room ${roomCode}`);
     } catch (error) {
         console.error("Error updating player score:", error);
+        if (error instanceof ScoreWriteRejected) {
+            throw new ScoreWriteRejected(error.reason, `Failed to update score: ${error.message}`);
+        }
         throw new Error(`Failed to update score: ${(error as Error).message}`);
     }
 };
@@ -536,13 +569,8 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
             return false;
         }
 
-        // Check if player is already in the room (by ID only, see addPlayerToRoom)
-        const existingPlayer = room.players.find(p => p.id === playerId);
-        if (existingPlayer) {
-            return true; // Consider this a success
-        }
-
-        // Add player to room
+        // Add player to room. A player already in it (the same ID) is a
+        // no-op there, so a rejoin also counts as success.
         await addPlayerToRoom(roomCode, playerId, playerName);
         return true;
     } catch (error) {

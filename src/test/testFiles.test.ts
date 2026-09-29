@@ -5,9 +5,10 @@ import { describe, expect, it } from "vitest";
 /**
  * Every page, component and hook ships with a test file (#140, Epic #53).
  *
- * A component (`.tsx`) or hook (`use*.ts`) under one of these folders needs
- * a sibling `<name>.test.ts(x)` or `<name>.spec.ts(x)`. Plain `.ts` helpers
- * (types, constants) aren't components and don't count.
+ * Every `.ts`/`.tsx` module under src/pages, src/components and src/hooks
+ * needs a sibling `<name>.test.ts(x)` or `<name>.spec.ts(x)`. In
+ * src/fabric-ui and src/store only components (`.tsx`) and hooks (`use*.ts`)
+ * do: their plain `.ts` files are shader constants and presets.
  * UNTESTED is the debt that predates the rule (#59): it may only shrink, so
  * when you add a test for one of these, delete its line here too (the second
  * test below fails until you do).
@@ -33,12 +34,17 @@ const UNTESTED = new Set([
   "src/store/useGameStore.ts",
 ]);
 
-// Vitest runs from the repo root. Paths are kept POSIX-style whatever the
-// OS, so they match UNTESTED.
-const root = process.cwd().replace(/\\/g, "/");
+// The repo root, from this file's own location rather than the working
+// directory. Paths are kept POSIX-style whatever the OS, so they match
+// UNTESTED.
+const root = posix.join(__dirname.replace(/\\/g, "/"), "..", "..");
 const isTest = (name: string) => /\.(test|spec)\.tsx?$/.test(name);
-const needsTest = (name: string) =>
-  !isTest(name) && !name.endsWith(".d.ts") && (/\.tsx$/.test(name) || /^use[A-Z].*\.ts$/.test(name));
+const EVERY_MODULE = ["src/pages/", "src/components/", "src/hooks/"];
+const needsTest = (file: string) => {
+  const name = posix.basename(file);
+  if (isTest(name) || name.endsWith(".d.ts") || !/\.tsx?$/.test(name)) return false;
+  return EVERY_MODULE.some((folder) => file.startsWith(folder)) || /\.tsx$/.test(name) || /^use[A-Z]/.test(name);
+};
 
 const walk = (folder: string): string[] =>
   readdirSync(posix.join(root, folder), { withFileTypes: true }).flatMap((entry) =>
@@ -51,7 +57,7 @@ const hasTest = (file: string) => {
   const base = file.replace(/\.tsx?$/, "");
   return ["test.ts", "test.tsx", "spec.ts", "spec.tsx"].some((suffix) => files.has(`${base}.${suffix}`));
 };
-const sources = allFiles.filter((file) => needsTest(posix.basename(file)));
+const sources = allFiles.filter(needsTest);
 
 describe("test files", () => {
   it("every new page, component and hook has a test file", () => {

@@ -9,7 +9,7 @@ const Lobby = () => {
     const [isHost, setIsHost] = useState<boolean>(false);
     const [gameCode, setGameCode] = useState<string | null>(null);
     const [playerName, setPlayerName] = useState<string | null>(null);
-    const [_playerId, setPlayerId] = useState<string | null>(null); // Renamed to _playerId to indicate it's not used directly
+    const [playerId, setPlayerId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [isSettingDifficulty, setIsSettingDifficulty] = useState<boolean>(false);
@@ -134,11 +134,14 @@ const Lobby = () => {
     }
 
     const visiblePlayers = room ? playingPlayers(room) : [];
+    // The room's copy of this player's name: joining can give a drawn name
+    // that's already taken a numeral ("Loreen II").
+    const displayName = room?.players.find(p => p.id === playerId)?.name ?? playerName;
 
     return (
         <Container>
             <Title>Quiz Lobby</Title>
-            {playerName && <PlayerName>You are: <Highlight>{playerName}</Highlight></PlayerName>}
+            {displayName && <PlayerName>You are: <Highlight>{displayName}</Highlight></PlayerName>}
             <GameInfo>
                 <InfoItem>Game Code: <Code>{gameCode}</Code></InfoItem>
                 <InfoItem>Difficulty: <Difficulty>{room?.difficulty ? room.difficulty.charAt(0).toUpperCase() + room.difficulty.slice(1) : "Not selected"}</Difficulty></InfoItem>

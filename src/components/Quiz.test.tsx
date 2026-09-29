@@ -4,7 +4,7 @@ import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import { theme } from "../styles/theme";
 import type { QuizQuestion } from "../utils/QuizDataProvider";
-import type { Room } from "../utils/roomsFirestore";
+import { ScoreWriteRejected, type Room } from "../utils/roomsFirestore";
 import Quiz from "./Quiz";
 
 const QUESTIONS: QuizQuestion[] = [
@@ -23,7 +23,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../firebase", () => ({ db: {} }));
-vi.mock("../utils/roomsFirestore", () => mocks);
+vi.mock("../utils/roomsFirestore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/roomsFirestore")>()),
+  ...mocks,
+}));
 vi.mock("../utils/QuizDataProvider", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../utils/QuizDataProvider")>();
   return { ...actual, loadQuizData: vi.fn(async () => QUESTIONS) };
@@ -83,7 +86,7 @@ describe("Quiz answer selection (#22)", () => {
 });
 
 describe("Quiz multiplayer score writes (#131)", () => {
-  it("tells the player once when the room doesn't know them, without retrying", async () => {
+  const givenRoom = () => {
     const room: Room = {
       id: "ABCD",
       hostId: "host",
@@ -99,15 +102,36 @@ describe("Quiz multiplayer score writes (#131)", () => {
       callback(room);
       return () => { };
     });
-    mocks.updatePlayerScore.mockRejectedValue(new Error("Failed to update score: Room ABCD has no player ghost"));
+  };
+
+  const answerCorrectly = async () => {
     const user = userEvent.setup();
-
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "ghost" });
-
     await user.click(await screen.findByRole("button", { name: "Sweden" }));
     await user.click(screen.getByRole("button", { name: "Submit Answer" }));
+  };
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be saved to this room");
+  it("tells the player once when the room doesn't know them, without retrying", async () => {
+    givenRoom();
+    mocks.updatePlayerScore.mockRejectedValue(
+      new ScoreWriteRejected("unknown-player", "Failed to update score: Room ABCD has no player ghost"),
+    );
+
+    await answerCorrectly();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("isn't being saved to this room");
     expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't warn when the room already has a higher score for the player", async () => {
+    givenRoom();
+    mocks.updatePlayerScore.mockRejectedValue(
+      new ScoreWriteRejected("lower-score", "Failed to update score: Refusing to lower score"),
+    );
+
+    await answerCorrectly();
+
+    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

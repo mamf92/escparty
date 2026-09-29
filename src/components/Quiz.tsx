@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import styled from "styled-components";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
-import { updatePlayerScore, listenToRoom, advanceQuestion, Room } from "../utils/roomsFirestore";
+import { updatePlayerScore, listenToRoom, advanceQuestion, Room, ScoreWriteRejected } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
@@ -10,10 +10,6 @@ import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
-
-// updatePlayerScore errors that another attempt can't fix (#131).
-const isPermanentScoreError = (error: unknown) =>
-  /has no player|Refusing to lower/.test((error as Error)?.message ?? "");
 
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -580,13 +576,21 @@ const Quiz = () => {
           try {
             await updatePlayerScore(roomCode, playerId, newScore);
             rememberAnswered(answeredQuestion);
+            setScoreSyncError(null);
             break;
           } catch (error) {
             console.error(`Failed to update score (attempt ${attempt} of 3):`, error);
-            // Retrying can't fix a player the room doesn't know, or a score
-            // the room already has higher: say so instead of failing quietly.
-            if (isPermanentScoreError(error)) {
-              setScoreSyncError("Your score couldn't be saved to this room. Rejoin the game to keep playing for points.");
+            if (error instanceof ScoreWriteRejected) {
+              // The room already has a higher score for this player (this
+              // tab hadn't picked it up after a refresh yet): nothing is
+              // lost, and the room's score comes back via the snapshot.
+              if (error.reason === "lower-score") {
+                rememberAnswered(answeredQuestion);
+                break;
+              }
+              // Retrying can't fix a room that doesn't know this player, or
+              // is gone: say so once instead of failing quietly (#131).
+              setScoreSyncError("Your score isn't being saved to this room. Ask the host to start a new game.");
               break;
             }
             if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));

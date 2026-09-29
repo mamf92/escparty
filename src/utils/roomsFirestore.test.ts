@@ -15,6 +15,8 @@ import {
     setRoomDifficulty,
     startGame,
     updatePlayerScore,
+    ScoreWriteRejected,
+    distinctPlayerName,
 } from "./roomsFirestore";
 
 // The Firebase client SDK is mocked rather than pointed at the emulator: the
@@ -247,7 +249,7 @@ describe("addPlayerToRoom", () => {
         expect(mocks.updateDoc).not.toHaveBeenCalled();
     });
 
-    it("adds a second player who drew a name already in the room (#131)", async () => {
+    it("adds a second player who drew a name already in the room, as the name's II (#131)", async () => {
         // Only the ID identifies a player: skipping on a name match left the
         // newcomer's ID out of the room, and every score they sent was lost.
         mocks.getDoc.mockResolvedValue(
@@ -257,6 +259,8 @@ describe("addPlayerToRoom", () => {
         await addPlayerToRoom("ABCD", "p-99", "Ida");
 
         expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
+        const added = (mocks.updateDoc.mock.calls[0][1] as { players: { __arrayUnion: Player[] } }).players.__arrayUnion[0];
+        expect(added).toMatchObject({ id: "p-99", name: "Ida II", score: 0 });
     });
 
     it("translates a rules rejection into a message about security rules", async () => {
@@ -295,6 +299,17 @@ describe("joinRoom", () => {
 
         await expect(joinRoom("ABCD", "p-2", "Ida")).resolves.toBe(true);
         expect(mocks.updateDoc).not.toHaveBeenCalled();
+    });
+
+    it("adds a newcomer who drew a name already in the room under their own ID (#131)", async () => {
+        mocks.getDoc.mockResolvedValue(
+            snapshotOf(roomWith({ players: [player("p-2", "Ida")] })),
+        );
+
+        await expect(joinRoom("ABCD", "p-99", "Ida")).resolves.toBe(true);
+        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
+        const added = (mocks.updateDoc.mock.calls[0][1] as { players: { __arrayUnion: Player[] } }).players.__arrayUnion[0];
+        expect(added).toMatchObject({ id: "p-99", name: "Ida II" });
     });
 
     it("adds a new player and reports success", async () => {
@@ -400,6 +415,25 @@ describe("updatePlayerScore", () => {
         await updatePlayerScore("ABCD", "p-1", 1500);
 
         expect(update).toHaveBeenCalledTimes(1);
+    });
+
+    it("marks a write the room turns down with a reason, so callers needn't parse messages", async () => {
+        givenTransactionSees(roomWith({ players: [player("p-1", "Martin", 500)] }));
+
+        await expect(updatePlayerScore("ABCD", "p-1", 100)).rejects.toMatchObject({
+            name: "ScoreWriteRejected",
+            reason: "lower-score",
+        });
+        await expect(updatePlayerScore("ABCD", "ghost", 900)).rejects.toMatchObject({ reason: "unknown-player" });
+        await expect(updatePlayerScore("ABCD", "p-1", -1)).rejects.toBeInstanceOf(ScoreWriteRejected);
+    });
+
+    it("passes on a failure that isn't the room's answer (e.g. offline) as a plain error", async () => {
+        mocks.runTransaction.mockRejectedValue(new Error("offline"));
+
+        const failure = updatePlayerScore("ABCD", "p-1", 500);
+        await expect(failure).rejects.toThrow("Failed to update score: offline");
+        await expect(failure).rejects.not.toBeInstanceOf(ScoreWriteRejected);
     });
 
     it("fails when the room disappeared under the transaction", async () => {
@@ -751,5 +785,18 @@ describe("generateRoomCode", () => {
 
         vi.spyOn(Math, "random").mockReturnValue(0.9999999);
         expect(generateRoomCode()).toBe("ZZZZ");
+    });
+});
+
+describe("distinctPlayerName", () => {
+    it("keeps a free name and numbers a taken one", () => {
+        expect(distinctPlayerName("Loreen", [])).toBe("Loreen");
+        expect(distinctPlayerName("Loreen", [{ name: "Loreen" }])).toBe("Loreen II");
+        expect(distinctPlayerName("Loreen", [{ name: "Loreen" }, { name: "Loreen II" }])).toBe("Loreen III");
+    });
+
+    it("falls back to a plain number once the numerals run out", () => {
+        const players = ["", " II", " III", " IV", " V", " VI", " VII", " VIII", " IX", " X"].map(suffix => ({ name: `Abba${suffix}` }));
+        expect(distinctPlayerName("Abba", players)).toBe("Abba 11");
     });
 });

@@ -153,20 +153,17 @@ const fetchQuizData = async (difficulty: QuizDifficulty): Promise<QuizQuestion[]
 
     console.log(`🔍 Fetching quiz from public path: ${publicPath}`);
 
-    // Use fetch with timeout to avoid hanging. The timer is cleared however
-    // the fetch settles (#132), not only on success.
+    // Use fetch with timeout to avoid hanging. The 5s covers the response
+    // and reading its body, so a body that stalls can't hang the load
+    // either, and the timer is cleared however it ends (#132).
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    try {
+    const readQuizFile = async (): Promise<QuizQuestion[]> => {
         const response = await fetch(publicPath, {
             signal: controller.signal,
             headers: { 'Cache-Control': 'no-cache' } // Avoid caching issues
         });
-
-        // The 5s limit is for the response to arrive, not for reading its
-        // body, as it always was; `finally` below covers the failure paths.
-        clearTimeout(timeoutId);
 
         console.log(`📋 Fetch response status: ${response.status} ${response.statusText}`);
 
@@ -183,11 +180,13 @@ const fetchQuizData = async (difficulty: QuizDifficulty): Promise<QuizQuestion[]
 
         console.log('✅ Successfully loaded quiz data from public directory:', data.length, 'questions');
         return data;
+    };
+
+    try {
+        return await readQuizFile().finally(() => clearTimeout(timeoutId));
     } catch (error) {
         console.error('❌ Error fetching from public directory:', error);
         throw error;
-    } finally {
-        clearTimeout(timeoutId);
     }
 };
 
