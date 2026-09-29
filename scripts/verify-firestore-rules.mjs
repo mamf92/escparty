@@ -782,5 +782,62 @@ await expectDenied("rewrite scores in a room that finished over 30s ago", () =>
   updateDoc(toResults, { players: [{ id: "host-1", name: "Host", score: 9999 }] })
 );
 
+// 14. Another round with the same guests (#21): a finished room points at
+// the next room once, and only at a lobby the same host just made; a room
+// still playing can't.
+const letters = () =>
+  Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join("");
+const nextCode = letters();
+await createRoomWithPhase(doc(db, "rooms", nextCode), nextCode);
+const strangerCode = letters();
+await setDoc(doc(db, "rooms", strangerCode), {
+  id: strangerCode,
+  hostId: "someone-else",
+  started: false,
+  createdAt: serverTimestamp(),
+  players: [{ id: "someone-else", name: "Other", score: 0 }],
+});
+const startedCode = letters();
+await createRoomWithPhase(doc(db, "rooms", startedCode), startedCode);
+await updateDoc(doc(db, "rooms", startedCode), { difficulty: "easy" });
+await updateDoc(doc(db, "rooms", startedCode), startWrite());
+const missingCode = [nextCode, strangerCode, startedCode].includes("ZZZZ") ? "YYYY" : "ZZZZ";
+
+await expectDenied("create a room already pointing at a next round", () => {
+  const { roomCode: c, roomRef: r } = freshRoom("NEXTNEW");
+  return setDoc(r, {
+    id: c,
+    hostId: "host-1",
+    started: false,
+    createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }],
+    nextRoomCode: nextCode,
+  });
+});
+await expectDenied("point a room still playing at a next round", () =>
+  updateDoc(score1.roomRef, { nextRoomCode: nextCode })
+);
+await expectDenied("a next-round code that isn't a room code", () =>
+  updateDoc(toResults, { nextRoomCode: "next!" })
+);
+await expectDenied("a next round that doesn't exist", () =>
+  updateDoc(toResults, { nextRoomCode: missingCode })
+);
+await expectDenied("a next round another host made", () =>
+  updateDoc(toResults, { nextRoomCode: strangerCode })
+);
+await expectDenied("a next round that has already started", () =>
+  updateDoc(toResults, { nextRoomCode: startedCode })
+);
+await expectAllowed("point a finished room at the next round", () =>
+  updateDoc(toResults, { nextRoomCode: nextCode })
+);
+await expectDenied("point it somewhere else afterwards", () =>
+  updateDoc(toResults, { nextRoomCode: strangerCode })
+);
+await expectDenied("the next round's code riding along with scores", () =>
+  updateDoc(score1.roomRef, { nextRoomCode: nextCode, players: [{ id: "host-1", name: "Host", score: 1 }] })
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

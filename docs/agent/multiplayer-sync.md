@@ -39,9 +39,9 @@ Why this runs on Firestore listeners and not WebSockets:
    room's phase becomes `mid-scoreboard` or `results`, every player
    navigates there. An observer host doesn't play: Lobby (or, failing that,
    the quiz page or the break screen) sends it to `/host-observer`, where it stays for the whole
-   game: that screen doesn't follow the room to the results yet (#21). Only
-   an observer that opens the lobby or quiz page after the game has ended
-   is sent on to the results (`shouldObserve` in `roomRoles.ts`). Any
+   game and follows the room to the results when it ends (#21). An
+   observer that opens the lobby or quiz page after the game has ended is
+   sent on to the results too (`shouldObserve` in `roomRoles.ts`). Any
    router state, like single player's `{ multiplayer: false }`, skips the
    `sessionStorage` fallback, so a leftover blob can't turn a later
    single-player quiz into an old room (#63). Single player still runs
@@ -63,8 +63,20 @@ Why this runs on Firestore listeners and not WebSockets:
    resume. `HostObserverView.tsx` is the host-only screen when
    `hostIsObserver` is true — the host watches without answering, and its
    Continue waits until every player is marked.
-5. **`QuizResults.tsx`** — final scoreboard, also recovers from
-   `sessionStorage` if `location.state` is missing (a direct link, a new tab).
+5. **`QuizResults.tsx`** — the finale (#67): the room's final standings,
+   revealed a tap at a time (everyone below the podium, then 3rd, 2nd and
+   1st; ties together, `finale.ts`), with no motion, in the Calm style. It
+   listens to the room for as long as it's open and recovers from
+   `sessionStorage` if `location.state` is missing (a direct link, a
+   reload). The stored game is kept through a reload, so a reload on the results
+   keeps working. The host's "Play
+   again with everyone" creates a new room and writes its code to the
+   finished room (`setNextRoom`, `nextRoomCode`, once; the rules only
+   accept an existing lobby with the same `hostId`); guests still on the
+   results see "Join the next round", which joins them under the same
+   player ID and name and takes everyone to the new lobby, where the host
+   picks the next quiz (#21). Leaving the results any other way (Back, a
+   typed URL) also forgets the stored game, a tick after the page closes.
    Single-player scores are separately persisted to `localStorage`
    (`quizScores`) and read by `Scoreboard.tsx` — that path doesn't touch
    Firestore at all.

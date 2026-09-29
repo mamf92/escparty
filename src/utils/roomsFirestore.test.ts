@@ -18,6 +18,7 @@ import {
     ScoreWriteRejected,
     JoinRejected,
     MAX_PLAYERS,
+    setNextRoom,
 } from "./roomsFirestore";
 
 // The Firebase client SDK is mocked rather than pointed at the emulator: the
@@ -893,3 +894,15 @@ describe("generateRoomCode", () => {
     });
 });
 
+describe("setNextRoom", () => {
+    it("writes the next round's code on the finished room", async () => {
+        mocks.updateDoc.mockResolvedValue(undefined);
+        await setNextRoom("ABCD", "EFGH");
+        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), { nextRoomCode: "EFGH" });
+    });
+
+    it("needs Firebase", async () => {
+        firebaseState.db = undefined;
+        await expect(setNextRoom("ABCD", "EFGH")).rejects.toThrow("Firebase not initialized");
+    });
+});
