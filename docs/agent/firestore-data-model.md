@@ -199,8 +199,9 @@ legacy started-only start is no longer accepted (#62): a game started that
 way would have no phase for clients to follow.
 
 `isAdvancingPhase` covers every later move, mirroring `phaseAfterQuestion`
-in `quizTiming.ts`: question N → question N+1 (N+1 not a multiple of 5),
-question N → `mid-scoreboard` at N+1 (N+1 a multiple of 5), question N →
+in `quizTiming.ts`: question N → question N+1 (no break before N+1),
+question N → `mid-scoreboard` at N+1 (N+1 a multiple of the room's
+`breakEvery`, 5 when unset, never when 0), question N →
 `results`, and `mid-scoreboard` N → question N (which may also clear
 `playersAtMidQuiz` to `[]`, and is the only move that may). A question can't be ended
 before `phaseStartedAt + 15s`, measured on the server's clock, so no client
@@ -320,6 +321,17 @@ criteria (also verified against the emulator, also in
   that makes something one-shot should come with a look at whether any
   client code assumed re-sending the same kind of write was harmless.
 
+**Finished rooms (#142, #50's "can't resurrect a finished room's
+state").** A room in `phase: "results"` takes no more score writes
+(`isNotFinished`), except in the first 30s (`RESULTS_GRACE_MS`), so the
+last answer's write or its retry still counts; during those 30s a client
+can rewrite scores exactly as it could during the quiz. Past the grace,
+`updatePlayerScore` refuses up front with a `"finished"` reason so the quiz
+says so instead of retrying. `isAdvancingPhase` has no move out of
+`results`, ready marks only land during a break, and the dead
+`continueReady` flag is refused in any room with a phase. Cases 12 and 13
+of the verify script.
+
 Remaining gaps, all pre-existing and **not** closed by any of the above:
 - The emulator checks are a plain Node script
   (`scripts/verify-firestore-rules.mjs`), not part of the Vitest suite; see
@@ -327,10 +339,8 @@ Remaining gaps, all pre-existing and **not** closed by any of the above:
   Epic 3 lands.
 - A client still can't be stopped from writing a *different* player's score
   entry specifically — rules can validate shape, not identity, without auth.
-- There's no "finished room" concept in the `Room` schema at all (no field
-  for it), so #50's "can't resurrect a finished room's state" can't be
-  enforced by a rule yet — that needs a data-model change first, not just a
-  rules change.
+- Rooms without a phase (pre-#61) have no finished state, so the
+  finished-room rule below doesn't cover them.
 
 ## Trust boundary for client-submitted writes
 

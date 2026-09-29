@@ -221,6 +221,7 @@ service cloud.firestore {
 
       return affected.hasOnly(['players']) &&
              existingData.started == true &&
+             isNotFinished(existingData) &&
              data.players is list &&
              existingData.players is list &&
              data.players.size() == existingData.players.size() &&
@@ -232,7 +233,22 @@ service cloud.firestore {
 
       return affected.hasOnly(['continueReady']) &&
              'continueReady' in data &&
-             data.continueReady is bool;
+             data.continueReady is bool &&
+             // Unused since #63: rooms with a phase never need it.
+             !('phase' in resource.data);
+    }
+
+    // A finished room (phase 'results') takes no more score writes (#142),
+    // so its final scores can't be rewritten afterwards, except in the first
+    // 30s (RESULTS_GRACE_MS in src/utils/quizTiming.ts): the last answer's
+    // write (or its retry) can land just after the room moves on. During
+    // those 30s a client can rewrite scores exactly as it could during the
+    // quiz (rules check shape, not whose score it is). isAdvancingPhase has
+    // no move out of 'results', isManagingMidQuizPlayers only allows marks
+    // in a break, and continueReady is refused in any room with a phase.
+    function isNotFinished(room) {
+      return room.get('phase', '') != 'results' ||
+             request.time < room.phaseStartedAt + duration.value(30, 's');
     }
 
     // A player marking itself ready at the mid-quiz break

@@ -597,6 +597,10 @@ const Quiz = () => {
                 setScore(scoreToSave);
                 continue;
               }
+              if (error.reason === "finished") {
+                setScoreSyncError("The game had already finished, so that answer didn't count.");
+                break;
+              }
               // Retrying can't fix a room that doesn't know this player, or
               // is gone: say so once instead of failing quietly (#131).
               if (error.reason !== "lower-score") {

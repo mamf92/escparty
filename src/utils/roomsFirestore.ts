@@ -11,7 +11,7 @@ import {
     FieldValue
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { MID_QUIZ_EVERY, phaseAfterQuestion } from "./quizTiming";
+import { MID_QUIZ_EVERY, RESULTS_GRACE_MS, phaseAfterQuestion, startedAtMillis } from "./quizTiming";
 
 // Define room and player interfaces
 export interface Player {
@@ -58,7 +58,7 @@ export interface Room {
  */
 export class ScoreWriteRejected extends Error {
     constructor(
-        public readonly reason: "invalid-score" | "no-room" | "unknown-player" | "lower-score",
+        public readonly reason: "invalid-score" | "no-room" | "unknown-player" | "lower-score" | "finished",
         message: string,
         /** For "lower-score": the score the room already holds. */
         public readonly currentScore?: number,
@@ -306,6 +306,13 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
             // rewrite the array unchanged and report success (#131).
             if (!existingPlayer) {
                 throw new ScoreWriteRejected("unknown-player", `Room ${roomCode} has no player ${playerId}`);
+            }
+            // A finished room only takes late writes for a short while
+            // (#142); past that, firestore.rules refuses them, and saying so
+            // beats retrying a write that can't succeed.
+            const finishedAt = room.phase === "results" ? startedAtMillis(room.phaseStartedAt) : null;
+            if (finishedAt !== null && Date.now() - finishedAt >= RESULTS_GRACE_MS) {
+                throw new ScoreWriteRejected("finished", `Room ${roomCode} has finished`);
             }
             if (score < existingPlayer.score) {
                 throw new ScoreWriteRejected(
