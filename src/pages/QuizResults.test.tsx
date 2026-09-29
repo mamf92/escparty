@@ -49,7 +49,9 @@ const room = (change: Partial<Room> = {}): Room => ({
 const standings = () => within(screen.getByRole("list", { name: "Final standings" })).getAllByRole("listitem").map(item => item.textContent);
 
 describe("QuizResults", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Let an earlier test's deferred unmount clear run before storing anything.
+    await new Promise(resolve => setTimeout(resolve, 0));
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
@@ -139,7 +141,67 @@ describe("QuizResults", () => {
     renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
     act(() => mocks.onRoom(room()));
     await userEvent.setup().click(screen.getByRole("button", { name: "Play again with everyone" }));
-    expect(screen.getByText("The next round couldn't be started. Try again.")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't start the next round. Try again.")).toBeInTheDocument();
+  });
+
+  it("retries the next round without making a second room", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    localStorage.setItem("playerName", "Someone else");
+    mocks.createRoom.mockResolvedValue(undefined);
+    mocks.setNextRoom.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(undefined);
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
+    // No buttons for the next round until the room says who hosts it.
+    expect(screen.queryByRole("button", { name: "Play again with everyone" })).not.toBeInTheDocument();
+    act(() => mocks.onRoom(room()));
+    const again = screen.getByRole("button", { name: "Play again with everyone" });
+    await user.click(again);
+    expect(screen.getByText("Couldn't start the next round. Try again.")).toBeInTheDocument();
+    await user.click(again);
+    expect(mocks.createRoom).toHaveBeenCalledTimes(1);
+    // The host's name in this room, not this device's last-used one.
+    expect(mocks.createRoom).toHaveBeenCalledWith("NEXT", "host", "Martin", false);
+    expect(mocks.setNextRoom).toHaveBeenCalledTimes(2);
+    expect(localStorage.getItem("playerId")).toBe("host");
+    expect(localStorage.getItem("playerName")).toBe("Martin");
+    expect(localStorage.getItem("isHost")).toBe("true");
+    expect(screen.getByText("at /lobby")).toBeInTheDocument();
+  });
+
+  it("ignores a second tap while the next round is starting", async () => {
+    const user = userEvent.setup();
+    let finish = () => {};
+    mocks.createRoom.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+    mocks.setNextRoom.mockResolvedValue(undefined);
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
+    act(() => mocks.onRoom(room()));
+    const again = screen.getByRole("button", { name: "Play again with everyone" });
+    await user.click(again);
+    expect(again).toBeDisabled();
+    await act(async () => finish());
+    expect(mocks.createRoom).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("at /lobby")).toBeInTheDocument();
+  });
+
+  it("takes the host back to the next round's lobby", async () => {
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
+    act(() => mocks.onRoom(room({ nextRoomCode: "NEXT" })));
+    expect(screen.getByText("You've started another round.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Play again with everyone" })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Back to the next round's lobby" }));
+    expect(mocks.joinRoom).not.toHaveBeenCalled();
+    expect(localStorage.getItem("gameCode")).toBe("NEXT");
+    expect(localStorage.getItem("isHost")).toBe("true");
+    expect(screen.getByText("at /lobby")).toBeInTheDocument();
+  });
+
+  it("forgets the game once the page is left any other way", async () => {
+    sessionStorage.setItem("multiplayerGame", JSON.stringify({ multiplayer: true, roomCode: "ABBA", playerId: "p2" }));
+    const { unmount } = renderResults();
+    unmount();
+    expect(sessionStorage.getItem("multiplayerGame")).not.toBeNull();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(sessionStorage.getItem("multiplayerGame")).toBeNull();
   });
 
   it("lets a guest follow the host into the next round", async () => {
@@ -153,13 +215,14 @@ describe("QuizResults", () => {
     const join = () => user.click(screen.getByRole("button", { name: "Join the next round" }));
 
     await join();
-    expect(screen.getByText("That round has already started without you.")).toBeInTheDocument();
+    expect(screen.getByText("That round isn't open any more: it has started or is gone.")).toBeInTheDocument();
     await join();
     expect(screen.getByText("Couldn't join the next round. Try again.")).toBeInTheDocument();
     await join();
     expect(mocks.joinRoom).toHaveBeenLastCalledWith("NEXT", "p2", "Loreen");
     expect(localStorage.getItem("gameCode")).toBe("NEXT");
     expect(localStorage.getItem("isHost")).toBe("false");
+    expect(localStorage.getItem("playerId")).toBe("p2");
     expect(screen.getByText("at /lobby")).toBeInTheDocument();
   });
 

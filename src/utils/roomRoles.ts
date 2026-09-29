@@ -24,8 +24,8 @@ export const isRoomHost = (
 /**
  * Whether `playerId` belongs on the observer screen (HostObserverView) right
  * now: the room's observer host, while the game is on. A finished room sends
- * the observer to the results like everyone else, which also clears a
- * leftover sessionStorage game, and a room from before #61 (no phase, so
+ * the observer to the results like everyone else (leaving the results
+ * clears the tab's stored game), and a room from before #61 (no phase, so
  * no break to continue from) goes to the quiz page's "start a new room"
  * error instead. Lobby, the quiz page and the break screen route by this.
  */

@@ -68,13 +68,15 @@ Why this runs on Firestore listeners and not WebSockets:
    1st; ties together, `finale.ts`), with no motion, in the Calm style. It
    listens to the room for as long as it's open and recovers from
    `sessionStorage` if `location.state` is missing (a direct link, a
-   reload). The stored game is only cleared when the player leaves the page
-   by a button, so a reload on the results keeps working. The host's "Play
+   reload). The stored game is kept through a reload, so a reload on the results
+   keeps working. The host's "Play
    again with everyone" creates a new room and writes its code to the
-   finished room (`setNextRoom`, `nextRoomCode`, once); guests still on the
+   finished room (`setNextRoom`, `nextRoomCode`, once; the rules only
+   accept an existing lobby with the same `hostId`); guests still on the
    results see "Join the next round", which joins them under the same
    player ID and name and takes everyone to the new lobby, where the host
-   picks the next quiz (#21).
+   picks the next quiz (#21). Leaving the results any other way (Back, a
+   typed URL) also forgets the stored game, a tick after the page closes.
    Single-player scores are separately persisted to `localStorage`
    (`quizScores`) and read by `Scoreboard.tsx` — that path doesn't touch
    Firestore at all.

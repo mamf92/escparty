@@ -52,3 +52,16 @@ export const winnerLine = (placed: Placed[]): string | null => {
     if (winners.length === 1) return `${winners[0].name} wins with ${score} points!`;
     return `A tie at the top: ${winners.map(winner => winner.name).join(" and ")}, ${score} points each!`;
 };
+
+/**
+ * What the next tap of the reveal shows, given how many rows are showing:
+ * "the rest" (everyone below the podium), "3rd place", "2nd place", or the
+ * winner (or winners, in a tie).
+ */
+export const nextRevealLabel = (placed: Placed[], shown: number): string => {
+    const next = placed[placed.length - shown - 1];
+    if (!next || next.place > 3) return "the rest";
+    if (next.place === 1) return placed.filter(entry => entry.place === 1).length > 1 ? "the winners" : "the winner";
+    const tied = placed.filter(entry => entry.place === next.place).length > 1;
+    return `${next.place === 2 ? "2nd" : "3rd"} place${tied ? " (a tie)" : ""}`;
+};

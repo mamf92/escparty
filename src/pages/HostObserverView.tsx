@@ -68,10 +68,13 @@ const HostObserverView = () => {
     }, [roomCode, navigate]);
 
     // The quiz is over for everyone at once (the room's phase, #62): take
-    // the host to the final standings and the next round (#21).
+    // the host to the final standings and the next round (#21). Replacing
+    // this screen, so Back from the results doesn't bounce here and on
+    // again. Without a known player ID the results couldn't tell this is
+    // the host, so it stays here and says the quiz is over.
     useEffect(() => {
-        if (room?.phase === "results" && roomCode) {
-            navigate("/results", { state: { multiplayer: true, roomCode, playerId, observer: true } });
+        if (room?.phase === "results" && roomCode && playerId) {
+            navigate("/results", { replace: true, state: { multiplayer: true, roomCode, playerId, observer: true } });
         }
     }, [room?.phase, roomCode, playerId, navigate]);
 

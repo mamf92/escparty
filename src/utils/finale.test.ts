@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PODIUM_POINTS, placePlayers, revealSteps, winnerLine } from "./finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealSteps, winnerLine } from "./finale";
 
 const p = (name: string, score: number) => ({ id: name.toLowerCase(), name, score });
 
@@ -29,5 +29,15 @@ describe("finale", () => {
         expect(winnerLine(placePlayers([p("Loreen", 12), p("Lordi", 3)]))).toBe("Loreen wins with 12 points!");
         expect(winnerLine(placePlayers([p("Loreen", 12), p("Abba", 12)]))).toBe("A tie at the top: Abba and Loreen, 12 points each!");
         expect(winnerLine([])).toBeNull();
+    });
+
+    it("says what the next tap reveals", () => {
+        const five = placePlayers([p("A", 900), p("B", 800), p("C", 700), p("D", 600), p("E", 500)]);
+        expect([0, 2, 3, 4].map(shown => nextRevealLabel(five, shown))).toEqual(["the rest", "3rd place", "2nd place", "the winner"]);
+        const tiedTop = placePlayers([p("A", 5), p("B", 5), p("C", 1)]);
+        expect(nextRevealLabel(tiedTop, 1)).toBe("the winners");
+        const tiedSecond = placePlayers([p("A", 9), p("B", 5), p("C", 5)]);
+        expect(nextRevealLabel(tiedSecond, 0)).toBe("2nd place (a tie)");
+        expect(nextRevealLabel(tiedSecond, 3)).toBe("the rest");
     });
 });

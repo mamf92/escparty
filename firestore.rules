@@ -39,6 +39,7 @@ service cloud.firestore {
              (!('difficulty' in data) || isQuizKey(data.difficulty)) &&
              (!('breakEvery' in data) || isBreakEvery(data.breakEvery)) &&
              (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
+             !('nextRoomCode' in data) &&
              (!('continueReady' in data) || data.continueReady is bool) &&
              (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list) &&
              // Shared progression state (#61). Optional so clients that predate
@@ -239,7 +240,12 @@ service cloud.firestore {
              !('nextRoomCode' in resource.data) &&
              request.resource.data.nextRoomCode is string &&
              request.resource.data.nextRoomCode.matches('[A-Z]{4}') &&
-             request.resource.data.nextRoomCode != resource.data.id;
+             request.resource.data.nextRoomCode != resource.data.id &&
+             // Only a real room, just made by the same host and still in
+             // its lobby, so a stranger can't point the guests elsewhere.
+             exists(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)) &&
+             get(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)).data.hostId == resource.data.hostId &&
+             get(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)).data.get('phase', 'lobby') == 'lobby';
     }
 
     function isSettingContinueReady(affected) {

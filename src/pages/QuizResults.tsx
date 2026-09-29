@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import {
@@ -13,7 +13,7 @@ import {
 import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
-import { PODIUM_POINTS, placePlayers, revealSteps, winnerLine } from "../utils/finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealSteps, winnerLine } from "../utils/finale";
 
 interface ScoreEntry {
   score: number;
@@ -68,6 +68,26 @@ const QuizResults = () => {
   const [isObserver, setIsObserver] = useState<boolean>(!!location.state?.observer);
   const [step, setStep] = useState(0);
   const [nextRound, setNextRound] = useState<"idle" | "busy" | string>("idle");
+  // A tap in the same render as another can't see "busy" yet.
+  const inFlight = useRef(false);
+  // The next round's room once created, so a retry after a failed
+  // setNextRoom points at it instead of creating another.
+  const createdRoom = useRef<string | null>(null);
+
+  // Leaving this page, however (a button, Back, a typed URL), ends this
+  // game for the tab, so its stored game can't resume a finished room
+  // later. Deferred, so StrictMode's rehearsal unmount in development
+  // doesn't count; a reload never runs it, so a reload keeps the game.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      setTimeout(() => {
+        if (!mounted.current) sessionStorage.removeItem("multiplayerGame");
+      }, 0);
+    };
+  }, []);
 
   useEffect(() => {
     if (!gameData.multiplayer || !gameData.roomCode) return;
@@ -88,6 +108,15 @@ const QuizResults = () => {
   const leave = (path: string) => {
     sessionStorage.removeItem("multiplayerGame");
     navigate(path);
+  };
+
+  /** Hand this tab over to another room's lobby, as MultiplayerLobby does. */
+  const goToLobby = (code: string, playerId: string, name: string, host: boolean) => {
+    localStorage.setItem("playerId", playerId);
+    localStorage.setItem("playerName", name);
+    localStorage.setItem("gameCode", code);
+    localStorage.setItem("isHost", String(host));
+    leave("/lobby");
   };
 
   if (!gameData.multiplayer) {
@@ -139,41 +168,51 @@ const QuizResults = () => {
   const revealed = placed.slice(placed.length - shown);
   const done = steps.length > 0 && step >= steps.length;
   const isHost = isRoomHost(room, gameData.playerId);
-  const myName = localStorage.getItem("playerName") ?? players.find(p => p.id === gameData.playerId)?.name ?? "Player";
+  // This player's name in this room (the host included, from the full
+  // list), before this device's last-used name, which another tab may have
+  // changed since.
+  const myName = room?.players.find(p => p.id === gameData.playerId)?.name
+    ?? localStorage.getItem("playerName") ?? "Player";
 
-  const playAgain = async () => {
-    if (!room || !gameData.playerId) return;
+  const nextRoundStep = async (what: string, run: (playerId: string) => Promise<void>) => {
+    if (inFlight.current || !gameData.playerId) return;
+    inFlight.current = true;
     setNextRound("busy");
     try {
+      await run(gameData.playerId);
+    } catch (err) {
+      console.error(`Couldn't ${what}:`, err);
+      setNextRound(`Couldn't ${what}. Try again.`);
+    } finally {
+      inFlight.current = false;
+    }
+  };
+
+  const playAgain = () => nextRoundStep("start the next round", async (playerId) => {
+    if (!room) return;
+    if (!createdRoom.current) {
       const code = generateRoomCode();
-      await createRoom(code, gameData.playerId, myName, room.hostIsObserver === true);
-      await setNextRoom(room.id, code);
-      localStorage.setItem("gameCode", code);
-      localStorage.setItem("isHost", "true");
-      leave("/lobby");
-    } catch (err) {
-      console.error("Couldn't start the next round:", err);
-      setNextRound("The next round couldn't be started. Try again.");
+      await createRoom(code, playerId, myName, room.hostIsObserver === true);
+      createdRoom.current = code;
     }
-  };
+    await setNextRoom(room.id, createdRoom.current);
+    goToLobby(createdRoom.current, playerId, myName, true);
+  });
 
-  const joinNext = async () => {
-    if (!room?.nextRoomCode || !gameData.playerId) return;
-    setNextRound("busy");
-    try {
-      const joined = await joinRoom(room.nextRoomCode, gameData.playerId, myName);
-      if (!joined) {
-        setNextRound("That round has already started without you.");
-        return;
-      }
-      localStorage.setItem("gameCode", room.nextRoomCode);
-      localStorage.setItem("isHost", "false");
-      leave("/lobby");
-    } catch (err) {
-      console.error("Couldn't join the next round:", err);
-      setNextRound("Couldn't join the next round. Try again.");
+  const joinNext = () => nextRoundStep("join the next round", async (playerId) => {
+    const code = room?.nextRoomCode;
+    if (!code) return;
+    if (isHost) {
+      // The host already made it: back to its lobby.
+      goToLobby(code, playerId, myName, true);
+      return;
     }
-  };
+    if (!(await joinRoom(code, playerId, myName))) {
+      setNextRound("That round isn't open any more: it has started or is gone.");
+      return;
+    }
+    goToLobby(code, playerId, myName, false);
+  });
 
   return (
     <CalmPage
@@ -214,7 +253,7 @@ const QuizResults = () => {
           <div className="calm-ground">
             <div className="lycra-pane calm-split">
               <button type="button" className="lycra" onClick={() => setStep(step + 1)}>
-                {step === 0 ? "Start the reveal" : `Reveal ${revealLabel(placed, steps, step)}`}
+                {step === 0 ? "Start the reveal" : `Reveal ${nextRevealLabel(placed, shown)}`}
               </button>
               <button type="button" className="lycra" onClick={() => setStep(steps.length)}>
                 Show everything
@@ -224,7 +263,7 @@ const QuizResults = () => {
         )
       )}
 
-      {isHost && !room?.nextRoomCode && (
+      {room && isHost && !room.nextRoomCode && (
         <div className="calm-ground">
           <div className="lycra-pane">
             <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={playAgain}>
@@ -233,13 +272,13 @@ const QuizResults = () => {
           </div>
         </div>
       )}
-      {!isHost && room?.nextRoomCode && (
+      {room?.nextRoomCode && (
         <>
-          <CalmNote>The host has started another round.</CalmNote>
+          <CalmNote>{isHost ? "You've started another round." : "The host has started another round."}</CalmNote>
           <div className="calm-ground">
             <div className="lycra-pane">
               <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={joinNext}>
-                Join the next round
+                {isHost ? "Back to the next round's lobby" : "Join the next round"}
               </button>
             </div>
           </div>
@@ -247,7 +286,7 @@ const QuizResults = () => {
       )}
       {nextRound !== "idle" && nextRound !== "busy" && <CalmNote role="status">{nextRound}</CalmNote>}
 
-      {!isHost && !room?.nextRoomCode && (
+      {room && !isHost && !room.nextRoomCode && (
         <div className="calm-ground">
           <div className="lycra-pane">
             <button type="button" className="lycra" onClick={() => leave("/multiplayer")}>Join or host another game</button>
@@ -256,13 +295,6 @@ const QuizResults = () => {
       )}
     </CalmPage>
   );
-};
-
-/** What the next tap shows: "3rd place", or everyone below the podium. */
-const revealLabel = (placed: ReturnType<typeof placePlayers>, steps: number[], step: number) => {
-  const before = steps[step - 1];
-  const next = placed[placed.length - before - 1];
-  return next ? ({ 1: "the winner", 2: "2nd place", 3: "3rd place" } as Record<number, string>)[next.place] ?? "the rest" : "the rest";
 };
 
 export default QuizResults;
