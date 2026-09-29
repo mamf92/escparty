@@ -26,6 +26,7 @@ import {
   getDoc,
   getDocs,
   deleteDoc,
+  runTransaction,
 } from "firebase/firestore";
 
 const app = initializeApp({ projectId: "demo-escparty" });
@@ -98,6 +99,23 @@ await expectAllowed("join room (arrayUnion, valid player)", () =>
     players: arrayUnion({ id: "player-2", name: "Guest", score: 0 }),
   })
 );
+
+// 2b. Joins are an arrayUnion (#64, addPlayerToRoom's shape), appended
+// server-side, so guests joining at the same moment all land. A join that
+// loses the race to the start is refused, and a fresh read shows why.
+const joinWithArrayUnion = (ref, id) =>
+  updateDoc(ref, { players: arrayUnion({ id, name: id, score: 0, joinedAt: Timestamp.now() }) });
+const joiners = freshRoom("JOINS");
+await createRoom(joiners.roomRef, joiners.roomCode);
+await expectAllowed("three guests join at the same moment", () =>
+  Promise.all(["g-1", "g-2", "g-3"].map((id) => joinWithArrayUnion(joiners.roomRef, id)))
+);
+const joined = (await getDoc(joiners.roomRef)).data().players.map((p) => p.id).sort();
+report("every simultaneous join is in the room", "g-1,g-2,g-3,host-1", joined.join(","));
+await updateDoc(joiners.roomRef, { difficulty: "easy" });
+await updateDoc(joiners.roomRef, startWrite());
+await expectDenied("a join that lands after the start", () => joinWithArrayUnion(joiners.roomRef, "g-late"));
+report("a fresh read after that refusal shows the game started", "true", String((await getDoc(joiners.roomRef)).data().started));
 
 // 3. Malicious: append a new "player" that's missing a required field. Sized
 // to exactly oldCount + 1 so this write actually reaches allPlayersValid via
@@ -355,6 +373,28 @@ await expectAllowed("update player score after start", () =>
   updateDoc(score1.roomRef, {
     players: [{ id: "host-1", name: "Host", score: 500 }],
   })
+);
+
+// 6c. Two players' scores written at the same moment (#64), the way
+// updatePlayerScore does it: a transaction per write, so the one that loses
+// the race is retried against the other's result instead of overwriting it.
+const scoreRace = freshRoom("RACE");
+await createRoom(scoreRace.roomRef, scoreRace.roomCode);
+await updateDoc(scoreRace.roomRef, { players: arrayUnion({ id: "player-2", name: "Guest", score: 0 }) });
+await updateDoc(scoreRace.roomRef, { difficulty: "medium" });
+await updateDoc(scoreRace.roomRef, startWrite());
+const scoreInTransaction = (id, score) =>
+  runTransaction(db, async (transaction) => {
+    const room = (await transaction.get(scoreRace.roomRef)).data();
+    transaction.update(scoreRace.roomRef, { players: room.players.map((p) => (p.id === id ? { ...p, score } : p)) });
+  });
+await expectAllowed("two players' scores written at the same moment", () =>
+  Promise.all([scoreInTransaction("host-1", 300), scoreInTransaction("player-2", 700)])
+);
+report(
+  "both simultaneous scores are kept",
+  "host-1:300,player-2:700",
+  (await getDoc(scoreRace.roomRef)).data().players.map((p) => `${p.id}:${p.score}`).join(","),
 );
 
 // 6b. Malicious: same-size players array during an active game, but with a

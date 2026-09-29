@@ -274,6 +274,24 @@ describe("addPlayerToRoom", () => {
             "Security rules prevented joining the room",
         );
     });
+    it("reports a start that raced the join as started, not as a rules error (#64)", async () => {
+        mocks.getDoc
+            .mockResolvedValueOnce(snapshotOf(roomWith()))
+            .mockResolvedValueOnce(snapshotOf(roomWith({ started: true })));
+        mocks.updateDoc.mockRejectedValue(
+            Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
+        );
+
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).rejects.toThrow("Game has already started");
+    });
+
+    it("passes on any other write failure", async () => {
+        mocks.getDoc.mockResolvedValue(snapshotOf(roomWith()));
+        mocks.updateDoc.mockRejectedValue(new Error("offline"));
+
+        await expect(addPlayerToRoom("ABCD", "p-2", "Ida")).rejects.toThrow("offline");
+        expect(mocks.getDoc).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("joinRoom", () => {
@@ -282,6 +300,17 @@ describe("joinRoom", () => {
 
         await expect(joinRoom("ZZZZ", "p-2", "Ida")).resolves.toBe(false);
         expect(mocks.updateDoc).not.toHaveBeenCalled();
+    });
+
+    it("returns false when the host started the game mid-join", async () => {
+        mocks.getDoc
+            .mockResolvedValueOnce(snapshotOf(roomWith()))
+            .mockResolvedValueOnce(snapshotOf(roomWith({ started: true })));
+        mocks.updateDoc.mockRejectedValue(
+            Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
+        );
+
+        await expect(joinRoom("ABCD", "p-2", "Ida")).resolves.toBe(false);
     });
 
     it("returns false when the game has already started", async () => {

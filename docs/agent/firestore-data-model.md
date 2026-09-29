@@ -83,6 +83,14 @@ The lifecycle:
 (`joinRoom` goes through it). The join screen draws a name nobody in the
 room has yet; two guests joining at the same instant can still end up with
 the same name, which is cosmetic: their IDs and scores stay separate.
+A host can start the game between a join's check and its write; the rules
+then refuse the join, and `addPlayerToRoom` re-reads the room so the guest
+hears "already started" (`joinRoom` returns `false`) rather than a rules
+error (#64). Joins stay an `arrayUnion`, not a transaction: a transaction
+writes the whole player list, and when another join grew the list first,
+the rules (exactly one more player) refuse it outright instead of letting
+Firestore retry. `scripts/verify-firestore-rules.mjs` cases 2b and 6c run
+simultaneous joins and simultaneous scores against the emulator.
 `updatePlayerScore`
 throws `ScoreWriteRejected` with a `reason` (`invalid-score`, `no-room`,
 `unknown-player`, `lower-score` with the room's `currentScore`) when the
@@ -99,6 +107,12 @@ room turns a write down, so callers don't parse messages (#131).
   write and a time's-up repair write in `Quiz.tsx` near a question's
   deadline) can't silently drop one of them the way a plain
   read-modify-write would.
+- **A transaction only helps if the rules accept its retry.** Rules judge
+  a write against the document as it is at commit time. If they compare
+  the new value with the old one (like "exactly one more player"), a
+  transaction built on a stale read is refused with `permission-denied`
+  and is not retried. Score writes are fine, because their rule only
+  checks the list's size and shape.
 - **Don't add a manual read-modify-write.** `markPlayerAtMidQuiz` used to
   be one (`getDoc` then `updateDoc` with a recomputed array); once #62 put
   every player at the break at the same moment, concurrent calls dropped

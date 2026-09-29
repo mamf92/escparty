@@ -206,9 +206,24 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
             joinedAt: currentTime
         };
         
-        await updateDoc(roomRef, {
-            players: arrayUnion(newPlayer)
-        });
+        try {
+            // arrayUnion, not a transaction: the append happens server-side,
+            // so guests joining at the same moment all land. (A transaction
+            // writes the whole list, and the rules judge it against a list
+            // another join already grew, so it's refused, not retried.)
+            await updateDoc(roomRef, {
+                players: arrayUnion(newPlayer)
+            });
+        } catch (error) {
+            // The host may have started the game between the check above and
+            // this write (#64); the rules refuse a join into a started room.
+            // Tell that apart from any other refusal, so the guest hears
+            // "already started" instead of a rules error.
+            if ((error as { code?: string }).code === 'permission-denied' && (await getRoom(roomCode))?.started) {
+                throw new Error("Game has already started");
+            }
+            throw error;
+        }
         
     } catch (error) {
         const err = error as { code?: string; message: string };

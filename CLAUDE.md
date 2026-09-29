@@ -124,6 +124,8 @@ end-to-end should use the `steward` skill
 - `docs/agent/architecture.md` — detailed `src/` layout and module boundaries.
 - `docs/agent/firestore-data-model.md` — the `Room`/`Player` shape, which
   writes are safe vs. race-prone, the missing-rules-file gap.
+- `docs/agent/adr/` — decision records, e.g. why sync is Firestore
+  `onSnapshot` and not WebSockets (0001).
 - `docs/agent/multiplayer-sync.md` — how room create/join/start/progress/
   results actually flows today.
 - `docs/agent/theming.md` — how Calm and Sparkle relate; pointers to both
