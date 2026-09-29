@@ -57,26 +57,13 @@ export class ScoreWriteRejected extends Error {
     constructor(
         public readonly reason: "invalid-score" | "no-room" | "unknown-player" | "lower-score",
         message: string,
+        /** For "lower-score": the score the room already holds. */
+        public readonly currentScore?: number,
     ) {
         super(message);
         this.name = "ScoreWriteRejected";
     }
 }
-
-/**
- * The name a joining player shows under: their drawn name, or, when someone
- * in the room already has it, the same name with the next Roman numeral
- * ("Loreen II", "Loreen III"), so every scoreboard can tell them apart.
- */
-export const distinctPlayerName = (name: string, players: Pick<Player, "name">[]): string => {
-    const taken = new Set(players.map(player => player.name));
-    if (!taken.has(name)) return name;
-    const numerals = ["II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-    for (const numeral of numerals) {
-        if (!taken.has(`${name} ${numeral}`)) return `${name} ${numeral}`;
-    }
-    return `${name} ${players.length + 1}`;
-};
 
 /**
  * Debug utility to check if Firebase is properly initialized
@@ -197,7 +184,10 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
 
         // Only the same ID is the same player. Matching on the name too
         // skipped a second guest who drew the same name, leaving their ID
-        // out of the room, so every score they sent was lost (#131).
+        // out of the room, so every score they sent was lost (#131). The
+        // join screen already draws a name nobody in the room has; two
+        // guests joining at the same instant can still share one, which only
+        // costs a duplicate name on the scoreboard, not a score.
         const existingPlayer = currentRoom.players.find(p => p.id === playerId);
         if (existingPlayer) {
             return; // Player already exists, skip adding
@@ -208,7 +198,7 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
         
         const newPlayer = {
             id: playerId,
-            name: distinctPlayerName(playerName, currentRoom.players),
+            name: playerName,
             score: 0,
             joinedAt: currentTime
         };
@@ -315,7 +305,8 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
             if (score < existingPlayer.score) {
                 throw new ScoreWriteRejected(
                     "lower-score",
-                    `Refusing to lower score for player ${playerId} in room ${roomCode} (${existingPlayer.score} -> ${score})`
+                    `Refusing to lower score for player ${playerId} in room ${roomCode} (${existingPlayer.score} -> ${score})`,
+                    existingPlayer.score
                 );
             }
 
@@ -332,7 +323,7 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
     } catch (error) {
         console.error("Error updating player score:", error);
         if (error instanceof ScoreWriteRejected) {
-            throw new ScoreWriteRejected(error.reason, `Failed to update score: ${error.message}`);
+            throw new ScoreWriteRejected(error.reason, `Failed to update score: ${error.message}`, error.currentScore);
         }
         throw new Error(`Failed to update score: ${(error as Error).message}`);
     }
@@ -559,28 +550,25 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
     }
 
     try {
-        // First check if room exists and game hasn't started
-        const room = await getRoom(roomCode);
-        if (!room) {
-            return false;
-        }
-
-        if (room.started) {
-            return false;
-        }
-
-        // Add player to room. A player already in it (the same ID) is a
-        // no-op there, so a rejoin also counts as success.
+        // addPlayerToRoom reads the room itself, and a player already in it
+        // (the same ID) is a no-op there, so a rejoin also counts as success.
         await addPlayerToRoom(roomCode, playerId, playerName);
         return true;
     } catch (error) {
         const err = error as { code?: string; message: string };
+
+        // A code that doesn't exist, or a game that's already on, is an
+        // answer rather than a failure.
+        if (err.message === "Room not found" || err.message === "Game has already started") {
+            return false;
+        }
+
         console.error("Error joining room:", error);
-        
+
         if (err.code === 'permission-denied' || err.message.includes('Security rules')) {
             throw new Error("Failed to join room: Security rules prevented access");
         }
-        
+
         throw new Error(`Failed to join room: ${err.message}`);
     }
 };

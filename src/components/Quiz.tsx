@@ -572,26 +572,30 @@ const Quiz = () => {
       // would repair it: the room (and every scoreboard built from it)
       // would keep the lower score.
       if (isMultiplayer && roomCode && playerId) {
+        let scoreToSave = newScore;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
-            await updatePlayerScore(roomCode, playerId, newScore);
+            await updatePlayerScore(roomCode, playerId, scoreToSave);
             rememberAnswered(answeredQuestion);
             setScoreSyncError(null);
             break;
           } catch (error) {
             console.error(`Failed to update score (attempt ${attempt} of 3):`, error);
             if (error instanceof ScoreWriteRejected) {
-              // The room already has a higher score for this player (this
-              // tab hadn't picked it up after a refresh yet): nothing is
-              // lost, and the room's score comes back via the snapshot.
-              if (error.reason === "lower-score") {
-                rememberAnswered(answeredQuestion);
-                break;
+              // The room already holds more than this tab knew (it hadn't
+              // picked the room's score up yet): add this answer's points
+              // to the room's score instead, rather than drop them.
+              if (error.reason === "lower-score" && error.currentScore !== undefined && attempt < 3) {
+                scoreToSave = error.currentScore + pointsForAnswer;
+                setScore(scoreToSave);
+                continue;
               }
               // Retrying can't fix a room that doesn't know this player, or
               // is gone: say so once instead of failing quietly (#131).
-              setScoreSyncError("Your score isn't being saved to this room. Ask the host to start a new game.");
-              break;
+              if (error.reason !== "lower-score") {
+                setScoreSyncError("Your score isn't being saved to this room. Ask the host to start a new game.");
+                break;
+              }
             }
             if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
             else setScoreSyncError("Your score couldn't reach the room. Check your connection.");

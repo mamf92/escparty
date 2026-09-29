@@ -123,15 +123,20 @@ describe("Quiz multiplayer score writes (#131)", () => {
     expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
   });
 
-  it("doesn't warn when the room already has a higher score for the player", async () => {
+  it("adds the answer's points to the room's score when the room already holds more", async () => {
     givenRoom();
-    mocks.updatePlayerScore.mockRejectedValue(
-      new ScoreWriteRejected("lower-score", "Failed to update score: Refusing to lower score"),
-    );
+    mocks.updatePlayerScore
+      .mockRejectedValueOnce(
+        new ScoreWriteRejected("lower-score", "Failed to update score: Refusing to lower score", 4000),
+      )
+      .mockResolvedValueOnce(undefined);
 
     await answerCorrectly();
 
-    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(2));
+    const [, , firstScore] = mocks.updatePlayerScore.mock.calls[0];
+    const [, , secondScore] = mocks.updatePlayerScore.mock.calls[1];
+    expect(secondScore).toBe(4000 + firstScore);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

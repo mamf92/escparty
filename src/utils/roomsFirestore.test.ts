@@ -16,7 +16,6 @@ import {
     startGame,
     updatePlayerScore,
     ScoreWriteRejected,
-    distinctPlayerName,
 } from "./roomsFirestore";
 
 // The Firebase client SDK is mocked rather than pointed at the emulator: the
@@ -249,7 +248,7 @@ describe("addPlayerToRoom", () => {
         expect(mocks.updateDoc).not.toHaveBeenCalled();
     });
 
-    it("adds a second player who drew a name already in the room, as the name's II (#131)", async () => {
+    it("adds a second player who drew a name already in the room under their own ID (#131)", async () => {
         // Only the ID identifies a player: skipping on a name match left the
         // newcomer's ID out of the room, and every score they sent was lost.
         mocks.getDoc.mockResolvedValue(
@@ -260,7 +259,7 @@ describe("addPlayerToRoom", () => {
 
         expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
         const added = (mocks.updateDoc.mock.calls[0][1] as { players: { __arrayUnion: Player[] } }).players.__arrayUnion[0];
-        expect(added).toMatchObject({ id: "p-99", name: "Ida II", score: 0 });
+        expect(added).toMatchObject({ id: "p-99", name: "Ida", score: 0 });
     });
 
     it("translates a rules rejection into a message about security rules", async () => {
@@ -309,7 +308,7 @@ describe("joinRoom", () => {
         await expect(joinRoom("ABCD", "p-99", "Ida")).resolves.toBe(true);
         expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
         const added = (mocks.updateDoc.mock.calls[0][1] as { players: { __arrayUnion: Player[] } }).players.__arrayUnion[0];
-        expect(added).toMatchObject({ id: "p-99", name: "Ida II" });
+        expect(added).toMatchObject({ id: "p-99", name: "Ida" });
     });
 
     it("adds a new player and reports success", async () => {
@@ -423,6 +422,7 @@ describe("updatePlayerScore", () => {
         await expect(updatePlayerScore("ABCD", "p-1", 100)).rejects.toMatchObject({
             name: "ScoreWriteRejected",
             reason: "lower-score",
+            currentScore: 500,
         });
         await expect(updatePlayerScore("ABCD", "ghost", 900)).rejects.toMatchObject({ reason: "unknown-player" });
         await expect(updatePlayerScore("ABCD", "p-1", -1)).rejects.toBeInstanceOf(ScoreWriteRejected);
@@ -788,15 +788,3 @@ describe("generateRoomCode", () => {
     });
 });
 
-describe("distinctPlayerName", () => {
-    it("keeps a free name and numbers a taken one", () => {
-        expect(distinctPlayerName("Loreen", [])).toBe("Loreen");
-        expect(distinctPlayerName("Loreen", [{ name: "Loreen" }])).toBe("Loreen II");
-        expect(distinctPlayerName("Loreen", [{ name: "Loreen" }, { name: "Loreen II" }])).toBe("Loreen III");
-    });
-
-    it("falls back to a plain number once the numerals run out", () => {
-        const players = ["", " II", " III", " IV", " V", " VI", " VII", " VIII", " IX", " X"].map(suffix => ({ name: `Abba${suffix}` }));
-        expect(distinctPlayerName("Abba", players)).toBe("Abba 11");
-    });
-});
