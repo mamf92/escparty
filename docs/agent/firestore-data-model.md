@@ -4,13 +4,17 @@ Read this before touching `roomsFirestore.ts` or any Firestore-backed page.
 
 ## Collections
 
-Two collections:
+Four collections:
 
 - `rooms`, keyed by a 4-letter uppercase room code (`generateRoomCode()`).
   No sub-collections; players live as an array on the room document, not
   as their own documents.
 - `quizzes`, saved custom quizzes (#76), keyed by a random 20-character
   Firestore id. See "Saved quizzes" below.
+- `parties`, scoreboard parties keyed by a 4-letter code, each with a
+  `ballots` sub-collection (one document per guest), and `contests`, the
+  real Burgas 2027 lineups, entered by hand and read-only to clients. Both
+  are documented in `docs/agent/scoreboard-party.md`.
 
 ## `Room` shape (as defined in `roomsFirestore.ts`)
 
