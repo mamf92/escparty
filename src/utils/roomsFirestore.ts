@@ -166,8 +166,10 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
             throw new Error("Game has already started");
         }
 
-        // Check if player already exists
-        const existingPlayer = currentRoom.players.find(p => p.id === playerId || p.name === playerName);
+        // Only the same ID is the same player. Matching on the name too
+        // skipped a second guest who drew the same name, leaving their ID
+        // out of the room, so every score they sent was lost (#131).
+        const existingPlayer = currentRoom.players.find(p => p.id === playerId);
         if (existingPlayer) {
             return; // Player already exists, skip adding
         }
@@ -534,8 +536,8 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
             return false;
         }
 
-        // Check if player is already in the room
-        const existingPlayer = room.players.find(p => p.id === playerId || p.name === playerName);
+        // Check if player is already in the room (by ID only, see addPlayerToRoom)
+        const existingPlayer = room.players.find(p => p.id === playerId);
         if (existingPlayer) {
             return true; // Consider this a success
         }

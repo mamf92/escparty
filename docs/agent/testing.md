@@ -139,16 +139,18 @@ open at the time of writing:
   timing in `src/utils/quizTiming.ts` have unit tests with a coverage floor
   (#56, #62), as do `src/utils/roomRoles.ts` and
   `src/utils/multiplayerSession.ts` (#63); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
-  floor. `src/pages/Home.test.tsx` and `src/components/Quiz.test.tsx` (answer
-  selection, #22) are the component tests; every other page is uncovered,
+  floor. `src/pages/Home.test.tsx` and `src/components/Quiz.test.tsx` are the
+  component tests; every other page is uncovered,
   which is #59.
-- **`Quiz.tsx` is covered only where it was extracted.** The scoring formula
-  moved to `src/utils/quizScoring.ts` and the multiplayer timing to
-  `src/utils/quizTiming.ts`, and both are tested directly; the component's
-  own effects (the local timers, following the room, phase navigation) are
-  not tested at all. Rungs 2 and 3 (#62, #63) were checked by hand with two
-  browsers against the emulator, including a client offline across the
-  host's continue; a committed version of that is #68. Don't read "scoring is covered" as "the quiz is covered".
+- **`Quiz.tsx` is mostly covered where it was extracted.** The scoring
+  formula moved to `src/utils/quizScoring.ts` and the multiplayer timing to
+  `src/utils/quizTiming.ts`, and both are tested directly.
+  `src/components/Quiz.test.tsx` renders the component for answer selection
+  (#22) and a failed multiplayer score write (#131), but its effects (the
+  local timers, following the room, phase navigation) are still untested.
+  Rungs 2 and 3 (#62, #63) were checked by hand with two browsers against
+  the emulator; a committed version of that is #68. Don't read "scoring is
+  covered" as "the quiz is covered".
 - **No e2e runner.** Playwright is #55.
 - **Test failures don't block merge or deploy yet.** `npm test` runs in
   `ci.yml`, but nothing requires it to pass before merge (branch protection,
@@ -156,9 +158,10 @@ open at the time of writing:
   GitHub integration today — #57 tracks the coverage-diff gate and the
   Vercel/branch-protection decision).
 - **New pages, components and hooks need a test file.**
-  `src/test/testFiles.test.ts` fails `npm test` when a file under
-  `src/pages`, `src/components` or `src/hooks` has no sibling
-  `*.test.ts(x)`, except the pre-existing debt it lists (#140, #59). The
+  `src/test/testFiles.test.ts` fails `npm test` when a component
+  (`.tsx`) or hook (`use*.ts`) under `src/pages`, `src/components`,
+  `src/hooks`, `src/fabric-ui` or `src/store` has no sibling
+  `*.test.ts(x)`/`*.spec.ts(x)`, except the pre-existing debt it lists (#140, #59). The
   steward treats missing tests as blocking (#58).
 - **Pre-existing debt.** `Quiz.tsx` (~880 lines, the multiplayer branching
   logic) and `src/fabric-ui/` are the obvious first targets — tracked as #59.

@@ -164,6 +164,10 @@ const fetchQuizData = async (difficulty: QuizDifficulty): Promise<QuizQuestion[]
             headers: { 'Cache-Control': 'no-cache' } // Avoid caching issues
         });
 
+        // The 5s limit is for the response to arrive, not for reading its
+        // body, as it always was; `finally` below covers the failure paths.
+        clearTimeout(timeoutId);
+
         console.log(`📋 Fetch response status: ${response.status} ${response.statusText}`);
 
         if (!response.ok) {

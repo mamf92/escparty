@@ -11,6 +11,10 @@ import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSes
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 
+// updatePlayerScore errors that another attempt can't fix (#131).
+const isPermanentScoreError = (error: unknown) =>
+  /has no player|Refusing to lower/.test((error as Error)?.message ?? "");
+
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const location = useLocation();
@@ -39,6 +43,7 @@ const Quiz = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(true);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
+  const [scoreSyncError, setScoreSyncError] = useState<string | null>(null); // A multiplayer score write that failed for good
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
@@ -578,7 +583,14 @@ const Quiz = () => {
             break;
           } catch (error) {
             console.error(`Failed to update score (attempt ${attempt} of 3):`, error);
+            // Retrying can't fix a player the room doesn't know, or a score
+            // the room already has higher: say so instead of failing quietly.
+            if (isPermanentScoreError(error)) {
+              setScoreSyncError("Your score couldn't be saved to this room. Rejoin the game to keep playing for points.");
+              break;
+            }
             if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            else setScoreSyncError("Your score couldn't reach the room. Check your connection.");
           }
         }
       }
@@ -644,6 +656,7 @@ const Quiz = () => {
           points!
         </PointsDisplay>
       )}
+      {scoreSyncError && <SyncWarning role="alert">{scoreSyncError}</SyncWarning>}
       <QuestionText>{currentQuestion.question}</QuestionText>
       <OptionsContainer>
         {currentQuestion.options.map((option) => (
@@ -862,6 +875,12 @@ const ErrorContainer = styled.div`
   padding: 2.5rem 1.25rem; /* 40px 20px */
   background: ${({ theme }) => theme.colors.magnolia};
   border-radius: 0; /* Changed from 10px to match square design */
+`;
+
+const SyncWarning = styled.p`
+  color: ${({ theme }) => theme.colors.incorrectRed};
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
 `;
 
 const ErrorMessage = styled.p`

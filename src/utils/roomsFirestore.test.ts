@@ -247,16 +247,16 @@ describe("addPlayerToRoom", () => {
         expect(mocks.updateDoc).not.toHaveBeenCalled();
     });
 
-    it("is a no-op when the name is taken, even by a different player id", async () => {
-        // Names are the only thing other players see on the scoreboard, so a
-        // second "Ida" is treated as the same person rejoining.
+    it("adds a second player who drew a name already in the room (#131)", async () => {
+        // Only the ID identifies a player: skipping on a name match left the
+        // newcomer's ID out of the room, and every score they sent was lost.
         mocks.getDoc.mockResolvedValue(
             snapshotOf(roomWith({ players: [player("p-2", "Ida")] })),
         );
 
         await addPlayerToRoom("ABCD", "p-99", "Ida");
 
-        expect(mocks.updateDoc).not.toHaveBeenCalled();
+        expect(mocks.updateDoc).toHaveBeenCalledTimes(1);
     });
 
     it("translates a rules rejection into a message about security rules", async () => {

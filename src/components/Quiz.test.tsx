@@ -4,6 +4,8 @@ import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import { theme } from "../styles/theme";
 import type { QuizQuestion } from "../utils/QuizDataProvider";
+import type { Room } from "../utils/roomsFirestore";
+import Quiz from "./Quiz";
 
 const QUESTIONS: QuizQuestion[] = [
   {
@@ -14,30 +16,36 @@ const QUESTIONS: QuizQuestion[] = [
   },
 ];
 
+const mocks = vi.hoisted(() => ({
+  listenToRoom: vi.fn(),
+  updatePlayerScore: vi.fn(),
+  advanceQuestion: vi.fn(),
+}));
+
 vi.mock("../firebase", () => ({ db: {} }));
+vi.mock("../utils/roomsFirestore", () => mocks);
 vi.mock("../utils/QuizDataProvider", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../utils/QuizDataProvider")>();
   return { ...actual, loadQuizData: vi.fn(async () => QUESTIONS) };
 });
 
-const renderSinglePlayerQuiz = () =>
+const renderQuiz = (state: Record<string, unknown>) =>
   renderWithProviders(
     <Routes>
       <Route path="/quiz/:difficulty" element={<Quiz />} />
     </Routes>,
-    { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: false } } as unknown as string] },
+    { initialEntries: [{ pathname: "/quiz/easy", state }] },
   );
-
-// Imported after the mocks above are registered.
-const { default: Quiz } = await import("./Quiz");
 
 beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => { });
+  vi.spyOn(console, "error").mockImplementation(() => { });
+  sessionStorage.clear();
 });
 
 describe("Quiz answer selection (#22)", () => {
   it("doesn't reveal the correct answer before the answer is submitted", async () => {
-    renderSinglePlayerQuiz();
+    renderQuiz({ multiplayer: false });
 
     const correct = await screen.findByRole("button", { name: "Sweden" });
     const wrong = screen.getByRole("button", { name: "Norway" });
@@ -46,7 +54,8 @@ describe("Quiz answer selection (#22)", () => {
     // Whichever option is picked, right or wrong, it looks the same, and
     // the unpicked ones all look alike. (Compared with each other rather
     // than against fixed colours: jsdom matches :hover rules regardless of
-    // the pointer, so the absolute colours here are the hover ones.)
+    // the pointer, so the absolute colours here are the hover ones. fireEvent
+    // rather than user-event for the same reason.)
     const look = (element: HTMLElement) => getComputedStyle(element).background;
 
     fireEvent.click(wrong);
@@ -63,12 +72,42 @@ describe("Quiz answer selection (#22)", () => {
 
   it("marks right and wrong only once the answer is submitted", async () => {
     const user = userEvent.setup();
-    renderSinglePlayerQuiz();
+    renderQuiz({ multiplayer: false });
 
     await user.click(await screen.findByRole("button", { name: "Norway" }));
     await user.click(screen.getByRole("button", { name: "Submit Answer" }));
 
     expect(screen.getByRole("button", { name: "Sweden" })).toHaveStyle({ background: theme.colors.accentgreen });
     expect(screen.getByRole("button", { name: "Norway" })).toHaveStyle({ background: theme.colors.incorrectRed });
+  });
+});
+
+describe("Quiz multiplayer score writes (#131)", () => {
+  it("tells the player once when the room doesn't know them, without retrying", async () => {
+    const room: Room = {
+      id: "ABCD",
+      hostId: "host",
+      started: true,
+      difficulty: "easy",
+      createdAt: null as unknown as Room["createdAt"],
+      players: [{ id: "host", name: "Loreen", score: 0 }],
+      phase: "question",
+      currentQuestionIndex: 0,
+      phaseStartedAt: { toMillis: () => Date.now() } as unknown as Room["phaseStartedAt"],
+    };
+    mocks.listenToRoom.mockImplementation((_code: string, callback: (room: Room) => void) => {
+      callback(room);
+      return () => { };
+    });
+    mocks.updatePlayerScore.mockRejectedValue(new Error("Failed to update score: Room ABCD has no player ghost"));
+    const user = userEvent.setup();
+
+    renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "ghost" });
+
+    await user.click(await screen.findByRole("button", { name: "Sweden" }));
+    await user.click(screen.getByRole("button", { name: "Submit Answer" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be saved to this room");
+    expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
   });
 });

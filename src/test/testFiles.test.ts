@@ -1,19 +1,27 @@
 import { readdirSync } from "node:fs";
-import { join, relative } from "node:path";
+import { posix } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
  * Every page, component and hook ships with a test file (#140, Epic #53).
  *
- * A file under one of these folders needs a sibling `<name>.test.ts(x)`.
+ * A component (`.tsx`) or hook (`use*.ts`) under one of these folders needs
+ * a sibling `<name>.test.ts(x)` or `<name>.spec.ts(x)`. Plain `.ts` helpers
+ * (types, constants) aren't components and don't count.
  * UNTESTED is the debt that predates the rule (#59): it may only shrink, so
  * when you add a test for one of these, delete its line here too (the second
  * test below fails until you do).
  */
-const CHECKED_FOLDERS = ["src/pages", "src/components", "src/hooks"];
+const CHECKED_FOLDERS = ["src/pages", "src/components", "src/hooks", "src/fabric-ui", "src/store"];
 
 const UNTESTED = new Set([
   "src/components/MobileFrame.tsx",
+  "src/fabric-ui/CalmSurface.tsx",
+  "src/fabric-ui/CameraRig.tsx",
+  "src/fabric-ui/FabricQuizDemo.tsx",
+  "src/fabric-ui/FabricSurface.tsx",
+  "src/fabric-ui/useFabricControls.ts",
+  "src/fabric-ui/useParallax.ts",
   "src/pages/HostObserverView.tsx",
   "src/pages/Lobby.tsx",
   "src/pages/MidQuizScoreboard.tsx",
@@ -22,24 +30,28 @@ const UNTESTED = new Set([
   "src/pages/Scoreboard.tsx",
   "src/pages/SelectDifficulty.tsx",
   "src/pages/UnderDevelopment.tsx",
+  "src/store/useGameStore.ts",
 ]);
 
-const root = join(__dirname, "..", "..");
-const isTest = (name: string) => /\.test\.tsx?$/.test(name);
-const isSource = (name: string) => /\.tsx?$/.test(name) && !isTest(name) && !name.endsWith(".d.ts");
+// Vitest runs from the repo root. Paths are kept POSIX-style whatever the
+// OS, so they match UNTESTED.
+const root = process.cwd().replace(/\\/g, "/");
+const isTest = (name: string) => /\.(test|spec)\.tsx?$/.test(name);
+const needsTest = (name: string) =>
+  !isTest(name) && !name.endsWith(".d.ts") && (/\.tsx$/.test(name) || /^use[A-Z].*\.ts$/.test(name));
 
 const walk = (folder: string): string[] =>
-  readdirSync(join(root, folder), { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? walk(join(folder, entry.name)) : [join(folder, entry.name)],
+  readdirSync(posix.join(root, folder), { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? walk(posix.join(folder, entry.name)) : [posix.join(folder, entry.name)],
   );
 
-const allFiles = CHECKED_FOLDERS.flatMap(walk).map((file) => relative(root, join(root, file)));
+const allFiles = CHECKED_FOLDERS.flatMap(walk);
 const files = new Set(allFiles);
 const hasTest = (file: string) => {
   const base = file.replace(/\.tsx?$/, "");
-  return files.has(`${base}.test.ts`) || files.has(`${base}.test.tsx`);
+  return ["test.ts", "test.tsx", "spec.ts", "spec.tsx"].some((suffix) => files.has(`${base}.${suffix}`));
 };
-const sources = allFiles.filter((file) => isSource(file.split("/").pop() ?? ""));
+const sources = allFiles.filter((file) => needsTest(posix.basename(file)));
 
 describe("test files", () => {
   it("every new page, component and hook has a test file", () => {
