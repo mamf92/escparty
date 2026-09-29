@@ -33,6 +33,7 @@ interface Room {
   phase?: RoomPhase;                 // "lobby" | "question" | "mid-scoreboard" | "results"
   currentQuestionIndex?: number;
   phaseStartedAt?: Timestamp | FieldValue; // always serverTimestamp()
+  nextRoomCode?: string;             // the next round's room (#21): set once, on a finished room
 }
 
 interface Player {

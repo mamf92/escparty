@@ -92,6 +92,9 @@ plan that also removes the ad hoc storage it would duplicate.
   Firestore `quizzes/`, and this device's "my quizzes" list in
   localStorage. See "Saved quizzes" in `firestore-data-model.md`.
 
+- `finale.ts` — the quiz finale (#67): final places with ties, and the
+  order the results page reveals them in.
+
 - `partyModel.ts` (rating sheets, scores, closeness, awards; pure),
   `partyFirestore.ts` (`parties/`, ballots, `contests/`),
   `partySession.ts` (this device's identity and ratings per party),

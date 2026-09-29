@@ -1,10 +1,19 @@
-import { useState, useEffect } from "react";
-import styled from "styled-components";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Player, listenToRoom } from "../utils/roomsFirestore";
-import { isObserverHost, playingPlayers } from "../utils/roomRoles";
+import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import {
+  createRoom,
+  generateRoomCode,
+  joinRoom,
+  listenToRoom,
+  setNextRoom,
+  type Player,
+  type Room,
+} from "../utils/roomsFirestore";
+import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
+import { PODIUM_POINTS, placePlayers, revealSteps, winnerLine } from "../utils/finale";
 
 interface ScoreEntry {
   score: number;
@@ -13,269 +22,247 @@ interface ScoreEntry {
   difficulty?: string;
 }
 
+/**
+ * The end of a quiz (#67). Solo: your score and your past ones. In a room:
+ * the final standings, revealed like a Eurovision scoreboard, from the
+ * bottom up with the podium one place at a time; then the host can start
+ * another round with the same guests, who follow from here (#21).
+ *
+ * Calm, so the reveal is staged by taps, never animated: each tap adds rows.
+ */
 const QuizResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Try to get data from location state first
-  const locationState = location.state || {
-    score: 0,
-    totalQuestions: 0,
-    multiplayer: false,
-    players: [],
-    roomCode: null,
-    playerId: null
-  };
-
-  // Without router state (a direct link, a new tab) this tab's stored
-  // multiplayer game, read up front so the first render (and the effect
-  // below) already knows it's multiplayer rather than showing single-player
-  // history.
+  // Without router state (a direct link, a reload) this tab's stored
+  // multiplayer game, read up front so the first render already knows it's
+  // multiplayer. It's kept until the player leaves this page on purpose, so
+  // a reload here still finds the room.
   const [gameData] = useState(() => {
+    const state = location.state ?? {};
     const session = location.state ? null : readMultiplayerGame();
     return {
-      score: locationState.score || 0,
-      totalQuestions: locationState.totalQuestions || 0,
-      multiplayer: session ? true : (locationState.multiplayer || false),
-      roomCode: session?.roomCode ?? (locationState.roomCode || null),
-      playerId: session?.playerId ?? (locationState.playerId || null),
-      players: locationState.players || []
+      score: (state.score as number) || 0,
+      multiplayer: session ? true : !!state.multiplayer,
+      roomCode: (session?.roomCode ?? state.roomCode ?? null) as string | null,
+      playerId: (session?.playerId ?? state.playerId ?? null) as string | null,
+      players: (state.players as Player[] | undefined) ?? [],
     };
   });
 
-  const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
-  const [winner, setWinner] = useState<string | null>(null);
+  const [scoreHistory] = useState<ScoreEntry[]>(() => {
+    if (gameData.multiplayer) return [];
+    try {
+      const stored: unknown = JSON.parse(localStorage.getItem("quizScores") || "[]");
+      return Array.isArray(stored) ? stored : [];
+    } catch {
+      return [];
+    }
+  });
+  const [room, setRoom] = useState<Room | null>(null);
+  const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(null);
-  const [players, setPlayers] = useState<Player[]>(gameData.players || []);
   // An observer host never played, so it gets the standings without a
   // score. Decided from the room once it arrives; the quiz page's router
   // flag only covers the first render.
   const [isObserver, setIsObserver] = useState<boolean>(!!location.state?.observer);
+  const [step, setStep] = useState(0);
+  const [nextRound, setNextRound] = useState<"idle" | "busy" | string>("idle");
 
   useEffect(() => {
-    // Clear session storage data as we're at the end of the game
-    sessionStorage.removeItem('multiplayerGame');
-
-    // Handle single player case
-    if (!gameData.multiplayer) {
-      const storedScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-      setScoreHistory(storedScores);
-
-      if (storedScores.length > 0) {
-        // Determine the best score
-        const highestScore = Math.max(...storedScores.map((entry: ScoreEntry) => entry.score));
-        const winnerEntry = storedScores.find((entry: ScoreEntry) => entry.score === highestScore);
-        if (winnerEntry) {
-          setWinner(`Best Score: ${winnerEntry.score}`);
-        }
+    if (!gameData.multiplayer || !gameData.roomCode) return;
+    // Listen while this page is open: the first snapshot can be slow, and
+    // the host's next round arrives on this room too.
+    return listenToRoom(gameData.roomCode, (next) => {
+      if (next) {
+        setRoom(next);
+        setPlayers(playingPlayers(next));
+        setIsObserver(isObserverHost(next, gameData.playerId));
+      } else {
+        setError("The game room no longer exists.");
       }
+    });
+  }, [gameData.multiplayer, gameData.roomCode, gameData.playerId]);
+
+  /** Leave on purpose: this game is over for this tab. */
+  const leave = (path: string) => {
+    sessionStorage.removeItem("multiplayerGame");
+    navigate(path);
+  };
+
+  if (!gameData.multiplayer) {
+    const best = scoreHistory.length > 0 ? Math.max(...scoreHistory.map(entry => entry.score)) : null;
+    return (
+      <CalmPage
+        title="Quiz complete"
+        subtitle={best !== null && best > gameData.score ? `Your best is still ${best}.` : undefined}
+        footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
+      >
+        <div className="calm-ground">
+          <div className="lycra-pane">
+            <div className="lycra is-block is-static is-chosen">
+              <span className="calm-label">You scored</span>
+              <span>{gameData.score} points</span>
+            </div>
+          </div>
+        </div>
+        <div className="calm-ground">
+          <div className="lycra-pane">
+            <button type="button" className="lycra" onClick={() => leave("/quizzes")}>Play another quiz</button>
+            <button type="button" className="lycra" onClick={() => leave("/scoreboard")}>See the scoreboard</button>
+          </div>
+        </div>
+        {scoreHistory.length > 0 && (
+          <>
+            <CalmNote>Your past scores</CalmNote>
+            <div className="calm-ground">
+              <ol className="lycra-pane" aria-label="Your past scores">
+                {scoreHistory.map((entry, index) => (
+                  <li key={index} className="lycra is-block is-static">
+                    <span className="calm-row">
+                      <span>{new Date(entry.date).toLocaleDateString()}</span>
+                      <span>{entry.score} / {entry.total}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </>
+        )}
+      </CalmPage>
+    );
+  }
+
+  const placed = placePlayers(players);
+  const steps = revealSteps(placed);
+  const shown = step === 0 ? 0 : steps[Math.min(step, steps.length) - 1];
+  const revealed = placed.slice(placed.length - shown);
+  const done = steps.length > 0 && step >= steps.length;
+  const isHost = isRoomHost(room, gameData.playerId);
+  const myName = localStorage.getItem("playerName") ?? players.find(p => p.id === gameData.playerId)?.name ?? "Player";
+
+  const playAgain = async () => {
+    if (!room || !gameData.playerId) return;
+    setNextRound("busy");
+    try {
+      const code = generateRoomCode();
+      await createRoom(code, gameData.playerId, myName, room.hostIsObserver === true);
+      await setNextRoom(room.id, code);
+      localStorage.setItem("gameCode", code);
+      localStorage.setItem("isHost", "true");
+      leave("/lobby");
+    } catch (err) {
+      console.error("Couldn't start the next round:", err);
+      setNextRound("The next round couldn't be started. Try again.");
     }
-    // Handle multiplayer case
-    else if (gameData.roomCode) {
-      // Set up one final listen to get the final scores
-      const unsubscribe = listenToRoom(gameData.roomCode, (room) => {
-        if (room) {
-          const filteredPlayers = playingPlayers(room);
-          setPlayers(filteredPlayers);
-          setIsObserver(isObserverHost(room, gameData.playerId));
+  };
 
-          // Calculate winner from filtered players list
-          if (filteredPlayers.length > 0) {
-            const sortedPlayers = [...filteredPlayers].sort((a, b) => b.score - a.score);
-            const highestScore = sortedPlayers[0].score;
-
-            // Check for a tie
-            const winners = sortedPlayers.filter(player => player.score === highestScore);
-
-            if (winners.length === 1) {
-              setWinner(`Winner: ${winners[0].name} with ${highestScore} points!`);
-            } else if (winners.length > 1) {
-              const winnerNames = winners.map(w => w.name).join(', ');
-              setWinner(`Tie between ${winnerNames} with ${highestScore} points!`);
-            }
-          }
-        } else {
-          setError("Game room no longer exists");
-        }
-      });
-
-      // Listen while this page is open rather than for a fixed 2s: on a
-      // slow network the first snapshot can take longer, and the standings,
-      // this player's score and whether they only observed (#63) all come
-      // from it.
-      return () => unsubscribe();
+  const joinNext = async () => {
+    if (!room?.nextRoomCode || !gameData.playerId) return;
+    setNextRound("busy");
+    try {
+      const joined = await joinRoom(room.nextRoomCode, gameData.playerId, myName);
+      if (!joined) {
+        setNextRound("That round has already started without you.");
+        return;
+      }
+      localStorage.setItem("gameCode", room.nextRoomCode);
+      localStorage.setItem("isHost", "false");
+      leave("/lobby");
+    } catch (err) {
+      console.error("Couldn't join the next round:", err);
+      setNextRound("Couldn't join the next round. Try again.");
     }
-  }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, location.state]);
+  };
 
   return (
-    <Container>
-      <Title>🎉 Quiz Completed! 🎤</Title>
-      {!isObserver && (
-        <Score>
-          You scored {gameData.multiplayer ? bestKnownScore(gameData.score, players, gameData.playerId) : gameData.score}!
-        </Score>
+    <CalmPage
+      title="And the results are…"
+      subtitle={isObserver ? undefined : `You scored ${bestKnownScore(gameData.score, players, gameData.playerId)} points.`}
+      footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
+    >
+      {error && <CalmNote role="alert">{error}</CalmNote>}
+      {placed.length === 0 && !error && <CalmNote role="status">Collecting the final scores…</CalmNote>}
+
+      {revealed.length > 0 && (
+        <div className="calm-ground">
+          <ol className="lycra-pane" aria-label="Final standings">
+            {revealed.map(({ player, place }) => {
+              const podium = PODIUM_POINTS[place];
+              const mine = player.id === gameData.playerId;
+              return (
+                <li
+                  key={player.id}
+                  className={`lycra is-block is-static${place === 1 ? " is-chosen" : ""}`}
+                >
+                  {podium && <span className="calm-label">{podium}</span>}
+                  <span className="calm-row">
+                    <span>{place}. {player.name}{mine ? " (you)" : ""}</span>
+                    <span>{player.score}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       )}
-      {winner && <WinnerText>{winner}</WinnerText>}
-      {error && <ErrorText>{error}</ErrorText>}
 
-      <ButtonContainer>
-        <ActionButton onClick={() => navigate("/quiz")}>Restart Quiz</ActionButton>
-        {!gameData.multiplayer && (
-          <ScoreboardButton onClick={() => navigate("/scoreboard")}>
-            📊 View Scoreboard
-          </ScoreboardButton>
-        )}
-        <HomeButton onClick={() => navigate("/")}>Return to Home</HomeButton>
-      </ButtonContainer>
+      {done ? (
+        <CalmNote role="status">{winnerLine(placed)}</CalmNote>
+      ) : (
+        placed.length > 0 && (
+          <div className="calm-ground">
+            <div className="lycra-pane calm-split">
+              <button type="button" className="lycra" onClick={() => setStep(step + 1)}>
+                {step === 0 ? "Start the reveal" : `Reveal ${revealLabel(placed, steps, step)}`}
+              </button>
+              <button type="button" className="lycra" onClick={() => setStep(steps.length)}>
+                Show everything
+              </button>
+            </div>
+          </div>
+        )
+      )}
 
-      {gameData.multiplayer && players && players.length > 0 && (
+      {isHost && !room?.nextRoomCode && (
+        <div className="calm-ground">
+          <div className="lycra-pane">
+            <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={playAgain}>
+              Play again with everyone
+            </button>
+          </div>
+        </div>
+      )}
+      {!isHost && room?.nextRoomCode && (
         <>
-          <ScoreTitle>📊 Final Scores</ScoreTitle>
-          <ScoreTable>
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...players].sort((a: Player, b: Player) => b.score - a.score).map((player: Player) => (
-                <tr key={player.id}>
-                  <td>{player.name}{player.id === gameData.playerId ? " (You)" : ""}</td>
-                  <td>{player.score}</td>
-                </tr>
-              ))}
-            </tbody>
-          </ScoreTable>
+          <CalmNote>The host has started another round.</CalmNote>
+          <div className="calm-ground">
+            <div className="lycra-pane">
+              <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={joinNext}>
+                Join the next round
+              </button>
+            </div>
+          </div>
         </>
       )}
+      {nextRound !== "idle" && nextRound !== "busy" && <CalmNote role="status">{nextRound}</CalmNote>}
 
-      {!gameData.multiplayer && scoreHistory.length > 0 && (
-        <>
-          <ScoreTitle>📊 Past Scores</ScoreTitle>
-          <ScoreTable>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scoreHistory.map((entry, index) => (
-                <tr key={index}>
-                  <td>{new Date(entry.date).toLocaleDateString()}</td>
-                  <td>{entry.score} / {entry.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </ScoreTable>
-        </>
+      {!isHost && !room?.nextRoomCode && (
+        <div className="calm-ground">
+          <div className="lycra-pane">
+            <button type="button" className="lycra" onClick={() => leave("/multiplayer")}>Join or host another game</button>
+          </div>
+        </div>
       )}
-    </Container>
+    </CalmPage>
   );
 };
 
+/** What the next tap shows: "3rd place", or everyone below the podium. */
+const revealLabel = (placed: ReturnType<typeof placePlayers>, steps: number[], step: number) => {
+  const before = steps[step - 1];
+  const next = placed[placed.length - before - 1];
+  return next ? ({ 1: "the winner", 2: "2nd place", 3: "3rd place" } as Record<number, string>)[next.place] ?? "the rest" : "the rest";
+};
+
 export default QuizResults;
-
-// Styled Components
-const Container = styled.div`
-  width: 100%;
-  max-width: 31.25rem; /* 500px */
-  margin: auto;
-  text-align: center;
-  padding: 1.25rem; /* 20px */
-  background: ${({ theme }) => theme.colors.white};
-`;
-
-const Title = styled.h2`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.night};
-  font-size: 1.5rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const Score = styled.p`
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: ${({ theme }) => theme.colors.purple};
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const WinnerText = styled.p`
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: ${({ theme }) => theme.colors.correctGreen};
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const ErrorText = styled.p`
-  font-size: 1rem;
-  color: ${({ theme }) => theme.colors.incorrectRed};
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const ButtonContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const ActionButton = styled.button`
-  background: ${({ theme }) => theme.colors.purple};
-  color: white;
-  font-size: 1rem;
-  font-weight: bold;
-  padding: 1rem;
-  border: none;
-  cursor: pointer;
-  transition: 0.3s;
-  width: 100%;
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.darkpurple};
-  }
-`;
-
-const ScoreboardButton = styled(ActionButton)`
-  background: ${({ theme }) => theme.colors.darkpurple};
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.purple};
-  }`;
-
-const HomeButton = styled(ActionButton)`
-  background: ${({ theme }) => theme.colors.gray};
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.night};
-  }
-`;
-
-const ScoreTitle = styled.h3`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.night};
-  margin-top: 1.25rem; /* 20px */
-`;
-
-const ScoreTable = styled.table`
-  width: 100%;
-  margin-top: 0.625rem; /* 10px */
-  border-collapse: collapse;
-  font-size: 1rem;
-  
-  th, td {
-    border: 0.0625rem solid ${({ theme }) => theme.colors.gray}; /* 1px */
-    padding: 0.5rem; /* 8px */
-    text-align: center;
-  }
-
-  th {
-    background: ${({ theme }) => theme.colors.nightblue};
-    color: white;
-  }
-
-  td {
-    color: ${({ theme }) => theme.colors.black};
-  }
-`;
-

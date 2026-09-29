@@ -782,5 +782,23 @@ await expectDenied("rewrite scores in a room that finished over 30s ago", () =>
   updateDoc(toResults, { players: [{ id: "host-1", name: "Host", score: 9999 }] })
 );
 
+// 14. Another round with the same guests (#21): a finished room points at
+// the next room once; a room still playing can't.
+await expectDenied("point a room still playing at a next round", () =>
+  updateDoc(score1.roomRef, { nextRoomCode: "NEXT" })
+);
+await expectDenied("a next-round code that isn't a room code", () =>
+  updateDoc(toResults, { nextRoomCode: "next!" })
+);
+await expectAllowed("point a finished room at the next round", () =>
+  updateDoc(toResults, { nextRoomCode: "NEXT" })
+);
+await expectDenied("point it somewhere else afterwards", () =>
+  updateDoc(toResults, { nextRoomCode: "ELSE" })
+);
+await expectDenied("the next round's code riding along with scores", () =>
+  updateDoc(score1.roomRef, { nextRoomCode: "NEXT", players: [{ id: "host-1", name: "Host", score: 1 }] })
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

@@ -67,6 +67,14 @@ const HostObserverView = () => {
         return () => unsubscribe();
     }, [roomCode, navigate]);
 
+    // The quiz is over for everyone at once (the room's phase, #62): take
+    // the host to the final standings and the next round (#21).
+    useEffect(() => {
+        if (room?.phase === "results" && roomCode) {
+            navigate("/results", { state: { multiplayer: true, roomCode, playerId, observer: true } });
+        }
+    }, [room?.phase, roomCode, playerId, navigate]);
+
     if (error) {
         return (
             <Container>

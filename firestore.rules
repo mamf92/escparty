@@ -71,7 +71,9 @@ service cloud.firestore {
         // Managing mid-quiz players
         isManagingMidQuizPlayers(affected) ||
         // Moving between question / mid-quiz break / results
-        isAdvancingPhase(affected)
+        isAdvancingPhase(affected) ||
+        // Pointing a finished room at the next round (#21)
+        isSettingNextRoom(affected)
       );
     }
 
@@ -226,6 +228,18 @@ service cloud.firestore {
              existingData.players is list &&
              data.players.size() == existingData.players.size() &&
              allPlayersValid(data.players);
+    }
+
+    // The host starting another round with the same guests (setNextRoom,
+    // #21): a finished room gets the new room's code, once. Like every room
+    // write, this checks shape, not who (no auth, #115).
+    function isSettingNextRoom(affected) {
+      return affected.hasOnly(['nextRoomCode']) &&
+             resource.data.get('phase', '') == 'results' &&
+             !('nextRoomCode' in resource.data) &&
+             request.resource.data.nextRoomCode is string &&
+             request.resource.data.nextRoomCode.matches('[A-Z]{4}') &&
+             request.resource.data.nextRoomCode != resource.data.id;
     }
 
     function isSettingContinueReady(affected) {

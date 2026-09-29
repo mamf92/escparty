@@ -50,6 +50,9 @@ export interface Room {
     // snapshot where that write is still pending (the writer's own listener
     // sees it first), so readers must handle null.
     phaseStartedAt?: Timestamp | FieldValue | null;
+    // Set once, when the host starts another round with the same guests
+    // (#21): the code of the new room, which guests join from the results.
+    nextRoomCode?: string;
 }
 
 /**
@@ -608,4 +611,16 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
 
         throw new Error(`Failed to join room: ${err.message}`);
     }
+};
+
+/**
+ * Point a finished room at the next round's room (#21), so its guests can
+ * follow the host there from the results. One-shot: firestore.rules only
+ * allows it once the room has finished, and only once.
+ */
+export const setNextRoom = async (roomCode: string, nextRoomCode: string): Promise<void> => {
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+    await updateDoc(doc(db, "rooms", roomCode), { nextRoomCode });
 };
