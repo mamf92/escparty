@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, generateRoomCode, getRoom, setRoomDifficulty } from "../utils/roomsFirestore";
-import { isKnownQuizKey, quizBreakEvery } from "../utils/quizCatalog";
+import { createRoom, joinRoom, generateRoomCode, getRoom } from "../utils/roomsFirestore";
+import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 
 const ESC_WINNERS = [
@@ -74,7 +74,7 @@ const MultiplayerLobby = () => {
       await createRoom(newGameCode, hostId, hostName, hostIsObserver);
       if (quizKey) {
         // Best effort: if it doesn't stick, the lobby still offers the list.
-        await setRoomDifficulty(newGameCode, quizKey, await quizBreakEvery(quizKey)).catch(error =>
+        await setRoomQuiz(newGameCode, quizKey).catch(error =>
           console.error("Couldn't preselect the quiz:", error));
       }
 

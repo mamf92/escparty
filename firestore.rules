@@ -158,8 +158,11 @@ service cloud.firestore {
 
     // Moving a started room from one phase to the next (#62). Mirrors
     // phaseAfterQuestion in src/utils/quizTiming.ts:
-    //   question N -> question N+1          (N+1 not a multiple of 5)
-    //   question N -> mid-scoreboard at N+1 (N+1 a multiple of 5)
+    //   question N -> question N+1          (no break before N+1)
+    //   question N -> mid-scoreboard at N+1 (a break before N+1: N+1 a
+    //                                        multiple of the room's
+    //                                        breakEvery, 5 if unset, never
+    //                                        if 0; see isBreakBefore)
     //   question N -> results               (index unchanged)
     //   mid-scoreboard N -> question N      (host resumes after the break,
     //                                        clearing playersAtMidQuiz)

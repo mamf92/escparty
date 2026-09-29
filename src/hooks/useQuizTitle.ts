@@ -1,17 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchQuizTitle, quizTitle } from "../utils/quizCatalog";
-import { isCustomQuizKey } from "../utils/customQuizzes";
+import { customQuizId, isCustomQuizKey, knownCustomTitle } from "../utils/customQuizzes";
 
 /**
- * A quiz key's title. Classic and premade titles are known at once; a
- * custom quiz someone else saved is read from Firestore, showing "Custom
- * quiz" until it arrives.
+ * A quiz key's title. Classic and premade titles are known at once, and so
+ * is a custom quiz this device saved; one someone else saved is read from
+ * Firestore, showing "Custom quiz" until it arrives.
  */
 export const useQuizTitle = (key: string | undefined | null): string => {
     const [fetched, setFetched] = useState<{ key: string; title: string } | null>(null);
+    // Worked out once per key, not on every render (the lobby re-renders on
+    // every room snapshot).
+    const { local, needsRead } = useMemo(() => ({
+        local: quizTitle(key),
+        needsRead: !!key && isCustomQuizKey(key) && knownCustomTitle(customQuizId(key)) === undefined,
+    }), [key]);
 
     useEffect(() => {
-        if (!key || !isCustomQuizKey(key)) return;
+        if (!key || !needsRead) return;
         let current = true;
         fetchQuizTitle(key).then(title => {
             if (current) setFetched({ key, title });
@@ -19,7 +25,7 @@ export const useQuizTitle = (key: string | undefined | null): string => {
         return () => {
             current = false;
         };
-    }, [key]);
+    }, [key, needsRead]);
 
-    return fetched && fetched.key === key ? fetched.title : quizTitle(key);
+    return fetched && fetched.key === key ? fetched.title : local;
 };

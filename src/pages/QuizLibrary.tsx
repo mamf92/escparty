@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { QUIZ_CHOICES } from "../utils/quizCatalog";
-import { customQuizId, customQuizKey, forgetMyQuiz, isCustomQuizKey, listMyQuizzes } from "../utils/customQuizzes";
+import { customQuizId, customQuizKey, forgetMyQuiz, isCustomQuizKey, listMyQuizzes, type MyQuiz } from "../utils/customQuizzes";
 
 /**
  * Every quiz this device can play (#72, #76): the quizzes you saved, then
@@ -15,13 +15,17 @@ const QuizLibrary = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [myQuizzes, setMyQuizzes] = useState(listMyQuizzes);
-    // A quiz just saved in the builder comes back picked.
-    const [picked, setPicked] = useState<string | null>(
-        () => (location.state as { picked?: string } | null)?.picked ?? null,
-    );
+    // A quiz just saved in the builder comes back picked. It also comes
+    // with the router state, so it's listed even if this browser couldn't
+    // store the list (private mode, full storage).
+    const returned = location.state as { picked?: string; saved?: MyQuiz } | null;
+    const [picked, setPicked] = useState<string | null>(() => returned?.picked ?? null);
+    const justSaved = returned?.saved && !myQuizzes.some(quiz => quiz.id === returned.saved?.id)
+        ? [{ ...returned.saved, savedAt: 0 }]
+        : [];
 
     const choices = [
-        ...myQuizzes.map(quiz => ({
+        ...[...justSaved, ...myQuizzes].map(quiz => ({
             key: customQuizKey(quiz.id),
             title: quiz.title,
             detail: "Your quiz",
@@ -36,6 +40,8 @@ const QuizLibrary = () => {
         forgetMyQuiz(customQuizId(key));
         setMyQuizzes(listMyQuizzes());
         setPicked(null);
+        // Drop the just-saved copy the router state still carries.
+        if (location.state) navigate(location.pathname, { replace: true, state: null });
     };
 
     return (

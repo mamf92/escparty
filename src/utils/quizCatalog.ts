@@ -13,6 +13,7 @@
 import { QUIZ_TEMPLATES, quizTemplate, type QuizTemplate } from "../data/quizTemplates";
 import { loadQuizData, type QuizDifficulty, type QuizQuestion } from "./QuizDataProvider";
 import { customQuizId, fetchCustomQuiz, isCustomQuizKey, knownCustomTitle } from "./customQuizzes";
+import { setRoomDifficulty } from "./roomsFirestore";
 import { DEFAULT_BREAK_EVERY, toPlayable, type AnyQuestion, type BankQuestion, type BreakEvery } from "./quizModel";
 
 export const CLASSIC_KEYS: QuizDifficulty[] = ["easy", "medium", "hard"];
@@ -105,15 +106,25 @@ export const QUIZ_CHOICES: { key: string; title: string; tagline: string; questi
 
 /**
  * How often a key's mid-quiz break comes, for a room about to play it.
- * Custom quizzes are read from Firestore; if that fails, the default.
+ * Rejects when a custom quiz can't be read or is gone: a room's quiz and
+ * break setting are one-shot, so guessing would lock in the wrong one.
  */
 export const quizBreakEvery = async (key: string): Promise<BreakEvery> => {
     if (isCustomQuizKey(key)) {
-        const quiz = await fetchCustomQuiz(customQuizId(key)).catch(() => null);
-        return quiz?.breakEvery ?? DEFAULT_BREAK_EVERY;
+        const quiz = await fetchCustomQuiz(customQuizId(key));
+        if (!quiz || quiz.questions.length === 0) throw new Error("This quiz isn't saved any more.");
+        return quiz.breakEvery;
     }
     return templateFor(key)?.breakEvery ?? DEFAULT_BREAK_EVERY;
 };
+
+/**
+ * Set the quiz a room plays together with its break setting, the one way
+ * pages should set a room's quiz (a bare setRoomDifficulty leaves the room
+ * on the default break). Rejects without writing if the quiz can't be read.
+ */
+export const setRoomQuiz = async (roomCode: string, key: string): Promise<void> =>
+    setRoomDifficulty(roomCode, key, await quizBreakEvery(key));
 
 /**
  * A quiz as the builder starts from it: its title, break setting and the

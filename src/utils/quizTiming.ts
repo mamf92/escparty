@@ -1,4 +1,5 @@
 import type { RoomPhase } from "./roomsFirestore";
+import { DEFAULT_BREAK_EVERY, isBreakAfter } from "./quizModel";
 
 // Per-question timing for multiplayer (#62). Every client derives its
 // countdown from the room's `phaseStartedAt` using these numbers, and
@@ -12,7 +13,7 @@ export const QUESTION_SLOT_MS = QUESTION_MS + FEEDBACK_MS;
  * A mid-quiz scoreboard break follows every Nth question, unless the room
  * says otherwise (`Room.breakEvery`, where 0 means never).
  */
-export const MID_QUIZ_EVERY = 5;
+export const MID_QUIZ_EVERY = DEFAULT_BREAK_EVERY;
 
 export interface PhaseAfterQuestion {
     phase: RoomPhase;
@@ -35,7 +36,7 @@ export const phaseAfterQuestion = (
     }
     const next = index + 1;
     return {
-        phase: breakEvery > 0 && next % breakEvery === 0 ? "mid-scoreboard" : "question",
+        phase: isBreakAfter(index, totalQuestions, breakEvery) ? "mid-scoreboard" : "question",
         currentQuestionIndex: next,
     };
 };

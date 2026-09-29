@@ -7,12 +7,14 @@ import {
     loadQuizForEditing,
     quizBreakEvery,
     quizTitle,
+    setRoomQuiz,
     templateKey,
 } from "./quizCatalog";
 import { QUIZ_TEMPLATES } from "../data/quizTemplates";
 import { bankQuestion } from "../data/questionBank";
 
-const mocks = vi.hoisted(() => ({ loadQuizData: vi.fn(), fetchCustomQuiz: vi.fn() }));
+const mocks = vi.hoisted(() => ({ loadQuizData: vi.fn(), fetchCustomQuiz: vi.fn(), setRoomDifficulty: vi.fn() }));
+vi.mock("./roomsFirestore", () => ({ setRoomDifficulty: mocks.setRoomDifficulty }));
 vi.mock("./QuizDataProvider", async (importOriginal) => ({
     ...(await importOriginal<typeof import("./QuizDataProvider")>()),
     loadQuizData: mocks.loadQuizData,
@@ -84,10 +86,29 @@ describe("fetchQuizTitle", () => {
 describe("quizBreakEvery", () => {
     it("is the quiz's own setting, or the default", async () => {
         await expect(quizBreakEvery(CUSTOM)).resolves.toBe(3);
-        mocks.fetchCustomQuiz.mockRejectedValueOnce(new Error("offline"));
-        await expect(quizBreakEvery(CUSTOM)).resolves.toBe(5);
         await expect(quizBreakEvery("t-quick-fire")).resolves.toBe(0);
         await expect(quizBreakEvery("easy")).resolves.toBe(5);
+    });
+
+    it("rejects rather than guess for a saved quiz it can't read", async () => {
+        mocks.fetchCustomQuiz.mockRejectedValueOnce(new Error("offline"));
+        await expect(quizBreakEvery(CUSTOM)).rejects.toThrow("offline");
+        mocks.fetchCustomQuiz.mockResolvedValueOnce(null);
+        await expect(quizBreakEvery(CUSTOM)).rejects.toThrow("This quiz isn't saved any more.");
+    });
+});
+
+describe("setRoomQuiz", () => {
+    it("sets the quiz and its break setting in one write", async () => {
+        await setRoomQuiz("ABBA", CUSTOM);
+        expect(mocks.setRoomDifficulty).toHaveBeenCalledWith("ABBA", CUSTOM, 3);
+    });
+
+    it("writes nothing when the quiz can't be read", async () => {
+        mocks.setRoomDifficulty.mockClear();
+        mocks.fetchCustomQuiz.mockRejectedValueOnce(new Error("offline"));
+        await expect(setRoomQuiz("ABBA", CUSTOM)).rejects.toThrow("offline");
+        expect(mocks.setRoomDifficulty).not.toHaveBeenCalled();
     });
 });
 

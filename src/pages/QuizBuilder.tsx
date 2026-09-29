@@ -70,6 +70,9 @@ const QuizBuilder = () => {
     const [saving, setSaving] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const [loadingFrom, setLoadingFrom] = useState(!!fromKey);
+    // Only a quiz that actually loaded is replaced in "my quizzes" on save.
+    const [editingLoaded, setEditingLoaded] = useState(false);
+    const [bankFailed, setBankFailed] = useState(false);
 
     const [bank, setBank] = useState<BankQuestion[] | null>(null);
     const [category, setCategory] = useState<QuestionCategory | "all">("all");
@@ -85,6 +88,7 @@ const QuizBuilder = () => {
                 setTitle(quizId ? start.title : `${start.title} (my version)`.slice(0, QUIZ_LIMITS.maxTitleLength));
                 setBreakEvery(start.breakEvery);
                 setQuestions(start.questions);
+                setEditingLoaded(!!quizId);
             })
             .catch(() => current && setNotice("That quiz couldn't be loaded, so you're starting from scratch."))
             .finally(() => current && setLoadingFrom(false));
@@ -95,9 +99,14 @@ const QuizBuilder = () => {
 
     // The bank loads the first time the picker opens.
     useEffect(() => {
-        if (mode !== "bank" || bank) return;
-        import("../data/questionBank").then(module => setBank(module.BANK_QUESTIONS));
-    }, [mode, bank]);
+        if (mode !== "bank" || bank || bankFailed) return;
+        import("../data/questionBank")
+            .then(module => setBank(module.BANK_QUESTIONS))
+            .catch(error => {
+                console.error("Couldn't load the question bank:", error);
+                setBankFailed(true);
+            });
+    }, [mode, bank, bankFailed]);
 
     const inQuiz = useMemo(() => new Set(questions.map(question => question.id)), [questions]);
     const full = questions.length >= QUIZ_LIMITS.maxQuestions;
@@ -159,9 +168,16 @@ const QuizBuilder = () => {
         if (draft.index === null) {
             setQuestions([...questions, { id: newCustomId(), source: "custom", ...trimmed }]);
         } else {
-            // An edited bank question becomes the host's own.
-            setQuestions(questions.map((question, i) =>
-                i === draft.index ? { id: question.source === "custom" ? question.id : newCustomId(), source: "custom", ...trimmed } : question));
+            // A changed bank question becomes the host's own; an unchanged
+            // one stays the bank's, so the picker still shows it as added.
+            setQuestions(questions.map((question, i) => {
+                if (i !== draft.index) return question;
+                const unchanged = question.question === trimmed.question &&
+                    question.correctAnswer === trimmed.correctAnswer &&
+                    question.options.join("\u0000") === trimmed.options.join("\u0000");
+                if (unchanged) return question;
+                return { id: question.source === "custom" ? question.id : newCustomId(), source: "custom", ...trimmed };
+            }));
         }
         setSelected(null);
         setMode("assemble");
@@ -181,8 +197,12 @@ const QuizBuilder = () => {
         setSaving(true);
         setNotice(null);
         try {
-            const id = await saveCustomQuiz({ title, breakEvery, questions }, quizId);
-            navigate("/quizzes", { state: { picked: customQuizKey(id) } });
+            const id = await saveCustomQuiz({ title, breakEvery, questions }, editingLoaded ? quizId : undefined);
+            // The library lists it from this device's storage; the state
+            // carries it too, in case this browser couldn't store the list.
+            navigate("/quizzes", {
+                state: { picked: customQuizKey(id), saved: { id, title: title.trim(), questionCount: questions.length } },
+            });
         } catch (error) {
             console.error("Couldn't save the quiz:", error);
             setNotice("The quiz couldn't be saved. Check your connection and try again.");
@@ -218,7 +238,16 @@ const QuizBuilder = () => {
                         </label>
                     </div>
                 </div>
-                {!bank ? (
+                {bankFailed ? (
+                    <>
+                        <CalmNote role="alert">The question bank couldn't be loaded.</CalmNote>
+                        <div className="calm-ground">
+                            <div className="lycra-pane">
+                                <button type="button" className="lycra" onClick={() => setBankFailed(false)}>Try again</button>
+                            </div>
+                        </div>
+                    </>
+                ) : !bank ? (
                     <CalmNote>Loading the bank…</CalmNote>
                 ) : (
                     <div className="calm-ground">

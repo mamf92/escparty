@@ -3,7 +3,11 @@ import { Route, Routes, useLocation, type InitialEntry } from "react-router-dom"
 import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
 import QuizBuilder from "./QuizBuilder";
 
-const mocks = vi.hoisted(() => ({ saveCustomQuiz: vi.fn(), fetchCustomQuiz: vi.fn() }));
+const mocks = vi.hoisted(() => ({ saveCustomQuiz: vi.fn(), fetchCustomQuiz: vi.fn(), bankFails: false }));
+vi.mock("../data/questionBank", async (importOriginal) => {
+  if (mocks.bankFails) throw new Error("chunk failed");
+  return importOriginal();
+});
 vi.mock("../utils/customQuizzes", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../utils/customQuizzes")>()),
   saveCustomQuiz: mocks.saveCustomQuiz,
@@ -41,6 +45,18 @@ const writeQuestion = async (user: ReturnType<typeof userEvent.setup>, text: str
 };
 
 describe("QuizBuilder", () => {
+  it("says so when the bank can't load, and tries again", async () => {
+    const user = userEvent.setup();
+    mocks.bankFails = true;
+    renderBuilder();
+    await user.click(screen.getByRole("button", { name: "Add from the bank" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The question bank couldn't be loaded.");
+
+    mocks.bankFails = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("group", { name: "Bank questions" })).toBeInTheDocument();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.saveCustomQuiz.mockResolvedValue(ID);
@@ -95,7 +111,9 @@ describe("QuizBuilder", () => {
         expect.objectContaining({ source: "custom", question: "Who sang 'Lipstick'?", options: ["Bros", "Jedward", "Zig and Zag"], correctAnswer: "Jedward" }),
       ],
     }, undefined);
-    expect(await screen.findByText(`at /quizzes with {"picked":"c-${ID}"}`)).toBeInTheDocument();
+    expect(await screen.findByText(
+      `at /quizzes with {"picked":"c-${ID}","saved":{"id":"${ID}","title":"Jedward's Revenge","questionCount":2}}`,
+    )).toBeInTheDocument();
   });
 
   it("checks a written question before adding it", async () => {
@@ -154,7 +172,13 @@ describe("QuizBuilder", () => {
     const rows = within(questionList()).getAllByRole("radio");
     expect(rows).toHaveLength(10);
 
+    // Opened and kept without a change, it stays the bank's.
     await user.click(rows[0]);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Keep these changes" }));
+    expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("Bank ·");
+
+    await user.click(within(questionList()).getAllByRole("radio")[0]);
     await user.click(screen.getByRole("button", { name: "Edit" }));
     await user.type(screen.getByLabelText("Question"), " Really?");
     await user.click(screen.getByRole("button", { name: "Keep these changes" }));
@@ -177,11 +201,17 @@ describe("QuizBuilder", () => {
     expect(mocks.saveCustomQuiz).toHaveBeenCalledWith(expect.objectContaining({ title: "Mine", breakEvery: 4 }), ID);
   });
 
-  it("starts empty when the quiz to start from can't be loaded", async () => {
+  it("starts empty when the quiz to edit can't be loaded, and then doesn't replace it", async () => {
+    const user = userEvent.setup();
     mocks.fetchCustomQuiz.mockResolvedValue(null);
     renderBuilder(`/quizzes/edit/${ID}`);
     expect(await screen.findByRole("status")).toHaveTextContent("That quiz couldn't be loaded");
     expect(screen.getByText(/No questions yet/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Name"), "Fresh");
+    await writeQuestion(user, "Q?", ["A", "B"], "A");
+    await user.click(screen.getByRole("button", { name: "Save quiz" }));
+    expect(mocks.saveCustomQuiz).toHaveBeenCalledWith(expect.objectContaining({ title: "Fresh" }), undefined);
   });
 
   it("says so when saving fails, and lets you try again", async () => {

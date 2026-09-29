@@ -86,6 +86,18 @@ describe("QuizLibrary", () => {
     expect(localStorage.getItem("escparty.myQuizzes")).toBe("[]");
   });
 
+  it("lists a just-saved quiz even when this browser couldn't store the list", async () => {
+    const user = userEvent.setup();
+    renderLibrary({
+      pathname: "/quizzes",
+      state: { picked: `c-${ID}`, saved: { id: ID, title: "Private mode quiz", questionCount: 3 } },
+    });
+    expect(screen.getByRole("radio", { name: /Private mode quiz/ })).toHaveAttribute("aria-checked", "true");
+
+    await user.click(screen.getByRole("button", { name: "Remove from this device" }));
+    expect(screen.queryByRole("radio", { name: /Private mode quiz/ })).not.toBeInTheDocument();
+  });
+
   it("opens a saved quiz in the builder to edit", async () => {
     const user = userEvent.setup();
     saveOne();

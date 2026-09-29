@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
-import { listenToRoom, Room, setRoomDifficulty, startGame } from "../utils/roomsFirestore";
+import { listenToRoom, Room, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
-import { QUIZ_CHOICES, quizBreakEvery } from "../utils/quizCatalog";
+import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
 import { customQuizKey, listMyQuizzes } from "../utils/customQuizzes";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 
@@ -16,6 +16,7 @@ const Lobby = () => {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [isSettingDifficulty, setIsSettingDifficulty] = useState<boolean>(false);
+    const [pickError, setPickError] = useState<string | null>(null);
     const navigate = useNavigate();
     const roomQuizTitle = useQuizTitle(room?.difficulty);
     // This device's saved quizzes, offered alongside the premade ones.
@@ -97,11 +98,15 @@ const Lobby = () => {
         // break setting goes with it, so every client breaks alike.)
         if (isHost && gameCode && !isSettingDifficulty) {
             setIsSettingDifficulty(true);
+            setPickError(null);
             try {
-                await setRoomDifficulty(gameCode, quizKey, await quizBreakEvery(quizKey));
+                await setRoomQuiz(gameCode, quizKey);
             } catch (error) {
+                // Nothing was written if the quiz couldn't be read, so the
+                // host can pick again; anything else is a dead end as before.
                 console.error("Error setting difficulty:", error);
-                setError("Failed to set difficulty");
+                if (String(error).includes("Failed to set difficulty")) setError("Failed to set difficulty");
+                else setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
             } finally {
                 setIsSettingDifficulty(false);
             }
@@ -156,6 +161,7 @@ const Lobby = () => {
             {isHost && !room?.difficulty && (
                 <DifficultySection>
                     <SubTitle>Pick a quiz:</SubTitle>
+                    {pickError && <ErrorMessage role="alert">{pickError}</ErrorMessage>}
                     <ButtonGroup>
                         {myQuizzes.map(quiz => (
                             <DifficultyButton key={quiz.id} disabled={isSettingDifficulty} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>

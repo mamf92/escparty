@@ -9,6 +9,14 @@ vi.mock("../utils/quizCatalog", async (importOriginal) => ({
 }));
 
 describe("useQuizTitle", () => {
+    it("names a quiz this device saved without a read", () => {
+        localStorage.setItem("escparty.myQuizzes", JSON.stringify([{ id: "AbCdEfGhIjKlMnOpQrSt", title: "Mine", questionCount: 1, savedAt: 1 }]));
+        const { result } = renderHook(() => useQuizTitle("c-AbCdEfGhIjKlMnOpQrSt"));
+        expect(result.current).toBe("Mine");
+        expect(fetchQuizTitle).not.toHaveBeenCalled();
+        localStorage.clear();
+    });
+
     it("names classic and premade quizzes without a read", () => {
         const { result } = renderHook(() => useQuizTitle("t-nordic-nights"));
         expect(result.current).toBe("Nordic Nights");
