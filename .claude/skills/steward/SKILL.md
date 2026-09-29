@@ -82,15 +82,19 @@ updated in the same PR, flag it in review — don't approve on the promise of
 a follow-up. "Someday" is how the docs and the code drifted apart the first
 time; the whole point of this epic was to stop relying on that promise.
 
-## Degrading gracefully around the missing test suite
+## Tests are part of "done" (#58)
 
-There is no test framework in this repo yet (`docs/agent/testing.md` is a
-stub). Don't hard-fail a PR for missing tests while that's true — note it
-as a known gap in review instead of blocking on it. Once a test suite
-lands, this tightens automatically: re-read `docs/agent/testing.md` at that
-point, and start treating "no tests for a new component/flow" as a real
-review finding rather than a known gap. Don't hand-wire that tightening
-yourself before the suite actually exists — check the file, don't assume.
+A PR that adds a new page, component or hook must add its unit/component
+test (a sibling `<name>.test.tsx`), and `npm test` enforces the file part:
+`src/test/testFiles.test.ts` fails for a new file without one. If the new
+code is part of a user-facing flow (a new page, or a new step in the quiz,
+room or scoreboard flows), it must also add or extend e2e coverage once the
+Playwright suite exists (#55; check `docs/agent/testing.md`).
+
+Treat a PR missing required tests like one with an unresolved review
+comment: not mergeable, whatever CI says. Ask for the tests; don't wave it
+through because build and lint are green. Existing untested files are the
+debt listed in `src/test/testFiles.test.ts` (#59); that list only shrinks.
 
 ## Applying this to a small real task
 

@@ -27,7 +27,7 @@ export const isProductionPreview = (): boolean => {
  */
 export const getBasePath = (): string => {
     // import.meta.env.BASE_URL is correctly set by Vite based on the 'base' configuration
-    // It will be '/' in development and '/escparty/' in production
+    // It is '/' everywhere since the GitHub Pages subpath went away (#125)
     return import.meta.env.BASE_URL;
 };
 

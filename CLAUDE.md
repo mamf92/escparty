@@ -28,8 +28,9 @@ transactions are `updatePlayerScore`, `advanceQuestion` and
 Unit/component tests run on Vitest + React Testing Library. Covered today:
 `roomsFirestore.ts`, `QuizDataProvider.ts`, `quizScoring.ts` and
 `quizTiming.ts`, `roomRoles.ts`, `multiplayerSession.ts` (with per-file coverage floors), the `useResumeRoom` hook
-(no floor), plus one `Home.tsx` smoke test — every other page,
-and `Quiz.tsx` itself, is uncovered. `npm test` now runs in `ci.yml`, but a
+(no floor), plus a `Home.tsx` smoke test and `Quiz.tsx`'s answer selection — every
+other page is uncovered, and `npm test` fails for a new page, component
+or hook without a test file (`src/test/testFiles.test.ts`). `npm test` now runs in `ci.yml`, but a
 red run doesn't yet block merge or deploy (see #57). See
 `docs/agent/testing.md` before assuming a given flow is covered.
 
@@ -69,9 +70,9 @@ One paragraph bridging the two, without repeating the skills' content:
 
 ## Do not change without explicit instruction
 
-- `vite.config.ts`'s `base` path — it resolves to `/` when Vercel builds
-  (`VERCEL=1`), which is what makes the deployed assets load from the domain
-  root. Changing it breaks the deploy.
+- `vite.config.ts`'s `base` path — it is `/`, which is what makes the
+  deployed assets load from the domain root on Vercel (#125). Changing it
+  breaks the deploy.
 - `roomsFirestore.ts`'s exported function signatures — multiple pages depend
   on this exact API; change it as a coordinated migration, not a drive-by edit.
 - `firestore.rules` at the repo root — production access control for every

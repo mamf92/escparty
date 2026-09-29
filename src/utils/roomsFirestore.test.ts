@@ -410,18 +410,13 @@ describe("updatePlayerScore", () => {
         );
     });
 
-    it("writes the player list back unchanged for an unknown player id", async () => {
-        // Documented, not endorsed: a score write for someone who isn't in the
-        // room resolves successfully and rewrites the array as-is rather than
-        // reporting the mistake. Worth knowing before trusting a resolved
-        // promise as proof the score landed.
+    it("rejects a score for a player who isn't in the room, writing nothing (#131)", async () => {
         const update = givenTransactionSees(roomWith({ players: [player("p-1", "Martin", 500)] }));
 
-        await updatePlayerScore("ABCD", "ghost", 900);
-
-        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
-            players: [{ id: "p-1", name: "Martin", score: 500 }],
-        });
+        await expect(updatePlayerScore("ABCD", "ghost", 900)).rejects.toThrow(
+            "Failed to update score: Room ABCD has no player ghost",
+        );
+        expect(update).not.toHaveBeenCalled();
     });
 });
 

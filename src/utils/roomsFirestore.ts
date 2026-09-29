@@ -276,7 +276,12 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
 
             const room = roomDoc.data() as Room;
             const existingPlayer = room.players.find(player => player.id === playerId);
-            if (existingPlayer && score < existingPlayer.score) {
+            // An unknown player (a stale or regenerated ID) would otherwise
+            // rewrite the array unchanged and report success (#131).
+            if (!existingPlayer) {
+                throw new Error(`Room ${roomCode} has no player ${playerId}`);
+            }
+            if (score < existingPlayer.score) {
                 throw new Error(
                     `Refusing to lower score for player ${playerId} in room ${roomCode} (${existingPlayer.score} -> ${score})`
                 );
