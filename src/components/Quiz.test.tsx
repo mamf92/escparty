@@ -136,6 +136,16 @@ describe("Quiz multiplayer score writes (#131)", () => {
     expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
   });
 
+  it("says once when the game had already finished, without retrying (#142)", async () => {
+    givenRoom();
+    mocks.updatePlayerScore.mockRejectedValue(new ScoreWriteRejected("finished", "Failed to update score: Room ABCD has finished"));
+
+    await answerCorrectly();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The game had already finished");
+    expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+  });
+
   it("adds the answer's points to the room's score when the room already holds more", async () => {
     givenRoom();
     mocks.updatePlayerScore
