@@ -16,16 +16,11 @@ import { describe, expect, it } from "vitest";
 const CHECKED_FOLDERS = ["src/pages", "src/components", "src/hooks", "src/fabric-ui", "src/store"];
 
 const UNTESTED = new Set([
-  "src/components/MobileFrame.tsx",
   "src/fabric-ui/CalmSurface.tsx",
   "src/fabric-ui/CameraRig.tsx",
   "src/fabric-ui/FabricQuizDemo.tsx",
   "src/fabric-ui/FabricSurface.tsx",
   "src/fabric-ui/useFabricControls.ts",
-  "src/fabric-ui/useParallax.ts",
-  "src/pages/MidQuizScoreboard.tsx",
-  "src/pages/Scoreboard.tsx",
-  "src/pages/UnderDevelopment.tsx",
   "src/store/useGameStore.ts",
 ]);
 

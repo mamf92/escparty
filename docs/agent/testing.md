@@ -141,8 +141,8 @@ open at the time of writing:
   `src/utils/multiplayerSession.ts` (#63); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
   floor. Every page, component and hook now has a test file except the
   ones listed in `UNTESTED` in `src/test/testFiles.test.ts`
-  (`MidQuizScoreboard`, `Scoreboard`, `UnderDevelopment`, `MobileFrame` and
-  the `src/fabric-ui/` components), which is #59; a test file doesn't mean
+  (the WebGL components in `src/fabric-ui/` and its `leva` debug-panel hook,
+  plus the dead `useGameStore`), which is #59; a test file doesn't mean
   every flow in it is covered.
 - **`Quiz.tsx` is mostly covered where it was extracted.** The scoring
   formula moved to `src/utils/quizScoring.ts` and the multiplayer timing to
