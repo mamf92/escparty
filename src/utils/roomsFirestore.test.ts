@@ -24,9 +24,9 @@ import {
 } from "./roomsFirestore";
 
 // The Firebase client SDK is mocked rather than pointed at the emulator: the
-// emulator needs a JDK and a running process, and `npm test` is about to
-// become a CI check (#57), so an emulator-bound suite would be un-runnable
-// there. The rules themselves are exercised against the real emulator by
+// emulator needs a JDK and a running process, and this suite is a CI check
+// (`npm run test:coverage`, #57), so an emulator-bound suite would be
+// un-runnable there. The rules themselves are exercised against the real emulator by
 // `scripts/verify-firestore-rules.mjs` — see docs/agent/testing.md. What this
 // file pins down is the logic *this module* adds on top of the SDK: the
 // guards, the wrapped error messages, and the exact write payloads.

@@ -46,8 +46,8 @@ export default defineConfig({
       ],
       thresholds: {
         // Per-file floors, keyed by the file they guard. `npm run
-        // test:coverage` fails if any of these regresses. It isn't a CI
-        // check yet — wiring the suite into CI is #57.
+        // test:coverage` fails if any of these regresses, and CI runs it
+        // (#57). Raise a floor, never lower it.
         'src/utils/quizScoring.ts': {
           statements: 100,
           branches: 100,

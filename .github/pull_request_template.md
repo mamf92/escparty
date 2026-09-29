@@ -20,7 +20,7 @@ Closes #<!-- issue number -->
 
 ## Test checklist
 
-<!-- Vitest runs in CI (`npm test`), and src/test/testFiles.test.ts fails
+<!-- Vitest runs in CI with the coverage floors (`npm run test:coverage`), and src/test/testFiles.test.ts fails
      when a new page, component or hook has no test file. See
      docs/agent/testing.md. -->
 
