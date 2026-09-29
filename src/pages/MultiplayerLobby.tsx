@@ -116,11 +116,17 @@ const MultiplayerLobby = () => {
 
     setLoading(true);
     try {
-      // Generate a unique ID for the player
-      const playerId = uuidv4();
-
-      // Get a unique name for the player
-      const randomName = await getUniquePlayerName(joinCode.toUpperCase(), ESC_WINNERS);
+      // Back into a game this device was already in (a closed tab, a
+      // dead phone, #65): the same player ID and name, so the room lets
+      // them in again even after the start and their score carries on.
+      // Otherwise a new ID and a free Eurovision winner's name.
+      const code = joinCode.toUpperCase();
+      const sameGame = localStorage.getItem("gameCode") === code;
+      const storedId = sameGame ? localStorage.getItem("playerId") : null;
+      const storedName = sameGame ? localStorage.getItem("playerName") : null;
+      const rejoining = !!storedId && !!storedName;
+      const playerId = storedId && storedName ? storedId : uuidv4();
+      const randomName = storedId && storedName ? storedName : await getUniquePlayerName(code, ESC_WINNERS);
 
       // Join the room in Firestore
       const joined = await joinRoom(joinCode.toUpperCase(), playerId, randomName);
@@ -130,7 +136,7 @@ const MultiplayerLobby = () => {
         localStorage.setItem("playerId", playerId);
         localStorage.setItem("playerName", randomName);
         localStorage.setItem("gameCode", joinCode.toUpperCase());
-        localStorage.setItem("isHost", "false");
+        if (!rejoining) localStorage.setItem("isHost", "false");
 
         // Navigate to lobby
         navigate("/lobby");

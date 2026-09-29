@@ -23,7 +23,6 @@ const UNTESTED = new Set([
   "src/fabric-ui/FabricSurface.tsx",
   "src/fabric-ui/useFabricControls.ts",
   "src/fabric-ui/useParallax.ts",
-  "src/pages/Lobby.tsx",
   "src/pages/MidQuizScoreboard.tsx",
   "src/pages/Scoreboard.tsx",
   "src/pages/UnderDevelopment.tsx",

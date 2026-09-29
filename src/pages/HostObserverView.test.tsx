@@ -5,8 +5,8 @@ import { renderWithProviders, screen } from "../test/test-utils";
 import HostObserverView from "./HostObserverView";
 import type { Room } from "../utils/roomsFirestore";
 
-const mocks = vi.hoisted(() => ({ listenToRoom: vi.fn(), onRoom: (_room: unknown) => {} }));
-vi.mock("../utils/roomsFirestore", () => ({ listenToRoom: mocks.listenToRoom, resumeAfterMidQuiz: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listenToRoom: vi.fn(), resumeAfterMidQuiz: vi.fn(), onRoom: (_room: unknown) => {} }));
+vi.mock("../utils/roomsFirestore", () => ({ listenToRoom: mocks.listenToRoom, resumeAfterMidQuiz: mocks.resumeAfterMidQuiz }));
 
 const ShowLocation = () => {
   const location = useLocation();
@@ -51,6 +51,19 @@ describe("HostObserverView", () => {
     renderView();
     act(() => mocks.onRoom(room({ phase: "results" })));
     expect(screen.getByText('at /results with {"multiplayer":true,"roomCode":"ABBA","playerId":"host","observer":true}')).toBeInTheDocument();
+  });
+
+  it("can go on without a player who never reaches the break (#65)", async () => {
+    mocks.resumeAfterMidQuiz.mockResolvedValue(true);
+    renderView();
+    act(() => mocks.onRoom(room({ phase: "mid-scoreboard", playersAtMidQuiz: ["p3"] })));
+    expect(screen.getByRole("button", { name: "Continue Quiz" })).toBeDisabled();
+    expect(screen.getByText("Still waiting for Loreen.")).toBeInTheDocument();
+    await act(async () => screen.getByRole("button", { name: "Continue without them" }).click());
+    expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledWith("ABBA");
+
+    act(() => mocks.onRoom(room({ phase: "mid-scoreboard", playersAtMidQuiz: ["p2", "p3"] })));
+    expect(screen.queryByRole("button", { name: "Continue without them" })).not.toBeInTheDocument();
   });
 
   it("says when there's no room to watch", () => {

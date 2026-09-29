@@ -34,6 +34,7 @@ interface Room {
   currentQuestionIndex?: number;
   phaseStartedAt?: Timestamp | FieldValue; // always serverTimestamp()
   nextRoomCode?: string;             // the next round's room (#21): set once, on a finished room, to a lobby the same host made
+  readyPlayers?: string[];           // lobby ready marks by player id (#65); only before the start
 }
 
 interface Player {
@@ -89,7 +90,17 @@ and its write; the rules then refuse the join, and `addPlayerToRoom`
 re-reads the room to say why, as a `JoinRejected` with a `reason`
 (`not-found`, `started`, `full`), rather than a rules error (#64).
 `joinRoom` answers `false` for the first two. A player already in the room
-(the same ID) is let back in even after the start. Joins are an
+(the same ID) is let back in even after the start; the join screen reuses
+this device's stored ID and name when the code typed is the game it was
+last in, so a closed tab or dead phone rejoins as the same player (#65).
+
+In the lobby (#65), each guest toggles a ready mark (`setPlayerReady`,
+`arrayUnion`/`arrayRemove` on `readyPlayers`), and the host can take a
+player out (`removePlayerFromRoom`, an `arrayRemove` of that exact player
+entry and its mark, so a guest joining at the same moment isn't lost).
+The rules allow both only before the start: one mark added or removed at a
+time, and one player removed, never the host (verify case 15). A player
+taken out sees so in the lobby and may join again with the code. Joins are an
 `arrayUnion`; why not a transaction is under "Which writes are safe"
 below.
 `updatePlayerScore`
@@ -99,7 +110,8 @@ room turns a write down, so callers don't parse messages (#131).
 
 ## Which writes are safe vs. race-prone
 
-- **Safe:** `addPlayerToRoom` and `markPlayerAtMidQuiz` use `arrayUnion` —
+- **Safe:** `addPlayerToRoom`, `markPlayerAtMidQuiz`, `setPlayerReady`
+  and `removePlayerFromRoom` use `arrayUnion`/`arrayRemove` —
   concurrent joins, and every player reaching the mid-quiz break on the same
   snapshot (#62), can't clobber each other. `advanceQuestion` and
   `resumeAfterMidQuiz` are transactions (see above). `updatePlayerScore` runs inside a `runTransaction` —

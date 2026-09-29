@@ -95,6 +95,9 @@ plan that also removes the ad hoc storage it would duplicate.
 - `finale.ts` — the quiz finale (#67): final places with ties, and the
   order the results page reveals them in.
 
+- `lobbyGate.ts` — when the lobby's host may start (#65): everyone ready,
+  "Start anyway" before that, never an observer host with nobody to play.
+
 - `partyModel.ts` (rating sheets, scores, closeness, awards; pure),
   `partyFirestore.ts` (`parties/`, ballots, `contests/`),
   `partySession.ts` (this device's identity and ratings per party),

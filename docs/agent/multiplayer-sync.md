@@ -16,7 +16,12 @@ Why this runs on Firestore listeners and not WebSockets:
    navigate to `/lobby`. Whether the host only observes is stored on the
    room (`Room.hostIsObserver`) and nowhere else.
 2. **`Lobby.tsx`** — reads those `localStorage` values back out, then opens
-   one `onSnapshot` listener via `listenToRoom(gameCode, callback)`. The host
+   one `onSnapshot` listener via `listenToRoom(gameCode, callback)`. It's
+   the "green room" (#65): guests tap "I'm ready" (`setPlayerReady`), the
+   host can take a player out (`removePlayerFromRoom`), and the host's
+   Start waits until every guest is ready, with an explicit "Start anyway"
+   before that (`lobbyGate.ts`; an observer host needs at least one
+   player). The host
    picks a difficulty (`setRoomDifficulty`) and starts the game
    (`startGame`, which sets `Room.started = true` and moves the room to
    `phase: "question"` in the same write; see
@@ -62,7 +67,8 @@ Why this runs on Firestore listeners and not WebSockets:
    stuck (#23). The rules refuse a ready mark that arrives after the
    resume. `HostObserverView.tsx` is the host-only screen when
    `hostIsObserver` is true — the host watches without answering, and its
-   Continue waits until every player is marked.
+   Continue waits until every player is marked, naming who's missing, with
+   "Continue without them" for a player whose phone died (#65).
 5. **`QuizResults.tsx`** — the finale (#67): the room's final standings,
    revealed a tap at a time (everyone below the podium, then 3rd, 2nd and
    1st; ties together, `finale.ts`), with no motion, in the Calm style. It

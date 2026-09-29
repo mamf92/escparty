@@ -35,6 +35,7 @@ const HostObserverView = () => {
     const playersAtMidQuiz = room?.playersAtMidQuiz ?? [];
     const allPlayersReady = players.length > 0 && players.every(player => playersAtMidQuiz.includes(player.id));
     const inBreak = room?.phase === "mid-scoreboard";
+    const missing = players.filter(player => !playersAtMidQuiz.includes(player.id)).map(player => player.name);
     // Continue resumes the room for everyone, so only the room's observer
     // host gets it, checked against the room rather than whoever opened
     // this page.
@@ -143,6 +144,16 @@ const HostObserverView = () => {
             >
                 {resuming ? "Continuing..." : "Continue Quiz"}
             </NextButton>
+            {/* A player whose phone died never reaches the break (#65, #23):
+                the host can go on without them, on purpose. */}
+            {isRoomObserver && inBreak && players.length > 0 && !allPlayersReady && (
+                <>
+                    <WaitingMessage>Still waiting for {missing.join(", ")}.</WaitingMessage>
+                    <NextButton onClick={resume} disabled={resuming}>
+                        Continue without them
+                    </NextButton>
+                </>
+            )}
             {resumeError && <ErrorMessage>{resumeError}</ErrorMessage>}
         </Container>
     );

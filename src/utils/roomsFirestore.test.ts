@@ -19,6 +19,8 @@ import {
     JoinRejected,
     MAX_PLAYERS,
     setNextRoom,
+    setPlayerReady,
+    removePlayerFromRoom,
 } from "./roomsFirestore";
 
 // The Firebase client SDK is mocked rather than pointed at the emulator: the
@@ -35,6 +37,7 @@ const mocks = vi.hoisted(() => ({
     setDoc: vi.fn(),
     updateDoc: vi.fn(),
     arrayUnion: vi.fn(),
+    arrayRemove: vi.fn(),
     onSnapshot: vi.fn(),
     runTransaction: vi.fn(),
     serverTimestamp: vi.fn(),
@@ -57,6 +60,7 @@ vi.mock("firebase/firestore", () => ({
     setDoc: mocks.setDoc,
     updateDoc: mocks.updateDoc,
     arrayUnion: mocks.arrayUnion,
+    arrayRemove: mocks.arrayRemove,
     onSnapshot: mocks.onSnapshot,
     runTransaction: mocks.runTransaction,
     serverTimestamp: mocks.serverTimestamp,
@@ -115,6 +119,7 @@ beforeEach(() => {
         __ref: `${collection}/${id}`,
     }));
     mocks.arrayUnion.mockImplementation((...items: unknown[]) => ({ __arrayUnion: items }));
+    mocks.arrayRemove.mockImplementation((...items: unknown[]) => ({ __arrayRemove: items }));
     mocks.serverTimestamp.mockReturnValue(SERVER_TIMESTAMP);
     mocks.timestampNow.mockReturnValue(NOW);
     mocks.setDoc.mockResolvedValue(undefined);
@@ -904,5 +909,40 @@ describe("setNextRoom", () => {
     it("needs Firebase", async () => {
         firebaseState.db = undefined;
         await expect(setNextRoom("ABCD", "EFGH")).rejects.toThrow("Firebase not initialized");
+    });
+});
+
+describe("setPlayerReady", () => {
+    it("adds and removes the player's ready mark server-side", async () => {
+        mocks.updateDoc.mockResolvedValue(undefined);
+        await setPlayerReady("ABCD", "p-1", true);
+        await setPlayerReady("ABCD", "p-1", false);
+        expect(mocks.updateDoc.mock.calls).toEqual([
+            [refFor("ABCD"), { readyPlayers: { __arrayUnion: ["p-1"] } }],
+            [refFor("ABCD"), { readyPlayers: { __arrayRemove: ["p-1"] } }],
+        ]);
+    });
+
+    it("needs Firebase", async () => {
+        firebaseState.db = undefined;
+        await expect(setPlayerReady("ABCD", "p-1", true)).rejects.toThrow("Firebase not initialized");
+    });
+});
+
+describe("removePlayerFromRoom", () => {
+    it("removes exactly that entry and its ready mark, without reading the room", async () => {
+        mocks.updateDoc.mockResolvedValue(undefined);
+        const guest = player("p-2", "Loreen");
+        await removePlayerFromRoom("ABCD", guest);
+        expect(mocks.getDoc).not.toHaveBeenCalled();
+        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), {
+            players: { __arrayRemove: [guest] },
+            readyPlayers: { __arrayRemove: ["p-2"] },
+        });
+    });
+
+    it("needs Firebase", async () => {
+        firebaseState.db = undefined;
+        await expect(removePlayerFromRoom("ABCD", player("p-2", "Loreen"))).rejects.toThrow("Firebase not initialized");
     });
 });
