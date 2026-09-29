@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, generateRoomCode, getRoom, setRoomDifficulty } from "../utils/roomsFirestore";
-import { isKnownQuizKey, quizTitle } from "../utils/quizCatalog";
+import { createRoom, joinRoom, generateRoomCode, getRoom } from "../utils/roomsFirestore";
+import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
+import { useQuizTitle } from "../hooks/useQuizTitle";
 
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
@@ -50,6 +51,7 @@ const MultiplayerLobby = () => {
     const picked = (location.state as { quizKey?: string } | null)?.quizKey;
     return isKnownQuizKey(picked) ? picked : null;
   });
+  const pickedTitle = useQuizTitle(quizKey);
   // The pick is for one new room: drop it from this history entry, so
   // coming Back here later doesn't preset the next room with it.
   const forgetPickedQuiz = () => {
@@ -72,7 +74,7 @@ const MultiplayerLobby = () => {
       await createRoom(newGameCode, hostId, hostName, hostIsObserver);
       if (quizKey) {
         // Best effort: if it doesn't stick, the lobby still offers the list.
-        await setRoomDifficulty(newGameCode, quizKey).catch(error =>
+        await setRoomQuiz(newGameCode, quizKey).catch(error =>
           console.error("Couldn't preselect the quiz:", error));
       }
 
@@ -169,7 +171,7 @@ const MultiplayerLobby = () => {
   return (
     <Container>
       <Title>Multiplayer Quiz</Title>
-      {quizKey && <HostingNote>Hosting: {quizTitle(quizKey)}</HostingNote>}
+      {quizKey && <HostingNote>Hosting: {pickedTitle}</HostingNote>}
       {!showJoinForm && !showCreateOptions ? (
         <OptionsContainer>
           <OptionCard onClick={loading ? undefined : handleShowCreateOptions} disabled={loading}>

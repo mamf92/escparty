@@ -28,7 +28,6 @@ const UNTESTED = new Set([
   "src/pages/MidQuizScoreboard.tsx",
   "src/pages/QuizResults.tsx",
   "src/pages/Scoreboard.tsx",
-  "src/pages/SelectDifficulty.tsx",
   "src/pages/UnderDevelopment.tsx",
   "src/store/useGameStore.ts",
 ]);

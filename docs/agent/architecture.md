@@ -6,7 +6,10 @@ moving files between folders.
 ## `src/pages/`
 
 Most screens live here: `Home.tsx`, `SelectDifficulty.tsx`,
-`QuizLibrary.tsx` (`/quizzes`, every premade quiz to play solo or host),
+`QuizLibrary.tsx` (`/quizzes`, your saved quizzes and every premade one,
+to play solo, host, or take into the builder), `QuizBuilder.tsx`
+(`/quizzes/new`, `/quizzes/edit/:quizId`: bank picker, question editor,
+order and break setting, save),
 `MultiplayerLobby.tsx`, `Lobby.tsx`, `MidQuizScoreboard.tsx`,
 `HostObserverView.tsx`, `QuizResults.tsx`, `Scoreboard.tsx`,
 `UnderDevelopment.tsx`. Routed from `src/App.tsx`, wrapped in `MobileFrame`
@@ -69,9 +72,14 @@ plan that also removes the ad hoc storage it would duplicate.
   `questionProblems`/`quizProblems` (at least 2 answers, one marked
   correct, limits), `BREAK_CHOICES` for the scoreboard placement,
   `isBreakAfter`, `toPlayable`, `seededShuffle`. Pure functions.
-- `quizCatalog.ts` — what a quiz key names (`easy`/`medium`/`hard`, or
-  `t-<templateId>`), its title, and `loadQuiz(key)`. The quiz route
-  (`/quiz/:key`) and a room's `difficulty` field both carry a key.
+- `quizCatalog.ts` — what a quiz key names (`easy`/`medium`/`hard`,
+  `t-<templateId>` or `c-<quizId>`), its title, `loadQuiz(key)`,
+  `quizBreakEvery(key)` for a room, and `loadQuizForEditing(key)` for the
+  builder. The quiz route (`/quiz/:key`) and a room's `difficulty` field
+  both carry a key.
+- `customQuizzes.ts` — saved custom quizzes (#76): save to and read from
+  Firestore `quizzes/`, and this device's "my quizzes" list in
+  localStorage. See "Saved quizzes" in `firestore-data-model.md`.
 
 - `roomsFirestore.ts` — the entire Firestore API surface: room/player CRUD,
   the `onSnapshot`-based `listenToRoom`, the phase moves
@@ -123,6 +131,9 @@ plan that also removes the ad hoc storage it would duplicate.
   the observer screen and the results page. 100% coverage floor.
 
 ## `src/hooks/`
+
+- `useQuizTitle.ts` — a quiz key's title, reading a saved quiz someone
+  else made from Firestore (the lobby and the multiplayer lobby).
 
 - `useResumeRoom.ts` — the host's Continue at a mid-quiz break (#63), used
   by `MidQuizScoreboard.tsx` and `HostObserverView.tsx`: calls

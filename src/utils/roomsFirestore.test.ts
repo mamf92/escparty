@@ -537,6 +537,18 @@ describe("advanceQuestion", () => {
         });
     });
 
+    it("follows the room's own break setting", async () => {
+        const update = givenTransactionSees({ ...onQuestion(3), breakEvery: 4 });
+
+        await advanceQuestion("ABCD", 3, 12);
+
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            phase: "mid-scoreboard",
+            currentQuestionIndex: 4,
+            phaseStartedAt: SERVER_TIMESTAMP,
+        });
+    });
+
     it("ends the quiz after the last question", async () => {
         const update = givenTransactionSees(onQuestion(14));
 
@@ -621,6 +633,12 @@ describe("the single-field room writes", () => {
         await setRoomDifficulty("ABCD", "hard");
 
         expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), { difficulty: "hard" });
+    });
+
+    it("setRoomDifficulty writes the break setting with the quiz when given", async () => {
+        await setRoomDifficulty("ABCD", "t-quick-fire", 0);
+
+        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), { difficulty: "t-quick-fire", breakEvery: 0 });
     });
 
     it("setContinueReady writes the flag in both directions", async () => {

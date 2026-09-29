@@ -25,6 +25,10 @@ const SelectDifficulty = () => {
         <Button onClick={() => handleSelect("hard")}>
           <DifficultyText>Hard</DifficultyText>
           <DifficultyDescription>You know where ESC was held when Dana International won</DifficultyDescription></Button>
+        <Button onClick={() => navigate("/quizzes")}>
+          <DifficultyText>More quizzes</DifficultyText>
+          <DifficultyDescription>Premade quizzes, and the ones you build yourself</DifficultyDescription>
+        </Button>
       </ButtonContainer>
     </Container>
   );

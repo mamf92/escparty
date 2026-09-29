@@ -4,9 +4,13 @@ Read this before touching `roomsFirestore.ts` or any Firestore-backed page.
 
 ## Collections
 
-One collection, `rooms`, keyed by a 4-letter uppercase room code
-(`generateRoomCode()`). No sub-collections; players live as an array on the
-room document, not as their own documents.
+Two collections:
+
+- `rooms`, keyed by a 4-letter uppercase room code (`generateRoomCode()`).
+  No sub-collections; players live as an array on the room document, not
+  as their own documents.
+- `quizzes`, saved custom quizzes (#76), keyed by a random 20-character
+  Firestore id. See "Saved quizzes" below.
 
 ## `Room` shape (as defined in `roomsFirestore.ts`)
 
@@ -15,7 +19,8 @@ interface Room {
   id: string;
   hostId: string;
   started: boolean;
-  difficulty?: string;               // the quiz key: "easy" | "medium" | "hard" | "t-<templateId>"
+  difficulty?: string;               // the quiz key: "easy" | "medium" | "hard" | "t-<templateId>" | "c-<quizId>"
+  breakEvery?: number;               // mid-quiz break every N questions, 0 = never; absent = 5
   createdAt: Timestamp | FieldValue;
   players: Player[];
   hostIsObserver?: boolean;
@@ -252,9 +257,39 @@ corrupted.
 **Quiz keys (#72).** `isSettingDifficulty` accepts `easy`, `medium`,
 `hard`, or `t-` followed by 1-40 lowercase letters, digits and dashes (a
 premade quiz from `src/data/quizTemplates.ts`; every client plays it from
-its own bundle). The field is still called `difficulty` so rooms and the
-exported API don't change. Covered by cases 5d/5e of
+its own bundle), or `c-` followed by a 20-character document id (a saved
+quiz, #77). The same `isQuizKey` check applies when a room is created with
+the field. The field is still called `difficulty` so rooms and the
+exported API don't change. The quiz's `breakEvery` may ride along in the
+same one-shot write (`setRoomDifficulty(code, key, breakEvery)`), and
+`isAdvancingPhase` puts the mid-quiz break where it says
+(`isBreakBefore`, the same arithmetic as `phaseAfterQuestion`). Covered by
+cases 5d-5g and the break-setting walks in case 12 of
 `scripts/verify-firestore-rules.mjs`.
+
+## Saved quizzes (`quizzes/{quizId}`, #76)
+
+```ts
+{
+  title: string;          // 1-60 characters
+  breakEvery: number;     // 0, 3, 4, 5 or 10
+  questions: {            // 1-50
+    id: string; question: string; options: string[]; correctAnswer: string;
+    source: "bank" | "custom"; difficulty?: ...; category?: ...;
+  }[];
+  createdAt: Timestamp;   // serverTimestamp()
+}
+```
+
+No sign-in, so the random document id is the capability: the rules allow
+`get` by id and refuse `list`, and a quiz is never updated or deleted, so
+every player in a room plays the same list. Editing saves a new document
+and swaps the id in this device's list (`localStorage`,
+`escparty.myQuizzes`); removing one only forgets the id here, and the
+document stays readable to anyone holding its id. The rules can't loop
+over 50 questions, so each one's shape is checked when a client loads the
+quiz (`fetchCustomQuiz` drops what `questionProblems` rejects, the same way
+on every client). Code: `src/utils/customQuizzes.ts`; rules cases 5h.
 
 **Two more real gaps found and fixed** on a pass against #50's own acceptance
 criteria (also verified against the emulator, also in

@@ -11,7 +11,7 @@ import {
     FieldValue
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { phaseAfterQuestion } from "./quizTiming";
+import { MID_QUIZ_EVERY, phaseAfterQuestion } from "./quizTiming";
 
 // Define room and player interfaces
 export interface Player {
@@ -34,6 +34,9 @@ export interface Room {
     hostId: string;
     started: boolean;
     difficulty?: string;
+    // How often the mid-quiz break comes (0: never), set with the quiz. Rooms
+    // without it break every MID_QUIZ_EVERY questions.
+    breakEvery?: number;
     createdAt: Timestamp | FieldValue;
     players: Player[];
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
@@ -220,9 +223,11 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
 };
 
 /**
- * Set the difficulty of a room
+ * Set which quiz a room plays (its `difficulty`, a quiz key), and optionally
+ * how often its mid-quiz break comes. One-shot: firestore.rules refuses a
+ * second write.
  */
-export const setRoomDifficulty = async (roomCode: string, difficulty: string): Promise<void> => {
+export const setRoomDifficulty = async (roomCode: string, difficulty: string, breakEvery?: number): Promise<void> => {
     console.log(`Setting difficulty for room ${roomCode} to ${difficulty}`);
 
     if (!checkFirebaseInitialization()) {
@@ -231,7 +236,7 @@ export const setRoomDifficulty = async (roomCode: string, difficulty: string): P
 
     try {
         const roomRef = doc(db, "rooms", roomCode);
-        await updateDoc(roomRef, { difficulty });
+        await updateDoc(roomRef, breakEvery === undefined ? { difficulty } : { difficulty, breakEvery });
         console.log(`Difficulty set to ${difficulty} for room ${roomCode}`);
     } catch (error) {
         console.error("Error setting room difficulty:", error);
@@ -361,7 +366,7 @@ export const advanceQuestion = async (roomCode: string, fromIndex: number, total
                 return false;
             }
 
-            const next = phaseAfterQuestion(fromIndex, totalQuestions);
+            const next = phaseAfterQuestion(fromIndex, totalQuestions, room.breakEvery ?? MID_QUIZ_EVERY);
             transaction.update(roomRef, {
                 phase: next.phase,
                 currentQuestionIndex: next.currentQuestionIndex,
