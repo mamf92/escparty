@@ -133,7 +133,7 @@ branch instead. `npm run test:coverage` itself is still not a CI check —
 The unit harness is the first rung of the test-coverage epic (#53). Still
 open at the time of writing:
 
-- **Covered so far: the data/logic layer, not the screens.**
+- **Covered so far: the data/logic layer, and a test file per screen.**
   `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts`, the
   extracted scoring math in `src/utils/quizScoring.ts` and the multiplayer
   timing in `src/utils/quizTiming.ts` have unit tests with a coverage floor

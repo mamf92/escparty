@@ -31,6 +31,12 @@ const renderBreak = (state?: unknown) =>
     { initialEntries: [{ pathname: "/mid-quiz-scoreboard", state }] },
   );
 
+/** The router state the page navigated to `path` with. */
+const stateAt = (path: string) => {
+  const text = screen.getByText(new RegExp(`^at ${path} with `)).textContent!;
+  return JSON.parse(text.slice(`at ${path} with `.length));
+};
+
 const room = (change: Partial<Room> = {}): Room => ({
   id: "ABBA",
   hostId: "host",
@@ -64,7 +70,7 @@ describe("MidQuizScoreboard", () => {
     expect(screen.getByText("You scored 800 so far!")).toBeInTheDocument();
     expect(mocks.listenToRoom).not.toHaveBeenCalled();
     await userEvent.setup().click(screen.getByRole("button", { name: "Continue Quiz" }));
-    expect(screen.getByText(/at \/quiz\/hard with .*"currentQuestionIndex":5,"score":800,"multiplayer":false/)).toBeInTheDocument();
+    expect(stateAt("/quiz/hard")).toMatchObject({ currentQuestionIndex: 5, score: 800, multiplayer: false });
   });
 
   it("shows a guest the room's standings and waits for the host", () => {
@@ -99,9 +105,41 @@ describe("MidQuizScoreboard", () => {
     }
   });
 
+  it("stops retrying a failed mark once the page closes", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mocks.markPlayerAtMidQuiz.mockRejectedValue(new Error("offline"));
+      const { unmount } = renderBreak(multiplayer("p2"));
+      act(() => mocks.onRoom(room({ hostIsObserver: true })));
+      await act(async () => {});
+      unmount();
+      await act(async () => vi.advanceTimersByTime(5000));
+      expect(mocks.markPlayerAtMidQuiz).toHaveBeenCalledTimes(1);
+      expect(mocks.unsubscribe).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("doesn't go anywhere after closing on a room that's gone", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderBreak(multiplayer("p2"));
+      act(() => mocks.onRoom(null));
+      unmount();
+      await act(async () => vi.advanceTimersByTime(2000));
+      expect(screen.queryByText(/at \/multiplayer/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("doesn't mark a later break this player hasn't reached", () => {
     renderBreak(multiplayer("p2"));
-    act(() => mocks.onRoom(room({ hostIsObserver: true, phase: "question", currentQuestionIndex: 4 })));
+    // Router state says this is the break before question 5; the room is
+    // already at the next one.
+    act(() => mocks.onRoom(room({ hostIsObserver: true, currentQuestionIndex: 10 })));
     expect(mocks.markPlayerAtMidQuiz).not.toHaveBeenCalled();
   });
 
@@ -112,7 +150,7 @@ describe("MidQuizScoreboard", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Continue Quiz" }));
     expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledWith("ABBA");
     act(() => mocks.onRoom(room({ phase: "question", currentQuestionIndex: 5 })));
-    expect(screen.getByText(/at \/quiz\/easy with .*"currentQuestionIndex":5,"score":400,"multiplayer":true,"roomCode":"ABBA","playerId":"host"/)).toBeInTheDocument();
+    expect(stateAt("/quiz/easy")).toMatchObject({ currentQuestionIndex: 5, score: 400, multiplayer: true, roomCode: "ABBA", playerId: "host" });
   });
 
   it("picks the break up from the room when opened without router state", () => {

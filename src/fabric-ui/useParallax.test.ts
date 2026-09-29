@@ -17,6 +17,9 @@ describe("useParallax", () => {
     const { result } = renderHook(() => useParallax(true, 10));
     act(() => pointer(window.innerWidth, 0));
     expect(result.current.offset.current).toEqual({ yaw: 10, tilt: 10 });
+    // A drag past the edge of the window stays at the strength.
+    act(() => pointer(window.innerWidth * 3, window.innerHeight * 3));
+    expect(result.current.offset.current).toEqual({ yaw: 10, tilt: -10 });
     act(() => pointer(window.innerWidth / 2, window.innerHeight / 2));
     expect(result.current.offset.current.yaw).toBeCloseTo(0);
     expect(result.current.needsPermission).toBe(false);
@@ -54,12 +57,25 @@ describe("useParallax", () => {
     vi.stubGlobal("DeviceOrientationEvent", Object.assign(class extends Event {}, { requestPermission }));
     const { result } = renderHook(() => useParallax(true, 20));
     expect(result.current.needsPermission).toBe(true);
+    // Not listened to until access is granted.
+    act(() => {
+      const event = new Event("deviceorientation");
+      Object.assign(event, { gamma: 15, beta: 75 });
+      window.dispatchEvent(event);
+    });
+    expect(result.current.offset.current).toEqual({ yaw: 0, tilt: 0 });
     await act(() => result.current.requestMotion());
     expect(result.current.needsPermission).toBe(true);
     await act(() => result.current.requestMotion());
     expect(result.current.needsPermission).toBe(true);
     await act(() => result.current.requestMotion());
     expect(result.current.needsPermission).toBe(false);
+    act(() => {
+      const event = new Event("deviceorientation");
+      Object.assign(event, { gamma: -15, beta: 45 });
+      window.dispatchEvent(event);
+    });
+    expect(result.current.offset.current).toEqual({ yaw: -10, tilt: 0 });
   });
 
   it("does nothing to ask for where no permission is needed", async () => {

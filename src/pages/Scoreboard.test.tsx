@@ -53,17 +53,32 @@ describe("Scoreboard", () => {
     expect(rows()[0]).toHaveClass("is-low");
 
     await user.click(screen.getByRole("tab", { name: "Difficulty" }));
-    expect(rows().map(row => row.textContent?.slice(0, 6))).toEqual(["2 / 10", "9 / 10", "5 / 10"]);
+    // Easiest first.
+    expect(rows().map(row => row.textContent?.slice(0, 6))).toEqual(["2 / 10", "5 / 10", "9 / 10"]);
   });
 
   it("keeps every run at rest when they all scored the same", () => {
     localStorage.setItem("quizScores", JSON.stringify([
       { score: 4, total: 8, difficulty: "easy", date: "not a date" },
+      { score: 5, total: 10, difficulty: "t-nordic-nights", date: "2026-05-16T00:00:00Z" },
     ]));
     renderScoreboard();
-    expect(screen.getByText("1 run. Your best stands highest.")).toBeInTheDocument();
-    expect(rows()[0]).not.toHaveClass("is-high");
-    expect(rows()[0]).toHaveTextContent("Unknown date");
+    expect(screen.getByText("2 runs. Your best stands highest.")).toBeInTheDocument();
+    for (const row of rows()) {
+      expect(row).not.toHaveClass("is-high");
+      expect(row).not.toHaveClass("is-low");
+    }
+    expect(screen.getByText("Unknown date")).toBeInTheDocument();
+  });
+
+  it("puts other quizzes after the classics, by title", async () => {
+    localStorage.setItem("quizScores", JSON.stringify([
+      { score: 1, total: 10, difficulty: "t-nordic-nights", date: "2026-05-16T00:00:00Z" },
+      { score: 2, total: 10, difficulty: "hard", date: "2026-05-16T00:00:00Z" },
+    ]));
+    renderScoreboard();
+    await userEvent.setup().click(screen.getByRole("tab", { name: "Difficulty" }));
+    expect(rows()[0]).toHaveTextContent("2 / 10");
   });
 
   it("goes home", async () => {
