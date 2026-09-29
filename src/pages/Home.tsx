@@ -19,6 +19,7 @@ const Home = () => {
         <Title>ESC Party 🎤</Title>
         <ButtonContainer>
           <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer quiz</QuizButton>
+          <QuizButton onClick={() => navigate("/quizzes")}>Quiz library</QuizButton>
           <QuizButton onClick={() => navigate("/select-difficulty")}>Single-player quiz</QuizButton>
           <QuizButton onClick={() => navigate("/quiz")}>Create quiz</QuizButton>
         </ButtonContainer>

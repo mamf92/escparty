@@ -36,7 +36,7 @@ service cloud.firestore {
              isValidPlayer(data.players[0]) &&
              data.players[0].id == data.hostId &&
              // Optional fields validation
-             (!('difficulty' in data) || data.difficulty is string) &&
+             (!('difficulty' in data) || isQuizKey(data.difficulty)) &&
              (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
              (!('continueReady' in data) || data.continueReady is bool) &&
              (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list) &&
@@ -82,12 +82,19 @@ service cloud.firestore {
       // before the game starts. Without auth there's no way to check the
       // caller is actually the host, so this is the closest enforceable
       // proxy for "only the host sets difficulty, and only once."
+      // `difficulty` names the quiz: see isQuizKey.
       return affected.hasOnly(['difficulty']) &&
              !('difficulty' in existingData) &&
              'difficulty' in data &&
-             data.difficulty is string &&
-             data.difficulty in ['easy', 'medium', 'hard'] &&
+             isQuizKey(data.difficulty) &&
              existingData.started == false;
+    }
+
+    // What a room's `difficulty` may name (src/utils/quizCatalog.ts): a
+    // classic difficulty, or a premade quiz as `t-` plus its template id (#72).
+    function isQuizKey(value) {
+      return value is string &&
+             (value in ['easy', 'medium', 'hard'] || value.matches('t-[a-z0-9-]{1,40}'));
     }
 
     function isAddingPlayer(affected) {

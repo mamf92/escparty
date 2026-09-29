@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 import { listenToRoom, Room, setRoomDifficulty, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
+import { QUIZ_CHOICES, quizTitle } from "../utils/quizCatalog";
 
 const Lobby = () => {
     const [room, setRoom] = useState<Room | null>(null);
@@ -81,17 +82,17 @@ const Lobby = () => {
         return () => unsubscribe();
     }, [navigate]);
 
-    const handleSelectDifficulty = async (displayDifficulty: string) => {
+    const handleSelectQuiz = async (quizKey: string) => {
         // Guard against a double-click firing two writes before the first
         // one's onSnapshot update disables these buttons — firestore.rules
         // now treats difficulty as a one-shot field, so a second write
         // would otherwise be denied and surface as a dead-end error screen.
+        // (The room's `difficulty` field names the quiz: a classic
+        // difficulty or a premade quiz, see quizCatalog.ts.)
         if (isHost && gameCode && !isSettingDifficulty) {
-            // Convert to lowercase for internal storage while keeping display capitalized
-            const difficulty = displayDifficulty.toLowerCase();
             setIsSettingDifficulty(true);
             try {
-                await setRoomDifficulty(gameCode, difficulty);
+                await setRoomDifficulty(gameCode, quizKey);
             } catch (error) {
                 console.error("Error setting difficulty:", error);
                 setError("Failed to set difficulty");
@@ -105,7 +106,7 @@ const Lobby = () => {
         if (isHost && gameCode) {
             try {
                 if (!room?.difficulty) {
-                    alert("Please select a difficulty first!");
+                    alert("Please pick a quiz first!");
                     return;
                 }
                 await startGame(gameCode);
@@ -141,18 +142,20 @@ const Lobby = () => {
             {playerName && <PlayerName>You are: <Highlight>{playerName}</Highlight></PlayerName>}
             <GameInfo>
                 <InfoItem>Game Code: <Code>{gameCode}</Code></InfoItem>
-                <InfoItem>Difficulty: <Difficulty>{room?.difficulty ? room.difficulty.charAt(0).toUpperCase() + room.difficulty.slice(1) : "Not selected"}</Difficulty></InfoItem>
+                <InfoItem>Quiz: <Difficulty>{quizTitle(room?.difficulty)}</Difficulty></InfoItem>
             </GameInfo>
             <AnimatedSubtitle>Waiting for players...</AnimatedSubtitle>
 
-            {/* If host and difficulty not selected, show difficulty options */}
+            {/* If host and no quiz picked yet, show the quizzes */}
             {isHost && !room?.difficulty && (
                 <DifficultySection>
-                    <SubTitle>Select Difficulty:</SubTitle>
+                    <SubTitle>Pick a quiz:</SubTitle>
                     <ButtonGroup>
-                        <DifficultyButton disabled={isSettingDifficulty} onClick={() => handleSelectDifficulty("Easy")}>Easy</DifficultyButton>
-                        <DifficultyButton disabled={isSettingDifficulty} onClick={() => handleSelectDifficulty("Medium")}>Medium</DifficultyButton>
-                        <DifficultyButton disabled={isSettingDifficulty} onClick={() => handleSelectDifficulty("Hard")}>Hard</DifficultyButton>
+                        {QUIZ_CHOICES.map(choice => (
+                            <DifficultyButton key={choice.key} disabled={isSettingDifficulty} onClick={() => handleSelectQuiz(choice.key)}>
+                                {choice.title}
+                            </DifficultyButton>
+                        ))}
                     </ButtonGroup>
                 </DifficultySection>
             )}
@@ -307,10 +310,9 @@ const SubTitle = styled.h3`
 `;
 
 const ButtonGroup = styled.div`
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 0.625rem; /* 10px */
-    flex-wrap: wrap;
     width: 100%;
 `;
 

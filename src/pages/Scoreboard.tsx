@@ -3,7 +3,9 @@ import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import "../fabric-ui/lycra-surface.css";
 import "../fabric-ui/calm.css";
+import "../styles/calm-page.css";
 import "./scoreboard-calm.css";
+import { quizTitle } from "../utils/quizCatalog";
 
 interface ScoreEntry {
     score: number;
@@ -119,7 +121,7 @@ const Scoreboard = () => {
     }, [scoreHistory, sortKey]);
 
     return (
-        <Page className="scoreboard-calm">
+        <Page className="calm-page scoreboard-calm">
             <Header>
                 <Title>Scoreboard</Title>
                 <Subtitle>
@@ -169,7 +171,7 @@ const Scoreboard = () => {
                                     <span>
                                         {entry.score} / {entry.total}
                                     </span>
-                                    <span className="calm-sub">{entry.difficulty}</span>
+                                    <span className="calm-sub">{quizTitle(entry.difficulty)}</span>
                                 </span>
                                 <span className="calm-sub">{formatDate(entry.date)}</span>
                             </li>

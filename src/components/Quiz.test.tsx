@@ -32,12 +32,12 @@ vi.mock("../utils/QuizDataProvider", async (importOriginal) => {
   return { ...actual, loadQuizData: vi.fn(async () => QUESTIONS) };
 });
 
-const renderQuiz = (state: Record<string, unknown>) =>
+const renderQuiz = (state: Record<string, unknown>, pathname = "/quiz/easy") =>
   renderWithProviders(
     <Routes>
       <Route path="/quiz/:difficulty" element={<Quiz />} />
     </Routes>,
-    { initialEntries: [{ pathname: "/quiz/easy", state }] },
+    { initialEntries: [{ pathname, state }] },
   );
 
 beforeEach(() => {
@@ -82,6 +82,19 @@ describe("Quiz answer selection (#22)", () => {
 
     expect(screen.getByRole("button", { name: "Sweden" })).toHaveStyle({ background: theme.colors.accentgreen });
     expect(screen.getByRole("button", { name: "Norway" })).toHaveStyle({ background: theme.colors.incorrectRed });
+  });
+});
+
+describe("Quiz sources (#72)", () => {
+  it("plays a premade quiz from the bank", async () => {
+    renderQuiz({ multiplayer: false }, "/quiz/t-quick-fire");
+    // Quick Fire opens with the douze points question.
+    expect(await screen.findByRole("heading", { name: "How many points is the famous 'douze points'?" })).toBeInTheDocument();
+  });
+
+  it("shows an error for a quiz this build doesn't know", async () => {
+    renderQuiz({ multiplayer: false }, "/quiz/t-no-such-quiz");
+    expect(await screen.findByText("Unknown quiz: t-no-such-quiz")).toBeInTheDocument();
   });
 });
 

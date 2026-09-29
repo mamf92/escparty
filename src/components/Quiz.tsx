@@ -4,15 +4,20 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
 import { updatePlayerScore, listenToRoom, advanceQuestion, Room, ScoreWriteRejected } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
-import { loadQuizData, filterEnabledQuestions, isFallbackQuizData, QuizQuestion, QuizDifficulty } from "../utils/QuizDataProvider";
+import { filterEnabledQuestions, isFallbackQuizData, QuizQuestion } from "../utils/QuizDataProvider";
+import { isKnownQuizKey, loadQuiz } from "../utils/quizCatalog";
+import { DEFAULT_BREAK_EVERY, isBreakAfter } from "../utils/quizModel";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
-import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { FEEDBACK_MS, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
 
 
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  // Where the single-player break goes: the quiz's own setting (#72).
+  // Multiplayer follows the room's phase instead.
+  const [breakEvery, setBreakEvery] = useState<number>(DEFAULT_BREAK_EVERY);
   const location = useLocation();
   const locationState = location.state as {
     currentQuestionIndex?: number;
@@ -95,10 +100,10 @@ const Quiz = () => {
       isLocationStatePresent: !!location.state
     });
 
-    // Handle case when difficulty is undefined or invalid
-    if (!difficulty || !['easy', 'medium', 'hard'].includes(difficulty)) {
-      console.error(`❌ Invalid difficulty parameter: ${difficulty}`);
-      setError(`Invalid difficulty level: ${difficulty}`);
+    // The route names a classic difficulty or a premade quiz (quizCatalog.ts)
+    if (!isKnownQuizKey(difficulty)) {
+      console.error(`❌ Unknown quiz: ${difficulty}`);
+      setError(`Unknown quiz: ${difficulty}`);
       setLoading(false);
       return;
     }
@@ -168,13 +173,14 @@ const Quiz = () => {
     setLoadingStatus("Loading quiz data...");
 
     // Use Promise.race with a timeout to prevent infinite loading
-    const quizLoaderPromise = loadQuizData(difficulty as QuizDifficulty);
+    const quizLoaderPromise = loadQuiz(difficulty);
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Quiz loading timed out after 10 seconds')), 10000);
     });
 
     Promise.race([quizLoaderPromise, timeoutPromise])
-      .then((quizData) => {
+      .then((loaded) => {
+        const quizData = loaded.questions;
         console.log("✅ Fetched Quiz Data:", quizData);
         if (!quizData || !Array.isArray(quizData)) {
           console.error("❌ Quiz data is not in expected format:", quizData);
@@ -186,7 +192,7 @@ const Quiz = () => {
         // In multiplayer, a client that could only load the small built-in
         // bank would be on different questions from everyone else, and its
         // shorter quiz could end the game for the whole room. Stop here.
-        if (multiplayerData?.multiplayer && isFallbackQuizData(quizData)) {
+        if (multiplayerData?.multiplayer && loaded.classic && isFallbackQuizData(quizData)) {
           setError("Couldn't load this quiz's questions. Check your connection and reload the page to rejoin.");
           setLoading(false);
           return;
@@ -196,12 +202,13 @@ const Quiz = () => {
         console.log(`📋 Loaded ${filteredQuestions.length} questions for ${difficulty} difficulty`);
 
         if (filteredQuestions.length === 0) {
-          setError("No questions available for this difficulty level");
+          setError("This quiz has no questions to play");
           setLoading(false);
           return;
         }
 
         setQuestions(filteredQuestions);
+        setBreakEvery(loaded.breakEvery);
         setLoading(false);
 
       })
@@ -477,7 +484,7 @@ const Quiz = () => {
   // Local clock only: move on once the feedback time is over
   const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      if ((currentQuestionIndex + 1) % MID_QUIZ_EVERY === 0) {
+      if (isBreakAfter(currentQuestionIndex, questions.length, breakEvery)) {
         navigate("/mid-quiz-scoreboard", {
           state: {
             score,

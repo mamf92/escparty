@@ -6,6 +6,7 @@ moving files between folders.
 ## `src/pages/`
 
 Most screens live here: `Home.tsx`, `SelectDifficulty.tsx`,
+`QuizLibrary.tsx` (`/quizzes`, every premade quiz to play solo or host),
 `MultiplayerLobby.tsx`, `Lobby.tsx`, `MidQuizScoreboard.tsx`,
 `HostObserverView.tsx`, `QuizResults.tsx`, `Scoreboard.tsx`,
 `UnderDevelopment.tsx`. Routed from `src/App.tsx`, wrapped in `MobileFrame`
@@ -13,8 +14,12 @@ Most screens live here: `Home.tsx`, `SelectDifficulty.tsx`,
 
 ## `src/components/`
 
-Only two files today, and the folder name is misleading — neither is a small
-reusable piece:
+Mostly not small reusable pieces, despite the folder name:
+
+- `CalmPage.tsx` — page chrome (title, subtitle, footer, `CalmLink`,
+  `CalmNote`) for screens on the Calm surface, plus the shared
+  `src/styles/calm-page.css` that fits Calm into the phone frame. New
+  screens use it; see `docs/agent/theming.md`.
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui`).
@@ -44,7 +49,29 @@ instead threaded through `localStorage`, `sessionStorage`, and router
 Landmines section. Don't wire new code to this store without a migration
 plan that also removes the ad hoc storage it would duplicate.
 
+## `src/data/`
+
+- `escBeginnerQuiz.json` / `escIntermediateQuiz.json` /
+  `escAdvancedQuiz.json` — the classic easy/medium/hard sets (duplicated in
+  `public/quizdata/`, see "Data files" below).
+- `questionBank.ts` — every built-in question tagged with a difficulty and
+  a category (#71, #72): the classic 30 plus the newer ones, current to the
+  2026 contest and Burgas 2027. Tested for playability and unique ids.
+  Loaded lazily by `quizCatalog.loadQuiz`, so it stays out of the main chunk:
+  don't import it statically from a page.
+- `quizTemplates.ts` — the premade quizzes, each a spelled-out list of bank
+  ids (so it doesn't import the bank) and its own mid-quiz scoreboard
+  setting, which applies solo only until rooms carry a break setting.
+
 ## `src/utils/`
+
+- `quizModel.ts` — the quiz data model (#70): bank vs custom questions,
+  `questionProblems`/`quizProblems` (at least 2 answers, one marked
+  correct, limits), `BREAK_CHOICES` for the scoreboard placement,
+  `isBreakAfter`, `toPlayable`, `seededShuffle`. Pure functions.
+- `quizCatalog.ts` — what a quiz key names (`easy`/`medium`/`hard`, or
+  `t-<templateId>`), its title, and `loadQuiz(key)`. The quiz route
+  (`/quiz/:key`) and a room's `difficulty` field both carry a key.
 
 - `roomsFirestore.ts` — the entire Firestore API surface: room/player CRUD,
   the `onSnapshot`-based `listenToRoom`, the phase moves

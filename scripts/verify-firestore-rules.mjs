@@ -158,6 +158,48 @@ await expectDenied("re-set difficulty after it's already set", () =>
   updateDoc(diff3.roomRef, { difficulty: "hard" })
 );
 
+// 5d. Legitimate: a premade quiz as the room's quiz (#72), then start it
+const tpl = freshRoom("TPL");
+await createRoom(tpl.roomRef, tpl.roomCode);
+await expectAllowed("set a premade quiz (t-<id>) as the room's quiz", () =>
+  updateDoc(tpl.roomRef, { difficulty: "t-nordic-nights" })
+);
+await expectAllowed("start a game with a premade quiz", () =>
+  updateDoc(tpl.roomRef, startWrite())
+);
+
+// 5e. Malicious: a quiz key that is neither a difficulty nor a template id
+for (const [label, value] of [
+  ["an unknown difficulty", "impossible"],
+  ["a template key with uppercase/spaces", "t-Nordic Nights"],
+  ["an empty template key", "t-"],
+  ["an overlong template key", "t-" + "a".repeat(41)],
+]) {
+  const bad = freshRoom("BADQ");
+  await createRoom(bad.roomRef, bad.roomCode);
+  await expectDenied(`set ${label} as the room's quiz`, () =>
+    updateDoc(bad.roomRef, { difficulty: value })
+  );
+}
+
+// 5f. A room may be created with its quiz already named, but only a real
+// quiz key: creation used to accept any string, leaving the room stuck on a
+// quiz no client can play (difficulty is one-shot).
+const preset = freshRoom("PRESET");
+await expectAllowed("create a room with a premade quiz already named", () =>
+  setDoc(preset.roomRef, {
+    id: preset.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }], difficulty: "t-quick-fire",
+  })
+);
+const bogus = freshRoom("BOGUS");
+await expectDenied("create a room with a bogus quiz key", () =>
+  setDoc(bogus.roomRef, {
+    id: bogus.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }], difficulty: "bogus",
+  })
+);
+
 // 5c. Malicious: list/enumerate the whole rooms collection with no code
 await expectDenied("list the entire rooms collection with no code", async () => {
   const snap = await getDocs(collection(db, "rooms"));

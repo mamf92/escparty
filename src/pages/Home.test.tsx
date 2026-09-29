@@ -9,11 +9,12 @@ import Home from "./Home";
 // that user-event can drive it. Keep it cheap — per-page behaviour belongs in
 // that page's own test file.
 describe("Home", () => {
-  it("renders the title and the three entry points", () => {
+  it("renders the title and the entry points", () => {
     renderWithProviders(<Home />);
 
     expect(screen.getByRole("heading", { name: /esc party/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Multiplayer quiz" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quiz library" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Single-player quiz" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create quiz" })).toBeInTheDocument();
   });

@@ -26,7 +26,6 @@ const UNTESTED = new Set([
   "src/pages/HostObserverView.tsx",
   "src/pages/Lobby.tsx",
   "src/pages/MidQuizScoreboard.tsx",
-  "src/pages/MultiplayerLobby.tsx",
   "src/pages/QuizResults.tsx",
   "src/pages/Scoreboard.tsx",
   "src/pages/SelectDifficulty.tsx",

@@ -37,10 +37,12 @@ red run doesn't yet block merge or deploy (see #57). See
 
 ## Where things live
 
-`src/pages/` holds most screens; `src/components/` currently has only
-`MobileFrame.tsx` (the phone-frame chrome) and `Quiz.tsx` (~880 lines — the
-biggest single file in the app, despite the folder name most "components"
-are pages). `src/fabric-ui/` is a self-contained WebGL rendering module for
+`src/pages/` holds most screens; `src/components/` has `MobileFrame.tsx`
+(the phone-frame chrome), `CalmPage.tsx` (chrome for Calm screens) and
+`Quiz.tsx` (~890 lines — the biggest single file in the app, despite the
+folder name most "components" are pages). `src/data/` holds the question
+bank and premade quizzes; `quizModel.ts` and `quizCatalog.ts` in
+`src/utils/` are the quiz data model and what a quiz key names. `src/fabric-ui/` is a self-contained WebGL rendering module for
 the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one
 file, `useGameStore.ts`, which is dead code (see Landmines). `src/utils/`
 has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz

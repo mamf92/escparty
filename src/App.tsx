@@ -12,6 +12,7 @@ import Lobby from "./pages/Lobby";
 import MidQuizScoreboard from "./pages/MidQuizScoreboard";
 import HostObserverView from "./pages/HostObserverView";
 import UnderDevelopment from "./pages/UnderDevelopment";
+import QuizLibrary from "./pages/QuizLibrary";
 import MobileFrame from "./components/MobileFrame";
 
 // Lazy so that three, react-three-fiber and leva stay out of the app's main
@@ -52,6 +53,7 @@ const App = () => {
           <Route element={<FramedLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/select-difficulty" element={<SelectDifficulty />} />
+            <Route path="/quizzes" element={<QuizLibrary />} />
             <Route path="/quiz" element={<UnderDevelopment />} />
             <Route path="/quiz/:difficulty" element={<Quiz />} />
             <Route path="/results" element={<QuizResults />} />

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, generateRoomCode, getRoom } from "../utils/roomsFirestore";
+import { createRoom, joinRoom, generateRoomCode, getRoom, setRoomDifficulty } from "../utils/roomsFirestore";
+import { isKnownQuizKey, quizTitle } from "../utils/quizCatalog";
 
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
@@ -42,6 +43,19 @@ const MultiplayerLobby = () => {
   const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const navigate = useNavigate();
+  // A quiz picked in the library before coming here (#72): the new room
+  // starts with it chosen, and the host can start straight away.
+  const location = useLocation();
+  const [quizKey, setQuizKey] = useState(() => {
+    const picked = (location.state as { quizKey?: string } | null)?.quizKey;
+    return isKnownQuizKey(picked) ? picked : null;
+  });
+  // The pick is for one new room: drop it from this history entry, so
+  // coming Back here later doesn't preset the next room with it.
+  const forgetPickedQuiz = () => {
+    setQuizKey(null);
+    if (location.state) navigate(location.pathname, { replace: true, state: null });
+  };
 
   // Function to create game with host as observer
   const createGame = async (hostIsObserver: boolean) => {
@@ -56,6 +70,11 @@ const MultiplayerLobby = () => {
 
       // Create the room in Firestore
       await createRoom(newGameCode, hostId, hostName, hostIsObserver);
+      if (quizKey) {
+        // Best effort: if it doesn't stick, the lobby still offers the list.
+        await setRoomDifficulty(newGameCode, quizKey).catch(error =>
+          console.error("Couldn't preselect the quiz:", error));
+      }
 
       // Save user info in local storage
       localStorage.setItem("playerId", hostId);
@@ -67,6 +86,7 @@ const MultiplayerLobby = () => {
 
       // Update state and navigate
       setGameCode(newGameCode);
+      forgetPickedQuiz();
       navigate("/lobby");
     } catch (error) {
       console.error("Error creating game:", error);
@@ -135,6 +155,8 @@ const MultiplayerLobby = () => {
   };
 
   const handleShowJoinForm = () => {
+    // Joining someone else's room: the quiz picked for hosting doesn't apply.
+    forgetPickedQuiz();
     setShowJoinForm(true);
   };
 
@@ -147,6 +169,7 @@ const MultiplayerLobby = () => {
   return (
     <Container>
       <Title>Multiplayer Quiz</Title>
+      {quizKey && <HostingNote>Hosting: {quizTitle(quizKey)}</HostingNote>}
       {!showJoinForm && !showCreateOptions ? (
         <OptionsContainer>
           <OptionCard onClick={loading ? undefined : handleShowCreateOptions} disabled={loading}>
@@ -214,6 +237,11 @@ const MultiplayerLobby = () => {
 export default MultiplayerLobby;
 
 // Styled Components
+const HostingNote = styled.p`
+  margin: -0.5rem 0 1rem;
+  color: ${({ theme }) => theme.colors.pinkLavender};
+`;
+
 interface OptionCardProps {
   disabled?: boolean;
 }

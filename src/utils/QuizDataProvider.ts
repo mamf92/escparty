@@ -8,7 +8,7 @@ export type QuizDifficulty = 'easy' | 'medium' | 'hard';
 
 // Interface for quiz questions
 export interface QuizQuestion {
-    id: number;
+    id: number | string;
     question: string;
     options: string[];
     correctAnswer: string;
