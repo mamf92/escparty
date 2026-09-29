@@ -84,6 +84,13 @@ function rowClass(level: Level): string {
     return out.join(" ");
 }
 
+/** Classic quizzes easiest first, then every other quiz by its title. */
+const CLASSIC_ORDER = ["easy", "medium", "hard"];
+function difficultyRank(entry: ScoreEntry): number {
+    const rank = CLASSIC_ORDER.indexOf(entry.difficulty);
+    return rank === -1 ? CLASSIC_ORDER.length : rank;
+}
+
 function formatDate(iso: string): string {
     const d = new Date(iso);
     return Number.isNaN(d.getTime())
@@ -115,7 +122,7 @@ const Scoreboard = () => {
             return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         }
         if (sortKey === "difficulty") {
-            return rows.sort((a, b) => a.difficulty.localeCompare(b.difficulty));
+            return rows.sort((a, b) => difficultyRank(a) - difficultyRank(b) || quizTitle(a.difficulty).localeCompare(quizTitle(b.difficulty)));
         }
         return rows.sort((a, b) => ratioOf(b) - ratioOf(a));
     }, [scoreHistory, sortKey]);

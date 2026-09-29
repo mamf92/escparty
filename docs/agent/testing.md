@@ -148,7 +148,7 @@ has to; a coverage-diff gate that would catch that is still open in #57.
 The unit harness is the first rung of the test-coverage epic (#53). Still
 open at the time of writing:
 
-- **Covered so far: the data/logic layer, not the screens.**
+- **Covered so far: the data/logic layer, and a test file per screen.**
   `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts`, the
   extracted scoring math in `src/utils/quizScoring.ts` and the multiplayer
   timing in `src/utils/quizTiming.ts` have unit tests with a coverage floor
@@ -156,8 +156,8 @@ open at the time of writing:
   `src/utils/multiplayerSession.ts` (#63); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
   floor. Every page, component and hook now has a test file except the
   ones listed in `UNTESTED` in `src/test/testFiles.test.ts`
-  (`MidQuizScoreboard`, `Scoreboard`, `UnderDevelopment`, `MobileFrame` and
-  the `src/fabric-ui/` components), which is #59; a test file doesn't mean
+  (the WebGL components in `src/fabric-ui/` and its `leva` debug-panel hook,
+  plus the dead `useGameStore`), which is #59; a test file doesn't mean
   every flow in it is covered.
 - **`Quiz.tsx` is mostly covered where it was extracted.** The scoring
   formula moved to `src/utils/quizScoring.ts` and the multiplayer timing to
