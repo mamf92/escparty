@@ -12,8 +12,13 @@ to play solo, host, or take into the builder), `QuizBuilder.tsx`
 order and break setting, save),
 `MultiplayerLobby.tsx`, `Lobby.tsx`, `MidQuizScoreboard.tsx`,
 `HostObserverView.tsx`, `QuizResults.tsx`, `Scoreboard.tsx`,
-`UnderDevelopment.tsx`. Routed from `src/App.tsx`, wrapped in `MobileFrame`
-(see below) except the standalone `/fabric-ui` demo route.
+`UnderDevelopment.tsx`, and the scoreboard party's `PartyHome.tsx`
+(`/party`), `PartySetup.tsx` (`/party/new`), `PartyRoom.tsx`
+(`/party/:code`), `PartyScreen.tsx` (`/party/:code/screen`) and
+`PartyAwards.tsx` (`/party/:code/awards`); see
+`docs/agent/scoreboard-party.md`. Routed from `src/App.tsx`, wrapped in
+`MobileFrame` (see below) except the standalone `/fabric-ui` demo route and
+the party's big screen, which fills the window for a TV.
 
 ## `src/components/`
 
@@ -23,6 +28,9 @@ Mostly not small reusable pieces, despite the folder name:
   `CalmNote`) for screens on the Calm surface, plus the shared
   `src/styles/calm-page.css` that fits Calm into the phone frame. New
   screens use it; see `docs/agent/theming.md`.
+
+- `PartyHostTools.tsx` — the host's tab in a scoreboard party: share the
+  link, enter the real result, edit the running order, open the awards.
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui`).
@@ -65,6 +73,9 @@ plan that also removes the ad hoc storage it would duplicate.
 - `quizTemplates.ts` — the premade quizzes, each a spelled-out list of bank
   ids (so it doesn't import the bank) and its own mid-quiz scoreboard
   setting, which applies solo only until rooms carry a break setting.
+- `contests2027.ts` — the Burgas 2027 semis and final with a **fictive**
+  running order, the fallback when Firestore `contests/` has no real one
+  (see `docs/agent/scoreboard-party.md`).
 
 ## `src/utils/`
 
@@ -81,7 +92,13 @@ plan that also removes the ad hoc storage it would duplicate.
   Firestore `quizzes/`, and this device's "my quizzes" list in
   localStorage. See "Saved quizzes" in `firestore-data-model.md`.
 
-- `roomsFirestore.ts` — the entire Firestore API surface: room/player CRUD,
+- `partyModel.ts` (rating sheets, scores, closeness, awards; pure),
+  `partyFirestore.ts` (`parties/`, ballots, `contests/`),
+  `partySession.ts` (this device's identity and ratings per party),
+  `partyResults.ts` (what the party screens show) and `partyNames.ts` —
+  the scoreboard party, see `docs/agent/scoreboard-party.md`.
+
+- `roomsFirestore.ts` — the quiz rooms' Firestore API: room/player CRUD,
   the `onSnapshot`-based `listenToRoom`, the phase moves
   (`advanceQuestion`, `resumeAfterMidQuiz`) and the mid-quiz ready marks
   (`playersAtMidQuiz`). See
@@ -134,6 +151,10 @@ plan that also removes the ad hoc storage it would duplicate.
 
 - `useQuizTitle.ts` — a quiz key's title, reading a saved quiz someone
   else made from Firestore (the lobby and the multiplayer lobby).
+
+- `usePartyData.ts` — a party and all its ballots, live;
+  `useOwnBallot.ts` — this guest's ratings, kept on the device and saved
+  (with retries) to Firestore.
 
 - `useResumeRoom.ts` — the host's Continue at a mid-quiz break (#63), used
   by `MidQuizScoreboard.tsx` and `HostObserverView.tsx`: calls

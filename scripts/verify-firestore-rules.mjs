@@ -25,6 +25,7 @@ import {
   collection,
   getDoc,
   getDocs,
+  deleteDoc,
 } from "firebase/firestore";
 
 const app = initializeApp({ projectId: "demo-escparty" });
@@ -252,6 +253,92 @@ for (const [label, overrides] of [
 ]) {
   await expectDenied(`save a quiz with ${label}`, () => setDoc(doc(collection(db, "quizzes")), aQuiz(overrides)));
 }
+
+// 5i. Scoreboard parties (#79): created whole, found by code, never listed;
+// host edits by shape only; each guest writes their own ballot.
+const partyCode = "P" + String.fromCharCode(65 + Math.floor(Math.random() * 26)) + "RT";
+const partyRef = doc(db, "parties", partyCode);
+const aParty = (overrides = {}) => ({
+  code: partyCode,
+  hostId: "host-1",
+  title: "Burgas 2027 · Grand final",
+  contestId: "burgas-2027-final",
+  kind: "final",
+  qualifiers: 0,
+  acts: [{ id: "se", country: "Sweden", flag: "🇸🇪", artist: "TBA", song: "TBA" }],
+  template: { id: "douze", name: "Douze Points", blurb: "", categories: [{ id: "points", label: "Points", max: 12 }] },
+  bonuses: true,
+  showNames: true,
+  results: {},
+  revealed: false,
+  createdAt: serverTimestamp(),
+  expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  ...overrides,
+});
+for (const [label, overrides] of [
+  ["results already in", { results: { places: { se: 1 } } }],
+  ["the awards already open", { revealed: true }],
+  ["no acts", { acts: [] }],
+  ["seven categories", { template: { categories: Array.from({ length: 7 }, (_, i) => ({ id: `c${i}`, label: `C${i}`, max: 10 }) ) } }],
+  ["a code that doesn't match its document", { code: "ZZZZ" }],
+  ["a client-chosen createdAt", { createdAt: Timestamp.fromMillis(0) }],
+  ["a far-off expireAt", { expireAt: Timestamp.fromMillis(Date.now() + 400 * 24 * 60 * 60 * 1000) }],
+  ["an extra field", { adminOf: "everything" }],
+]) {
+  await expectDenied(`create a party with ${label}`, () => setDoc(partyRef, aParty(overrides)));
+}
+await expectDenied("create a party under a lowercase code", () =>
+  setDoc(doc(db, "parties", "abcd"), aParty({ code: "abcd" }))
+);
+await expectAllowed("create a party", () => setDoc(partyRef, aParty()));
+await expectAllowed("read a party by code", () => getDoc(partyRef));
+await expectDenied("list the parties collection", async () => {
+  const snap = await getDocs(collection(db, "parties"));
+  if (snap.size > 0) throw { code: "unexpectedly-succeeded", size: snap.size };
+});
+await expectDenied("create over an existing party", () => setDoc(partyRef, aParty()));
+await expectAllowed("edit the running order", () =>
+  updateDoc(partyRef, { acts: [...aParty().acts, { id: "no", country: "Norway", flag: "🇳🇴", artist: "TBA", song: "TBA" }] })
+);
+await expectAllowed("enter real results", () => updateDoc(partyRef, { results: { places: { se: 2, no: 1 } } }));
+await expectAllowed("open the awards", () => updateDoc(partyRef, { revealed: true }));
+await expectDenied("change the party's host", () => updateDoc(partyRef, { hostId: "attacker" }));
+await expectDenied("change the rating template mid-party", () => updateDoc(partyRef, { template: { categories: [] } }));
+await expectDenied("results with an unknown key", () => updateDoc(partyRef, { results: { winner: "se" } }));
+await expectDenied("empty the running order", () => updateDoc(partyRef, { acts: [] }));
+
+const ballotRef = doc(db, "parties", partyCode, "ballots", "guest-1");
+// An override of `undefined` leaves that field out.
+const aBallot = (overrides = {}) => Object.fromEntries(Object.entries({
+  name: "Loreen",
+  ratings: { se: { points: 12 } },
+  bonuses: { se: ["wind"] },
+  updatedAt: serverTimestamp(),
+  expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  ...overrides,
+}).filter(([, value]) => value !== undefined));
+await expectAllowed("save a ballot", () => setDoc(ballotRef, aBallot()));
+await expectAllowed("update a ballot", () => setDoc(ballotRef, aBallot({ ratings: { se: { points: 10 } } })));
+await expectAllowed("read every ballot in a party", () => getDocs(collection(db, "parties", partyCode, "ballots")));
+await expectDenied("save a ballot in a party that doesn't exist", () =>
+  setDoc(doc(db, "parties", "NONE", "ballots", "guest-1"), aBallot())
+);
+for (const [label, overrides] of [
+  ["no name", { name: "" }],
+  ["a 41-character name", { name: "x".repeat(41) }],
+  ["a client-chosen updatedAt", { updatedAt: Timestamp.fromMillis(0) }],
+  ["an extra field", { isHost: true }],
+  ["ratings that aren't a map", { ratings: [12] }],
+  ["a far-off expireAt", { expireAt: Timestamp.fromMillis(Date.now() + 400 * 24 * 60 * 60 * 1000) }],
+  ["no expireAt", { expireAt: undefined }],
+]) {
+  await expectDenied(`save a ballot with ${label}`, () => setDoc(doc(db, "parties", partyCode, "ballots", "guest-2"), aBallot(overrides)));
+}
+await expectDenied("delete a ballot", () => deleteDoc(ballotRef));
+await expectAllowed("read a contest lineup", () => getDoc(doc(db, "contests", "burgas-2027-final")));
+await expectDenied("write a contest lineup", () =>
+  setDoc(doc(db, "contests", "burgas-2027-final"), { acts: [] })
+);
 
 // 5c. Malicious: list/enumerate the whole rooms collection with no code
 await expectDenied("list the entire rooms collection with no code", async () => {

@@ -96,3 +96,46 @@
 .calm-page select.lycra-field {
   appearance: none;
 }
+
+/*
+  A rating scale (the scoreboard party, #83): the numbers 1..max as one
+  pane of small plates in a grid. Still direct siblings in the pane, so the
+  neighbour tug holds along each row.
+*/
+.calm-page .lycra-pane.calm-scale {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr));
+  gap: 0.6rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.calm-page .calm-scale .lycra {
+  min-width: 0;
+  padding: 0.6rem 0;
+}
+
+/* A pane of two or three moves side by side (previous / next). */
+.calm-page .lycra-pane.calm-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 0.75rem;
+}
+
+/*
+  The big screen (#84): the same surface for a TV across the room. Only the
+  sizes change; still two type sizes, both scaled up together.
+*/
+.calm-page.calm-screen {
+  font-size: 1.35rem;
+}
+
+.calm-page.calm-screen .lycra {
+  font-size: 1.35rem;
+  min-height: 3.5rem;
+}
+
+.calm-page.calm-screen .calm-sub {
+  font-size: 1rem;
+}

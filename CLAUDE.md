@@ -44,7 +44,9 @@ folder name most "components" are pages). `src/data/` holds the question
 bank and premade quizzes; `quizModel.ts` and `quizCatalog.ts` in
 `src/utils/` are the quiz data model and what a quiz key names, and
 `customQuizzes.ts` saves custom quizzes to Firestore's `quizzes`
-collection. `src/fabric-ui/` is a self-contained WebGL rendering module for
+collection. The scoreboard party (`/party`, rating Burgas 2027 with the
+room) is its own set of `party*` files and Firestore `parties`/`contests`:
+`docs/agent/scoreboard-party.md`. `src/fabric-ui/` is a self-contained WebGL rendering module for
 the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one
 file, `useGameStore.ts`, which is dead code (see Landmines). `src/utils/`
 has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz
@@ -126,6 +128,9 @@ end-to-end should use the `steward` skill
   results actually flows today.
 - `docs/agent/theming.md` — how Calm and Sparkle relate; pointers to both
   skills.
+- `docs/agent/scoreboard-party.md` — the scoreboard party: screens, the
+  fictive 2027 lineups and how to enter the real ones, scoring, awards,
+  privacy, data and retention.
 - `docs/agent/testing.md` — how to run and write tests, and what isn't
   covered yet.
 

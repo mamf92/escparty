@@ -13,13 +13,15 @@ import "../styles/calm-page.css";
  * children of the pane (the neighbour tug needs it). Titles, notes and
  * the back link stay outside it, as here.
  */
-export const CalmPage = ({ title, subtitle, children, footer }: {
+export const CalmPage = ({ title, subtitle, children, footer, className }: {
   title: string;
   subtitle?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /** Extra classes, e.g. `calm-screen` for the big-screen sizes. */
+  className?: string;
 }) => (
-  <Page className="calm-page">
+  <Page className={className ? `calm-page ${className}` : "calm-page"}>
     <Header>
       <Title>{title}</Title>
       {subtitle && <Subtitle>{subtitle}</Subtitle>}

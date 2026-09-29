@@ -348,6 +348,100 @@ service cloud.firestore {
              data.createdAt == request.time;
     }
 
+    // Scoreboard parties (#79). A party is found by its 4-letter code, never
+    // listed. Without sign-in the rules can't tell the host from a guest,
+    // so a host-only edit (running order, results, opening the awards) is
+    // limited by shape, the same trust model as quiz rooms: anyone with the
+    // code could make one. Each guest's ratings are their own document
+    // under ballots/, so guests never write over each other.
+    match /parties/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isValidPartyCreation(code);
+      allow update: if isValidPartyUpdate();
+      allow delete: if false;
+
+      // Ballots are read together (the room's standings, the awards), so
+      // listing them within a party is allowed.
+      match /ballots/{guestId} {
+        allow read: if true;
+        allow create, update: if isValidBallot(code);
+        allow delete: if false;
+      }
+    }
+
+    // A show's real running order, written by the project owner in the
+    // Firebase console once it's announced (docs/agent/scoreboard-party.md).
+    // Clients only read it; without it they use the bundled fictive one.
+    match /contests/{contestId} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    function isValidPartyCreation(code) {
+      let data = request.resource.data;
+      return code.matches('[A-Z]{4}') &&
+             data.keys().hasOnly(['code', 'hostId', 'title', 'contestId', 'kind', 'qualifiers', 'acts',
+                                  'template', 'bonuses', 'showNames', 'results', 'revealed', 'createdAt', 'expireAt']) &&
+             data.keys().hasAll(['code', 'hostId', 'title', 'contestId', 'kind', 'qualifiers', 'acts',
+                                 'template', 'bonuses', 'showNames', 'results', 'revealed', 'createdAt', 'expireAt']) &&
+             data.code == code &&
+             data.hostId is string && data.hostId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 80 &&
+             data.contestId is string && data.contestId.size() <= 60 &&
+             data.kind in ['semi', 'final'] &&
+             data.qualifiers is int && data.qualifiers >= 0 && data.qualifiers <= 40 &&
+             isValidActs(data.acts) &&
+             data.template is map &&
+             data.template.categories is list &&
+             data.template.categories.size() > 0 &&
+             data.template.categories.size() <= 6 &&
+             data.bonuses is bool &&
+             data.showNames is bool &&
+             data.results == {} &&
+             data.revealed == false &&
+             data.createdAt == request.time &&
+             // Kept 30 days (PARTY_LIFETIME_DAYS), for a TTL policy on expireAt.
+             data.expireAt is timestamp &&
+             data.expireAt > request.time + duration.value(29, 'd') &&
+             data.expireAt < request.time + duration.value(31, 'd');
+    }
+
+    // The host's edits: the running order, the real results, opening the
+    // awards. One of them per write; nothing else about a party changes.
+    function isValidPartyUpdate() {
+      let data = request.resource.data;
+      let affected = data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['acts', 'results', 'revealed']) &&
+             isValidActs(data.acts) &&
+             data.results is map &&
+             data.results.keys().hasOnly(['places', 'qualifiers']) &&
+             (!('places' in data.results) || (data.results.places is map && data.results.places.size() <= 40)) &&
+             (!('qualifiers' in data.results) || (data.results.qualifiers is list && data.results.qualifiers.size() <= 40)) &&
+             data.revealed is bool;
+    }
+
+    function isValidActs(acts) {
+      return acts is list && acts.size() > 0 && acts.size() <= 40;
+    }
+
+    // A guest's ratings. Written whole on every change (saveBallot), always
+    // stamped with the server's clock, and only inside a party that exists.
+    function isValidBallot(code) {
+      let data = request.resource.data;
+      return exists(/databases/$(database)/documents/parties/$(code)) &&
+             data.keys().hasOnly(['name', 'ratings', 'bonuses', 'updatedAt', 'expireAt']) &&
+             data.keys().hasAll(['name', 'ratings', 'bonuses', 'updatedAt', 'expireAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 40 &&
+             data.ratings is map && data.ratings.size() <= 40 &&
+             data.bonuses is map && data.bonuses.size() <= 40 &&
+             data.updatedAt == request.time &&
+             // Kept 30 days after the last change, for a TTL policy on expireAt.
+             data.expireAt is timestamp &&
+             data.expireAt > request.time + duration.value(29, 'd') &&
+             data.expireAt < request.time + duration.value(31, 'd');
+    }
+
     // Default deny all other collections and documents
     match /{document=**} {
       allow read, write: if false;
