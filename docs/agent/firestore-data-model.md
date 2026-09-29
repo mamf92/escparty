@@ -317,6 +317,17 @@ criteria (also verified against the emulator, also in
   that makes something one-shot should come with a look at whether any
   client code assumed re-sending the same kind of write was harmless.
 
+**Finished rooms (#142, #50's "can't resurrect a finished room's
+state").** A room in `phase: "results"` takes no more score writes
+(`isNotFinished`), except in the first 30s (`RESULTS_GRACE_MS`), so the
+last answer's write or its retry still counts; during those 30s a client
+can rewrite scores exactly as it could during the quiz. Past the grace,
+`updatePlayerScore` refuses up front with a `"finished"` reason so the quiz
+says so instead of retrying. `isAdvancingPhase` has no move out of
+`results`, ready marks only land during a break, and the dead
+`continueReady` flag is refused in any room with a phase. Cases 12 and 13
+of the verify script.
+
 Remaining gaps, all pre-existing and **not** closed by any of the above:
 - The emulator checks are a plain Node script
   (`scripts/verify-firestore-rules.mjs`), not part of the Vitest suite; see
@@ -324,14 +335,8 @@ Remaining gaps, all pre-existing and **not** closed by any of the above:
   Epic 3 lands.
 - A client still can't be stopped from writing a *different* player's score
   entry specifically — rules can validate shape, not identity, without auth.
-- A finished room (`phase: "results"`) takes no more writes (#142, #50's
-  "can't resurrect a finished room's state"): `isNotFinished` refuses score
-  and `continueReady` writes, `isAdvancingPhase` has no move out of
-  `results`, and ready marks only land during a break. The one exception
-  is a score write in the first 30s of the results, so the last answer's
-  write (or its retry) still counts. Rooms without a phase (pre-#61) have
-  no finished state and aren't covered. Cases 12 and 13 of the verify
-  script.
+- Rooms without a phase (pre-#61) have no finished state, so the
+  finished-room rule below doesn't cover them.
 
 ## Trust boundary for client-submitted writes
 

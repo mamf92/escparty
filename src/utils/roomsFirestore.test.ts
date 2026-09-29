@@ -428,6 +428,22 @@ describe("updatePlayerScore", () => {
         await expect(updatePlayerScore("ABCD", "p-1", -1)).rejects.toBeInstanceOf(ScoreWriteRejected);
     });
 
+    it("refuses a score once the room has been finished for the grace period (#142)", async () => {
+        const at = (msAgo: number) => ({ toMillis: () => Date.now() - msAgo }) as unknown as Room["phaseStartedAt"];
+        const finished = (msAgo: number) =>
+            roomWith({ started: true, phase: "results", phaseStartedAt: at(msAgo), players: [player("p-1", "Martin", 500)] });
+
+        const update = givenTransactionSees(finished(31_000));
+        await expect(updatePlayerScore("ABCD", "p-1", 900)).rejects.toMatchObject({ reason: "finished" });
+        expect(update).not.toHaveBeenCalled();
+
+        // Inside the grace, and while the finish time is still pending, it goes through.
+        givenTransactionSees(finished(5_000));
+        await expect(updatePlayerScore("ABCD", "p-1", 900)).resolves.toBeUndefined();
+        givenTransactionSees(roomWith({ started: true, phase: "results", phaseStartedAt: null, players: [player("p-1", "Martin", 500)] }));
+        await expect(updatePlayerScore("ABCD", "p-1", 900)).resolves.toBeUndefined();
+    });
+
     it("passes on a failure that isn't the room's answer (e.g. offline) as a plain error", async () => {
         mocks.runTransaction.mockRejectedValue(new Error("offline"));
 

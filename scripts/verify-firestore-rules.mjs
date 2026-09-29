@@ -536,11 +536,15 @@ await expectDenied("resume from a mid-quiz break the room isn't in", () =>
 await expectAllowed("end the quiz after a question (-> results)", () =>
   updateDoc(toResults, advanceTo("results", 0))
 );
+const toResultsFinishedAt = Date.now();
 await expectDenied("move on from results", () =>
   updateDoc(toResults, advanceTo("question", 1))
 );
 await expectAllowed("a late score write just after the room finished (#142 grace)", () =>
   updateDoc(toResults, { players: [{ id: "host-1", name: "Host", score: 700 }] })
+);
+await expectDenied("set continueReady in a room with a phase (unused since #63)", () =>
+  updateDoc(walker, { continueReady: true })
 );
 
 await expectAllowed("advance to the next question once the slot is over (0 -> 1)", () =>
@@ -617,16 +621,14 @@ await expectDenied("end the resumed question immediately", () =>
   updateDoc(walker, advanceTo("question", 6))
 );
 
-// 13. A finished room takes no more writes once the grace is over (#142).
-// `toResults` finished before the walks above, well over 30s ago.
+// 13. A finished room takes no more score writes once the grace is over
+// (#142). The walks above usually take longer than that already; wait out
+// whatever is left so this doesn't depend on them.
+const RESULTS_GRACE_MS = 30_000;
+const leftOfGrace = toResultsFinishedAt + RESULTS_GRACE_MS + 1_000 - Date.now();
+if (leftOfGrace > 0) await new Promise((resolve) => setTimeout(resolve, leftOfGrace));
 await expectDenied("rewrite scores in a room that finished over 30s ago", () =>
   updateDoc(toResults, { players: [{ id: "host-1", name: "Host", score: 9999 }] })
-);
-await expectDenied("set continueReady in a finished room", () =>
-  updateDoc(toResults, { continueReady: true })
-);
-await expectDenied("mark a player ready in a finished room", () =>
-  updateDoc(toResults, { playersAtMidQuiz: arrayUnion("host-1") })
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);

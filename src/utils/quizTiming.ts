@@ -8,6 +8,10 @@ import { DEFAULT_BREAK_EVERY, isBreakAfter } from "./quizModel";
 export const QUESTION_MS = 10_000; // time to answer
 export const FEEDBACK_MS = 5_000; // answer feedback before the next question
 export const QUESTION_SLOT_MS = QUESTION_MS + FEEDBACK_MS;
+// How long after a room reaches the results a late score write still
+// counts (#142): enough for the last answer's write and Quiz.tsx's retries.
+// firestore.rules hardcodes it in isNotFinished — keep the two in sync.
+export const RESULTS_GRACE_MS = 30_000;
 
 /**
  * A mid-quiz scoreboard break follows every Nth question, unless the room
