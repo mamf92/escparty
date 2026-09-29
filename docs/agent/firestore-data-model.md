@@ -195,8 +195,9 @@ legacy started-only start is no longer accepted (#62): a game started that
 way would have no phase for clients to follow.
 
 `isAdvancingPhase` covers every later move, mirroring `phaseAfterQuestion`
-in `quizTiming.ts`: question N → question N+1 (N+1 not a multiple of 5),
-question N → `mid-scoreboard` at N+1 (N+1 a multiple of 5), question N →
+in `quizTiming.ts`: question N → question N+1 (no break before N+1),
+question N → `mid-scoreboard` at N+1 (N+1 a multiple of the room's
+`breakEvery`, 5 when unset, never when 0), question N →
 `results`, and `mid-scoreboard` N → question N (which may also clear
 `playersAtMidQuiz` to `[]`, and is the only move that may). A question can't be ended
 before `phaseStartedAt + 15s`, measured on the server's clock, so no client
@@ -323,10 +324,14 @@ Remaining gaps, all pre-existing and **not** closed by any of the above:
   Epic 3 lands.
 - A client still can't be stopped from writing a *different* player's score
   entry specifically — rules can validate shape, not identity, without auth.
-- There's no "finished room" concept in the `Room` schema at all (no field
-  for it), so #50's "can't resurrect a finished room's state" can't be
-  enforced by a rule yet — that needs a data-model change first, not just a
-  rules change.
+- A finished room (`phase: "results"`) takes no more writes (#142, #50's
+  "can't resurrect a finished room's state"): `isNotFinished` refuses score
+  and `continueReady` writes, `isAdvancingPhase` has no move out of
+  `results`, and ready marks only land during a break. The one exception
+  is a score write in the first 30s of the results, so the last answer's
+  write (or its retry) still counts. Rooms without a phase (pre-#61) have
+  no finished state and aren't covered. Cases 12 and 13 of the verify
+  script.
 
 ## Trust boundary for client-submitted writes
 
