@@ -31,5 +31,11 @@ jobs:
         run: npm run build
       - name: Lint
         run: npm run lint
+      # The coverage floors (#57) are checked once; the other Node version
+      # runs the same suite without instrumentation.
+      - name: Test (with the per-file coverage floors)
+        if: matrix.node-version == '22.x'
+        run: npm run test:coverage
       - name: Test
+        if: matrix.node-version != '22.x'
         run: npm test
