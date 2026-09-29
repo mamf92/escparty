@@ -19,12 +19,14 @@ transport:
   source of truth.
 - A timed `continueReady` handshake could be missed by a slow client.
   Fixed by #63: clients now follow the room's phase instead.
-- Score and ready writes were plain read-modify-writes. Fixed by #62 and
-  #64: `updatePlayerScore` and `advanceQuestion` are transactions, and
-  ready marks and joins use `arrayUnion`.
+- Score and ready writes were plain read-modify-writes. Fixed by #62:
+  `updatePlayerScore` and `advanceQuestion` are transactions, and ready
+  marks use `arrayUnion`, as joins already did. #64 checked both under
+  simultaneous writes from separate clients, and made a join that races
+  the start report "already started".
 - Nothing on the server refused an illegal move. Fixed by `firestore.rules`,
-  which now checks phase moves, their timing, joins, and score writes
-  against a finished room (#142).
+  which now checks phase moves and their timing, and refuses joins into a
+  started room and score writes into a finished one (#142).
 
 A WebSocket server would have had to be built with the same fixes. The
 transport was never the cause.

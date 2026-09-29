@@ -68,6 +68,17 @@ export class ScoreWriteRejected extends Error {
     }
 }
 
+/** Why a room turned a join down; `joinRoom` answers `false` for "not-found" and "started". */
+export class JoinRejected extends Error {
+    constructor(public readonly reason: "not-found" | "started" | "full", message: string) {
+        super(message);
+        this.name = "JoinRejected";
+    }
+}
+
+/** The most players a room holds: firestore.rules' allPlayersValid caps the list at 32. */
+export const MAX_PLAYERS = 32;
+
 /**
  * Debug utility to check if Firebase is properly initialized
  */
@@ -173,66 +184,66 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
         throw new Error("Firebase not initialized");
     }
 
-    try {
-        // Get current room data to validate
-        const currentRoom = await getRoom(roomCode);
-        
-        if (!currentRoom) {
-            throw new Error("Room not found");
+    const currentRoom = await getRoom(roomCode);
+    // Throws JoinRejected when the room says no; returns true when the
+    // player is already in it.
+    const alreadyIn = (room: Room | null) => {
+        if (!room) {
+            throw new JoinRejected("not-found", "Room not found");
         }
-        
-        if (currentRoom.started) {
-            throw new Error("Game has already started");
-        }
-
         // Only the same ID is the same player. Matching on the name too
         // skipped a second guest who drew the same name, leaving their ID
         // out of the room, so every score they sent was lost (#131). The
         // join screen already draws a name nobody in the room has; two
-        // guests joining at the same instant can still share one, which only
-        // costs a duplicate name on the scoreboard, not a score.
-        const existingPlayer = currentRoom.players.find(p => p.id === playerId);
-        if (existingPlayer) {
-            return; // Player already exists, skip adding
+        // guests joining at the same instant can still share one, which
+        // only costs a duplicate name on the scoreboard, not a score. A
+        // player already in the room is in, started or not.
+        if (room.players.some(p => p.id === playerId)) {
+            return true;
         }
+        if (room.started) {
+            throw new JoinRejected("started", "Game has already started");
+        }
+        if (room.players.length >= MAX_PLAYERS) {
+            throw new JoinRejected("full", `The room is full (${MAX_PLAYERS} players)`);
+        }
+        return false;
+    };
+    if (alreadyIn(currentRoom)) {
+        return;
+    }
 
-        const roomRef = doc(db, "rooms", roomCode);
-        const currentTime = Timestamp.now();
-        
-        const newPlayer = {
-            id: playerId,
-            name: playerName,
-            score: 0,
-            joinedAt: currentTime
-        };
-        
-        try {
-            // arrayUnion, not a transaction: the append happens server-side,
-            // so guests joining at the same moment all land. (A transaction
-            // writes the whole list, and the rules judge it against a list
-            // another join already grew, so it's refused, not retried.)
-            await updateDoc(roomRef, {
-                players: arrayUnion(newPlayer)
-            });
-        } catch (error) {
-            // The host may have started the game between the check above and
-            // this write (#64); the rules refuse a join into a started room.
-            // Tell that apart from any other refusal, so the guest hears
-            // "already started" instead of a rules error.
-            if ((error as { code?: string }).code === 'permission-denied' && (await getRoom(roomCode))?.started) {
-                throw new Error("Game has already started");
-            }
-            throw error;
-        }
-        
+    try {
+        // arrayUnion, not a transaction: the append happens server-side,
+        // so guests joining at the same moment all land (see "Which writes
+        // are safe" in docs/agent/firestore-data-model.md).
+        await updateDoc(doc(db, "rooms", roomCode), {
+            players: arrayUnion({
+                id: playerId,
+                name: playerName,
+                score: 0,
+                joinedAt: Timestamp.now()
+            })
+        });
     } catch (error) {
         const err = error as { code?: string; message: string };
-        console.error("Error adding player to room:", error);
-        
         if (err.code === 'permission-denied') {
+            // The room changed between the read above and this write: most
+            // likely the host started the game (#64), or it filled up. Read
+            // it again to say which, rather than blaming the rules.
+            let latest: Room | null | undefined;
+            try {
+                latest = await getRoom(roomCode);
+            } catch {
+                latest = undefined; // Can't tell; report the refusal itself.
+            }
+            if (latest !== undefined && alreadyIn(latest)) {
+                return;
+            }
+            console.error("Error adding player to room:", error);
             throw new Error("Security rules prevented joining the room");
         }
-        
+        console.error("Error adding player to room:", error);
         throw error;
     }
 };
@@ -582,14 +593,13 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
         await addPlayerToRoom(roomCode, playerId, playerName);
         return true;
     } catch (error) {
-        const err = error as { code?: string; message: string };
-
         // A code that doesn't exist, or a game that's already on, is an
         // answer rather than a failure.
-        if (err.message === "Room not found" || err.message === "Game has already started") {
+        if (error instanceof JoinRejected && error.reason !== "full") {
             return false;
         }
 
+        const err = error as { code?: string; message: string };
         console.error("Error joining room:", error);
 
         if (err.code === 'permission-denied' || err.message.includes('Security rules')) {

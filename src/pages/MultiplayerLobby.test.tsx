@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import MultiplayerLobby from "./MultiplayerLobby";
-import { createRoom, setRoomDifficulty } from "../utils/roomsFirestore";
+import { createRoom, joinRoom, setRoomDifficulty } from "../utils/roomsFirestore";
 
 vi.mock("../utils/roomsFirestore", () => ({
   createRoom: vi.fn(async () => undefined),
@@ -61,5 +61,17 @@ describe("MultiplayerLobby", () => {
     renderLobby({ quizKey: "t-nordic-nights" });
     await user.click(screen.getByText("Join game"));
     expect(screen.queryByText(/Hosting:/)).not.toBeInTheDocument();
+  });
+
+  it("tells a guest when the game is full", async () => {
+    const user = userEvent.setup();
+    const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(joinRoom).mockRejectedValueOnce(new Error("Failed to join room: The room is full (32 players)"));
+    renderLobby();
+    await user.click(screen.getByText("Join game"));
+    await user.type(screen.getByPlaceholderText("code"), "ABBA");
+    await user.click(screen.getByText("Join Game"));
+    expect(alert).toHaveBeenCalledWith("This game is full. Ask the host to start a new one.");
   });
 });

@@ -100,22 +100,43 @@ await expectAllowed("join room (arrayUnion, valid player)", () =>
   })
 );
 
-// 2b. Joins are an arrayUnion (#64, addPlayerToRoom's shape), appended
-// server-side, so guests joining at the same moment all land. A join that
-// loses the race to the start is refused, and a fresh read shows why.
-const joinWithArrayUnion = (ref, id) =>
-  updateDoc(ref, { players: arrayUnion({ id, name: id, score: 0, joinedAt: Timestamp.now() }) });
+// 2b. Joins are an arrayUnion (#64, addPlayerToRoom's write), appended
+// server-side. Each guest here is its own client (its own app and write
+// stream), so the three joins really are in flight at once, and all must
+// land. Then a join races the host's start from two clients: whichever
+// wins, the room must end up consistent (the guest is in and the game
+// started, or the join was refused and the game started).
+const clients = ["guest-a", "guest-b", "guest-c", "host-b"].map((name) => {
+  const clientDb = getFirestore(initializeApp({ projectId: "demo-escparty" }, name));
+  connectFirestoreEmulator(clientDb, "127.0.0.1", 8080);
+  return clientDb;
+});
+const joinFrom = (clientDb, code, id) =>
+  updateDoc(doc(clientDb, "rooms", code), { players: arrayUnion({ id, name: id, score: 0, joinedAt: Timestamp.now() }) });
 const joiners = freshRoom("JOINS");
 await createRoom(joiners.roomRef, joiners.roomCode);
-await expectAllowed("three guests join at the same moment", () =>
-  Promise.all(["g-1", "g-2", "g-3"].map((id) => joinWithArrayUnion(joiners.roomRef, id)))
+await expectAllowed("three guests on three clients join at the same moment", () =>
+  Promise.all(["g-1", "g-2", "g-3"].map((id, i) => joinFrom(clients[i], joiners.roomCode, id)))
 );
 const joined = (await getDoc(joiners.roomRef)).data().players.map((p) => p.id).sort();
 report("every simultaneous join is in the room", "g-1,g-2,g-3,host-1", joined.join(","));
 await updateDoc(joiners.roomRef, { difficulty: "easy" });
-await updateDoc(joiners.roomRef, startWrite());
-await expectDenied("a join that lands after the start", () => joinWithArrayUnion(joiners.roomRef, "g-late"));
-report("a fresh read after that refusal shows the game started", "true", String((await getDoc(joiners.roomRef)).data().started));
+const [lateJoin] = await Promise.allSettled([
+  joinFrom(clients[0], joiners.roomCode, "g-late"),
+  updateDoc(doc(clients[3], "rooms", joiners.roomCode), startWrite()),
+]);
+const raced = (await getDoc(joiners.roomRef)).data();
+const lateIn = raced.players.some((p) => p.id === "g-late");
+report(
+  "a join racing the start leaves the room consistent",
+  "started, join matches room",
+  `${raced.started ? "started" : "not started"}, join ${
+    (lateJoin.status === "fulfilled") === lateIn &&
+    (lateJoin.status === "fulfilled" || lateJoin.reason.code === "permission-denied")
+      ? "matches room"
+      : `${lateJoin.status} but in room=${lateIn}`
+  }`,
+);
 
 // 3. Malicious: append a new "player" that's missing a required field. Sized
 // to exactly oldCount + 1 so this write actually reaches allPlayersValid via
@@ -375,21 +396,24 @@ await expectAllowed("update player score after start", () =>
   })
 );
 
-// 6c. Two players' scores written at the same moment (#64), the way
-// updatePlayerScore does it: a transaction per write, so the one that loses
-// the race is retried against the other's result instead of overwriting it.
+// 6c. Two players' scores written at the same moment from two clients
+// (#64), each the way updatePlayerScore does it: read the room and write
+// the list back in a transaction. Firestore makes whichever commits second
+// retry against the first's result (the score rule only checks size and
+// shape, so the retry is allowed), so both scores must survive.
 const scoreRace = freshRoom("RACE");
 await createRoom(scoreRace.roomRef, scoreRace.roomCode);
 await updateDoc(scoreRace.roomRef, { players: arrayUnion({ id: "player-2", name: "Guest", score: 0 }) });
 await updateDoc(scoreRace.roomRef, { difficulty: "medium" });
 await updateDoc(scoreRace.roomRef, startWrite());
-const scoreInTransaction = (id, score) =>
-  runTransaction(db, async (transaction) => {
-    const room = (await transaction.get(scoreRace.roomRef)).data();
-    transaction.update(scoreRace.roomRef, { players: room.players.map((p) => (p.id === id ? { ...p, score } : p)) });
+const scoreFrom = (clientDb, id, score) =>
+  runTransaction(clientDb, async (transaction) => {
+    const ref = doc(clientDb, "rooms", scoreRace.roomCode);
+    const room = (await transaction.get(ref)).data();
+    transaction.update(ref, { players: room.players.map((p) => (p.id === id ? { ...p, score } : p)) });
   });
-await expectAllowed("two players' scores written at the same moment", () =>
-  Promise.all([scoreInTransaction("host-1", 300), scoreInTransaction("player-2", 700)])
+await expectAllowed("two players' scores written at the same moment on two clients", () =>
+  Promise.all([scoreFrom(clients[0], "host-1", 300), scoreFrom(clients[1], "player-2", 700)])
 );
 report(
   "both simultaneous scores are kept",

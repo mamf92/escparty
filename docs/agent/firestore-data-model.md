@@ -83,14 +83,14 @@ The lifecycle:
 (`joinRoom` goes through it). The join screen draws a name nobody in the
 room has yet; two guests joining at the same instant can still end up with
 the same name, which is cosmetic: their IDs and scores stay separate.
-A host can start the game between a join's check and its write; the rules
-then refuse the join, and `addPlayerToRoom` re-reads the room so the guest
-hears "already started" (`joinRoom` returns `false`) rather than a rules
-error (#64). Joins stay an `arrayUnion`, not a transaction: a transaction
-writes the whole player list, and when another join grew the list first,
-the rules (exactly one more player) refuse it outright instead of letting
-Firestore retry. `scripts/verify-firestore-rules.mjs` cases 2b and 6c run
-simultaneous joins and simultaneous scores against the emulator.
+A host can start the game (or the room can fill up) between a join's check
+and its write; the rules then refuse the join, and `addPlayerToRoom`
+re-reads the room to say why, as a `JoinRejected` with a `reason`
+(`not-found`, `started`, `full`), rather than a rules error (#64).
+`joinRoom` answers `false` for the first two. A player already in the room
+(the same ID) is let back in even after the start. Joins are an
+`arrayUnion`; why not a transaction is under "Which writes are safe"
+below.
 `updatePlayerScore`
 throws `ScoreWriteRejected` with a `reason` (`invalid-score`, `no-room`,
 `unknown-player`, `lower-score` with the room's `currentScore`) when the
@@ -109,10 +109,13 @@ room turns a write down, so callers don't parse messages (#131).
   read-modify-write would.
 - **A transaction only helps if the rules accept its retry.** Rules judge
   a write against the document as it is at commit time. If they compare
-  the new value with the old one (like "exactly one more player"), a
-  transaction built on a stale read is refused with `permission-denied`
-  and is not retried. Score writes are fine, because their rule only
-  checks the list's size and shape.
+  the new value with the old one (like the join rule's "exactly one more
+  player"), a transaction built on a stale read is refused with
+  `permission-denied` and is not retried. That is why joins stay an
+  `arrayUnion`. Score writes are fine, because their rule only checks the
+  list's size and shape. `scripts/verify-firestore-rules.mjs` cases 2b and
+  6c run simultaneous joins, a join racing the start, and simultaneous
+  scores from separate clients against the emulator.
 - **Don't add a manual read-modify-write.** `markPlayerAtMidQuiz` used to
   be one (`getDoc` then `updateDoc` with a recomputed array); once #62 put
   every player at the break at the same moment, concurrent calls dropped
