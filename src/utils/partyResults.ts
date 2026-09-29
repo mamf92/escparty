@@ -4,7 +4,8 @@
  * awards. Kept apart from the pages so the room, the big screen and the
  * awards all agree.
  */
-import type { Party } from "./partyFirestore";
+import type { Act } from "../data/contests2027";
+import type { Party, PartyResults } from "./partyFirestore";
 import {
     PARTY_BONUSES,
     ballotScores,
@@ -31,9 +32,10 @@ export const hasResults = (party: Pick<Party, "kind" | "results">) =>
 export const predictionFor = (party: Party, ballot: Ballot): Prediction | null => {
     if (!hasResults(party)) return null;
     const scores = ballotScores(ballot, actIdsOf(party), party.template.categories, partyBonusList(party));
+    const results = resultsFor(party.acts, party.results);
     return party.kind === "final"
-        ? predictFinal(scores, party.results.places ?? {})
-        : predictSemi(scores, party.results.qualifiers ?? []);
+        ? predictFinal(scores, results.places ?? {})
+        : predictSemi(scores, results.qualifiers ?? []);
 };
 
 /** Every guest's closeness, keyed by guest id; empty before there's a result. */
@@ -80,3 +82,15 @@ export const awardWinners = (
 
 /** The link a guest opens to join: the app's own address, at the party. */
 export const partyLink = (code: string) => `${window.location.origin}${window.location.pathname}#/party/${code}`;
+
+/** A result trimmed to the acts in the show. */
+export const resultsFor = (acts: Act[], results: PartyResults): PartyResults => {
+    const ids = new Set(acts.map(act => act.id));
+    const trimmed: PartyResults = {};
+    if (results.places) {
+        const kept = Object.entries(results.places).filter(([actId]) => ids.has(actId)).sort((a, b) => a[1] - b[1]);
+        trimmed.places = Object.fromEntries(kept.map(([actId], index) => [actId, index + 1]));
+    }
+    if (results.qualifiers) trimmed.qualifiers = results.qualifiers.filter(actId => ids.has(actId));
+    return trimmed;
+};

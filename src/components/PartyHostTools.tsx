@@ -10,7 +10,7 @@ import {
     type PartyResults,
 } from "../utils/partyFirestore";
 import type { Ballot } from "../utils/partyModel";
-import { ordinal, partyLink } from "../utils/partyResults";
+import { ordinal, partyLink, resultsFor } from "../utils/partyResults";
 
 /**
  * The host's side of a party (#82, #85, #86, #87): share the code, fix up
@@ -68,7 +68,7 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
                 onLoadLatest={() => run("load the latest lineup", async () => {
                     const contest = await fetchContest(party.contestId);
                     if (!contest) throw new Error(`No show ${party.contestId}`);
-                    await updatePartyActs(party.code, contest.acts);
+                    await updatePartyActs(party.code, contest.acts, party.results);
                 }, "Loaded the latest lineup.")}
             />
 
@@ -92,7 +92,8 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
 
 /** A final's real result, tapped in from the top as the scoreboard reveals it. */
 const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onSave: (results: PartyResults) => void }) => {
-    const places = party.results.places ?? {};
+    // Only acts still in the show, in case the lineup changed under the result.
+    const places = resultsFor(party.acts, party.results).places ?? {};
     const placed = party.acts.filter(act => places[act.id] !== undefined).sort((a, b) => places[a.id] - places[b.id]);
     const unplaced = party.acts.filter(act => places[act.id] === undefined);
     const next = placed.length + 1;
@@ -149,7 +150,7 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
 
 /** A semi-final's qualifiers, ticked as the envelopes open. */
 const SemiResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onSave: (results: PartyResults) => void }) => {
-    const qualifiers = party.results.qualifiers ?? [];
+    const qualifiers = resultsFor(party.acts, party.results).qualifiers ?? [];
     const full = qualifiers.length >= party.qualifiers;
     const toggle = (actId: string) =>
         onSave({ qualifiers: qualifiers.includes(actId) ? qualifiers.filter(id => id !== actId) : [...qualifiers, actId] });
@@ -191,30 +192,16 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
     onLoadLatest: () => void;
 }) => {
     const [actId, setActId] = useState(party.acts[0].id);
+    // The picked act, or the first one if it left the lineup.
     const index = Math.max(party.acts.findIndex(act => act.id === actId), 0);
     const act = party.acts[index];
-    const [artist, setArtist] = useState(act.artist);
-    const [song, setSong] = useState(act.song);
 
-    const pick = (id: string) => {
-        const next = party.acts.find(entry => entry.id === id) ?? party.acts[0];
-        setActId(next.id);
-        setArtist(next.artist);
-        setSong(next.song);
-    };
     const move = (by: number) => {
         const acts = [...party.acts];
         const [moved] = acts.splice(index, 1);
         acts.splice(index + by, 0, moved);
         onSave(acts);
     };
-    const saveDetails = () =>
-        onSave(
-            party.acts.map(entry => (entry.id === act.id
-                ? { ...entry, artist: artist.trim() || entry.artist, song: song.trim() || entry.song }
-                : entry)),
-            `Saved ${act.country}.`,
-        );
 
     return (
         <>
@@ -223,12 +210,47 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
                 <div className="lycra-pane">
                     <label>
                         <span className="calm-label">Act</span>
-                        <select className="lycra-field" value={act.id} onChange={event => pick(event.target.value)}>
+                        <select className="lycra-field" value={act.id} onChange={event => setActId(event.target.value)}>
                             {party.acts.map((entry, i) => (
                                 <option key={entry.id} value={entry.id}>{i + 1}. {entry.country}</option>
                             ))}
                         </select>
                     </label>
+                </div>
+            </div>
+            <div className="calm-ground">
+                <div className="lycra-pane calm-split">
+                    <button type="button" className="lycra" disabled={busy || index === 0} onClick={() => move(-1)}>Move earlier</button>
+                    <button type="button" className="lycra" disabled={busy || index === party.acts.length - 1} onClick={() => move(1)}>Move later</button>
+                </div>
+            </div>
+            {/* Keyed on what's saved, so a newer lineup refills the fields instead of being overwritten by them. */}
+            <ActDetails
+                key={`${act.id}|${act.artist}|${act.song}`}
+                act={act}
+                busy={busy}
+                onSave={(artist, song) => onSave(
+                    party.acts.map(entry => (entry.id === act.id ? { ...entry, artist, song } : entry)),
+                    `Saved ${act.country}.`,
+                )}
+            />
+            <div className="calm-ground">
+                <div className="lycra-pane">
+                    <button type="button" className="lycra" disabled={busy} onClick={onLoadLatest}>Load the latest lineup</button>
+                </div>
+            </div>
+        </>
+    );
+};
+
+/** One act's artist and song, as the host types them. */
+const ActDetails = ({ act, busy, onSave }: { act: Act; busy: boolean; onSave: (artist: string, song: string) => void }) => {
+    const [artist, setArtist] = useState(act.artist);
+    const [song, setSong] = useState(act.song);
+    return (
+        <>
+            <div className="calm-ground">
+                <div className="lycra-pane">
                     <label>
                         <span className="calm-label">Artist</span>
                         <input className="lycra-field" value={artist} maxLength={80} onChange={event => setArtist(event.target.value)} />
@@ -240,15 +262,15 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
                 </div>
             </div>
             <div className="calm-ground">
-                <div className="lycra-pane calm-split">
-                    <button type="button" className="lycra" disabled={busy || index === 0} onClick={() => move(-1)}>Move earlier</button>
-                    <button type="button" className="lycra" disabled={busy || index === party.acts.length - 1} onClick={() => move(1)}>Move later</button>
-                </div>
-            </div>
-            <div className="calm-ground">
                 <div className="lycra-pane">
-                    <button type="button" className="lycra" disabled={busy} onClick={saveDetails}>Save {act.country}</button>
-                    <button type="button" className="lycra" disabled={busy} onClick={onLoadLatest}>Load the latest lineup</button>
+                    <button
+                        type="button"
+                        className="lycra"
+                        disabled={busy}
+                        onClick={() => onSave(artist.trim() || act.artist, song.trim() || act.song)}
+                    >
+                        Save {act.country}
+                    </button>
                 </div>
             </div>
         </>

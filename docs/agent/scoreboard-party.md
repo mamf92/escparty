@@ -21,11 +21,21 @@ generously and so on, each named after a moment in Eurovision history.
 | `/party/:code/screen` | `PartyScreen.tsx` | The TV: QR code, the code, the room's standings, closest guests. Outside the phone frame |
 | `/party/:code/awards` | `PartyAwards.tsx` | One award at a time, then who came closest. Only after the host opens them (the host can preview) |
 
+Each guest's place in the running order is kept by act id, so a host
+reordering the lineup doesn't move them to another country.
+
 Live data comes from `usePartyData` (two `onSnapshot` listeners: the party
 and its ballots). The guest's own ratings go through `useOwnBallot`: kept in
 localStorage on every tap, saved to Firestore 400ms later, retried every 5s
 while that fails, and merged once with the server's copy when it arrives
-(`mergeBallots`, this device wins per rating).
+(`mergeBallots`, this device wins per rating). Leaving the page sends a
+save that was still waiting. Ballots are tidied as they're read
+(`toBallot` drops non-number ratings and non-list bonuses), since the
+rules only check their outline.
+
+When the host loads a new lineup, places and qualifier ticks of acts that
+left go in the same write, and the places left are renumbered;
+`resultsFor` trims the same way wherever a result is read.
 
 ## The shows (#82)
 
@@ -66,8 +76,9 @@ lineup" from `contests/`.
   machine +1, key change +1, pyro +1, a grandma on stage +2).
 - **The room's standings** average each act over the guests who rated it.
 - **Closeness to a final's result** (#86): only acts with a real place
-  count; the guest's scores for them are ranked among themselves (ties
-  share the average place), and each act earns 12, 8, 5, 3, 1 or 0 by how
+  count, and only the ones the guest rated: both the guest's scores and
+  the real places are ranked among those acts (ties share the average
+  place), so skipping an act doesn't shift the rest. Each act earns 12, 8, 5, 3, 1 or 0 by how
   many places off it is. A half-entered result compares like with like.
 - **A semi-final** only reveals who goes through, so a guest's top N (N =
   qualifiers entered so far) earns 12 per act that went through.
@@ -76,8 +87,8 @@ lineup" from `contests/`.
 
 | Award | For | Needs |
 | --- | --- | --- |
-| The Jedward Twins | Most alike (highest Pearson correlation over shared acts) | Two guests sharing 3+ rated acts |
-| Lordi & Salvador Sobral | Most different (lowest correlation) | Same, and not the same pair |
+| The Jedward Twins | Most alike (highest Pearson correlation over shared acts) | Two guests sharing 3+ rated acts, positive correlation |
+| Lordi & Salvador Sobral | Most different (lowest correlation) | Same, not the same pair, correlation under 0.3 |
 | Euphoria / Nul Points | Highest / lowest average | Averages differ |
 | The Wind Machine | Biggest spread | Any spread |
 | Lasha Tumbai | Above the room's average, and the most even | |
@@ -96,9 +107,13 @@ is told when one is theirs, and the closeness table shows only their own
 place. The TV never shows anyone's own ratings; it names the closest
 guests only when names are on.
 
-Ballots are readable by anyone with the party code (the standings and
-awards are worked out on each device), the same trust level as a quiz room.
-Don't put anything in a ballot a guest wouldn't want the room to see.
+Anonymous awards are a courtesy, not a secret: ballots are readable by
+anyone with the party code (the standings and awards are worked out on
+each device), the same trust level as a quiz room, so a curious guest with
+developer tools could work out who won what. The setup screen says so. Real
+secrecy would need the awards worked out server-side (a Cloud Function),
+which the project doesn't have. Don't put anything in a ballot a guest
+wouldn't want the room to see.
 
 ## Data (`partyFirestore.ts`)
 
@@ -124,7 +139,8 @@ clients ever write the same document.
 
 Rules (`firestore.rules`, verify cases 5i): a party is created with exactly
 those keys, an empty result, not revealed, and an `expireAt` 29-31 days
-out; after that only `acts`, `results` and `revealed` may change. There's
+out (the rules accept 1-60 days, since the phone's clock sets it); after
+that only `acts`, `results` and `revealed` may change. There's
 no sign-in, so like quiz rooms the rules check shape, not who: anyone with
 the code could edit the result. Ballots need the party to exist, a 1-40
 character name and at most 40 acts. `contests/` is read-only to clients.
@@ -132,7 +148,7 @@ character name and at most 40 acts. `contests/` is read-only to clients.
 ## Retention
 
 Every party and every ballot carries `expireAt`, 30 days out
-(`PARTY_LIFETIME_DAYS`; the rules accept 29-31). Nothing is deleted until
+(`PARTY_LIFETIME_DAYS`; the rules accept 1-60 days, as the phone's clock sets it). Nothing is deleted until
 the project owner enables a Firestore TTL policy on `expireAt` for both
 collection groups, `parties` and `ballots` (Firebase console, Firestore,
 Time-to-live). Deleting a party doesn't delete its ballots on its own,

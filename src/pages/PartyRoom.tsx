@@ -101,8 +101,8 @@ const PartyRoom = () => {
                 <RateAct
                     party={party}
                     ballot={own.ballot}
-                    actIndex={Math.min(Math.max(identity.actIndex ?? 0, 0), party.acts.length - 1)}
-                    onMove={actIndex => updateIdentity({ actIndex })}
+                    actIndex={Math.max(party.acts.findIndex(entry => entry.id === identity.actId), 0)}
+                    onMove={index => updateIdentity({ actId: party.acts[index].id })}
                     onRate={own.rate}
                     onBonus={own.toggleBonus}
                 />
@@ -131,7 +131,7 @@ const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity:
     const join = () => {
         setTried(true);
         if (!name.trim()) return;
-        onJoin({ guestId: uuidv4(), name: name.trim(), isHost: false, actIndex: 0 });
+        onJoin({ guestId: uuidv4(), name: name.trim(), isHost: false });
     };
     return (
         <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
@@ -152,7 +152,7 @@ const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity:
             <CalmNote>
                 {party.showNames
                     ? "At the end, the awards name who rated most alike and most differently."
-                    : "The awards at the end are anonymous: only you see which ones are yours."}
+                    : "The awards at the end don't name names: you're only told which ones are yours."}
             </CalmNote>
         </CalmPage>
     );

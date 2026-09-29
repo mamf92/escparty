@@ -14,8 +14,8 @@ export interface PartyIdentity {
     guestId: string;
     name: string;
     isHost: boolean;
-    /** Where they were in the running order. */
-    actIndex?: number;
+    /** The act they were on, by id, so a reordered lineup keeps them there. */
+    actId?: string;
 }
 
 export interface StoredBallot {

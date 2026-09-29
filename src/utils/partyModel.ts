@@ -190,13 +190,16 @@ export interface Prediction {
  * halfway (the top 10 so far) still compares like with like. Each act then
  * scores by how many places off it is: 12 for exact, then 8, 5, 3, 1 and 0
  * from five places off. An act with a real place the guest never rated
- * scores 0. Ties in the guest's scores share places (see rankPositions);
+ * is left out on both sides, so it neither scores nor moves the others'
+ * places. Ties in the guest's scores share places (see rankPositions);
  * a fractional distance rounds to the nearest place.
  */
 export const predictFinal = (scores: Map<string, number>, realPlaces: Record<string, number>): Prediction => {
-    const placed = Object.keys(realPlaces).filter(actId => Number.isFinite(realPlaces[actId]));
-    const realRank = rankPositions(new Map(placed.map(actId => [actId, -realPlaces[actId]])));
-    const guestRank = rankPositions(new Map(placed.filter(actId => scores.has(actId)).map(actId => [actId, scores.get(actId)!])));
+    // Only acts with a real place that the guest rated, ranked among
+    // themselves on both sides, so skipping an act doesn't shift the rest.
+    const compared = Object.keys(realPlaces).filter(actId => Number.isFinite(realPlaces[actId]) && scores.has(actId));
+    const realRank = rankPositions(new Map(compared.map(actId => [actId, -realPlaces[actId]])));
+    const guestRank = rankPositions(new Map(compared.map(actId => [actId, scores.get(actId)!])));
     let points = 0;
     let distance = 0;
     for (const [actId, guestPlace] of guestRank) {
@@ -276,6 +279,8 @@ export const pearson = (xs: number[], ys: number[]): number | null => {
 export const MIN_SHARED_ACTS = 3;
 /** The least acts a guest must have rated to count in the solo awards. */
 export const MIN_RATED_ACTS = 3;
+/** The most-different pair only counts if they agreed less than this (Pearson r). */
+export const OPPOSITES_BELOW = 0.3;
 
 export type AwardId =
     | "twins"
@@ -389,9 +394,15 @@ export const partyAwards = (
         }
         const twins = best(pairs, pair => pair.r);
         const opposites = best(pairs, pair => -pair.r);
-        if (twins) awards.push(award("twins", twins.ids, `They agreed ${Math.round(twins.r * 100)}% of the way over ${twins.shared} acts.`));
-        if (opposites && opposites !== twins) {
-            awards.push(award("opposites", opposites.ids, `They agreed ${Math.round(opposites.r * 100)}% over ${opposites.shared} acts.`));
+        const r2 = (r: number) => r.toFixed(2);
+        if (twins && twins.r > 0) {
+            awards.push(award("twins", twins.ids, `Their scores rose and fell together over ${twins.shared} acts (correlation ${r2(twins.r)}).`));
+        }
+        // Only a pair that really disagreed: a weak or negative correlation.
+        if (opposites && opposites !== twins && opposites.r < OPPOSITES_BELOW) {
+            awards.push(award("opposites", opposites.ids, opposites.r < 0
+                ? `When one scored an act up, the other scored it down, over ${opposites.shared} acts (correlation ${r2(opposites.r)}).`
+                : `They agreed least of anyone over ${opposites.shared} acts (correlation ${r2(opposites.r)}).`));
         }
 
         const stats = scored.map(entry => {

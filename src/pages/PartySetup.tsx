@@ -73,7 +73,7 @@ const PartySetup = () => {
                 bonuses,
                 showNames,
             });
-            savePartyIdentity(code, { guestId: hostId, name: name.trim(), isHost: true, actIndex: 0 });
+            savePartyIdentity(code, { guestId: hostId, name: name.trim(), isHost: true });
             navigate(`/party/${code}`);
         } catch (error) {
             console.error("Couldn't create the party:", error);
@@ -199,7 +199,7 @@ const PartySetup = () => {
                         <span className="calm-sub">
                             {showNames
                                 ? "Everyone sees who rated like twins and who was toughest."
-                                : "The awards say \"two of you\" and \"one of you\"; each guest still sees their own."}
+                                : "The awards say \"two of you\" and \"one of you\", and each guest is told which are theirs. It keeps the fun friendly; the ratings themselves aren't secret from the party."}
                         </span>
                     </button>
                 </div>

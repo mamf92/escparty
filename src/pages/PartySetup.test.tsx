@@ -43,7 +43,7 @@ describe("PartySetup", () => {
         const party = mocks.createParty.mock.calls[0][0];
         expect(party).toMatchObject({ contestId: "burgas-2027-final", kind: "final", qualifiers: 0, bonuses: true, showNames: true });
         expect(party.template.id).toBe("jury");
-        expect(readPartyIdentity("ABBA")).toEqual({ guestId: party.hostId, name: "Martin", isHost: true, actIndex: 0 });
+        expect(readPartyIdentity("ABBA")).toEqual({ guestId: party.hostId, name: "Martin", isHost: true });
     });
 
     it("sets up a semi with our own categories, no bonuses and anonymous awards", async () => {

@@ -93,13 +93,40 @@ describe("PartyHostTools", () => {
         expect(screen.getByRole("status")).toHaveTextContent("Saved Ireland.");
     });
 
+    it("refills the fields from a newer lineup instead of saving old ones over it", async () => {
+        const user = userEvent.setup();
+        const { rerender } = renderTools(makeParty());
+        expect(screen.getByLabelText("Artist")).toHaveValue("Loreen");
+        const real = [{ ...fixtureActs[0], artist: "The real artist" }, ...fixtureActs.slice(1)];
+        rerender(<PartyHostTools party={makeParty({ acts: real })} ballots={[]} />);
+        expect(screen.getByLabelText("Artist")).toHaveValue("The real artist");
+        await user.click(screen.getByRole("button", { name: "Save Sweden" }));
+        expect(mocks.updatePartyActs).toHaveBeenLastCalledWith("ABBA", real);
+
+        // The picked act left the lineup: back to the first act, with its own details.
+        await user.selectOptions(screen.getByLabelText("Act"), "ie");
+        rerender(<PartyHostTools party={makeParty({ acts: real.slice(0, 3) })} ballots={[]} />);
+        expect(screen.getByLabelText("Act")).toHaveValue("se");
+        expect(screen.getByLabelText("Artist")).toHaveValue("The real artist");
+    });
+
+    it("ignores places and qualifiers of acts that left the lineup", () => {
+        const { unmount } = renderTools(makeParty({ acts: fixtureActs.slice(0, 3), results: { places: { ie: 1, fi: 2 } } }));
+        expect(screen.getByText("So far: 1st Finland.")).toBeInTheDocument();
+        expect(screen.getByText("The real result: tap who came 2nd.")).toBeInTheDocument();
+        unmount();
+        renderTools(makeParty({ kind: "semi", qualifiers: 1, acts: fixtureActs.slice(0, 3), results: { qualifiers: ["ie"] } }));
+        expect(screen.getByText(/\(0 of 1\)/)).toBeInTheDocument();
+        expect(within(screen.getByLabelText("Who goes through")).getByRole("button", { name: /Sweden/ })).toBeEnabled();
+    });
+
     it("loads the latest lineup", async () => {
         const user = userEvent.setup();
         mocks.fetchContest.mockResolvedValueOnce({ acts: [fixtureActs[2]] }).mockResolvedValueOnce(undefined);
-        renderTools(makeParty());
+        renderTools(makeParty({ results: { places: { se: 1 } } }));
         await user.click(screen.getByRole("button", { name: "Load the latest lineup" }));
         expect(mocks.fetchContest).toHaveBeenCalledWith("burgas-2027-final");
-        expect(mocks.updatePartyActs).toHaveBeenLastCalledWith("ABBA", [fixtureActs[2]]);
+        expect(mocks.updatePartyActs).toHaveBeenLastCalledWith("ABBA", [fixtureActs[2]], { places: { se: 1 } });
         expect(screen.getByRole("status")).toHaveTextContent("Loaded the latest lineup.");
         await user.click(screen.getByRole("button", { name: "Load the latest lineup" }));
         expect(screen.getByRole("status")).toHaveTextContent("Couldn't load the latest lineup.");

@@ -18,6 +18,7 @@ import {
 import { db } from "../firebase";
 import { contestById, type Act, type Contest } from "../data/contests2027";
 import type { Ballot, Bonuses, RatingTemplate, Ratings } from "./partyModel";
+import { resultsFor } from "./partyResults";
 import { generateRoomCode } from "./roomsFirestore";
 
 export interface PartyResults {
@@ -105,15 +106,21 @@ export const createParty = async (party: NewParty): Promise<string> => {
         const code = generateRoomCode();
         const ref = doc(database, "parties", code);
         if ((await getDoc(ref)).exists()) continue;
-        const expireAt = expiry();
-        await setDoc(ref, {
-            ...party,
-            code,
-            results: {},
-            revealed: false,
-            createdAt: serverTimestamp(),
-            expireAt,
-        });
+        try {
+            await setDoc(ref, {
+                ...party,
+                code,
+                results: {},
+                revealed: false,
+                createdAt: serverTimestamp(),
+                expireAt: expiry(),
+            });
+        } catch (error) {
+            // Another host took this code between the check and the write:
+            // the write then counts as an update, which the rules refuse.
+            if ((error as { code?: string }).code === "permission-denied") continue;
+            throw error;
+        }
         return code;
     }
     throw new Error("Couldn't find a free party code. Try again.");
@@ -135,12 +142,30 @@ export const listenToBallots = (code: string, onBallots: (ballots: Ballot[]) => 
         error => onError?.(error),
     );
 
-const toBallot = (guestId: string, data: Record<string, unknown>): Ballot => ({
-    guestId,
-    name: typeof data.name === "string" ? data.name : "Guest",
-    ratings: isRecord(data.ratings) ? (data.ratings as Ratings) : {},
-    bonuses: isRecord(data.bonuses) ? (data.bonuses as Bonuses) : {},
-});
+/**
+ * A ballot as it comes from Firestore, tidied. Anyone with the code can
+ * write a ballot and the rules only check its outline, so every rating
+ * that isn't a number and every bonus list that isn't a list of strings is
+ * dropped here, before any screen or award works with it.
+ */
+const toBallot = (guestId: string, data: Record<string, unknown>): Ballot => {
+    const ratings: Ratings = {};
+    if (isRecord(data.ratings)) {
+        for (const [actId, values] of Object.entries(data.ratings as Record<string, unknown>)) {
+            if (!isRecord(values)) continue;
+            ratings[actId] = Object.fromEntries(
+                Object.entries(values as Record<string, unknown>).filter((entry): entry is [string, number] => typeof entry[1] === "number"),
+            );
+        }
+    }
+    const bonuses: Bonuses = {};
+    if (isRecord(data.bonuses)) {
+        for (const [actId, ids] of Object.entries(data.bonuses as Record<string, unknown>)) {
+            if (Array.isArray(ids)) bonuses[actId] = ids.filter((id): id is string => typeof id === "string");
+        }
+    }
+    return { guestId, name: typeof data.name === "string" ? data.name : "Guest", ratings, bonuses };
+};
 
 const isRecord = (value: unknown) => !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -168,8 +193,13 @@ export const fetchBallot = async (code: string, guestId: string): Promise<Ballot
 };
 
 /** The host's edits: the running order, the real results, opening the awards. */
-export const updatePartyActs = (code: string, acts: Act[]) =>
-    updateDoc(doc(requireDb(), "parties", code), { acts });
+/**
+ * Replace the running order. When acts leave the show, their places and
+ * qualifier ticks go too, in the same write, so the result never points at
+ * an act that isn't there; the places left are renumbered 1, 2, 3...
+ */
+export const updatePartyActs = (code: string, acts: Act[], results?: PartyResults) =>
+    updateDoc(doc(requireDb(), "parties", code), results ? { acts, results: resultsFor(acts, results) } : { acts });
 
 export const setPartyResults = (code: string, results: PartyResults) =>
     updateDoc(doc(requireDb(), "parties", code), { results });

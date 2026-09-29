@@ -122,6 +122,12 @@ describe("prediction closeness", () => {
         expect(predictFinal(scores, { se: 2, no: 1 })).toEqual({ points: 24, distance: 0, compared: 2 });
     });
 
+    it("ranks a guest who skipped acts only against the acts they rated", () => {
+        // Rated only Norway and Finland, in the real order: both exact.
+        const scores = ballotScores(ballot("a", [null, 10, 8, null, null]), acts, douze);
+        expect(predictFinal(scores, real)).toEqual({ points: 24, distance: 0, compared: 2 });
+    });
+
     it("scores nothing for a placed act the guest never rated", () => {
         const scores = ballotScores(ballot("a", [12, null, null, null, null]), acts, douze);
         expect(predictFinal(scores, real)).toEqual({ points: 12, distance: 0, compared: 1 });
@@ -192,7 +198,9 @@ describe("partyAwards", () => {
     it("tells each award's story in words", () => {
         const twins = partyAwards(ballots, acts, douze).find(entry => entry.id === "twins")!;
         expect(twins.title).toBe("The Jedward Twins");
-        expect(twins.detail).toMatch(/agreed \d+% of the way over 5 acts/);
+        expect(twins.detail).toMatch(/rose and fell together over 5 acts \(correlation \d\.\d\d\)/);
+        const opposites = partyAwards(ballots, acts, douze).find(entry => entry.id === "opposites")!;
+        expect(opposites.detail).toMatch(/scored it down, over 5 acts \(correlation -/);
         for (const names of Object.values(AWARD_NAMES)) {
             expect(names.title && names.for && names.story).toBeTruthy();
         }
@@ -217,6 +225,13 @@ describe("partyAwards", () => {
         expect(byId(partyAwards(ballots, acts, douze)).babushki).toBeUndefined();
         // A result nobody scored against: no Johnny Logan.
         expect(byId(partyAwards(ballots, acts, douze, [], new Map([["ann", { points: 0, distance: 9, compared: 5 }]])))["johnny-logan"]).toBeUndefined();
+    });
+
+    it("names no opposites when everyone broadly agrees", () => {
+        const agreeing = [ballot("a", [12, 9, 6, 3, 1]), ballot("b", [11, 9, 5, 4, 1]), ballot("c", [10, 10, 4, 2, 3])];
+        const ids = partyAwards(agreeing, acts, douze).map(entry => entry.id);
+        expect(ids).toContain("twins");
+        expect(ids).not.toContain("opposites");
     });
 
     it("doesn't name the same pair twins and opposites", () => {

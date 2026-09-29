@@ -10,6 +10,7 @@ import {
     ordinal,
     partyBonusList,
     partyLink,
+    resultsFor,
     predictionFor,
     predictionsFor,
 } from "./partyResults";
@@ -78,5 +79,14 @@ describe("partyResults", () => {
 
     it("links to the party", () => {
         expect(partyLink("ABBA")).toBe(`${window.location.origin}${window.location.pathname}#/party/ABBA`);
+    });
+
+    it("trims a result to the acts in the show, renumbering places", () => {
+        expect(resultsFor(acts, { places: { xx: 1, fi: 3, se: 2 }, qualifiers: ["xx", "no"] }))
+            .toEqual({ places: { se: 1, fi: 2 }, qualifiers: ["no"] });
+        expect(resultsFor(acts, {})).toEqual({});
+        // A removed act doesn't count against a guest.
+        const guest = ballot("a", [12, 10]);
+        expect(predictionFor(party({ results: { places: { xx: 1, se: 2, no: 3 } } }), guest)).toEqual({ points: 24, distance: 0, compared: 2 });
     });
 });

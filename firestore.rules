@@ -417,10 +417,11 @@ service cloud.firestore {
              data.results == {} &&
              data.revealed == false &&
              data.createdAt == request.time &&
-             // Kept 30 days (PARTY_LIFETIME_DAYS), for a TTL policy on expireAt.
+             // Kept about 30 days (PARTY_LIFETIME_DAYS), for a TTL policy on expireAt.
              data.expireAt is timestamp &&
-             data.expireAt > request.time + duration.value(29, 'd') &&
-             data.expireAt < request.time + duration.value(31, 'd');
+             // A wide window: expireAt comes from the phone's own clock.
+             data.expireAt > request.time + duration.value(1, 'd') &&
+             data.expireAt < request.time + duration.value(60, 'd');
     }
 
     // The host's edits: the running order, the real results, opening the
@@ -452,10 +453,11 @@ service cloud.firestore {
              data.ratings is map && data.ratings.size() <= 40 &&
              data.bonuses is map && data.bonuses.size() <= 40 &&
              data.updatedAt == request.time &&
-             // Kept 30 days after the last change, for a TTL policy on expireAt.
+             // Kept about 30 days after the last change, for a TTL policy on expireAt.
              data.expireAt is timestamp &&
-             data.expireAt > request.time + duration.value(29, 'd') &&
-             data.expireAt < request.time + duration.value(31, 'd');
+             // A wide window: expireAt comes from the phone's own clock.
+             data.expireAt > request.time + duration.value(1, 'd') &&
+             data.expireAt < request.time + duration.value(60, 'd');
     }
 
     // Default deny all other collections and documents

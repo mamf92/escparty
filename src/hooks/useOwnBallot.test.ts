@@ -79,7 +79,19 @@ describe("useOwnBallot", () => {
         expect(mocks.saveBallot).not.toHaveBeenCalled();
         act(() => result.current.rate("se", "points", 2));
         unmount();
+        expect(mocks.saveBallot).not.toHaveBeenCalled();
         const none = renderHook(() => useOwnBallot(undefined, me, undefined));
         expect(none.result.current.ballot).toEqual({ ratings: {}, bonuses: {} });
+    });
+
+    it("sends a waiting save when the page closes, trying once", async () => {
+        mocks.saveBallot.mockRejectedValue(new Error("offline"));
+        const { result, unmount } = renderHook(() => useOwnBallot("ABBA", me, undefined));
+        act(() => result.current.rate("se", "points", 12));
+        unmount();
+        expect(mocks.saveBallot).toHaveBeenCalledTimes(1);
+        expect(mocks.saveBallot.mock.calls[0][1].ratings).toEqual({ se: { points: 12 } });
+        await act(() => vi.advanceTimersByTimeAsync(10_000));
+        expect(mocks.saveBallot).toHaveBeenCalledTimes(1);
     });
 });

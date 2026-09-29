@@ -100,6 +100,15 @@ describe("createParty", () => {
         vi.mocked(Date.now).mockRestore();
     });
 
+    it("tries another code when one is taken between the check and the write", async () => {
+        mocks.generateRoomCode.mockReturnValueOnce("ABBA").mockReturnValueOnce("LORD");
+        mocks.getDoc.mockResolvedValue(snapshot(null));
+        mocks.setDoc.mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }));
+        expect(await createParty(party)).toBe("LORD");
+        mocks.setDoc.mockRejectedValueOnce(new Error("offline"));
+        await expect(createParty(party)).rejects.toThrow("offline");
+    });
+
     it("gives up after five taken codes", async () => {
         mocks.generateRoomCode.mockReturnValue("ABBA");
         mocks.getDoc.mockResolvedValue(snapshot({}));
@@ -137,10 +146,12 @@ describe("listeners", () => {
         next({ docs: [
             { id: "g1", data: () => ({ name: "Jedward", ratings: { se: { points: 12 } }, bonuses: { se: ["wind"] } }) },
             { id: "g2", data: () => ({ name: 3, ratings: [], bonuses: null }) },
+            { id: "g3", data: () => ({ name: "Hatari", ratings: { se: { points: "12", show: 4 }, no: 5 }, bonuses: { se: "wind", no: [1, "pyro"] } }) },
         ] });
         expect(onBallots).toHaveBeenCalledWith([
             { guestId: "g1", name: "Jedward", ratings: { se: { points: 12 } }, bonuses: { se: ["wind"] } },
             { guestId: "g2", name: "Guest", ratings: {}, bonuses: {} },
+            { guestId: "g3", name: "Hatari", ratings: { se: { show: 4 } }, bonuses: { no: ["pyro"] } },
         ]);
         fail(new Error("ignored without a handler"));
     });
@@ -159,10 +170,12 @@ describe("ballots and host writes", () => {
 
     it("update the running order, the result and the awards", async () => {
         await updatePartyActs("ABBA", [act]);
+        await updatePartyActs("ABBA", [act], { places: { no: 1, se: 2 } });
         await setPartyResults("ABBA", { places: { se: 1 } });
         await setPartyRevealed("ABBA", true);
         expect(mocks.updateDoc.mock.calls).toEqual([
             [{ path: "parties/ABBA" }, { acts: [act] }],
+            [{ path: "parties/ABBA" }, { acts: [act], results: { places: { se: 1 } } }],
             [{ path: "parties/ABBA" }, { results: { places: { se: 1 } } }],
             [{ path: "parties/ABBA" }, { revealed: true }],
         ]);

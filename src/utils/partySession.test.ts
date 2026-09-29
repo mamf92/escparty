@@ -8,7 +8,7 @@ import {
     storeBallot,
 } from "./partySession";
 
-const me = { guestId: "g1", name: "Jedward", isHost: false, actIndex: 3 };
+const me = { guestId: "g1", name: "Jedward", isHost: false, actId: "se" };
 
 beforeEach(() => {
     localStorage.clear();

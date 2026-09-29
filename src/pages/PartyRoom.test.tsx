@@ -56,13 +56,13 @@ describe("PartyRoom", () => {
         await user.type(screen.getByLabelText("Your name at the party"), "Lordi");
         await user.click(screen.getByRole("button", { name: "Join the party" }));
         expect(screen.getByText("Party ABBA · you're Lordi")).toBeInTheDocument();
-        expect(readPartyIdentity("ABBA")).toMatchObject({ name: "Lordi", isHost: false, actIndex: 0 });
+        expect(readPartyIdentity("ABBA")).toMatchObject({ name: "Lordi", isHost: false });
     });
 
     it("warns about anonymous awards on joining", () => {
         mocks.data = { party: makeParty({ showNames: false }), ballots: [], error: null };
         renderRoom();
-        expect(screen.getByText(/only you see which ones are yours/)).toBeInTheDocument();
+        expect(screen.getByText(/only told which ones are yours/)).toBeInTheDocument();
     });
 
     it("rates acts one by one and remembers where you were", async () => {
@@ -82,12 +82,24 @@ describe("PartyRoom", () => {
 
         await user.click(screen.getByRole("button", { name: "Next act" }));
         expect(screen.getByRole("radiogroup", { name: "Points for Norway" })).toBeInTheDocument();
-        expect(readPartyIdentity("ABBA")?.actIndex).toBe(1);
+        expect(readPartyIdentity("ABBA")?.actId).toBe("no");
         await user.selectOptions(screen.getByLabelText("Jump to an act"), "3");
         expect(screen.getByRole("button", { name: "Next act" })).toBeDisabled();
         expect(screen.getByRole("option", { name: "1. Sweden ✓" })).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Previous act" }));
         expect(screen.getByRole("radiogroup", { name: "Points for Finland" })).toBeInTheDocument();
+    });
+
+    it("stays on the same act when the host reorders the lineup", () => {
+        savePartyIdentity("ABBA", { ...guest, actId: "fi" });
+        const { unmount } = renderRoom();
+        expect(screen.getByRole("radiogroup", { name: "Points for Finland" })).toBeInTheDocument();
+        unmount();
+        const [se, no, fi, ie] = makeParty().acts;
+        mocks.data = { party: makeParty({ acts: [fi, se, no, ie] }), ballots: [], error: null };
+        renderRoom();
+        expect(screen.getByRole("radiogroup", { name: "Points for Finland" })).toBeInTheDocument();
+        expect(screen.getByText("1 of 4")).toBeInTheDocument();
     });
 
     it("shows your ranking, and how close it came", async () => {
