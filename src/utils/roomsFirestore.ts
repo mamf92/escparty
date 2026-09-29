@@ -4,6 +4,7 @@ import {
     setDoc,
     updateDoc,
     arrayUnion,
+    arrayRemove,
     onSnapshot,
     runTransaction,
     serverTimestamp,
@@ -53,6 +54,8 @@ export interface Room {
     // Set once, when the host starts another round with the same guests
     // (#21): the code of the new room, which guests join from the results.
     nextRoomCode?: string;
+    // The players who've said they're ready in the lobby (#65), by id.
+    readyPlayers?: string[];
 }
 
 /**
@@ -623,4 +626,33 @@ export const setNextRoom = async (roomCode: string, nextRoomCode: string): Promi
         throw new Error("Firebase not initialized");
     }
     await updateDoc(doc(db, "rooms", roomCode), { nextRoomCode });
+};
+
+/**
+ * Say this player is (or isn't) ready in the lobby (#65). arrayUnion and
+ * arrayRemove, like markPlayerAtMidQuiz, since players tap at once.
+ */
+export const setPlayerReady = async (roomCode: string, playerId: string, ready: boolean): Promise<void> => {
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+    await updateDoc(doc(db, "rooms", roomCode), {
+        readyPlayers: ready ? arrayUnion(playerId) : arrayRemove(playerId),
+    });
+};
+
+/**
+ * The host removes a player from the lobby (#65): someone who joined by
+ * mistake or dropped out before the start. arrayRemove of the exact entry
+ * the host sees, so a guest joining at the same moment isn't lost. It fails
+ * quietly (nothing removed) if the entry has changed since.
+ */
+export const removePlayerFromRoom = async (roomCode: string, player: Player): Promise<void> => {
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+    await updateDoc(doc(db, "rooms", roomCode), {
+        players: arrayRemove(player),
+        readyPlayers: arrayRemove(player.id),
+    });
 };

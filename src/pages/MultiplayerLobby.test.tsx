@@ -74,4 +74,48 @@ describe("MultiplayerLobby", () => {
     await user.click(screen.getByText("Join Game"));
     expect(alert).toHaveBeenCalledWith("This game is full. Ask the host to start a new one.");
   });
+
+  it("lets a player back into a game this device was in, as themselves (#65)", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-loreen");
+    localStorage.setItem("playerName", "Loreen");
+    renderLobby();
+    await user.click(screen.getByText("Join game"));
+    await user.type(screen.getByPlaceholderText("code"), "ABBA");
+    await user.click(screen.getByText("Join Game"));
+    expect(confirm).toHaveBeenCalledWith("You were in this game as Loreen. Rejoin as Loreen? (Cancel joins as someone new.)");
+    expect(joinRoom).toHaveBeenCalledWith("ABBA", "p-loreen", "Loreen");
+    expect(screen.getByText("at /lobby")).toBeInTheDocument();
+  });
+
+  it("joins the same game as someone new when that's not you", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-loreen");
+    localStorage.setItem("playerName", "Loreen");
+    renderLobby();
+    await user.click(screen.getByText("Join game"));
+    await user.type(screen.getByPlaceholderText("code"), "ABBA");
+    await user.click(screen.getByText("Join Game"));
+    expect(vi.mocked(joinRoom).mock.calls[0][1]).not.toBe("p-loreen");
+    expect(localStorage.getItem("playerId")).not.toBe("p-loreen");
+  });
+
+  it("joins another game as someone new", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-loreen");
+    localStorage.setItem("playerName", "Loreen");
+    renderLobby();
+    await user.click(screen.getByText("Join game"));
+    await user.type(screen.getByPlaceholderText("code"), "EFGH");
+    await user.click(screen.getByText("Join Game"));
+    const [code, id] = vi.mocked(joinRoom).mock.calls[0];
+    expect(code).toBe("EFGH");
+    expect(id).not.toBe("p-loreen");
+    expect(localStorage.getItem("gameCode")).toBe("EFGH");
+  });
 });

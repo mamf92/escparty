@@ -2,11 +2,11 @@ import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen } from "../test/test-utils";
-import HostObserverView from "./HostObserverView";
+import HostObserverView, { MISSING_PLAYER_GRACE_MS } from "./HostObserverView";
 import type { Room } from "../utils/roomsFirestore";
 
-const mocks = vi.hoisted(() => ({ listenToRoom: vi.fn(), onRoom: (_room: unknown) => {} }));
-vi.mock("../utils/roomsFirestore", () => ({ listenToRoom: mocks.listenToRoom, resumeAfterMidQuiz: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listenToRoom: vi.fn(), resumeAfterMidQuiz: vi.fn(), onRoom: (_room: unknown) => {} }));
+vi.mock("../utils/roomsFirestore", () => ({ listenToRoom: mocks.listenToRoom, resumeAfterMidQuiz: mocks.resumeAfterMidQuiz }));
 
 const ShowLocation = () => {
   const location = useLocation();
@@ -51,6 +51,32 @@ describe("HostObserverView", () => {
     renderView();
     act(() => mocks.onRoom(room({ phase: "results" })));
     expect(screen.getByText('at /results with {"multiplayer":true,"roomCode":"ABBA","playerId":"host","observer":true}')).toBeInTheDocument();
+  });
+
+  it("can go on without a player who never reaches the break, after a grace period (#65)", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.resumeAfterMidQuiz.mockResolvedValue(true);
+      renderView();
+      act(() => mocks.onRoom(room({ phase: "mid-scoreboard", playersAtMidQuiz: ["p3"] })));
+      expect(screen.getByText("Still waiting for Loreen.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Continue without them" })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(MISSING_PLAYER_GRACE_MS));
+      const button = screen.getByRole("button", { name: "Continue without them" });
+      expect(button).toBeEnabled();
+      await act(async () => button.click());
+      expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledWith("ABBA");
+
+      // The next break waits again.
+      act(() => mocks.onRoom(room({ phase: "question", currentQuestionIndex: 5 })));
+      act(() => mocks.onRoom(room({ phase: "mid-scoreboard", currentQuestionIndex: 9, playersAtMidQuiz: [] })));
+      expect(screen.getByRole("button", { name: "Continue without them" })).toBeDisabled();
+      act(() => mocks.onRoom(room({ phase: "mid-scoreboard", currentQuestionIndex: 9, playersAtMidQuiz: ["p2", "p3"] })));
+      expect(screen.getByRole("button", { name: "Continue Quiz" })).toBeEnabled();
+      expect(screen.queryByText(/Still waiting/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("says when there's no room to watch", () => {

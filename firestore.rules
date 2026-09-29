@@ -40,6 +40,7 @@ service cloud.firestore {
              (!('breakEvery' in data) || isBreakEvery(data.breakEvery)) &&
              (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
              !('nextRoomCode' in data) &&
+             !('readyPlayers' in data) &&
              (!('continueReady' in data) || data.continueReady is bool) &&
              (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list) &&
              // Shared progression state (#61). Optional so clients that predate
@@ -74,7 +75,11 @@ service cloud.firestore {
         // Moving between question / mid-quiz break / results
         isAdvancingPhase(affected) ||
         // Pointing a finished room at the next round (#21)
-        isSettingNextRoom(affected)
+        isSettingNextRoom(affected) ||
+        // A player saying they're ready in the lobby (#65)
+        isSettingReady(affected) ||
+        // The host removing a player from the lobby (#65)
+        isRemovingPlayer(affected)
       );
     }
 
@@ -246,6 +251,43 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)) &&
              get(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)).data.hostId == resource.data.hostId &&
              get(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)).data.get('phase', 'lobby') == 'lobby';
+    }
+
+    // setPlayerReady: one id added (arrayUnion) or removed (arrayRemove)
+    // from readyPlayers, before the game starts. The id isn't checked
+    // against the players (the rules can't search a list of maps), so a
+    // stray id only ever counts for nobody.
+    function isSettingReady(affected) {
+      let before = resource.data.get('readyPlayers', []);
+      let after = request.resource.data.readyPlayers;
+      return affected.hasOnly(['readyPlayers']) &&
+             resource.data.started == false &&
+             after is list &&
+             after.size() <= 32 &&
+             ((after.size() == before.size() + 1 && after.hasAll(before) &&
+               after[after.size() - 1] is string && after[after.size() - 1].size() <= 64) ||
+              (after.size() == before.size() - 1 && before.hasAll(after)) ||
+              after == before);
+    }
+
+    // removePlayerFromRoom: exactly one entry leaves the lobby (never the
+    // host, who stays first), and at most one ready mark goes with it. Like
+    // every room write there's no sign-in to check who asks (see
+    // docs/agent/firestore-data-model.md), so anyone with the code could
+    // remove a guest, who can join again with the code.
+    function isRemovingPlayer(affected) {
+      let data = request.resource.data;
+      let existingData = resource.data;
+      return affected.hasOnly(['players', 'readyPlayers']) &&
+             existingData.started == false &&
+             data.players is list &&
+             data.players.size() == existingData.players.size() - 1 &&
+             data.players.size() >= 1 &&
+             existingData.players.hasAll(data.players) &&
+             data.players[0].id == existingData.hostId &&
+             data.get('readyPlayers', []) is list &&
+             existingData.get('readyPlayers', []).hasAll(data.get('readyPlayers', [])) &&
+             data.get('readyPlayers', []).size() >= existingData.get('readyPlayers', []).size() - 1;
     }
 
     function isSettingContinueReady(affected) {

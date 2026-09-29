@@ -20,6 +20,7 @@ import {
   setDoc,
   updateDoc,
   arrayUnion,
+  arrayRemove,
   serverTimestamp,
   Timestamp,
   collection,
@@ -837,6 +838,72 @@ await expectDenied("point it somewhere else afterwards", () =>
 );
 await expectDenied("the next round's code riding along with scores", () =>
   updateDoc(score1.roomRef, { nextRoomCode: nextCode, players: [{ id: "host-1", name: "Host", score: 1 }] })
+);
+
+// 15. The waiting room (#65): players mark themselves ready, and the host
+// can remove a player, before the start only.
+const lobby = freshRoom("LOBBY");
+await createRoomWithPhase(lobby.roomRef, lobby.roomCode);
+await updateDoc(lobby.roomRef, { players: arrayUnion({ id: "p-2", name: "Loreen", score: 0 }) });
+await updateDoc(lobby.roomRef, { players: arrayUnion({ id: "p-3", name: "Lordi", score: 0 }) });
+await expectDenied("create a room with ready marks", () => {
+  const { roomCode: c, roomRef: r } = freshRoom("READYNEW");
+  return setDoc(r, {
+    id: c,
+    hostId: "host-1",
+    started: false,
+    createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }],
+    readyPlayers: ["host-1"],
+  });
+});
+await expectAllowed("mark a player ready (arrayUnion)", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: arrayUnion("p-2") })
+);
+await expectAllowed("mark a second player ready", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: arrayUnion("p-3") })
+);
+await expectAllowed("take a ready mark back (arrayRemove)", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: arrayRemove("p-3") })
+);
+await expectDenied("mark several players ready in one write", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: ["p-2", "p-3", "p-4"] })
+);
+await expectDenied("a ready mark that isn't an id", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: arrayUnion(42) })
+);
+await expectDenied("a ready mark riding along with the quiz pick", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: arrayUnion("p-3"), difficulty: "easy" })
+);
+await updateDoc(lobby.roomRef, { readyPlayers: arrayUnion("p-3") });
+await expectDenied("remove a player and wipe everyone's ready marks", () =>
+  updateDoc(lobby.roomRef, {
+    players: arrayRemove({ id: "p-2", name: "Loreen", score: 0 }),
+    readyPlayers: [],
+  })
+);
+await expectAllowed("the host removes a player and their ready mark", () =>
+  updateDoc(lobby.roomRef, {
+    players: arrayRemove({ id: "p-2", name: "Loreen", score: 0 }),
+    readyPlayers: arrayRemove("p-2"),
+  })
+);
+await expectDenied("remove the host", () =>
+  updateDoc(lobby.roomRef, { players: [{ id: "p-3", name: "Lordi", score: 0 }] })
+);
+await expectDenied("empty the room", () =>
+  updateDoc(lobby.roomRef, { players: [] })
+);
+await expectDenied("swap a player for someone else while removing", () =>
+  updateDoc(lobby.roomRef, { players: [{ id: "host-1", name: "Host", score: 5 }] })
+);
+await updateDoc(lobby.roomRef, { difficulty: "easy" });
+await updateDoc(lobby.roomRef, startWrite());
+await expectDenied("change a ready mark after the start", () =>
+  updateDoc(lobby.roomRef, { readyPlayers: arrayRemove("p-3") })
+);
+await expectDenied("remove a player after the start", () =>
+  updateDoc(lobby.roomRef, { players: arrayRemove({ id: "p-3", name: "Lordi", score: 0 }) })
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);
