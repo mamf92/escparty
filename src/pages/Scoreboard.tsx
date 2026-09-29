@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "../fabric-ui/lycra-surface.css";
 import "../fabric-ui/calm.css";
 import "./scoreboard-calm.css";
+import { quizTitle } from "../utils/quizCatalog";
 
 interface ScoreEntry {
     score: number;
@@ -169,7 +170,7 @@ const Scoreboard = () => {
                                     <span>
                                         {entry.score} / {entry.total}
                                     </span>
-                                    <span className="calm-sub">{entry.difficulty}</span>
+                                    <span className="calm-sub">{quizTitle(entry.difficulty)}</span>
                                 </span>
                                 <span className="calm-sub">{formatDate(entry.date)}</span>
                             </li>

@@ -1,0 +1,70 @@
+/*
+  The Calm surface on a live page inside the phone frame, shared by every
+  screen built after the scoreboard (quiz library, quiz builder, scoreboard
+  party). Same adaptations scoreboard-calm.css makes for its screen, which
+  it documents in full; calm.css and the vendored lycra-surface.css stay
+  untouched.
+*/
+
+/* The ground fills the frame instead of calm.css's viewport-sized card. */
+.calm-page .calm-ground {
+  width: 100%;
+  padding: 1.25rem 1rem;
+  /* Pools mirrored top and bottom so a tall card doesn't become a
+     brightness ramp (see scoreboard-calm.css). */
+  background:
+    radial-gradient(80% 28% at 10% 8%, #3a1a63 0%, transparent 62%),
+    radial-gradient(80% 28% at 90% 92%, #3a1a63 0%, transparent 62%),
+    radial-gradient(62% 22% at 88% 34%, #4a1f6e 0%, transparent 66%),
+    radial-gradient(62% 22% at 12% 68%, #4a1f6e 0%, transparent 66%),
+    #190c31;
+}
+
+/* No marker gutter: only the quiz screen has marks to put in it. */
+.calm-page .calm-ground .lycra-pane {
+  padding: 1.5rem 1.25rem;
+  margin: 0;
+  list-style: none;
+}
+
+.calm-page .calm-ground + .calm-ground {
+  margin-top: 0.75rem;
+}
+
+/* Rows read left to right: a title with its detail under it. */
+.calm-page .lycra.is-block {
+  align-items: stretch;
+  text-align: left;
+}
+
+.calm-page .calm-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+/* A field's caption, in the second (12px) type size. */
+.calm-page .calm-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.72;
+  margin-bottom: 0.35rem;
+}
+
+/* Fields sit in the pane as grooves (lycra-field), full width. */
+.calm-page .lycra-field {
+  box-sizing: border-box;
+}
+
+.calm-page textarea.lycra-field {
+  resize: vertical;
+  min-height: 4.5rem;
+  line-height: 1.4;
+}
+
+.calm-page select.lycra-field {
+  appearance: none;
+}

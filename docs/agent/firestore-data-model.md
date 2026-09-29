@@ -15,7 +15,7 @@ interface Room {
   id: string;
   hostId: string;
   started: boolean;
-  difficulty?: string;
+  difficulty?: string;               // the quiz key: "easy" | "medium" | "hard" | "t-<templateId>"
   createdAt: Timestamp | FieldValue;
   players: Player[];
   hostIsObserver?: boolean;
@@ -248,6 +248,13 @@ an earlier version of this fix only checked the last entry, which a review
 pass caught: array-grew-by-one doesn't by itself prove the write came from
 `arrayUnion` appending rather than a full replace with an earlier entry
 corrupted.
+
+**Quiz keys (#72).** `isSettingDifficulty` accepts `easy`, `medium`,
+`hard`, or `t-` followed by 1-40 lowercase letters, digits and dashes (a
+premade quiz from `src/data/quizTemplates.ts`; every client plays it from
+its own bundle). The field is still called `difficulty` so rooms and the
+exported API don't change. Covered by cases 5d/5e of
+`scripts/verify-firestore-rules.mjs`.
 
 **Two more real gaps found and fixed** on a pass against #50's own acceptance
 criteria (also verified against the emulator, also in

@@ -82,11 +82,14 @@ service cloud.firestore {
       // before the game starts. Without auth there's no way to check the
       // caller is actually the host, so this is the closest enforceable
       // proxy for "only the host sets difficulty, and only once."
+      // `difficulty` names the quiz (src/utils/quizCatalog.ts): a classic
+      // difficulty, or a premade quiz as `t-` plus its template id (#72).
       return affected.hasOnly(['difficulty']) &&
              !('difficulty' in existingData) &&
              'difficulty' in data &&
              data.difficulty is string &&
-             data.difficulty in ['easy', 'medium', 'hard'] &&
+             (data.difficulty in ['easy', 'medium', 'hard'] ||
+              data.difficulty.matches('t-[a-z0-9-]{1,40}')) &&
              existingData.started == false;
     }
 

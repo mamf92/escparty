@@ -32,6 +32,12 @@ page-scoped override stylesheet — there's no `OverlayItem` involved on that
 path. If you're adding a new interactive state, decide which path you're
 on: inside the demo's shared model, or a direct CSS adoption on a real page.
 
+New screens take the direct path through `src/components/CalmPage.tsx`,
+which imports the vendored stylesheet, `calm.css`, and
+`src/styles/calm-page.css` (the phone-frame fit that `scoreboard-calm.css`
+first worked out, shared). Controls go straight into a `.lycra-pane`;
+fields use the vendored `.lycra-field` groove.
+
 ## Where the implementation lives
 
 Sparkle's renderer and the `OverlayItem` model live in `src/fabric-ui/` (see
