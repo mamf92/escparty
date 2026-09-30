@@ -66,7 +66,7 @@ describe("QuizResults", () => {
     renderResults({ score: 9, multiplayer: false });
     expect(screen.getByText("9 points")).toBeInTheDocument();
     expect(screen.getByText("Your best is still 12.")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Your past scores" })).toHaveTextContent("12 / 15");
+    expect(screen.getByRole("list", { name: "Your past scores" })).toHaveTextContent("12 points · 15 questions");
     await userEvent.setup().click(screen.getByRole("button", { name: "Play another quiz" }));
     expect(screen.getByText("at /quizzes")).toBeInTheDocument();
   });

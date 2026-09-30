@@ -1,10 +1,15 @@
 # Testing
 
-Unit and component tests run on **Vitest + React Testing Library**. There is
-no e2e runner yet, but the unit suite now runs on every PR and push to `main`
-as part of `ci.yml` — see "Known gaps" below for what's still missing.
+Unit and component tests run on **Vitest + React Testing Library**, on every
+PR and push to `main` as part of `ci.yml`. A small **Playwright** end-to-end
+suite in `e2e/` drives the real app in Chromium against the Firestore
+emulator (`e2e.yml`, see "End-to-end" below). "Known gaps" below lists what's
+still missing.
 
 ## Commands
+
+- `npm run test:e2e` — the Playwright suite in `e2e/`, with the Firestore
+  emulator started around it (needs a JDK); see "End-to-end" below.
 
 - `npm test` — run the unit/component suite once (`vitest run`).
 - `npm run test:watch` — the same suite in watch mode while developing.
@@ -130,11 +135,7 @@ Coverage `include` therefore lists exactly the files with a floor:
 | `src/utils/roomRoles.ts` | 100% statements / branches / functions / lines |
 | `src/utils/multiplayerSession.ts` | 100% statements / branches / functions / lines |
 | `src/utils/roomsFirestore.ts` | 100% statements / branches / functions / lines |
-| `src/utils/QuizDataProvider.ts` | 98% statements & lines, 96% branches, 100% functions |
-
-`QuizDataProvider.ts` is short of 100% only because of the `default:` arm in
-`directImportQuizData`'s switch, which `loadQuizData` normalises away before
-ever calling it.
+| `src/utils/QuizDataProvider.ts` | 100% statements / branches / functions / lines |
 
 Adding a file to the list is how coverage gets ratcheted up (#59 tracks the
 backlog); **lowering a floor to make a run go green is not** — cover the new
@@ -148,7 +149,7 @@ has to; a coverage-diff gate that would catch that is still open in #57.
 The unit harness is the first rung of the test-coverage epic (#53). Still
 open at the time of writing:
 
-- **Covered so far: the data/logic layer, not the screens.**
+- **Covered so far: the data/logic layer, and a test file per screen.**
   `src/utils/roomsFirestore.ts`, `src/utils/QuizDataProvider.ts`, the
   extracted scoring math in `src/utils/quizScoring.ts` and the multiplayer
   timing in `src/utils/quizTiming.ts` have unit tests with a coverage floor
@@ -156,19 +157,21 @@ open at the time of writing:
   `src/utils/multiplayerSession.ts` (#63); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
   floor. Every page, component and hook now has a test file except the
   ones listed in `UNTESTED` in `src/test/testFiles.test.ts`
-  (`MidQuizScoreboard`, `Scoreboard`, `UnderDevelopment`, `MobileFrame` and
-  the `src/fabric-ui/` components), which is #59; a test file doesn't mean
+  (the WebGL components in `src/fabric-ui/` and its `leva` debug-panel hook,
+  plus the dead `useGameStore`), which is #59; a test file doesn't mean
   every flow in it is covered.
 - **`Quiz.tsx` is mostly covered where it was extracted.** The scoring
   formula moved to `src/utils/quizScoring.ts` and the multiplayer timing to
   `src/utils/quizTiming.ts`, and both are tested directly.
   `src/components/Quiz.test.tsx` renders the component for answer selection
-  (#22) and a failed multiplayer score write (#131), but its effects (the
-  local timers, following the room, phase navigation) are still untested.
-  Rungs 2 and 3 (#62, #63) were checked by hand with two browsers against
-  the emulator; a committed version of that is #68. Don't read "scoring is
+  (#22), a failed multiplayer score write (#131) and the solo clock timing
+  out an unanswered question through to the saved run (#160, with fake
+  intervals and `Date`: React schedules its own work on `setTimeout`, so
+  that stays real). Following the room and phase navigation are still
+  untested in unit tests.
+  Rungs 2 and 3 (#62, #63) are covered end to end by
+  `e2e/lockstep.spec.ts` (#68). Don't read "scoring is
   covered" as "the quiz is covered".
-- **No e2e runner.** Playwright is #55.
 - **Test failures don't block merge yet.** CI fails on them, but requiring
   the checks before merge is branch protection (#49), a setting only the
   owner can turn on; see "The deploy gate" above for the check names.
@@ -183,3 +186,30 @@ open at the time of writing:
 
 Treat a PR checklist item about tests honestly: say what is and isn't
 covered rather than checking the box to make the template look complete.
+
+## End-to-end
+
+`e2e/` holds Playwright specs (#55), run by `npm run test:e2e` locally and by
+`.github/workflows/e2e.yml` on every PR and push to `main`.
+`playwright.config.ts` starts Vite on port 5174 with a demo Firebase config
+pointed at the emulator (`VITE_USE_FIREBASE_EMULATOR`), so nothing touches
+production. Questions run on their real 15-second slots, so a spec takes a
+minute or two; there is one worker and no retries (a flaky spec is a bug).
+
+- `solo.spec.ts` — Home → quiz library → play Quick Fire solo → results →
+  scoreboard, and the run is saved exactly once.
+- `lockstep.spec.ts` — two browsers, the guest's network slowed: host and
+  guest stay on the same question, both reach the mid-quiz break, and both
+  resume together (#62, #63, #68).
+- `builder.spec.ts` — build a quiz from three bank questions and one of
+  your own with a break after question 3, save it, host a room with it and
+  play it through alone, break included (#78).
+- `party.spec.ts` — a scoreboard party: a host and two guests rate four
+  acts of a semi, the host ticks a qualifier and opens the awards, and the
+  guests see the Jedward Twins go to the two who rated alike (#91).
+- `theme.spec.ts` — every scoreboard party screen measured and judged by
+  the Calm skill's `tools/check.py` (#90; needs `python3`, which CI's
+  runner has). See "Checking a live page" in `theming.md`.
+
+On a failure CI uploads the HTML report and traces as the `playwright-report`
+artifact.

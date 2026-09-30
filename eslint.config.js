@@ -3,8 +3,9 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
+import { defineConfig } from 'eslint/config'
 
-export default tseslint.config(
+export default defineConfig(
   // Both are generated output: `dist` from a build, `coverage` from
   // `npm run test:coverage` (its HTML report ships its own bundled JS).
   { ignores: ['dist', 'coverage'] },

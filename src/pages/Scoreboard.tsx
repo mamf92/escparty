@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import "../fabric-ui/lycra-surface.css";
@@ -37,8 +37,9 @@ const SORTS: { key: SortKey; label: string }[] = [
     { key: "difficulty", label: "Difficulty" },
 ];
 
-function ratioOf(entry: ScoreEntry): number {
-    return entry.total > 0 ? entry.score / entry.total : 0;
+/** Rank by the points each row shows, so the ladder matches its numbers. */
+function pointsOf(entry: ScoreEntry): number {
+    return entry.score;
 }
 
 /**
@@ -59,16 +60,16 @@ function levelsFor(entries: ScoreEntry[]): Map<ScoreEntry, Level> {
     const levels = new Map<ScoreEntry, Level>();
     if (entries.length === 0) return levels;
 
-    const ratios = entries.map(ratioOf);
-    const best = Math.max(...ratios);
-    const worst = Math.min(...ratios);
+    const points = entries.map(pointsOf);
+    const best = Math.max(...points);
+    const worst = Math.min(...points);
 
     for (const entry of entries) {
         if (best === worst) {
             levels.set(entry, "rest");
             continue;
         }
-        const r = ratioOf(entry);
+        const r = pointsOf(entry);
         levels.set(entry, r === best ? "high" : r === worst ? "low" : "rest");
     }
     return levels;
@@ -84,6 +85,13 @@ function rowClass(level: Level): string {
     return out.join(" ");
 }
 
+/** Classic quizzes easiest first, then every other quiz by its title. */
+const CLASSIC_ORDER = ["easy", "medium", "hard"];
+function difficultyRank(entry: ScoreEntry): number {
+    const rank = CLASSIC_ORDER.indexOf(entry.difficulty);
+    return rank === -1 ? CLASSIC_ORDER.length : rank;
+}
+
 function formatDate(iso: string): string {
     const d = new Date(iso);
     return Number.isNaN(d.getTime())
@@ -93,17 +101,15 @@ function formatDate(iso: string): string {
 
 const Scoreboard = () => {
     const navigate = useNavigate();
-    const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
-    const [sortKey, setSortKey] = useState<SortKey>("score");
-
-    useEffect(() => {
+    const [scoreHistory] = useState<ScoreEntry[]>(() => {
         try {
             const stored = JSON.parse(localStorage.getItem("quizScores") || "[]");
-            setScoreHistory(Array.isArray(stored) ? stored : []);
+            return Array.isArray(stored) ? stored : [];
         } catch {
-            setScoreHistory([]);
+            return [];
         }
-    }, []);
+    });
+    const [sortKey, setSortKey] = useState<SortKey>("score");
 
     // Levels are computed from the unsorted history, so re-sorting moves rows
     // without changing how high any of them sits.
@@ -115,9 +121,9 @@ const Scoreboard = () => {
             return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         }
         if (sortKey === "difficulty") {
-            return rows.sort((a, b) => a.difficulty.localeCompare(b.difficulty));
+            return rows.sort((a, b) => difficultyRank(a) - difficultyRank(b) || quizTitle(a.difficulty).localeCompare(quizTitle(b.difficulty)));
         }
-        return rows.sort((a, b) => ratioOf(b) - ratioOf(a));
+        return rows.sort((a, b) => pointsOf(b) - pointsOf(a));
     }, [scoreHistory, sortKey]);
 
     return (
@@ -169,11 +175,13 @@ const Scoreboard = () => {
                             >
                                 <span className="rank-line">
                                     <span>
-                                        {entry.score} / {entry.total}
+                                        {entry.score} points
                                     </span>
                                     <span className="calm-sub">{quizTitle(entry.difficulty)}</span>
                                 </span>
-                                <span className="calm-sub">{formatDate(entry.date)}</span>
+                                <span className="calm-sub">
+                                    {entry.total} {entry.total === 1 ? "question" : "questions"} · {formatDate(entry.date)}
+                                </span>
                             </li>
                         ))
                     )}

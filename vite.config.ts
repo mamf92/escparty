@@ -78,13 +78,11 @@ export default defineConfig({
           functions: 100,
           lines: 100,
         },
-        // Short of 100 only because of `directImportQuizData`'s `default:`
-        // switch arm, which `loadQuizData` normalises away before the call.
         'src/utils/QuizDataProvider.ts': {
-          statements: 98,
-          branches: 96,
+          statements: 100,
+          branches: 100,
           functions: 100,
-          lines: 98,
+          lines: 100,
         },
       },
     },
@@ -92,7 +90,7 @@ export default defineConfig({
   build: {
     // Output directory - Vercel picks this up as the build output
     outDir: 'dist',
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         // Get better cache handling with content hashes
         entryFileNames: 'assets/[name]-[hash].js',
