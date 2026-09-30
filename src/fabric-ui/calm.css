@@ -113,3 +113,14 @@
   background: var(--lyc-face-down);
   box-shadow: var(--lyc-sink);
 }
+
+/*
+  With reduced motion the sink is shadow alone (#90): the vendored
+  reduced-motion block resets `.is-selected` but can't know about this rule.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .lycra.is-chosen,
+  .lycra.is-chosen:hover {
+    transform: none;
+  }
+}

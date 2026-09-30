@@ -55,3 +55,16 @@ skill.
 
 Default to Calm unless the task explicitly asks for Sparkle, party mode, or
 similar — see each skill's description for the exact trigger wording.
+
+## Checking a live page
+
+`e2e/theme.spec.ts` renders each scoreboard party screen (home, setup,
+join, rate, my ranking, the room, host tools, awards, big screen) with
+reduced motion on, measures it inside `.calm-ground`, and runs the Calm
+skill's own `tools/check.py` on the measurements (#90), so the rules stay
+in the skill. The measurements are attached to the Playwright report. Two checks
+stay manual because no script can decide them: the neighbour tug and the
+squint ladder. Add a screen there when you build a new Calm page. Sparkle
+isn't checked on live pages: they take Calm's CSS directly, and Sparkle
+is only the opt-in `/fabric-ui` demo, so a Sparkle pass needs a live page
+built on `OverlayItem` first.
