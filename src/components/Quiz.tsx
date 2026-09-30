@@ -39,8 +39,8 @@ const Quiz = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
   const [loadingStatus, setLoadingStatus] = useState<string>("Initializing..."); // Used in loading state display
-  const [timeLeft, setTimeLeft] = useState(10); // 10 second timer
-  const [timeLeftMs, setTimeLeftMs] = useState(10000); // More precise millisecond timer for scoring
+  const [timeLeft, setTimeLeft] = useState(QUESTION_MS / 1000);
+  const [timeLeftMs, setTimeLeftMs] = useState(QUESTION_MS); // More precise millisecond timer for scoring
   const [showFeedback, setShowFeedback] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(true);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
@@ -233,7 +233,11 @@ const Quiz = () => {
   // before any effect runs (see the useLayoutEffect after the handlers).
   const handleTimeUpRef = useRef<() => void>(() => { });
   const moveToNextQuestionRef = useRef<() => void>(() => { });
-  const timeLeftRef = useRef(timeLeft);
+  // Single player: when the open question and its feedback end. Answers are
+  // scored from the question's deadline, never from the last tick's state,
+  // so a question that has only just (re)started can't score stale time.
+  const questionDeadlineRef = useRef<number | null>(null);
+  const feedbackDeadlineRef = useRef(0);
 
   // Single player: the question's countdown. It counts to a deadline rather
   // than counting ticks, so a phone that throttles timers still ends on
@@ -242,6 +246,7 @@ const Quiz = () => {
   useEffect(() => {
     if (quizCompleted || loading || isMultiplayer || showFeedback) return;
     const deadline = Date.now() + QUESTION_MS;
+    questionDeadlineRef.current = deadline;
     const tick = setInterval(() => {
       const ms = Math.max(0, deadline - Date.now());
       setTimeLeftMs(ms);
@@ -255,10 +260,10 @@ const Quiz = () => {
   }, [currentQuestionIndex, quizCompleted, loading, showFeedback, isMultiplayer]);
 
   // Single player: the feedback countdown, then the next question. It lasts
-  // whatever submitAnswer or handleTimeUp set timeLeft to.
+  // until the deadline submitAnswer or handleTimeUp set.
   useEffect(() => {
     if (!showFeedback || isMultiplayer) return;
-    const deadline = Date.now() + timeLeftRef.current * 1000;
+    const deadline = feedbackDeadlineRef.current;
     const tick = setInterval(() => {
       const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       setTimeLeft(left);
@@ -461,12 +466,13 @@ const Quiz = () => {
   // Local clock only: time's up, then 5 seconds of feedback
   const handleTimeUp = () => {
     markTimeUp();
+    feedbackDeadlineRef.current = Date.now() + FEEDBACK_MS;
     setTimeLeft(FEEDBACK_MS / 1000);
   };
 
-  // The solo run is saved once. The feedback timer calls this from inside a
-  // state updater, which React may run twice (StrictMode in development
-  // did, saving every run twice).
+  // The solo run is saved once, even if the last question's feedback ends
+  // twice (it used to end inside a state updater, which StrictMode ran
+  // twice, saving every run twice).
   const savedRunRef = useRef(false);
 
   // Local clock only: move on once the feedback time is over
@@ -527,7 +533,6 @@ const Quiz = () => {
   // Keep the refs the timers and the shared tick read current.
   useLayoutEffect(() => {
     isSubmittedRef.current = isSubmitted;
-    timeLeftRef.current = timeLeft;
     markTimeUpRef.current = markTimeUp;
     lockQuestionRef.current = lockQuestion;
     handleTimeUpRef.current = handleTimeUp;
@@ -552,8 +557,12 @@ const Quiz = () => {
     // late setShowFeedback(true) would land on (and lock) the next question.
     // Locally: remaining question time PLUS 5 seconds; in multiplayer the
     // shared tick counts down to the slot's end.
+    const msLeft = !isMultiplayer && questionDeadlineRef.current !== null
+      ? Math.max(0, questionDeadlineRef.current - Date.now())
+      : timeLeftMs;
     if (!sharedClock) {
-      const feedbackTime = Math.min(timeLeft, QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
+      const feedbackTime = Math.min(Math.ceil(msLeft / 1000), QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
+      feedbackDeadlineRef.current = Date.now() + feedbackTime * 1000;
       setTimeLeft(feedbackTime);
     }
 
@@ -561,9 +570,9 @@ const Quiz = () => {
     if (answer === currentQuestion.correctAnswer) {
       // Base score plus a time bonus, both clamped and rounded in
       // `quizScoring.ts` so the rule is unit-tested rather than inline here.
-      const timeBonus = calculateTimeBonus(timeLeftMs);
-      const pointsForAnswer = calculateQuestionScore(timeLeftMs);
-      console.log(`Correct answer! Time left: ${timeLeftMs / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
+      const timeBonus = calculateTimeBonus(msLeft);
+      const pointsForAnswer = calculateQuestionScore(msLeft);
+      console.log(`Correct answer! Time left: ${msLeft / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
 
       // Set points for current question to display in the UI
       setCurrentQuestionPoints(pointsForAnswer);

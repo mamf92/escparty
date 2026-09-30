@@ -1,6 +1,3 @@
-/* eslint-disable react-hooks/immutability -- react-three-fiber's useFrame mutates three.js
-   objects (the camera, uniforms, the overlay bridge) once a frame, outside
-   React's render; that is the library's intended pattern, not React state. */
 import { useRef } from 'react';
 import type { RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -33,6 +30,7 @@ export default function CameraRig({ tilt, yaw, parallax }: CameraRigProps) {
     const { camera, size } = useThree();
     const current = useRef({ tilt: 0, yaw: 0 });
 
+    // eslint-disable-next-line react-hooks/immutability -- useFrame moves the three.js camera once a frame, outside React's render
     useFrame((_, delta) => {
         if (!(camera instanceof THREE.OrthographicCamera)) return;
 
@@ -76,6 +74,7 @@ export default function CameraRig({ tilt, yaw, parallax }: CameraRigProps) {
         const baseY = THREE.MathUtils.degToRad(yaw);
         const zoomX = size.width / (2 * DESIGN_HALF_WIDTH * Math.cos(baseY));
         const zoomY = size.height / (2 * DESIGN_HALF_HEIGHT * Math.cos(baseT));
+        // eslint-disable-next-line react-hooks/immutability -- the camera is three.js's object, not React state
         camera.zoom = Math.min(zoomX, zoomY);
 
         camera.near = 0.1;

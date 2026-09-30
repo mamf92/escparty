@@ -1,6 +1,3 @@
-/* eslint-disable react-hooks/immutability -- react-three-fiber's useFrame mutates three.js
-   objects (the camera, uniforms, the overlay bridge) once a frame, outside
-   React's render; that is the library's intended pattern, not React state. */
 import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -108,6 +105,7 @@ export default function FabricSurface({ features, controls, bridge }: FabricSurf
         [],
     );
 
+    // eslint-disable-next-line react-hooks/immutability -- useFrame writes the overlay bridge once a frame, outside React's render
     useFrame((_, delta) => {
         const material = materialRef.current;
         if (!material) return;
@@ -277,6 +275,7 @@ export default function FabricSurface({ features, controls, bridge }: FabricSurf
             const hpx = Math.max(2 * hh * zoom, 1);
 
             const quad = bridge.quads[i];
+            // eslint-disable-next-line react-hooks/immutability -- the bridge is a per-frame scratch object, not React state
             quad.a = (2 * ux) / w;
             quad.b = (2 * uy) / w;
             // Element y runs down the screen while plane y runs up it.

@@ -5,6 +5,7 @@ import { Player, Room, listenToRoom } from "../utils/roomsFirestore";
 import { LEGACY_ROOM_MESSAGE, ObserverRouteState, isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
+import { startedAtMillis } from "../utils/quizTiming";
 
 /** How long the break waits for every player before Continue can go on without some. */
 export const MISSING_PLAYER_GRACE_MS = 20_000;
@@ -57,8 +58,10 @@ const HostObserverView = () => {
     // a grace period Continue goes on without whoever is missing. Not at
     // once: the phones need a moment to write their marks.
     // The break the grace period ran out for; a new break starts it again.
+    // Keyed on when the break began too, so a new game in the same room
+    // doesn't find its break at the same index already waited out.
     const [waitedFor, setWaitedFor] = useState<string | null>(null);
-    const breakKey = inBreak ? `${room?.currentQuestionIndex}` : null;
+    const breakKey = inBreak ? `${room?.currentQuestionIndex}@${startedAtMillis(room?.phaseStartedAt)}` : null;
     const waitedLongEnough = breakKey !== null && waitedFor === breakKey;
     useEffect(() => {
         if (breakKey === null) return;

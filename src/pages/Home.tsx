@@ -2,13 +2,14 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { getAssetPath } from "../utils/pathUtils";
 
+const BACKGROUND_PATH = getAssetPath('concert-bg.jpg');
+
 const Home = () => {
   const navigate = useNavigate();
-  const backgroundPath = getAssetPath('concert-bg.jpg');
 
   return (
     <Container>
-      <BackgroundImage $backgroundPath={backgroundPath} />
+      <BackgroundImage $backgroundPath={BACKGROUND_PATH} />
       <Overlay>
         <Title>ESC Party 🎤</Title>
         <ButtonContainer>

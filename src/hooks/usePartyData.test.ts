@@ -36,6 +36,18 @@ describe("usePartyData", () => {
         expect(mocks.stopBallots).toHaveBeenCalled();
     });
 
+    it("doesn't show the last party's data while switching to another", () => {
+        const { result, rerender } = renderHook(({ code }) => usePartyData(code), { initialProps: { code: "ABBA" } });
+        act(() => {
+            mocks.listenToParty.mock.calls[0][1](makeParty());
+            mocks.listenToBallots.mock.calls[0][1]([makeBallot("g", "Jedward", [12])]);
+        });
+        rerender({ code: "LORD" });
+        expect(mocks.stopParty).toHaveBeenCalled();
+        expect(result.current).toEqual({ party: undefined, ballots: undefined, error: null });
+        expect(mocks.listenToParty.mock.calls[1][0]).toBe("LORD");
+    });
+
     it("has no party without a code", () => {
         const { result } = renderHook(() => usePartyData(undefined));
         expect(result.current.party).toBeNull();
