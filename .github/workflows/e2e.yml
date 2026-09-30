@@ -1,0 +1,57 @@
+name: End-to-end
+
+# The Playwright suite in e2e/ (#55): the real app in Chromium against the
+# Firestore emulator, never production. See docs/agent/testing.md.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FIREBASE_TOOLS: firebase-tools@15.31.0
+
+jobs:
+  e2e:
+    name: Playwright against the emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Cache the emulator download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS }}
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run the e2e suite
+        run: >-
+          npx -y "$FIREBASE_TOOLS" emulators:exec --only firestore
+          --project demo-escparty "npx playwright test"
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

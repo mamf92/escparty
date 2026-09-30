@@ -176,11 +176,13 @@ const Scoreboard = () => {
                             >
                                 <span className="rank-line">
                                     <span>
-                                        {entry.score} / {entry.total}
+                                        {entry.score} points
                                     </span>
                                     <span className="calm-sub">{quizTitle(entry.difficulty)}</span>
                                 </span>
-                                <span className="calm-sub">{formatDate(entry.date)}</span>
+                                <span className="calm-sub">
+                                    {entry.total} {entry.total === 1 ? "question" : "questions"} · {formatDate(entry.date)}
+                                </span>
                             </li>
                         ))
                     )}

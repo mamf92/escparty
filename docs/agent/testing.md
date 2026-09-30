@@ -1,10 +1,15 @@
 # Testing
 
-Unit and component tests run on **Vitest + React Testing Library**. There is
-no e2e runner yet, but the unit suite now runs on every PR and push to `main`
-as part of `ci.yml` — see "Known gaps" below for what's still missing.
+Unit and component tests run on **Vitest + React Testing Library**, on every
+PR and push to `main` as part of `ci.yml`. A small **Playwright** end-to-end
+suite in `e2e/` drives the real app in Chromium against the Firestore
+emulator (`e2e.yml`, see "End-to-end" below). "Known gaps" below lists what's
+still missing.
 
 ## Commands
+
+- `npm run test:e2e` — the Playwright suite in `e2e/`, with the Firestore
+  emulator started around it (needs a JDK); see "End-to-end" below.
 
 - `npm test` — run the unit/component suite once (`vitest run`).
 - `npm run test:watch` — the same suite in watch mode while developing.
@@ -165,10 +170,9 @@ open at the time of writing:
   `src/components/Quiz.test.tsx` renders the component for answer selection
   (#22) and a failed multiplayer score write (#131), but its effects (the
   local timers, following the room, phase navigation) are still untested.
-  Rungs 2 and 3 (#62, #63) were checked by hand with two browsers against
-  the emulator; a committed version of that is #68. Don't read "scoring is
+  Rungs 2 and 3 (#62, #63) are covered end to end by
+  `e2e/lockstep.spec.ts` (#68). Don't read "scoring is
   covered" as "the quiz is covered".
-- **No e2e runner.** Playwright is #55.
 - **Test failures don't block merge yet.** CI fails on them, but requiring
   the checks before merge is branch protection (#49), a setting only the
   owner can turn on; see "The deploy gate" above for the check names.
@@ -183,3 +187,21 @@ open at the time of writing:
 
 Treat a PR checklist item about tests honestly: say what is and isn't
 covered rather than checking the box to make the template look complete.
+
+## End-to-end
+
+`e2e/` holds Playwright specs (#55), run by `npm run test:e2e` locally and by
+`.github/workflows/e2e.yml` on every PR and push to `main`.
+`playwright.config.ts` starts Vite on port 5174 with a demo Firebase config
+pointed at the emulator (`VITE_USE_FIREBASE_EMULATOR`), so nothing touches
+production. Questions run on their real 15-second slots, so a spec takes a
+minute or two; there is one worker and no retries (a flaky spec is a bug).
+
+- `solo.spec.ts` — Home → quiz library → play Quick Fire solo → results →
+  scoreboard, and the run is saved exactly once.
+- `lockstep.spec.ts` — two browsers, the guest's network slowed: host and
+  guest stay on the same question, both reach the mid-quiz break, and both
+  resume together (#62, #63, #68).
+
+On a failure CI uploads the HTML report and traces as the `playwright-report`
+artifact. Not covered yet: the quiz builder and the scoreboard party.

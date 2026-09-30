@@ -24,6 +24,8 @@ transactions are `updatePlayerScore`, `advanceQuestion` and
   coverage floors.
 - `npm run preview` — serve the production build locally.
 - `npm run emulators` — start the local Firestore emulator (needs a JDK).
+- `npm run test:e2e` — Playwright end-to-end specs in `e2e/` against the
+  emulator (needs a JDK); CI runs them in `e2e.yml`.
 
 Unit/component tests run on Vitest + React Testing Library. The Firestore
 API and the quiz logic have per-file coverage floors, and every page,
