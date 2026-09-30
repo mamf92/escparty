@@ -1,3 +1,6 @@
+/* eslint-disable react-hooks/immutability -- react-three-fiber's useFrame mutates three.js
+   objects (the camera, uniforms, the overlay bridge) once a frame, outside
+   React's render; that is the library's intended pattern, not React state. */
 import { useRef } from 'react';
 import type { RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';

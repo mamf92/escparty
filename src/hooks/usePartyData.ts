@@ -21,10 +21,7 @@ export const usePartyData = (code: string | undefined): PartyData => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!code) {
-            setParty(null);
-            return;
-        }
+        if (!code) return;
         const failed = (what: string) => (err: Error) => {
             console.error(`Couldn't follow the party's ${what}:`, err);
             setError("The party couldn't be reached. Check your connection.");
@@ -46,5 +43,6 @@ export const usePartyData = (code: string | undefined): PartyData => {
         };
     }, [code]);
 
-    return { party, ballots, error };
+    // No code, no party: nothing to listen to.
+    return { party: code ? party : null, ballots, error };
 };

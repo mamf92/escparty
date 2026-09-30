@@ -56,12 +56,13 @@ const HostObserverView = () => {
     // A player whose phone died never reaches the break (#65, #23), so after
     // a grace period Continue goes on without whoever is missing. Not at
     // once: the phones need a moment to write their marks.
-    const [waitedLongEnough, setWaitedLongEnough] = useState(false);
+    // The break the grace period ran out for; a new break starts it again.
+    const [waitedFor, setWaitedFor] = useState<string | null>(null);
     const breakKey = inBreak ? `${room?.currentQuestionIndex}` : null;
+    const waitedLongEnough = breakKey !== null && waitedFor === breakKey;
     useEffect(() => {
-        setWaitedLongEnough(false);
         if (breakKey === null) return;
-        const timer = setTimeout(() => setWaitedLongEnough(true), MISSING_PLAYER_GRACE_MS);
+        const timer = setTimeout(() => setWaitedFor(breakKey), MISSING_PLAYER_GRACE_MS);
         return () => clearTimeout(timer);
     }, [breakKey]);
     useEffect(() => {

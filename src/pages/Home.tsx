@@ -1,16 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { useState, useEffect } from "react";
 import { getAssetPath } from "../utils/pathUtils";
 
 const Home = () => {
   const navigate = useNavigate();
-  const [backgroundPath, setBackgroundPath] = useState('');
-
-  useEffect(() => {
-    // Use our utility to get the correct path
-    setBackgroundPath(getAssetPath('concert-bg.jpg'));
-  }, []);
+  const backgroundPath = getAssetPath('concert-bg.jpg');
 
   return (
     <Container>
