@@ -57,10 +57,20 @@ describe("Scoreboard", () => {
     expect(rows().map(row => row.textContent?.match(/^\d+ points/)?.[0])).toEqual(["2 points", "5 points", "9 points"]);
   });
 
+  it("ranks by the points shown, not points per question", () => {
+    localStorage.setItem("quizScores", JSON.stringify([
+      { score: 1200, total: 10, difficulty: "quick-fire", date: "2026-05-10T00:00:00Z" },
+      { score: 1300, total: 12, difficulty: "nul-points", date: "2026-05-01T00:00:00Z" },
+    ]));
+    renderScoreboard();
+    expect(rows()[0]).toHaveTextContent("1300 points");
+    expect(rows()[0]).toHaveClass("is-high");
+  });
+
   it("keeps every run at rest when they all scored the same", () => {
     localStorage.setItem("quizScores", JSON.stringify([
       { score: 4, total: 8, difficulty: "easy", date: "not a date" },
-      { score: 5, total: 10, difficulty: "t-nordic-nights", date: "2026-05-16T00:00:00Z" },
+      { score: 4, total: 10, difficulty: "t-nordic-nights", date: "2026-05-16T00:00:00Z" },
     ]));
     renderScoreboard();
     expect(screen.getByText("2 runs. Your best stands highest.")).toBeInTheDocument();

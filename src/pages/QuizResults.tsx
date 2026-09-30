@@ -150,7 +150,7 @@ const QuizResults = () => {
                   <li key={index} className="lycra is-block is-static">
                     <span className="calm-row">
                       <span>{new Date(entry.date).toLocaleDateString()}</span>
-                      <span>{entry.score} points</span>
+                      <span>{entry.score} points · {entry.total} {entry.total === 1 ? "question" : "questions"}</span>
                     </span>
                   </li>
                 ))}

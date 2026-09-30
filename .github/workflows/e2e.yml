@@ -16,9 +16,6 @@ concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FIREBASE_TOOLS: firebase-tools@15.31.0
-
 jobs:
   e2e:
     name: Playwright against the emulator
@@ -38,14 +35,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-${{ env.FIREBASE_TOOLS }}
+          key: firebase-emulators-${{ hashFiles('package.json') }}
       - run: npm ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run the e2e suite
-        run: >-
-          npx -y "$FIREBASE_TOOLS" emulators:exec --only firestore
-          --project demo-escparty "npx playwright test"
+      # The same command as locally; package.json pins firebase-tools.
+      - run: npm run test:e2e
       - name: Upload the report
         if: failure()
         uses: actions/upload-artifact@v4

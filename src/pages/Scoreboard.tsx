@@ -37,8 +37,9 @@ const SORTS: { key: SortKey; label: string }[] = [
     { key: "difficulty", label: "Difficulty" },
 ];
 
-function ratioOf(entry: ScoreEntry): number {
-    return entry.total > 0 ? entry.score / entry.total : 0;
+/** Rank by the points each row shows, so the ladder matches its numbers. */
+function pointsOf(entry: ScoreEntry): number {
+    return entry.score;
 }
 
 /**
@@ -59,16 +60,16 @@ function levelsFor(entries: ScoreEntry[]): Map<ScoreEntry, Level> {
     const levels = new Map<ScoreEntry, Level>();
     if (entries.length === 0) return levels;
 
-    const ratios = entries.map(ratioOf);
-    const best = Math.max(...ratios);
-    const worst = Math.min(...ratios);
+    const points = entries.map(pointsOf);
+    const best = Math.max(...points);
+    const worst = Math.min(...points);
 
     for (const entry of entries) {
         if (best === worst) {
             levels.set(entry, "rest");
             continue;
         }
-        const r = ratioOf(entry);
+        const r = pointsOf(entry);
         levels.set(entry, r === best ? "high" : r === worst ? "low" : "rest");
     }
     return levels;
@@ -124,7 +125,7 @@ const Scoreboard = () => {
         if (sortKey === "difficulty") {
             return rows.sort((a, b) => difficultyRank(a) - difficultyRank(b) || quizTitle(a.difficulty).localeCompare(quizTitle(b.difficulty)));
         }
-        return rows.sort((a, b) => ratioOf(b) - ratioOf(a));
+        return rows.sort((a, b) => pointsOf(b) - pointsOf(a));
     }, [scoreHistory, sortKey]);
 
     return (

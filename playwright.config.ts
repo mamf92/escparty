@@ -26,7 +26,8 @@ export default defineConfig({
     webServer: {
         command: `npx vite --port ${PORT} --strictPort`,
         url: `http://localhost:${PORT}`,
-        reuseExistingServer: !process.env.CI,
+        // Never reuse: a dev server already on this port may point at production.
+        reuseExistingServer: false,
         timeout: 120_000,
         env: {
             // A demo project: the emulator accepts it, production never sees it.

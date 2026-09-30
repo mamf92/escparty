@@ -70,8 +70,10 @@ test("host and a throttled guest see the same questions through a break", async 
     await expect(guest.getByText("Waiting for the host to continue...")).toBeVisible();
     await host.getByRole("button", { name: "Continue Quiz" }).click();
 
-    // Both come back on question 5, and move on to question 6 together.
-    await expect(question(host)).toBeVisible();
+    // Both come back on question 5, and move on to question 6 together. (The
+    // break's title is an h2 too, so wait until it's gone before reading.)
+    await expect(host.getByText("Mid-Quiz Scoreboard")).toBeHidden({ timeout: 30_000 });
+    await expect(host.getByRole("button", { name: "Submit Answer" })).toBeVisible();
     await expect(question(guest)).toHaveText((await question(host).textContent())!);
     const fifth = await question(host).textContent();
     await Promise.all([answer(host), answer(guest)]);
