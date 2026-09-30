@@ -91,6 +91,23 @@ describe("loadQuizData in development", () => {
         expect(fetchMock.mock.calls[0][0]).toBe("/quizdata/escAdvancedQuiz.json");
     });
 
+    it("gives up on a bundled import that hangs for 5 seconds and fetches instead", async () => {
+        vi.resetModules();
+        vi.doMock("../data/escIntermediateQuiz.json", () => new Promise(() => { }));
+        vi.useFakeTimers();
+        try {
+            const { loadQuizData: load } = await import("./QuizDataProvider");
+            const loading = load("medium");
+            await vi.advanceTimersByTimeAsync(5000);
+            await expect(loading).resolves.toEqual(FETCHED);
+        } finally {
+            vi.useRealTimers();
+            // Back to this file's mock (doUnmock would drop it for the real bank).
+            vi.doMock("../data/escIntermediateQuiz.json", () => ({ default: IMPORTED_MEDIUM }));
+            vi.resetModules();
+        }
+    });
+
     it("falls back to the hardcoded bank when both the import and the fetch fail", async () => {
         fetchMock.mockRejectedValue(new Error("offline"));
 

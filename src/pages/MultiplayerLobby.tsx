@@ -39,6 +39,8 @@ const getUniquePlayerName = async (roomCode: string, namesList: string[]): Promi
 const MultiplayerLobby = () => {
   const [_gameCode, setGameCode] = useState<string | null>(null); // Renamed to _gameCode as it's not used directly
   const [joinCode, setJoinCode] = useState("");
+  // Four letters, A to Z; the field upper-cases what is typed.
+  const codeInvalid = !/^[A-Z]{4}$/.test(joinCode);
   const [loading, setLoading] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false); // Added missing state variable
   const [showCreateOptions, setShowCreateOptions] = useState(false);
@@ -107,10 +109,7 @@ const MultiplayerLobby = () => {
   const joinGame = async () => {
     setAttempted(true);
 
-    if (!joinCode) {
-      return;
-    }
-    if (joinCode.length !== 4 || !/^[A-Z]{4}$/.test(joinCode)) {
+    if (codeInvalid) {
       return;
     }
 
@@ -212,7 +211,7 @@ const MultiplayerLobby = () => {
             {loading && <LoadingText>Creating...</LoadingText>}
           </OptionCard>
 
-          <Button onClick={() => setShowCreateOptions(false)} disabled={loading} secondary style={{ marginTop: '1rem' }}>
+          <Button onClick={() => setShowCreateOptions(false)} disabled={loading} $secondary style={{ marginTop: '1rem' }}>
             Back
           </Button>
         </OptionsContainer>
@@ -225,14 +224,16 @@ const MultiplayerLobby = () => {
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             placeholder="code"
             disabled={loading}
-            $isInvalid={attempted && (!joinCode || joinCode.length < 4 || !/^[A-Z]{4}$/.test(joinCode))}
+            $isInvalid={attempted && codeInvalid}
+            aria-invalid={attempted && codeInvalid}
+            aria-describedby={attempted && codeInvalid ? "join-code-help" : undefined}
             autoFocus
             autoCapitalize="characters"
             maxLength={4}
           />
-          {attempted && (!joinCode || joinCode.length < 4 || !/^[A-Z]{4}$/.test(joinCode)) && <InputHelperText>Please enter 4 letters.</InputHelperText>}
+          {attempted && codeInvalid && <InputHelperText id="join-code-help">Please enter 4 letters.</InputHelperText>}
           <ButtonGroup>
-            <Button onClick={handleBackToOptions} disabled={loading} secondary>
+            <Button onClick={handleBackToOptions} disabled={loading} $secondary>
               Back
             </Button>
             <Button onClick={joinGame} disabled={loading}>
@@ -257,7 +258,7 @@ interface OptionCardProps {
   disabled?: boolean;
 }
 interface ButtonProps {
-  secondary?: boolean;
+  $secondary?: boolean;
 }
 
 interface InputProps {
@@ -391,17 +392,17 @@ const ButtonGroup = styled.div`
 
 const Button = styled.button<ButtonProps>`
     padding: 0.75rem 1.25rem; /* 12px 20px */
-    background: ${({ secondary, theme }) => secondary ? theme.colors.darkpurple : theme.colors.purple};
+    background: ${({ $secondary, theme }) => $secondary ? theme.colors.darkpurple : theme.colors.purple};
     color: ${({ theme }) => theme.colors.white};
     font-size: 1rem;
     font-weight: bold;
     border: none;
     cursor: pointer;
-    flex: ${props => props.secondary ? '0.4' : '0.6'};
+    flex: ${props => props.$secondary ? '0.4' : '0.6'};
     transition: all 0.2s ease;
 
     &:hover {
-      background: ${({ secondary, theme }) => secondary ? theme.colors.purple : theme.colors.darkpurple};
+      background: ${({ $secondary, theme }) => $secondary ? theme.colors.purple : theme.colors.darkpurple};
     }
     
     &:disabled {

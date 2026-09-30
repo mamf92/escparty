@@ -68,16 +68,17 @@ export class ScoreWriteRejected extends Error {
         message: string,
         /** For "lower-score": the score the room already holds. */
         public readonly currentScore?: number,
+        options?: ErrorOptions,
     ) {
-        super(message);
+        super(message, options);
         this.name = "ScoreWriteRejected";
     }
 }
 
 /** Why a room turned a join down; `joinRoom` answers `false` for "not-found" and "started". */
 export class JoinRejected extends Error {
-    constructor(public readonly reason: "not-found" | "started" | "full", message: string) {
-        super(message);
+    constructor(public readonly reason: "not-found" | "started" | "full", message: string, options?: ErrorOptions) {
+        super(message, options);
         this.name = "JoinRejected";
     }
 }
@@ -367,7 +368,7 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
     } catch (error) {
         console.error("Error updating player score:", error);
         if (error instanceof ScoreWriteRejected) {
-            throw new ScoreWriteRejected(error.reason, `Failed to update score: ${error.message}`, error.currentScore);
+            throw new ScoreWriteRejected(error.reason, `Failed to update score: ${error.message}`, error.currentScore, { cause: error });
         }
         throw new Error(`Failed to update score: ${(error as Error).message}`, { cause: error });
     }
