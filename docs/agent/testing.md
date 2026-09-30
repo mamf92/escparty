@@ -202,6 +202,12 @@ minute or two; there is one worker and no retries (a flaky spec is a bug).
 - `lockstep.spec.ts` — two browsers, the guest's network slowed: host and
   guest stay on the same question, both reach the mid-quiz break, and both
   resume together (#62, #63, #68).
+- `builder.spec.ts` — build a quiz from three bank questions and one of
+  your own with a break after question 3, save it, host a room with it and
+  play it through alone, break included (#78).
+- `party.spec.ts` — a scoreboard party: a host and two guests rate four
+  acts of a semi, the host ticks a qualifier and opens the awards, and the
+  guests see the Jedward Twins go to the two who rated alike (#91).
 
 On a failure CI uploads the HTML report and traces as the `playwright-report`
-artifact. Not covered yet: the quiz builder and the scoreboard party.
+artifact.
