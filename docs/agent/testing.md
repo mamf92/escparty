@@ -164,8 +164,11 @@ open at the time of writing:
   formula moved to `src/utils/quizScoring.ts` and the multiplayer timing to
   `src/utils/quizTiming.ts`, and both are tested directly.
   `src/components/Quiz.test.tsx` renders the component for answer selection
-  (#22) and a failed multiplayer score write (#131), but its effects (the
-  local timers, following the room, phase navigation) are still untested.
+  (#22), a failed multiplayer score write (#131) and the solo clock timing
+  out an unanswered question through to the saved run (#160, with fake
+  intervals and `Date`: React schedules its own work on `setTimeout`, so
+  that stays real). Following the room and phase navigation are still
+  untested in unit tests.
   Rungs 2 and 3 (#62, #63) are covered end to end by
   `e2e/lockstep.spec.ts` (#68). Don't read "scoring is
   covered" as "the quiz is covered".

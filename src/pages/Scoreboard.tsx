@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import "../fabric-ui/lycra-surface.css";
@@ -101,17 +101,15 @@ function formatDate(iso: string): string {
 
 const Scoreboard = () => {
     const navigate = useNavigate();
-    const [scoreHistory, setScoreHistory] = useState<ScoreEntry[]>([]);
-    const [sortKey, setSortKey] = useState<SortKey>("score");
-
-    useEffect(() => {
+    const [scoreHistory] = useState<ScoreEntry[]>(() => {
         try {
             const stored = JSON.parse(localStorage.getItem("quizScores") || "[]");
-            setScoreHistory(Array.isArray(stored) ? stored : []);
+            return Array.isArray(stored) ? stored : [];
         } catch {
-            setScoreHistory([]);
+            return [];
         }
-    }, []);
+    });
+    const [sortKey, setSortKey] = useState<SortKey>("score");
 
     // Levels are computed from the unsorted history, so re-sorting moves rows
     // without changing how high any of them sits.

@@ -163,3 +163,39 @@ describe("Quiz multiplayer score writes (#131)", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+describe("Quiz solo clock (#160)", () => {
+  it("times out an unanswered question, shows feedback, then saves the run once", async () => {
+    // Only the clock and intervals: React schedules its own work on setTimeout.
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    try {
+      localStorage.removeItem("quizScores");
+      renderWithProviders(
+        <Routes>
+          <Route path="/quiz/:difficulty" element={<Quiz />} />
+          <Route path="/results" element={<p>results</p>} />
+        </Routes>,
+        { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: false } }] },
+      );
+      await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Which country won in 1974?" })).toBeInTheDocument());
+
+      const start = Date.now();
+      // Ten seconds with no answer: the question locks with feedback.
+      await vi.advanceTimersByTimeAsync(10_200);
+      expect(screen.getByRole("button", { name: /Next Question in/ })).toBeInTheDocument();
+      expect(screen.queryByText("results")).not.toBeInTheDocument();
+
+      // Five seconds of feedback, then the results, saved once. The clock
+      // steps until the results show, since React starts the feedback
+      // countdown on its own schedule; its deadline was fixed at time's up.
+      await vi.waitFor(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+        expect(screen.getByText("results")).toBeInTheDocument();
+      }, { timeout: 5_000 });
+      expect(Date.now() - start).toBeGreaterThanOrEqual(15_000);
+      expect(JSON.parse(localStorage.getItem("quizScores") ?? "[]")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
