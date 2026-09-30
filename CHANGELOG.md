@@ -44,6 +44,7 @@
 - Removed the GitHub Pages deploy path (`predeploy`/`deploy` scripts and the `gh-pages` devDependency) and `.github/workflows/deploy-vercel.yml`, which had failed on all 12 of its runs for want of the `VERCEL_*` secrets; Vercel's GitHub integration is the one deploy path that actually runs (2026-09-22)
 
 ### Changed
+- Runtime dependencies brought up to date (#141): firebase 12, uuid 14, react-router-dom 7.18, styled-components 6.5, react-icons 5.7, three 0.186 (with `@types/three` to match) and React 19.2.8, with its types pinned to 19.2 as well. React is held below 19.3 because `@react-three/fiber` 9.7 doesn't support it yet, and `.github/dependabot.yml` ignores 19.3+ until it does. Removed `@types/uuid`, `@types/react-router-dom` and `@types/styled-components`: those libraries ship their own types, and the last two were v5 typings (2026-09-30)
 - Let agents merge PRs they opened without waiting for a person, when CI is green, a `code-review` pass posted on the PR has every Important finding addressed, no thread is open, and the PR doesn't touch the guardrails themselves. The rule lives in `CONTRIBUTING.md` section 8, and `.claude/settings.json` allows the GitHub merge tool (2026-09-28)
 - Pointed the README live-demo link, `SECURITY.md`'s supported-version URL and `package.json`'s `homepage` at https://escparty-murex.vercel.app, replacing the GitHub Pages URL whose last build was from October 2025 (2026-09-22)
 - Added the missing Commit and Fix steps to the dev loop in `.claude/skills/steward/SKILL.md` and `CONTRIBUTING.md`, so the written loop is pick → plan → execute → commit → PR → review → fix → merge (2026-09-22)
@@ -131,6 +132,7 @@
 - Enhanced error handling with specific user-friendly messages
 
 ### Security
+- Transitive security bumps Dependabot had opened one by one (#141): postcss, nanoid, colord, js-yaml, browserslist, brace-expansion and @humanfs/node (2026-09-30)
 - Implemented secure Firestore rules that work without user authentication
 - Added protection against malformed data and unauthorized operations
 - Validated all room operations (create, join, start, update scores, etc.)
