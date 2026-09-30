@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
  * A small scoreboard party end to end (#91): a host and two guests rate the
@@ -8,46 +9,26 @@ import { expect, test, type Page } from "@playwright/test";
  * award has a known answer.
  */
 
-const rateFirstActs = async (page: Page, points: number[]) => {
-    for (const [index, value] of points.entries()) {
-        await page.getByRole("radiogroup").getByRole("radio", { name: String(value), exact: true }).click();
-        await expect(page.getByText(/^Your score for /)).toBeVisible();
-        if (index < points.length - 1) await page.getByRole("button", { name: "Next act" }).click();
-    }
-    await expect(page.getByText("Your ratings are saved.")).toBeVisible();
-};
-
-const join = async (page: Page, code: string, name: string) => {
-    await page.goto(`/#/party/${code}`);
-    await page.getByLabel("Your name at the party").fill(name);
-    await page.getByRole("button", { name: "Join the party" }).click();
-    await expect(page.getByText(`Party ${code} · you're ${name}`)).toBeVisible();
-};
-
 test("a host and two guests rate a semi and get their awards", async ({ browser }) => {
     const [host, john, lordi] = await Promise.all(
         [0, 1, 2].map(async () => (await browser.newContext()).newPage()),
     );
 
-    await host.goto("/#/party/new");
-    await host.getByRole("radio", { name: /Semi-final 1/ }).click();
-    await host.getByRole("radio", { name: /Douze Points/ }).click();
-    await host.getByLabel("Your name at the party").fill("Loreen");
-    await host.getByRole("button", { name: "Start the party" }).click();
-    await expect(host).toHaveURL(/#\/party\/[A-Z]{4}$/);
-    const code = host.url().split("/").pop()!;
+    const code = await hostParty(host, "Loreen", /Douze Points/);
 
-    await join(john, code, "John");
-    await join(lordi, code, "Lordi");
+    await joinParty(john, code, "John");
+    await joinParty(lordi, code, "Lordi");
 
-    await rateFirstActs(host, [12, 8, 4, 1]);
-    await rateFirstActs(john, [12, 8, 4, 1]);
-    await rateFirstActs(lordi, [1, 4, 8, 12]);
+    await rateActs(host, [12, 8, 4, 1]);
+    await rateActs(john, [12, 8, 4, 1]);
+    await rateActs(lordi, [1, 4, 8, 12]);
 
-    // Everyone sees the room's standings from all three ballots.
+    // Every rating reached Firestore: all four acts have three on another phone.
     await john.getByRole("tab", { name: "The room" }).click();
     await expect(john.getByText("3 guests are rating.")).toBeVisible();
-    await expect(john.getByRole("list", { name: "The room's standings" }).getByRole("listitem")).toHaveCount(4);
+    const standings = john.getByRole("list", { name: "The room's standings" }).getByRole("listitem");
+    await expect(standings).toHaveCount(4);
+    await expect(standings.filter({ hasText: "3 ratings" })).toHaveCount(4);
 
     // The host ticks the first act through and opens the awards.
     await host.getByRole("tab", { name: "Host" }).click();

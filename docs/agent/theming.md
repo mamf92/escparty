@@ -62,7 +62,7 @@ similar — see each skill's description for the exact trigger wording.
 join, rate, my ranking, the room, host tools, awards, big screen) with
 reduced motion on, measures it inside `.calm-ground`, and runs the Calm
 skill's own `tools/check.py` on the measurements (#90), so the rules stay
-in the skill. The measurements land in `test-results/theme/`. Two checks
+in the skill. The measurements are attached to the Playwright report. Two checks
 stay manual because no script can decide them: the neighbour tug and the
 squint ladder. Add a screen there when you build a new Calm page. Sparkle
 isn't checked on live pages: they take Calm's CSS directly, and Sparkle

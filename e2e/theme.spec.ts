@@ -1,6 +1,7 @@
-import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
  * Theme compliance for the scoreboard party screens (#90). Each screen is
@@ -14,9 +15,11 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 const CHECK = ".claude/skills/escparty-calm/tools/check.py";
-const ACCENTS = ["rgb(40, 167, 69)", "rgb(220, 53, 69)"];
+// Signal green and signal red, at any alpha.
+const ACCENT = /rgba?\((40, 167, 69|220, 53, 69)[,)]/.source;
 
-const measure = (page: Page) => page.evaluate((accents) => {
+const measure = (page: Page) => page.evaluate((accentSource) => {
+    const accent = new RegExp(accentSource);
     const grounds = [...document.querySelectorAll<HTMLElement>(".calm-ground")];
     const inGround = (el: Element) => grounds.some(ground => ground.contains(el));
 
@@ -55,7 +58,7 @@ const measure = (page: Page) => page.evaluate((accents) => {
     }
 
     // Controls must be direct children of their pane.
-    const controls = [...document.querySelectorAll<HTMLElement>(".lycra:not(.lycra-pane):not(.lycra-field)")].filter(inGround);
+    const controls = [...document.querySelectorAll<HTMLElement>(".lycra")].filter(inGround);
     const wrapped = controls.filter(el => !el.parentElement?.classList.contains("lycra-pane")).length;
 
     // Green and red, as a share of the surface.
@@ -66,37 +69,42 @@ const measure = (page: Page) => page.evaluate((accents) => {
         surfaceArea += box.width * box.height;
         for (const el of ground.querySelectorAll<HTMLElement>("*")) {
             const style = getComputedStyle(el);
-            if (accents.includes(style.backgroundColor)) {
+            const painted = [style.backgroundColor, style.color, style.borderTopColor, style.fill, style.stroke];
+            if (painted.some(value => accent.test(value))) {
                 const r = el.getBoundingClientRect();
                 accentArea += r.width * r.height;
             }
         }
     }
 
+    // Only what was actually measured: check.py skips a missing key, and
+    // an empty one would pass without checking anything.
     return {
-        type_sizes_px: [...sizes],
+        ...(sizes.size ? { type_sizes_px: [...sizes] } : {}),
         ...(blurs ? { outer_shadow_blurs_px: blurs } : {}),
-        tinted_control_states: tinted,
-        controls_not_direct_children: wrapped,
-        accent_coverage_pct: surfaceArea ? Math.round((accentArea / surfaceArea) * 10000) / 100 : 0,
-        reduced_motion_transforms: controls.map(el => getComputedStyle(el).transform),
+        ...(rest && chosen ? { tinted_control_states: tinted } : {}),
+        ...(controls.length ? {
+            controls_not_direct_children: wrapped,
+            reduced_motion_transforms: controls.map(el => getComputedStyle(el).transform),
+        } : {}),
+        ...(surfaceArea ? { accent_coverage_pct: Math.round((accentArea / surfaceArea) * 10000) / 100 } : {}),
     };
-}, ACCENTS);
+}, ACCENT);
 
 const judge = async (page: Page, name: string) => {
     await expect(page.locator(".calm-ground").first()).toBeVisible();
     const measurements = await measure(page);
-    mkdirSync("test-results/theme", { recursive: true });
-    const file = `test-results/theme/${name}.json`;
+    const file = test.info().outputPath(`${name}.json`);
     writeFileSync(file, JSON.stringify(measurements, null, 2));
-    let report: string;
-    try {
-        report = execFileSync("python3", [CHECK, file], { encoding: "utf8" });
-    } catch (error) {
-        const failed = error as { stdout?: string };
-        throw new Error(`${name} isn't Calm:\n${failed.stdout ?? String(error)}`);
+    await test.info().attach(name, { path: file, contentType: "application/json" });
+
+    const run = spawnSync("python3", [CHECK, file], { encoding: "utf8" });
+    if (run.error || (run.status !== 0 && run.status !== 1)) {
+        // Not a verdict on the page: python3 is missing or check.py broke.
+        throw new Error(`Couldn't run ${CHECK} on ${name}: ${run.error ?? `exit ${run.status}`}\n${run.stderr}${run.stdout}`);
     }
-    test.info().annotations.push({ type: name, description: report.split("\n").filter(line => line.startsWith("[")).join("; ") });
+    if (run.status === 1) throw new Error(`${name} isn't Calm:\n${run.stdout}`);
+    test.info().annotations.push({ type: name, description: run.stdout.split("\n").filter(line => line.startsWith("[")).join("; ") });
 };
 
 test("the scoreboard party screens pass Calm's self-check", async ({ browser }) => {
@@ -110,39 +118,29 @@ test("the scoreboard party screens pass Calm's self-check", async ({ browser }) 
     await host.goto("/#/party/new");
     await expect(host.getByRole("button", { name: "Start the party" })).toBeVisible();
     await judge(host, "party-setup");
-    await host.getByRole("radio", { name: /Semi-final 1/ }).click();
-    await host.getByLabel("Your name at the party").fill("Loreen");
-    await host.getByRole("button", { name: "Start the party" }).click();
-    await expect(host).toHaveURL(/#\/party\/[A-Z]{4}$/);
-    const code = host.url().split("/").pop()!;
+    const code = await hostParty(host, "Loreen");
 
     await guest.goto(`/#/party/${code}`);
     await expect(guest.getByRole("button", { name: "Join the party" })).toBeVisible();
     await judge(guest, "party-join");
-    await guest.getByLabel("Your name at the party").fill("John");
-    await guest.getByRole("button", { name: "Join the party" }).click();
+    await joinParty(guest, code, "John");
 
     // Rate three acts on each phone, so every screen has something to show.
-    for (const [page, values] of [[host, [10, 6, 2]], [guest, [9, 5, 3]]] as const) {
-        for (const [index, value] of values.entries()) {
-            for (const group of await page.getByRole("radiogroup").all()) {
-                await group.getByRole("radio", { name: String(value), exact: true }).click();
-            }
-            if (index < values.length - 1) await page.getByRole("button", { name: "Next act" }).click();
-        }
-        await expect(page.getByText("Your ratings are saved.")).toBeVisible();
-    }
+    await rateActs(host, [10, 6, 2]);
+    await rateActs(guest, [9, 5, 3]);
     await judge(guest, "party-rate");
 
     await guest.getByRole("tab", { name: "My ranking" }).click();
     await expect(guest.getByRole("list", { name: "Your ranking" })).toBeVisible();
     await judge(guest, "party-my-ranking");
     await guest.getByRole("tab", { name: "The room" }).click();
-    await expect(guest.getByRole("list", { name: "The room's standings" })).toBeVisible();
+    const standings = guest.getByRole("list", { name: "The room's standings" }).getByRole("listitem");
+    await expect(standings.filter({ hasText: "2 ratings" })).toHaveCount(3);
     await judge(guest, "party-the-room");
 
     await host.getByRole("tab", { name: "Host" }).click();
     await host.getByLabel("Who goes through").getByRole("button").first().click();
+    await expect(host.getByText(/tick who goes through \(1 of 10\)/)).toBeVisible();
     await judge(host, "party-host-tools");
     await host.getByRole("button", { name: "Open the awards for everyone" }).click();
 

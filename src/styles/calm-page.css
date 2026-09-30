@@ -139,16 +139,3 @@
 .calm-page.calm-screen .calm-sub {
   font-size: 1rem;
 }
-
-/*
-  Reduced motion (#90): a chosen control sinks by shadow alone. calm.css
-  offsets it 1px 2px, and the vendored reduced-motion block only resets
-  `.is-selected`, so without this a chosen plate still moved for someone
-  who asked for no motion (caught by e2e/theme.spec.ts).
-*/
-@media (prefers-reduced-motion: reduce) {
-  .calm-page .lycra.is-chosen,
-  .calm-page .lycra.is-chosen:hover {
-    transform: none;
-  }
-}
