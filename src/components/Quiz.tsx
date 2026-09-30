@@ -481,6 +481,11 @@ const Quiz = () => {
     setTimeLeft(FEEDBACK_MS / 1000);
   };
 
+  // The solo run is saved once. The feedback timer calls this from inside a
+  // state updater, which React may run twice (StrictMode in development
+  // did, saving every run twice).
+  const savedRunRef = useRef(false);
+
   // Local clock only: move on once the feedback time is over
   const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
@@ -509,6 +514,8 @@ const Quiz = () => {
         setCurrentQuestionPoints(0); // Reset points for new question
       }
     } else {
+      if (savedRunRef.current) return;
+      savedRunRef.current = true;
       const difficultyLevel = difficulty ?? "easy";
 
       const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
@@ -621,6 +628,7 @@ const Quiz = () => {
   };
 
   const restartQuiz = () => {
+    savedRunRef.current = false;
     setCurrentQuestionIndex(0);
     setScore(0);
     setQuizCompleted(false);

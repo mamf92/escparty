@@ -87,3 +87,7 @@ out
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Playwright
+test-results/
+playwright-report/
