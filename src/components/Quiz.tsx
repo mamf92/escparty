@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import styled from "styled-components";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaHome } from "react-icons/fa";
@@ -39,8 +39,8 @@ const Quiz = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
   const [loadingStatus, setLoadingStatus] = useState<string>("Initializing..."); // Used in loading state display
-  const [timeLeft, setTimeLeft] = useState(10); // 10 second timer
-  const [timeLeftMs, setTimeLeftMs] = useState(10000); // More precise millisecond timer for scoring
+  const [timeLeft, setTimeLeft] = useState(QUESTION_MS / 1000);
+  const [timeLeftMs, setTimeLeftMs] = useState(QUESTION_MS); // More precise millisecond timer for scoring
   const [showFeedback, setShowFeedback] = useState(false);
   const [isTimerVisible, setIsTimerVisible] = useState(true);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
@@ -86,7 +86,9 @@ const Quiz = () => {
   }, [isMultiplayer, observing, room, roomCode, playerId, navigate]);
 
   useEffect(() => {
-    // Clear any previous errors when component mounts or difficulty changes
+    // Clear any previous errors when component mounts or difficulty changes.
+    // (A reset for the quiz about to load, which then loads asynchronously.)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
     setLoading(true);
     setLoadingStatus("Initializing quiz...");
@@ -226,73 +228,57 @@ const Quiz = () => {
     };
   }, [difficulty, navigate, location]);
 
-  // Timer effect for question countdown (single player only)
+  // The latest render's handlers, for the solo timers below and the shared
+  // tick, which must not restart on every render. Set after each render,
+  // before any effect runs (see the useLayoutEffect after the handlers).
+  const handleTimeUpRef = useRef<() => void>(() => { });
+  const moveToNextQuestionRef = useRef<() => void>(() => { });
+  // Single player: when the open question and its feedback end. Answers are
+  // scored from the question's deadline, never from the last tick's state,
+  // so a question that has only just (re)started can't score stale time.
+  const questionDeadlineRef = useRef<number | null>(null);
+  const feedbackDeadlineRef = useRef(0);
+
+  // Single player: the question's countdown. It counts to a deadline rather
+  // than counting ticks, so a phone that throttles timers still ends on
+  // time, and time's up is handled here, never inside a state updater
+  // (which React may run twice).
   useEffect(() => {
-    if (quizCompleted || loading || isMultiplayer) return;
-
-    // Only start a new timer if we're in question mode (not feedback mode)
-    if (!showFeedback) {
-      console.log("Setting up new question timer");
-      setTimeLeft(QUESTION_MS / 1000);
-      setTimeLeftMs(QUESTION_MS);
-
-      // Use a more precise interval for millisecond timer (100ms)
-      const msTimer = setInterval(() => {
-        setTimeLeftMs(prev => {
-          if (prev <= 100) { // When 0.1 seconds left
-            clearInterval(msTimer);
-            handleTimeUp();
-            return 0;
-          }
-          return prev - 100; // Decrease by 100ms each time
-        });
-      }, 100);
-
-      // Regular timer for visible UI updates (every second)
-      const uiTimer = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(uiTimer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      // Return cleanup function for both timers
-      return () => {
-        clearInterval(msTimer);
-        clearInterval(uiTimer);
-      };
-    }
+    if (quizCompleted || loading || isMultiplayer || showFeedback) return;
+    const deadline = Date.now() + QUESTION_MS;
+    questionDeadlineRef.current = deadline;
+    const tick = setInterval(() => {
+      const ms = Math.max(0, deadline - Date.now());
+      setTimeLeftMs(ms);
+      setTimeLeft(Math.ceil(ms / 1000));
+      if (ms === 0) {
+        clearInterval(tick);
+        handleTimeUpRef.current();
+      }
+    }, 100);
+    return () => clearInterval(tick);
   }, [currentQuestionIndex, quizCompleted, loading, showFeedback, isMultiplayer]);
 
-  // Separate effect for feedback timer that automatically moves to next question
+  // Single player: the feedback countdown, then the next question. It lasts
+  // until the deadline submitAnswer or handleTimeUp set.
   useEffect(() => {
-    if (showFeedback && !isMultiplayer) {
-      // Note: We don't reset time here - it's set in submitAnswer or handleTimeUp
-      const feedbackTimer = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(feedbackTimer);
-            moveToNextQuestion(); // Automatically move to next question when feedback time ends
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => {
-        clearInterval(feedbackTimer);
-      };
-    }
+    if (!showFeedback || isMultiplayer) return;
+    const deadline = feedbackDeadlineRef.current;
+    const tick = setInterval(() => {
+      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setTimeLeft(left);
+      if (left === 0) {
+        clearInterval(tick);
+        moveToNextQuestionRef.current();
+      }
+    }, 250);
+    return () => clearInterval(tick);
   }, [showFeedback, isMultiplayer]);
 
   // --- Shared, room-driven progression (multiplayer) ---
 
   // Refs so the 100ms tick below reads current values without restarting.
   const isSubmittedRef = useRef(isSubmitted);
-  isSubmittedRef.current = isSubmitted;
   const lastAdvanceAttemptRef = useRef(0);
   const advanceInFlightRef = useRef(false);
   const markTimeUpRef = useRef<() => void>(() => { });
@@ -332,6 +318,8 @@ const Quiz = () => {
   useEffect(() => {
     if (!sharedClock || !playerId) return;
     if (storedScore > score) {
+      // Syncing from the room's snapshot; deriving it instead is part of #27.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setScore(storedScore);
     }
   }, [sharedClock, playerId, storedScore, score]);
@@ -342,6 +330,8 @@ const Quiz = () => {
     if (!sharedClock || room?.phase !== "question") return;
     const roomIndex = room.currentQuestionIndex ?? 0;
     if (roomIndex !== currentQuestionIndex) {
+      // Syncing from the room's snapshot; deriving it instead is part of #27.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentQuestionIndex(roomIndex);
       setSelectedAnswer(null);
       setIsSubmitted(false);
@@ -472,18 +462,17 @@ const Quiz = () => {
     setCurrentQuestionPoints(0);
     rememberAnswered(currentQuestionIndex);
   };
-  markTimeUpRef.current = markTimeUp;
-  lockQuestionRef.current = lockQuestion;
 
   // Local clock only: time's up, then 5 seconds of feedback
   const handleTimeUp = () => {
     markTimeUp();
+    feedbackDeadlineRef.current = Date.now() + FEEDBACK_MS;
     setTimeLeft(FEEDBACK_MS / 1000);
   };
 
-  // The solo run is saved once. The feedback timer calls this from inside a
-  // state updater, which React may run twice (StrictMode in development
-  // did, saving every run twice).
+  // The solo run is saved once, even if the last question's feedback ends
+  // twice (it used to end inside a state updater, which StrictMode ran
+  // twice, saving every run twice).
   const savedRunRef = useRef(false);
 
   // Local clock only: move on once the feedback time is over
@@ -541,6 +530,15 @@ const Quiz = () => {
     }
   };
 
+  // Keep the refs the timers and the shared tick read current.
+  useLayoutEffect(() => {
+    isSubmittedRef.current = isSubmitted;
+    markTimeUpRef.current = markTimeUp;
+    lockQuestionRef.current = lockQuestion;
+    handleTimeUpRef.current = handleTimeUp;
+    moveToNextQuestionRef.current = moveToNextQuestion;
+  });
+
   const handleAnswer = (answer: string) => {
     if (!isSubmitted) {
       setSelectedAnswer(answer);
@@ -559,8 +557,12 @@ const Quiz = () => {
     // late setShowFeedback(true) would land on (and lock) the next question.
     // Locally: remaining question time PLUS 5 seconds; in multiplayer the
     // shared tick counts down to the slot's end.
+    const msLeft = !isMultiplayer && questionDeadlineRef.current !== null
+      ? Math.max(0, questionDeadlineRef.current - Date.now())
+      : timeLeftMs;
     if (!sharedClock) {
-      const feedbackTime = Math.min(timeLeft, QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
+      const feedbackTime = Math.min(Math.ceil(msLeft / 1000), QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
+      feedbackDeadlineRef.current = Date.now() + feedbackTime * 1000;
       setTimeLeft(feedbackTime);
     }
 
@@ -568,9 +570,9 @@ const Quiz = () => {
     if (answer === currentQuestion.correctAnswer) {
       // Base score plus a time bonus, both clamped and rounded in
       // `quizScoring.ts` so the rule is unit-tested rather than inline here.
-      const timeBonus = calculateTimeBonus(timeLeftMs);
-      const pointsForAnswer = calculateQuestionScore(timeLeftMs);
-      console.log(`Correct answer! Time left: ${timeLeftMs / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
+      const timeBonus = calculateTimeBonus(msLeft);
+      const pointsForAnswer = calculateQuestionScore(msLeft);
+      console.log(`Correct answer! Time left: ${msLeft / 1000}s, Time bonus: ${timeBonus}, Total points: ${pointsForAnswer}`);
 
       // Set points for current question to display in the UI
       setCurrentQuestionPoints(pointsForAnswer);

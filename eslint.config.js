@@ -35,26 +35,6 @@ export default defineConfig(
     },
   },
   {
-    // The React Compiler rules react-hooks 7 added found 18 problems in
-    // these files, written before the rules: warnings here until #160 fixes
-    // them, errors everywhere else so no new file adds one.
-    files: [
-      'src/components/Quiz.tsx',
-      'src/fabric-ui/CameraRig.tsx',
-      'src/fabric-ui/FabricSurface.tsx',
-      'src/hooks/useOwnBallot.ts',
-      'src/hooks/usePartyData.ts',
-      'src/pages/Home.tsx',
-      'src/pages/HostObserverView.tsx',
-      'src/pages/Scoreboard.tsx',
-    ],
-    rules: {
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/refs': 'warn',
-    },
-  },
-  {
     // Test files and the shared test helpers never ship in the app bundle,
     // so Fast Refresh's "components only" rule doesn't apply to them —
     // test-utils.tsx exports a provider wrapper alongside plain helpers on

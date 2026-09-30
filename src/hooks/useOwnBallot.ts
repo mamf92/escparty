@@ -29,6 +29,9 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const merged = useRef(false);
 
+    // The latest `save`, for its own retry and for the unmount below.
+    const saveNow = useRef<(last?: boolean) => Promise<void>>(async () => {});
+
     /** `last`: the page is closing, so try once and don't schedule a retry. */
     const save = useCallback(async (last = false) => {
         if (!code || !identity) return;
@@ -42,7 +45,7 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         } catch (error) {
             console.error("Couldn't save the ratings, will retry:", error);
             setState("offline");
-            if (!last && !timer.current) timer.current = setTimeout(() => void save(), RETRY_MS);
+            if (!last && !timer.current) timer.current = setTimeout(() => void saveNow.current(), RETRY_MS);
         }
     }, [code, identity]);
 
@@ -54,7 +57,6 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
     // Leaving the page (to the awards, the big screen) mid-wait sends the
     // waiting save now instead of dropping it. If that fails too, the
     // device copy is merged back in on the next visit.
-    const saveNow = useRef(save);
     useEffect(() => {
         saveNow.current = save;
     }, [save]);
