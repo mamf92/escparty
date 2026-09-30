@@ -10,6 +10,17 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: "development"
+    # @react-three/fiber 9.7 supports react <19.3; drop this once it
+    # supports 19.3 (package.json pins react and react-dom to ~19.2.8).
+    ignore:
+      - dependency-name: "react"
+        versions: [">=19.3.0"]
+      - dependency-name: "react-dom"
+        versions: [">=19.3.0"]
+      - dependency-name: "@types/react"
+        versions: [">=19.3.0"]
+      - dependency-name: "@types/react-dom"
+        versions: [">=19.3.0"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

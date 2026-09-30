@@ -123,6 +123,7 @@ const MidQuizScoreboard = () => {
     // subscription, like the timer and flag after it.
     let latestRoom: Room | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let goneTimer: ReturnType<typeof setTimeout> | undefined;
     // Set on cleanup: a mark that fails after this page has closed (a write
     // queued offline, refused on reconnect) must not start retrying against
     // the last room this page saw.
@@ -206,7 +207,7 @@ const MidQuizScoreboard = () => {
           }
         } else {
           setError("Game room no longer exists");
-          setTimeout(() => navigate("/multiplayer"), 2000);
+          goneTimer = setTimeout(() => navigate("/multiplayer"), 2000);
         }
       });
 
@@ -214,6 +215,7 @@ const MidQuizScoreboard = () => {
         disposed = true;
         unsubscribe();
         clearTimeout(retryTimer);
+        clearTimeout(goneTimer);
       };
     }
   }, [gameData.multiplayer, gameData.roomCode, gameData.playerId, navigate, returnToQuiz]);

@@ -68,16 +68,17 @@ export class ScoreWriteRejected extends Error {
         message: string,
         /** For "lower-score": the score the room already holds. */
         public readonly currentScore?: number,
+        options?: ErrorOptions,
     ) {
-        super(message);
+        super(message, options);
         this.name = "ScoreWriteRejected";
     }
 }
 
 /** Why a room turned a join down; `joinRoom` answers `false` for "not-found" and "started". */
 export class JoinRejected extends Error {
-    constructor(public readonly reason: "not-found" | "started" | "full", message: string) {
-        super(message);
+    constructor(public readonly reason: "not-found" | "started" | "full", message: string, options?: ErrorOptions) {
+        super(message, options);
         this.name = "JoinRejected";
     }
 }
@@ -152,7 +153,7 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
         const detail = error as { code?: string; message?: string };
         console.error("Error details:", detail?.code, detail?.message);
         console.error("Stack:", (error as Error).stack);
-        throw new Error(`Failed to create room: ${(error as Error).message}`);
+        throw new Error(`Failed to create room: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -178,7 +179,7 @@ export const getRoom = async (roomCode: string): Promise<Room | null> => {
         }
     } catch (error) {
         console.error("Error getting room:", error);
-        throw new Error(`Failed to get room: ${(error as Error).message}`);
+        throw new Error(`Failed to get room: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -247,7 +248,7 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
                 return;
             }
             console.error("Error adding player to room:", error);
-            throw new Error("Security rules prevented joining the room");
+            throw new Error("Security rules prevented joining the room", { cause: error });
         }
         console.error("Error adding player to room:", error);
         throw error;
@@ -272,7 +273,7 @@ export const setRoomDifficulty = async (roomCode: string, difficulty: string, br
         console.log(`Difficulty set to ${difficulty} for room ${roomCode}`);
     } catch (error) {
         console.error("Error setting room difficulty:", error);
-        throw new Error(`Failed to set difficulty: ${(error as Error).message}`);
+        throw new Error(`Failed to set difficulty: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -297,7 +298,7 @@ export const startGame = async (roomCode: string): Promise<void> => {
         console.log(`Game started in room ${roomCode}`);
     } catch (error) {
         console.error("Error starting game:", error);
-        throw new Error(`Failed to start game: ${(error as Error).message}`);
+        throw new Error(`Failed to start game: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -367,9 +368,9 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
     } catch (error) {
         console.error("Error updating player score:", error);
         if (error instanceof ScoreWriteRejected) {
-            throw new ScoreWriteRejected(error.reason, `Failed to update score: ${error.message}`, error.currentScore);
+            throw new ScoreWriteRejected(error.reason, `Failed to update score: ${error.message}`, error.currentScore, { cause: error });
         }
-        throw new Error(`Failed to update score: ${(error as Error).message}`);
+        throw new Error(`Failed to update score: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -415,7 +416,7 @@ export const advanceQuestion = async (roomCode: string, fromIndex: number, total
         });
     } catch (error) {
         console.error("Error advancing question:", error);
-        throw new Error(`Failed to advance question: ${(error as Error).message}`);
+        throw new Error(`Failed to advance question: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -458,7 +459,7 @@ export const resumeAfterMidQuiz = async (roomCode: string): Promise<boolean> => 
         });
     } catch (error) {
         console.error("Error resuming after mid-quiz:", error);
-        throw new Error(`Failed to resume quiz: ${(error as Error).message}`);
+        throw new Error(`Failed to resume quiz: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -534,7 +535,7 @@ export const setContinueReady = async (roomCode: string, continueReady: boolean)
         console.log(`Continue ready state set to ${continueReady} for room ${roomCode}`);
     } catch (error) {
         console.error("Error setting continue ready state:", error);
-        throw new Error(`Failed to set continue ready state: ${(error as Error).message}`);
+        throw new Error(`Failed to set continue ready state: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -560,7 +561,7 @@ export const markPlayerAtMidQuiz = async (roomCode: string, playerId: string): P
         console.log(`Player ${playerId} marked as ready at mid-quiz in room ${roomCode}`);
     } catch (error) {
         console.error("Error marking player as ready at mid-quiz:", error);
-        throw new Error(`Failed to mark player as ready: ${(error as Error).message}`);
+        throw new Error(`Failed to mark player as ready: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -582,7 +583,7 @@ export const resetPlayersAtMidQuiz = async (roomCode: string): Promise<void> => 
         console.log(`Players at mid-quiz reset for room ${roomCode}`);
     } catch (error) {
         console.error("Error resetting players at mid-quiz:", error);
-        throw new Error(`Failed to reset players at mid-quiz: ${(error as Error).message}`);
+        throw new Error(`Failed to reset players at mid-quiz: ${(error as Error).message}`, { cause: error });
     }
 };
 
@@ -609,10 +610,10 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
         console.error("Error joining room:", error);
 
         if (err.code === 'permission-denied' || err.message.includes('Security rules')) {
-            throw new Error("Failed to join room: Security rules prevented access");
+            throw new Error("Failed to join room: Security rules prevented access", { cause: error });
         }
 
-        throw new Error(`Failed to join room: ${err.message}`);
+        throw new Error(`Failed to join room: ${err.message}`, { cause: error });
     }
 };
 
