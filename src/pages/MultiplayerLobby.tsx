@@ -225,7 +225,7 @@ const MultiplayerLobby = () => {
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             placeholder="code"
             disabled={loading}
-            isInvalid={attempted && (!joinCode || joinCode.length < 4 || !/^[A-Z]{4}$/.test(joinCode))}
+            $isInvalid={attempted && (!joinCode || joinCode.length < 4 || !/^[A-Z]{4}$/.test(joinCode))}
             autoFocus
             autoCapitalize="characters"
             maxLength={4}
@@ -261,7 +261,7 @@ interface ButtonProps {
 }
 
 interface InputProps {
-  isInvalid?: boolean;
+  $isInvalid?: boolean;
 }
 
 const Container = styled.div`
@@ -357,7 +357,7 @@ const Input = styled.input<InputProps>`
   padding: 0.75rem; /* 12px */
   margin: 0.625rem 0; /* 10px */
   width: 90%;
-  border: 0.1875rem solid ${({ isInvalid, theme }) => isInvalid ? theme.colors.accentorange : theme.colors.purple}; /* 3px */
+  border: 0.1875rem solid ${({ $isInvalid, theme }) => $isInvalid ? theme.colors.accentorange : theme.colors.purple}; /* 3px */
   background: ${({ theme }) => theme.colors.white};
   color: ${({ theme }) => theme.colors.black};
   font-size: 1rem;

@@ -21,6 +21,12 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // The React Compiler rules react-hooks 7 added: 18 findings in code
+      // written before them, being worked through in #160. Back to error
+      // once they're fixed.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/refs': 'warn',
       // The codebase already marks deliberately unused bindings with a leading
       // underscore, so make the linter agree with the convention.
       '@typescript-eslint/no-unused-vars': [

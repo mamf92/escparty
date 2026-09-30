@@ -156,6 +156,20 @@ describe("loadQuizData in production", () => {
         }
     });
 
+    it("gives up on a fetch that stalls for 5 seconds and serves the bundled import", async () => {
+        vi.useFakeTimers();
+        try {
+            fetchMock.mockImplementation((_path: string, init: RequestInit) => new Promise((_, reject) => {
+                init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+            }));
+            const loading = loadQuizData("easy");
+            await vi.advanceTimersByTimeAsync(5000);
+            await expect(loading).resolves.toEqual(IMPORTED_EASY);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("treats a 404 as a failed fetch, not as empty data", async () => {
         fetchMock.mockResolvedValue(notFoundResponse());
 

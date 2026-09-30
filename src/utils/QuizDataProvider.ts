@@ -106,16 +106,13 @@ const directImportQuizData = async (difficulty: QuizDifficulty): Promise<QuizQue
         let importPromise: Promise<{ default?: unknown }>;
 
         switch (difficulty) {
-            case 'easy':
-                importPromise = import('../data/escBeginnerQuiz.json');
-                break;
             case 'medium':
                 importPromise = import('../data/escIntermediateQuiz.json');
                 break;
             case 'hard':
                 importPromise = import('../data/escAdvancedQuiz.json');
                 break;
-            default:
+            default: // 'easy' (loadQuizData normalises anything else to it)
                 importPromise = import('../data/escBeginnerQuiz.json');
                 break;
         }
@@ -124,6 +121,8 @@ const directImportQuizData = async (difficulty: QuizDifficulty): Promise<QuizQue
         // timer once the race is decided either way (#132).
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
         const timeoutPromise = new Promise((_, reject) => {
+            // A bundled import can't be made to hang in a test.
+            /* v8 ignore next */
             timeoutId = setTimeout(() => reject(new Error('Import timeout after 5 seconds')), 5000);
         });
 
