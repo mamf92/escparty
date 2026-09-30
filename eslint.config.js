@@ -3,8 +3,9 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
+import { defineConfig } from 'eslint/config'
 
-export default tseslint.config(
+export default defineConfig(
   // Both are generated output: `dist` from a build, `coverage` from
   // `npm run test:coverage` (its HTML report ships its own bundled JS).
   { ignores: ['dist', 'coverage'] },
@@ -31,6 +32,26 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+    },
+  },
+  {
+    // The React Compiler rules react-hooks 7 added found 18 problems in
+    // these files, written before the rules: warnings here until #160 fixes
+    // them, errors everywhere else so no new file adds one.
+    files: [
+      'src/components/Quiz.tsx',
+      'src/fabric-ui/CameraRig.tsx',
+      'src/fabric-ui/FabricSurface.tsx',
+      'src/hooks/useOwnBallot.ts',
+      'src/hooks/usePartyData.ts',
+      'src/pages/Home.tsx',
+      'src/pages/HostObserverView.tsx',
+      'src/pages/Scoreboard.tsx',
+    ],
+    rules: {
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/refs': 'warn',
     },
   },
   {

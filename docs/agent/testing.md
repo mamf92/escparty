@@ -135,11 +135,7 @@ Coverage `include` therefore lists exactly the files with a floor:
 | `src/utils/roomRoles.ts` | 100% statements / branches / functions / lines |
 | `src/utils/multiplayerSession.ts` | 100% statements / branches / functions / lines |
 | `src/utils/roomsFirestore.ts` | 100% statements / branches / functions / lines |
-| `src/utils/QuizDataProvider.ts` | 98% statements & lines, 96% branches, 100% functions |
-
-`QuizDataProvider.ts` is short of 100% only because of the `default:` arm in
-`directImportQuizData`'s switch, which `loadQuizData` normalises away before
-ever calling it.
+| `src/utils/QuizDataProvider.ts` | 100% statements / branches / functions / lines |
 
 Adding a file to the list is how coverage gets ratcheted up (#59 tracks the
 backlog); **lowering a floor to make a run go green is not** — cover the new

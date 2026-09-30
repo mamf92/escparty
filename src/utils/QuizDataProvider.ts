@@ -106,16 +106,13 @@ const directImportQuizData = async (difficulty: QuizDifficulty): Promise<QuizQue
         let importPromise: Promise<{ default?: unknown }>;
 
         switch (difficulty) {
-            case 'easy':
-                importPromise = import('../data/escBeginnerQuiz.json');
-                break;
             case 'medium':
                 importPromise = import('../data/escIntermediateQuiz.json');
                 break;
             case 'hard':
                 importPromise = import('../data/escAdvancedQuiz.json');
                 break;
-            default:
+            default: // 'easy' (loadQuizData normalises anything else to it)
                 importPromise = import('../data/escBeginnerQuiz.json');
                 break;
         }
