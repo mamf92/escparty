@@ -18,17 +18,37 @@ const renderPage = () =>
   );
 
 describe("SelectDifficulty", () => {
+  it("is a Calm page with one heading and the three difficulties as controls", () => {
+    renderPage();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pick a difficulty");
+    const group = screen.getByRole("group", { name: "Difficulty" });
+    expect(group).toHaveClass("lycra-pane");
+    const controls = [...group.querySelectorAll("button")];
+    expect(controls.map(button => button.firstElementChild?.textContent)).toEqual(["Easy", "Medium", "Hard"]);
+    for (const control of controls) {
+      expect(control).toHaveClass("lycra", "is-block");
+      expect(control.parentElement).toBe(group);
+    }
+  });
+
   it("starts a classic quiz single-player", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByText("Medium"));
+    await user.click(screen.getByRole("button", { name: /^Medium/ }));
     expect(screen.getByText('at /quiz/medium with {"multiplayer":false}')).toBeInTheDocument();
   });
 
   it("leads to the quiz library for premade and your own quizzes", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByText("More quizzes"));
+    await user.click(screen.getByRole("button", { name: /Browse the quiz library/ }));
     expect(screen.getByText("at /quizzes with null")).toBeInTheDocument();
+  });
+
+  it("has a way back home", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "Back to ESCParty" }));
+    expect(screen.getByText("at / with null")).toBeInTheDocument();
   });
 });
