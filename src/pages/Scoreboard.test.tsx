@@ -91,8 +91,52 @@ describe("Scoreboard", () => {
     expect(rows()[0]).toHaveTextContent("2 points");
   });
 
+  it("sorts with tabs that label their panel and move with the arrow keys", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("quizScores", JSON.stringify([
+      { score: 5, total: 10, difficulty: "medium", date: "2026-05-10T00:00:00Z" },
+      { score: 9, total: 10, difficulty: "hard", date: "2026-05-01T00:00:00Z" },
+    ]));
+    renderScoreboard();
+    const score = screen.getByRole("tab", { name: "Score" });
+    expect(score).toHaveClass("lycra", "is-chosen");
+    expect(score).not.toHaveAttribute("aria-pressed");
+    expect(screen.getByRole("tabpanel", { name: "Score" })).toContainElement(screen.getByRole("list", { name: "Your runs" }));
+    // The proud step is the design system's own row elevation.
+    expect(rows()[0]).toHaveClass("is-static", "is-high");
+
+    // Only the chosen tab is in the tab order; arrows move and choose.
+    expect(screen.getByRole("tab", { name: "Date" })).toHaveAttribute("tabindex", "-1");
+    score.focus();
+    await user.keyboard("{ArrowRight}");
+    const date = screen.getByRole("tab", { name: "Date" });
+    expect(date).toHaveFocus();
+    expect(date).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "Date" })).toBeInTheDocument();
+    await user.keyboard("{End}");
+    expect(screen.getByRole("tab", { name: "Difficulty" })).toHaveFocus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Score" })).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByRole("tab", { name: "Difficulty" })).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("tab", { name: "Score" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("shows one run without tabs", () => {
+    localStorage.setItem("quizScores", JSON.stringify([
+      { score: 5, total: 1, difficulty: "easy", date: "2026-05-10T00:00:00Z" },
+    ]));
+    renderScoreboard();
+    expect(screen.getByText("1 run. Your best stands highest.")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
+    expect(screen.getByText(/1 question ·/)).toBeInTheDocument();
+  });
+
   it("goes home", async () => {
     renderScoreboard();
+    expect(screen.getByRole("heading", { level: 1, name: "Scoreboard" })).toHaveClass("esc-title");
     await userEvent.setup().click(screen.getByRole("button", { name: "Back to ESCParty" }));
     expect(screen.getByText("home")).toBeInTheDocument();
   });

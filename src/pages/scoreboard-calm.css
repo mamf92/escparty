@@ -1,9 +1,0 @@
-/*
-  Scoreboard-only layout on top of the shared surface
-  (src/design/surface.css), which already gives a proud row (.is-high) its
-  larger lift and lays out .rank-line.
-*/
-.esc-app .scoreboard-calm .lycra.is-rank {
-  align-items: stretch;
-  text-align: left;
-}

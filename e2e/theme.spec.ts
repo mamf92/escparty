@@ -173,6 +173,28 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await Promise.all([host, guest].map(page => page.context().close()));
 });
 
+test("the solo scoreboard follows the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("quizScores", JSON.stringify([
+        { score: 900, total: 10, difficulty: "easy", date: "2026-05-10T00:00:00Z" },
+        { score: 1300, total: 10, difficulty: "hard", date: "2026-05-01T00:00:00Z" },
+        { score: 400, total: 10, difficulty: "medium", date: "2026-05-16T00:00:00Z" },
+    ])));
+    await page.goto("/#/scoreboard");
+    await expect(page.getByText("3 runs. Your best stands highest.")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Score" })).toHaveAttribute("aria-selected", "true");
+    await judge(page, "solo-scoreboard");
+
+    // The best run stands proud in both themes; Sparkle gilds the same lift.
+    const best = page.getByRole("list", { name: "Your runs" }).getByRole("listitem").first();
+    await expect(best).toHaveClass(/is-high/);
+    await page.getByRole("switch", { name: "Sparkle mode" }).click();
+    await expect(best).toHaveCSS("box-shadow", /rgba\(255, 201, 60, 0\.4\) 0px 0px 26px/);
+
+    await page.context().close();
+});
+
 test("Sparkle mode switches every screen, is remembered, and keeps still with reduced motion", async ({ browser }) => {
     const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
     await page.goto("/#/quizzes");
