@@ -9,7 +9,6 @@ import { describe, expect, it } from "vitest";
  */
 const here = __dirname.replace(/\\/g, "/");
 const tokens = readFileSync(posix.join(here, "tokens.css"), "utf8");
-const sparkle = readFileSync(posix.join(here, "sparkle.css"), "utf8");
 
 const block = (selector: string) => {
   const start = tokens.indexOf(selector);
@@ -50,56 +49,56 @@ const rgbas = (decl: string) => [...decl.matchAll(/rgba\((\d+), (\d+), (\d+), ([
 const brightest = (stops: Rgb[]) => stops.reduce((a, b) => (luminance(a) > luminance(b) ? a : b));
 
 /*
- * The brightest spot of a ground: each solid stop, and each translucent pool
- * or glitter dot laid over the ground's brightest solid stop (the worst case:
- * a pool may sit right where the base is lightest).
+ * The brightest spot of a layered background: each solid stop, and each
+ * translucent dot or pool laid over the brightest solid stop (the worst
+ * case: a sequin or a spotlight may sit right where the base is lightest).
  */
-const groundPeak = (themeBlock: string) => {
-  const decl = declaration(themeBlock, "--esc-ground");
+const peak = (themeBlock: string, name: string) => {
+  const decl = declaration(themeBlock, name);
   const solid = hexes(decl);
   const base = brightest(solid);
   return brightest([...solid, ...rgbas(decl).map(({ colour, alpha }) => over(colour, alpha, base))]);
 };
 
-// Calm's pane is 5% white (lycra-surface.css) over its ground, and a raised
-// face another 5% on top of that.
-const calmPane = over([255, 255, 255], 0.05, groundPeak(calm));
-const calmFace = over([255, 255, 255], 0.05, calmPane);
-
-// Sparkle's pane is its padding-box tint (sparkle.css) over its ground.
-const paneRule = sparkle.indexOf(".lycra-pane {");
-if (paneRule < 0) throw new Error("sparkle.css has no .lycra-pane rule to read the pane tint from");
-const sparklePaneTint = rgbas(sparkle.slice(paneRule))[0];
-const sparklePane = over(sparklePaneTint.colour, sparklePaneTint.alpha, groundPeak(glam));
-// Sparkle's faces: the brightest stop of each sheet, under its brightest sequin.
-const sequin = (face: Rgb) => over([255, 255, 255], 0.3, face);
-const faceStops = (name: string) => hexes(declaration(sparkle, name));
+const TEXT = ["--esc-ink", "--esc-ink-muted"];
+const MARKS = ["--esc-correct", "--esc-wrong", "--esc-focus"];
 
 describe("design token contrast", () => {
-  it("Calm: text on a control and on the screen holds 4.5:1", () => {
-    const ink = rgb(token(calm, "--esc-ink"));
-    expect(ratio(ink, calmFace)).toBeGreaterThanOrEqual(4.5);
-    expect(ratio(ink, rgb(token(calm, "--esc-screen")))).toBeGreaterThanOrEqual(4.5);
-    expect(ratio(rgb(token(calm, "--esc-title")), rgb(token(calm, "--esc-screen")))).toBeGreaterThanOrEqual(4.5);
-    expect(ratio(rgb(token(calm, "--esc-link")), rgb(token(calm, "--esc-screen")))).toBeGreaterThanOrEqual(4.5);
+  it("Calm: every surface is the background colour, with no frame to read against", () => {
+    expect(token(calm, "--esc-bg")).toBe(token(calm, "--esc-surface"));
   });
 
-  it("Calm: markers and the focus ring hold 3:1 on the pane they sit on", () => {
-    for (const name of ["--esc-correct", "--esc-wrong", "--esc-focus"]) {
-      expect(ratio(rgb(token(calm, name)), calmPane), name).toBeGreaterThanOrEqual(3);
+  it("Calm: text holds 4.5:1 on the background and on every face", () => {
+    for (const face of ["--esc-bg", "--esc-face-hover", "--esc-face-pressed"]) {
+      for (const name of [...TEXT, "--esc-accent", "--esc-link", "--esc-title"]) {
+        expect(ratio(rgb(token(calm, name)), rgb(token(calm, face))), `${name} on ${face}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it("Calm: markers and the focus ring hold 3:1 on the background", () => {
+    for (const name of MARKS) {
+      expect(ratio(rgb(token(calm, name)), rgb(token(calm, "--esc-bg"))), name).toBeGreaterThanOrEqual(3);
     }
   });
 
   it("Sparkle: text holds 4.5:1 on every sequin face, even over a sequin", () => {
-    const ink = rgb(token(glam, "--esc-ink"));
-    for (const name of ["--lyc-face", "--lyc-face-hover", "--lyc-face-down"]) {
-      expect(ratio(ink, sequin(brightest(faceStops(name)))), name).toBeGreaterThanOrEqual(4.5);
+    for (const face of ["--esc-face", "--esc-face-hover", "--esc-face-pressed"]) {
+      for (const name of TEXT) {
+        expect(ratio(rgb(token(glam, name)), peak(glam, face)), `${name} on ${face}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
+    // A chosen key's label is gold on the gold side of its sequins.
+    expect(ratio(rgb(token(glam, "--esc-accent")), peak(glam, "--esc-face-pressed"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("Sparkle: markers and the focus ring hold 3:1 on the pane they sit on", () => {
-    for (const name of ["--esc-correct", "--esc-wrong", "--esc-focus"]) {
-      expect(ratio(rgb(token(glam, name)), sparklePane), name).toBeGreaterThanOrEqual(3);
+  it("Sparkle: titles, links, markers and focus hold up on the brightest spot of the stage", () => {
+    const stage = peak(glam, "--esc-screen");
+    for (const name of [...TEXT, "--esc-title", "--esc-link"]) {
+      expect(ratio(rgb(token(glam, name)), stage), name).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const name of MARKS) {
+      expect(ratio(rgb(token(glam, name)), stage), name).toBeGreaterThanOrEqual(3);
     }
   });
 });

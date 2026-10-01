@@ -69,12 +69,17 @@ styled-components and `theme.colors` (Home, the quiz, multiplayer entry,
 the break and host views) are being moved over under epic #166; don't copy
 their pattern.
 
-- **Calm** — the accessible default and landing state: a dark violet
-  fabric surface, no motion beyond a press. Skill: `.claude/skills/escparty-calm/`.
-- **Sparkle** — opt-in via the **Sparkle mode** switch: the same screens in
+The language is modern soft neumorphism: one background, and frameless
+surfaces of the same colour raised out of it or pressed into it.
+
+- **Calm** — the accessible default and landing state: one flat violet,
+  no motion beyond a press.
+- **Sparkle** — opt-in via the **Sparkle mode** switch: the same shapes in
   sequins, gold foil and glitter, animated only when the system allows
-  motion. Its WebGL showcase is `/fabric-ui`. Skill:
-  `.claude/skills/escparty-sparkle/`.
+  motion.
+
+The `escparty-calm`/`escparty-sparkle` skills describe the older lycra
+surface kept for the `/fabric-ui` demo only.
 
 How the switch works and how the two relate: `docs/agent/theming.md`.
 

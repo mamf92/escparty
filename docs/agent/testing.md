@@ -207,9 +207,9 @@ minute or two; there is one worker and no retries (a flaky spec is a bug).
 - `party.spec.ts` — a scoreboard party: a host and two guests rate four
   acts of a semi, the host ticks a qualifier and opens the awards, and the
   guests see the Jedward Twins go to the two who rated alike (#91).
-- `theme.spec.ts` — every scoreboard party screen measured and judged by
-  the Calm skill's `tools/check.py` (#90; needs `python3`, which CI's
-  runner has). See "Checking a live page" in `theming.md`.
+- `theme.spec.ts` — every scoreboard party screen measured against the
+  design system's surface rules (#90), and the Sparkle mode switch. See
+  "Checking a live page" in `theming.md`.
 
 On a failure CI uploads the HTML report and traces as the `playwright-report`
 artifact.

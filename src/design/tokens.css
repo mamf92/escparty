@@ -1,16 +1,17 @@
 /*
-  ESCParty design tokens — the one place a colour, font, size or radius is
-  decided. Rules: docs/design/design-system.md.
+  ESCParty design tokens — the one place a colour, font, size, radius or
+  shadow is decided. Rules: docs/design/design-system.md.
 
-  Every page reads these variables; no page writes a hex value of its own.
+  The language is modern soft neumorphism: one background colour, and
+  every surface is made of that same colour, lifted out of it or pressed
+  into it by a pair of soft shadows (light from the top left, shade to the
+  bottom right). Nothing has a border or a frame.
+
   The two themes set the same variables to different values, and that is
-  the only way they differ in colour and type:
+  the only way they differ:
 
     :root / [data-theme="calm"]   Calm, the accessible default
     [data-theme="sparkle"]        Sparkle, the opt-in sequins-and-glitter skin
-
-  The surface shadows (--lyc-*) are owned by the vendored
-  src/fabric-ui/lycra-surface.css; Sparkle re-skins them in sparkle.css.
 */
 
 :root,
@@ -19,18 +20,13 @@
   --esc-font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
   --esc-font-body: "Open Sans", "Segoe UI", system-ui, sans-serif;
 
-  /*
-    The type scale. Inside a ground only --esc-text-control and
-    --esc-text-sub are allowed (Calm's two-size rule, 1.25:1). The others
-    are chrome: the page title, notes and links around the surface.
-  */
-  --esc-text-title: 1.5rem;
   --esc-text-display: 2rem;
-  --esc-text-control: 15px;
-  --esc-text-sub: 12px;
-  --esc-text-note: 0.8125rem;
-  --esc-text-link: 0.875rem;
-  --esc-title-tracking: 0.08em;
+  --esc-text-title: 1.5rem;
+  --esc-text-heading: 1.0625rem;
+  --esc-text-control: 1rem;
+  --esc-text-body: 0.9375rem;
+  --esc-text-sub: 0.8125rem;
+  --esc-title-tracking: 0.04em;
 
   /* Space, on a 4px step. */
   --esc-space-1: 0.25rem;
@@ -41,64 +37,104 @@
   --esc-space-6: 1.5rem;
   --esc-space-8: 2rem;
 
-  --esc-radius-control: 12px;
-  --esc-radius-pane: 22px;
-  --esc-target-min: 48px;
+  --esc-radius-control: 16px;
+  --esc-radius-field: 14px;
+  --esc-radius-card: 24px;
+  --esc-target-min: 52px;
 
-  /* Colour. */
-  --esc-backdrop: #0b0618;
-  --esc-screen: #281259;
-  --esc-ink: #eee8f0;
-  --esc-ink-muted: rgba(238, 232, 240, 0.78);
-  --esc-title: #d5b8e6;
-  --esc-title-fill: none;
-  --esc-link: #d5b8e6;
-  --esc-focus: #eee8f0;
-  --esc-correct: #28a745;
-  /*
-    Lifted from the skill's #dc3545, which falls to 2.4:1 over the ground's
-    brightest pool; markers need 3:1 (contrast.test.ts).
-  */
-  --esc-wrong: #ff6b78;
+  /* Colour. One background; surfaces are the same colour. */
+  --esc-bg: #2a2142;
+  --esc-surface: #2a2142;
+  --esc-backdrop: #1d1630;
   --esc-frame: #141018;
+  --esc-ink: #f1ecf7;
+  --esc-ink-muted: #c3b8d6;
+  --esc-accent: #f2a7dc;
+  --esc-on-accent: #2a1230;
+  --esc-title: #f1ecf7;
+  --esc-title-fill: none;
+  --esc-link: #f2a7dc;
+  --esc-focus: #f2a7dc;
+  --esc-correct: #5ad48a;
+  --esc-wrong: #ff7b86;
 
-  /* The ground behind a pane: dark and never flat (the pane refracts it). */
-  --esc-ground:
-    radial-gradient(80% 28% at 10% 8%, #3a1a63 0%, transparent 62%),
-    radial-gradient(80% 28% at 90% 92%, #3a1a63 0%, transparent 62%),
-    radial-gradient(62% 22% at 88% 34%, #4a1f6e 0%, transparent 66%),
-    radial-gradient(62% 22% at 12% 68%, #4a1f6e 0%, transparent 66%),
-    #190c31;
+  /* The page behind the content: the same flat colour. */
+  --esc-screen: var(--esc-bg);
+
+  /*
+    Elevation: a light and a dark shadow, offset the same distance in
+    opposite directions. Raised surfaces cast them outwards, pressed ones
+    hold them inside.
+  */
+  --esc-light: rgba(255, 255, 255, 0.085);
+  --esc-shade: rgba(10, 5, 22, 0.6);
+  --esc-raise-sm: -3px -3px 8px var(--esc-light), 3px 3px 8px var(--esc-shade);
+  --esc-raise: -5px -5px 14px var(--esc-light), 5px 5px 14px var(--esc-shade);
+  --esc-raise-lg: -8px -8px 22px var(--esc-light), 9px 9px 24px var(--esc-shade);
+  --esc-inset: inset 5px 5px 12px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
+  --esc-inset-sm: inset 2px 2px 6px var(--esc-shade), inset -2px -2px 6px var(--esc-light);
+
+  /* A surface's face: flat, the background colour. */
+  --esc-face: var(--esc-surface);
+  --esc-face-hover: #2e2548;
+  --esc-face-pressed: #272040;
+
+  --esc-press: 120ms ease-out;
 
   color-scheme: dark;
 }
 
 :root[data-theme="sparkle"] {
-  --esc-font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
-  --esc-title-tracking: 0.12em;
+  --esc-title-tracking: 0.1em;
 
-  --esc-backdrop: #07020f;
-  --esc-screen:
-    radial-gradient(120% 45% at 50% -8%, rgba(255, 31, 143, 0.55) 0%, transparent 60%),
-    radial-gradient(70% 35% at 0% 40%, rgba(255, 201, 60, 0.22) 0%, transparent 65%),
-    radial-gradient(70% 35% at 100% 70%, rgba(45, 226, 230, 0.2) 0%, transparent 65%),
-    linear-gradient(180deg, #2a0640 0%, #14031f 55%, #1d0434 100%);
+  --esc-bg: #240a33;
+  --esc-surface: #2c0d3e;
+  --esc-backdrop: #10040f;
+  --esc-frame: #1a0f1f;
   --esc-ink: #fff7fb;
-  --esc-ink-muted: rgba(255, 247, 251, 0.85);
+  --esc-ink-muted: #ffeef8;
+  --esc-accent: #ffd86b;
+  --esc-on-accent: #2a1600;
   --esc-title: #ffd86b;
   --esc-title-fill: linear-gradient(100deg, #fff3c4 0%, #ffd86b 22%, #c9952b 45%, #fff3c4 58%, #ffc93c 78%, #fff3c4 100%);
   --esc-link: #ffd86b;
   --esc-focus: #ffd86b;
-  --esc-correct: #3ddc84;
-  --esc-wrong: #ff5a6e;
-  --esc-frame: #1a0f1f;
+  --esc-correct: #5ee69a;
+  --esc-wrong: #ff7b8a;
 
-  --esc-ground:
-    radial-gradient(circle at 50% 50%, rgba(255, 236, 170, 0.5) 0 0.8px, transparent 1.4px) 0 0 / 23px 23px,
-    radial-gradient(circle at 50% 50%, rgba(255, 140, 210, 0.45) 0 0.8px, transparent 1.4px) 11px 7px / 31px 31px,
-    radial-gradient(circle at 50% 50%, rgba(160, 240, 255, 0.35) 0 0.7px, transparent 1.3px) 5px 17px / 41px 41px,
-    radial-gradient(90% 40% at 15% 0%, rgba(255, 31, 143, 0.5) 0%, transparent 62%),
-    radial-gradient(90% 40% at 85% 100%, rgba(255, 201, 60, 0.28) 0%, transparent 62%),
-    linear-gradient(160deg, #3b0a52 0%, #1f0533 50%, #2c0742 100%);
+  /* The stage: a flat plum floor under spotlights and a fine glitter. */
+  --esc-screen:
+    radial-gradient(circle at 50% 50%, rgba(255, 236, 170, 0.24) 0 0.8px, transparent 1.4px) 0 0 / 23px 23px,
+    radial-gradient(circle at 50% 50%, rgba(255, 140, 210, 0.26) 0 0.8px, transparent 1.4px) 11px 7px / 31px 31px,
+    radial-gradient(circle at 50% 50%, rgba(160, 240, 255, 0.3) 0 0.7px, transparent 1.3px) 5px 17px / 41px 41px,
+    radial-gradient(120% 40% at 50% -6%, rgba(255, 31, 143, 0.35) 0%, transparent 62%),
+    radial-gradient(70% 30% at 0% 55%, rgba(255, 201, 60, 0.12) 0%, transparent 65%),
+    radial-gradient(70% 30% at 100% 85%, rgba(45, 226, 230, 0.1) 0%, transparent 65%),
+    #240a33;
 
+  --esc-light: rgba(255, 150, 215, 0.12);
+  --esc-shade: rgba(6, 0, 10, 0.65);
+
+  /* The same lift, with stage light catching the sequins. */
+  --esc-raise: -5px -5px 14px var(--esc-light), 5px 5px 14px var(--esc-shade), 0 0 18px rgba(255, 31, 143, 0.28);
+  --esc-raise-lg: -8px -8px 22px var(--esc-light), 9px 9px 24px var(--esc-shade), 0 0 26px rgba(255, 201, 60, 0.4);
+  --esc-inset: inset 4px 4px 10px var(--esc-shade), inset -4px -4px 10px var(--esc-light), 0 0 14px rgba(255, 201, 60, 0.35);
+
+  /*
+    Sequins: two offset dot lattices over a magenta sheet. Kept dark enough
+    that the label holds 4.5:1 over the brightest sequin (contrast.test.ts).
+  */
+  --esc-face:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.3) 0 1.1px, transparent 1.6px) 0 0 / 7px 7px,
+    radial-gradient(circle at 50% 50%, rgba(255, 196, 236, 0.22) 0 1.1px, transparent 1.6px) 3.5px 3.5px / 7px 7px,
+    linear-gradient(135deg, #760c52 0%, #560944 52%, #6a0e5a 100%);
+  --esc-face-hover:
+    radial-gradient(circle at 50% 50%, rgba(255, 236, 170, 0.3) 0 1.1px, transparent 1.6px) 0 0 / 7px 7px,
+    radial-gradient(circle at 50% 50%, rgba(255, 196, 236, 0.24) 0 1.1px, transparent 1.6px) 3.5px 3.5px / 7px 7px,
+    linear-gradient(135deg, #7e0d58 0%, #5c0a48 52%, #721062 100%);
+  /* Pressed and chosen: the sequins flip to their dark gold side. */
+  --esc-face-pressed:
+    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.28) 0 1.1px, transparent 1.6px) 0 0 / 7px 7px,
+    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.16) 0 1.1px, transparent 1.6px) 3.5px 3.5px / 7px 7px,
+    linear-gradient(135deg, #3d2405 0%, #24140a 60%, #3a2008 100%);
 }

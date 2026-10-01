@@ -47,14 +47,14 @@ body {
 
 .esc-subtitle {
   margin: var(--esc-space-2) 0 0;
-  font-size: var(--esc-text-link);
+  font-size: var(--esc-text-body);
   line-height: 1.5;
   color: var(--esc-ink-muted);
 }
 
 .esc-note {
   margin: var(--esc-space-2) 0 0;
-  font-size: var(--esc-text-note);
+  font-size: var(--esc-text-sub);
   line-height: 1.5;
   text-align: center;
   color: var(--esc-ink-muted);
@@ -63,7 +63,7 @@ body {
 /* The quiet underlined link for "back" and secondary moves. */
 .esc-link {
   font-family: var(--esc-font-body);
-  font-size: var(--esc-text-link);
+  font-size: var(--esc-text-body);
   min-height: 44px;
   background: none;
   border: none;
@@ -74,33 +74,6 @@ body {
   color: var(--esc-link);
 }
 
-/*
-  An information row (.is-static) is not a control: pressing it must not
-  sink it or tug its neighbours, which the vendored :active rules would.
-*/
-.lycra.is-static:active,
-.lycra.is-static:active + .lycra,
-.lycra:has(+ .lycra.is-static:active) {
-  transform: none;
-}
-
-.lycra.is-static:active:not(.is-low):not(.is-chosen):not(.is-high) {
-  background: var(--lyc-face);
-  box-shadow: var(--lyc-rise);
-}
-
-/* A proud information row: first place, or your own row. */
-.lycra.is-static.is-high,
-.lycra.is-static.is-high:active {
-  background: var(--lyc-face);
-  box-shadow: var(--lyc-rise-high);
-}
-
-.lycra.is-static.is-low:active {
-  background: var(--lyc-face-down);
-  box-shadow: var(--lyc-groove);
-}
-
 /* One focus ring everywhere, in the theme's focus colour. */
 .esc-app :focus-visible {
   outline: 2px solid var(--esc-focus);
@@ -108,24 +81,23 @@ body {
 }
 
 /*
-  Windows High Contrast / forced colours drops every box-shadow, and the
+  Windows High Contrast / forced colours drops every box-shadow, and a
   surface draws its edges with nothing else. Give controls and fields a
   real border so they stay findable.
 */
 @media (forced-colors: active) {
-  .lycra,
-  .lycra-field,
-  .lycra-well,
-  .lycra-pane {
+  .esc-app .lycra,
+  .esc-app .lycra-field,
+  .esc-app .lycra-well {
     border: 1px solid CanvasText;
   }
 
-  .lycra {
+  .esc-app .lycra {
     border-color: ButtonText;
   }
 
-  .lycra.is-chosen,
-  .lycra.is-selected {
+  .esc-app .lycra.is-chosen,
+  .esc-app .lycra.is-selected {
     outline: 3px solid Highlight;
     outline-offset: 2px;
   }
@@ -137,7 +109,8 @@ body {
 
 /*
   Someone who asked for more contrast gets a visible edge on every control
-  and field (3:1 or better against the pane), in both themes.
+  and field (3:1 or better against the background), in both themes. This is
+  the one place a surface carries a line.
 */
 @media (prefers-contrast: more) {
   .esc-app .lycra,
@@ -180,8 +153,8 @@ body {
   width: 40px;
   height: 22px;
   border-radius: 11px;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: var(--lyc-groove);
+  background: var(--esc-bg);
+  box-shadow: var(--esc-inset-sm);
 }
 
 .esc-theme-switch-thumb {
@@ -196,9 +169,9 @@ body {
   font-size: 10px;
   line-height: 1;
   color: var(--esc-ink-muted);
-  background: var(--lyc-face-hover);
-  box-shadow: var(--lyc-rise);
-  transition: transform var(--lyc-out);
+  background: var(--esc-face-hover);
+  box-shadow: var(--esc-raise-sm);
+  transition: transform var(--esc-press);
 }
 
 .esc-theme-switch[aria-checked="true"] .esc-theme-switch-thumb {

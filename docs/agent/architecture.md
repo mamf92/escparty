@@ -25,8 +25,8 @@ the party's big screen, which fills the window for a TV.
 Mostly not small reusable pieces, despite the folder name:
 
 - `CalmPage.tsx` — page chrome (title, subtitle, footer, `CalmLink`,
-  `CalmNote`) every screen renders through, in either theme; the shared
-  `src/styles/calm-page.css` fits the surface into the phone frame. See
+  `CalmNote`) every screen renders through, in either theme; the surface
+  itself is `src/design/surface.css`. See
   `docs/design/design-system.md`.
 
 - `PartyHostTools.tsx` — the host's tab in a scoreboard party: share the
@@ -179,8 +179,10 @@ the local emulator only when `isDevelopmentEnvironment()` is true **and**
 ## `src/design/`
 
 The design system (rules: `docs/design/design-system.md`). `tokens.css`
-holds every colour, font, size and radius per theme (`data-theme` on
-`<html>`); `sparkle.css` is the Sparkle skin over the Calm surface;
+holds every colour, font, size, radius, face and shadow per theme
+(`data-theme` on `<html>`); `surface.css` draws the frameless neumorphic
+surface classes from them; `sparkle.css` is Sparkle's decoration (glint,
+stars);
 `base.css` the page chrome classes (`esc-title`, `esc-note`, `esc-link`),
 the theme switch and the forced-colours / more-contrast rules;
 `design-system.css` imports them all once, from `main.tsx`.

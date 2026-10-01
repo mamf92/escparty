@@ -19,12 +19,10 @@ type Level = "high" | "rest" | "low";
 /*
   Score leads, because the ladder has to read on arrival.
 
-  The ranked-ladder archetype carries an unstated premise, found by measuring
-  the real render rather than by reading the spec: the list has to be ordered
-  by whatever elevation encodes. `--lyc-rise-high` is only about 10% stronger
-  than the resting rise, which is a relative signal — plenty when the proud row
-  sits beside its peers, invisible when it is scattered somewhere down a list
-  of six. Sorted by score, the ladder descends and the eye reads a slope; the
+  The ranked ladder has to be ordered by whatever elevation encodes. A
+  surface's lift is a relative signal: plain when the proud row sits beside
+  its peers, easy to miss when it is scattered somewhere down a list of six.
+  Sorted by score, the ladder descends and the eye reads a slope; the
   other two sorts are still honest (the best and worst stay marked) but they
   are a history, not a ranking.
 */

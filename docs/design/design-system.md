@@ -18,18 +18,27 @@ screen is wrong, not the theme.
 
 ## 1. Principles
 
-1. **One surface, one anatomy.** Every screen is a page header over one or
-   more panes of controls on a ground. No screen invents its own cards,
-   buttons or colours.
-2. **Elevation is the hierarchy.** Importance is shown by height (proud,
-   rest, flush), not by bigger type or louder colour.
-3. **State is shape; colour is a verdict.** A control says raised or
-   pressed. Correct and wrong are a check and a cross in the gutter; green
-   and red appear nowhere else.
-4. **Accessible first, then fabulous.** Calm meets WCAG 2.2 AA on its own.
-   Sparkle adds bling on top without taking any of that away: the same
-   contrast floor, targets, focus ring and reduced-motion behaviour.
-5. **The party is the point.** Copy is warm, short and in on the joke
+The language is **modern soft neumorphism** (sometimes called flat
+skeuomorphism): a flat, modern UI whose surfaces are moulded out of the
+background rather than placed on top of it.
+
+1. **One background, no frames.** A screen is one colour. Every surface is
+   made of that same colour and connects with it; nothing has a border, an
+   outline, a card around a group, or a darker rim. Space groups things.
+2. **Raised or pressed, nothing else.** A surface is lifted out of the
+   background by a pair of soft shadows (light from the top left, shade to
+   the bottom right) or pressed into it by the same pair turned inwards.
+   That is the whole visual vocabulary.
+3. **Height is the hierarchy.** Importance is shown by how far a surface
+   stands out (proud, rest, sunk), not by bigger type or louder colour.
+4. **One accent, used sparingly.** The accent marks what is chosen, links
+   and focus. Correct and wrong are a check and a cross; green and red
+   appear nowhere else.
+5. **Accessible first, then fabulous.** Soft shadows alone are a weak cue,
+   so every state also has a non-shadow signal (the accent, a glyph,
+   `aria-pressed`) and text always meets 4.5:1. Sparkle adds bling on top
+   without taking any of that away.
+6. **The party is the point.** Copy is warm, short and in on the joke
    (douze points, nul points, the Jedward Twins), and never at the expense
    of clarity.
 
@@ -38,54 +47,59 @@ screen is wrong, not the theme.
 | | Calm | Sparkle |
 | --- | --- | --- |
 | Role | Default, accessible, the landing state | Opt-in party skin |
-| Ground | Dark violet, softly pooled | Stage-lit plum with a fine glitter field |
-| Controls | Violet fabric pushed up as stacked shadows | Magenta sequins with a gold-foil hem |
-| Chosen / pressed | Sunk into the sheet | Sunk, sequins flipped to their dark-gold side, gold ring |
-| Pane | Translucent sheet, 1px light edge | Same sheet with a gold, silver and pink foil rim |
-| Page title | Lavender, uppercase, tracked | Gold foil, framed by ✦ stars |
+| Background | One flat violet (`#2a2142`) | A plum stage with spotlights and fine glitter |
+| Controls | The background colour, raised by soft light and shade | Magenta sequins, raised the same way, with a pink stage glow |
+| Chosen / pressed | Pressed into the background, label in the accent | Pressed in, sequins flipped to their dark-gold side, gold label and glow |
+| Fields | Wells pressed into the background | Dark wells |
+| Page title | Uppercase, tracked, in ink | Gold foil, framed by ✦ stars |
 | Motion | The press only | The press, a glint across a hovered control, twinkling stars, foil shimmer — **only** when the system allows motion |
-| Markers | `#28a745` check, `#ff6b78` cross | Brighter green and red, with a glow |
+| Frames | None | None: the bling is in the material, never a rim |
 
-What a theme may change: token values (`src/design/tokens.css`), the
-surface shadows and faces (`--lyc-*`, re-skinned in `src/design/sparkle.css`),
-and decoration that carries no meaning (`<Sparkles />`, glints, foil).
+What a theme may change: token values (`src/design/tokens.css`, which
+holds the faces, shadows and the screen background too) and decoration
+that carries no meaning (`<Sparkles />`, glints, foil).
 
-What a theme may never change: layout, spacing, type sizes, copy, which
-state a control is in, focus behaviour, or anything a screen reader hears.
+What a theme may never change: layout, spacing, shape, type sizes, copy,
+which state a control is in, focus behaviour, or anything a screen reader
+hears.
 
 How it works: `data-theme="calm" | "sparkle"` sits on `<html>` (set before
 first paint by the script in `index.html`, then kept in sync by
 `DesignThemeProvider`). Every token is a CSS variable that switches with
-it. Skins are scoped to `.esc-app`, the class on the phone frame's screen
-and on the big screen, so the standalone `/fabric-ui` WebGL demo keeps its
-own renderers.
+it. The surface (`src/design/surface.css`) and the skin are scoped to
+`.esc-app`, the class on the phone frame's screen and on the big screen,
+so the standalone `/fabric-ui` WebGL demo keeps its own renderers.
 
-The WebGL sequin membrane in `src/fabric-ui/` (`.claude/skills/escparty-sparkle/`)
-is Sparkle's showcase renderer, still only on `/fabric-ui`. Live pages get
-Sparkle through the CSS skin described here.
+The WebGL sequin membrane in `src/fabric-ui/` is a showcase on
+`/fabric-ui` only. Live pages get Sparkle through the CSS described here.
 
 ## 3. Tokens
 
 All in `src/design/tokens.css`. Pages read variables; they never write a
-hex value, a font name or a pixel size of their own.
+hex value, a font name, a shadow or a pixel size of their own.
 
 | Token | Use |
 | --- | --- |
 | `--esc-font-display` | Montserrat 700/800: page titles, the brand, big numbers |
 | `--esc-font-body` | Open Sans 400/600: everything else |
-| `--esc-text-control` (15px) / `--esc-text-sub` (12px) | The only two sizes allowed **inside** a ground (1.25:1) |
-| `--esc-text-title`, `--esc-text-display` | Page title (1.5rem), and a one-off hero number (2rem) |
-| `--esc-text-note`, `--esc-text-link` | Notes and links around the surface |
+| `--esc-text-control` (16px) / `--esc-text-sub` (13px) | Control labels, and detail text, captions and notes |
+| `--esc-text-body` (15px) | Subtitles and links around the surface |
+| `--esc-text-heading`, `--esc-text-title`, `--esc-text-display` | A section heading, the page title (1.5rem), a one-off hero number (2rem) |
 | `--esc-space-1` … `--esc-space-8` | 4px steps: 4, 8, 12, 16, 20, 24, 32 |
-| `--esc-radius-control` / `--esc-radius-pane` | 12px / 22px |
-| `--esc-target-min` | 48px: a control's minimum height |
-| `--esc-backdrop` | Behind the phone frame |
-| `--esc-screen` | The phone screen and big screen background |
-| `--esc-ground` | The ground behind a pane |
+| `--esc-radius-control` / `--esc-radius-field` / `--esc-radius-card` | 16px / 14px / 24px |
+| `--esc-target-min` | 52px: a control's and a field's minimum height |
+| `--esc-bg` / `--esc-surface` | The background, and the colour every surface is made of (the same in Calm) |
+| `--esc-screen` | What the phone screen and big screen paint: the background, plus Sparkle's stage |
+| `--esc-backdrop`, `--esc-frame` | Behind the phone, and the phone's body |
+| `--esc-raise-sm`, `--esc-raise`, `--esc-raise-lg` | Soft lifts: an information row, a control, the proud row |
+| `--esc-inset`, `--esc-inset-sm` | Pressed in: chosen and fields, and the bottom of a ladder |
+| `--esc-face`, `--esc-face-hover`, `--esc-face-pressed` | A surface's face at rest, hovered, pressed or chosen |
 | `--esc-ink`, `--esc-ink-muted` | Text, and secondary text |
+| `--esc-accent`, `--esc-on-accent` | The one accent (chosen), and text set on it |
 | `--esc-title`, `--esc-title-fill` | Title colour, and Sparkle's foil fill |
 | `--esc-link`, `--esc-focus` | Links, and the focus ring |
 | `--esc-correct`, `--esc-wrong` | The check and cross glyphs, nothing else |
+| `--esc-press` | The one transition: 120ms ease-out |
 
 `src/styles/theme.ts` (styled-components' theme) is legacy: its fonts point
 at the tokens, and its named colours only remain until every screen is
@@ -94,30 +108,35 @@ migrated (see the design system epic). Don't use `theme.colors` in new code.
 ## 4. Page anatomy
 
 ```
-MobileFrame (or the big screen)
+MobileFrame (or the big screen)    one background, edge to edge
 ├─ App bar            ESCParty brand · Sparkle mode switch
 └─ CalmPage           every screen's chrome
    ├─ Page header     <h1> title (one per page) · optional subtitle
-   ├─ Ground          <Ground>  the dark, never-flat ground
-   │  └─ Pane         <Pane>    one sheet of controls
-   │     ├─ Control   <Control> a raised button, a direct child
+   ├─ Ground          <Ground>  a section of the page (layout only)
+   │  └─ Pane         <Pane>    a stack of surfaces (layout only)
+   │     ├─ Control   <Control> a raised button
    │     ├─ Row       <Row>     a raised row of information
-   │     └─ Field     <Field>   a sunken input
-   ├─ Notes           <CalmNote> status, hints, errors, between grounds
+   │     └─ Field     <Field>   a well pressed into the background
+   ├─ Notes           <CalmNote> status, hints, errors, between sections
    └─ Footer          <CalmLink> the way back
 ```
 
 - Every screen renders through `CalmPage` (`src/components/CalmPage.tsx`).
   No screen builds its own header, background or container.
 - Use the primitives from `src/design` (`Ground`, `Pane`, `Control`,
-  `Row`, `Field`). They render the surface classes (`calm-ground`, `lycra-pane`,
-  `lycra`, `lycra-field`; the names are historical) and nothing else.
-- **Controls are direct children of their pane.** No row wrapper `div`s:
-  the neighbour tug, and the Calm check, depend on it.
+  `Row`, `Field`). They render the surface classes (`calm-ground`,
+  `lycra-pane`, `lycra`, `lycra-field`; the names are historical) and
+  nothing else.
+- **Ground and Pane draw nothing.** They are spacing and grouping only: no
+  fill, no border, no shadow. The background shows through, so every
+  control sits directly on it.
+- Surfaces need room for their shadows: keep at least `--esc-space-3`
+  between raised things, and never clip them with `overflow: hidden` on a
+  tight box.
 - One `<h1>` per screen, in the page header. Sections inside a page use
-  `<h2>` labels outside the ground, set as a note.
-- Group related controls in one pane; separate unrelated groups into
-  separate grounds rather than adding dividers.
+  `<h2>` labels outside the pane, set as a note.
+- Separate unrelated groups with space (another `Ground`), never a divider
+  or a box.
 - A list of things reads as a list: `<Pane as="ol">` with `<Row as="li">`
   rows (an `<li>`, not a button, and no tab stop).
 
@@ -128,40 +147,39 @@ case, verb first ("Host a party", "Lock in", "Next act"). States:
 
 | State | Calm | Sparkle | Markup |
 | --- | --- | --- | --- |
-| Rest | Raised | Raised, gold hem | — |
-| Hover | Face lightens slightly | Glint crosses the face | — |
-| Pressed | Sinks (80ms in, 420ms overshoot out) | Same | `:active` |
-| Chosen | Holds the sink | Holds the sink, dark-gold sequins, gold ring | `chosen` → `.is-chosen` + `aria-pressed` |
-| Disabled | Faded into a groove | Same | `disabled` |
+| Rest | Raised (`--esc-raise`) | Raised sequins, pink glow | — |
+| Hover | Face lightens a touch | A glint crosses the face | — |
+| Pressed | Pressed in (`--esc-inset`), no movement | Same | `:active` |
+| Chosen | Stays pressed in, label in the accent | Stays pressed in, gold sequins, gold label and glow | `chosen` → `.is-chosen` + `aria-pressed` |
+| Disabled | Faded, a smaller lift | Same | `disabled` |
 
 Rows with a title and detail use `block`: title in the control size, detail
 in `.calm-sub`, laid out left to right with `.calm-row`.
 
-**Row** (`<Row>`, `.lycra.is-block.is-static`). Information on the surface:
-raised like a control, but no pointer, hover, press, glint or tab stop.
-Anything you can act on is a `Control`; a row never takes `onClick`.
-`as="li"` inside a list pane. Its place on the elevation ladder carries
-rank: `elevation="high"` stands proud (first place, your own row),
-`"rest"` is the default, `"low"` sits flush (the bottom). Never mark an
-information row `is-chosen`: chosen means *picked*, and only a control
-can be picked.
+**Row** (`<Row>`, `.lycra.is-block.is-static`). Information on the
+surface: a quieter lift than a control (`--esc-raise-sm`), and no pointer,
+hover, press, glint or tab stop. Anything you can act on is a `Control`; a
+row never takes `onClick`. `as="li"` inside a list pane. Its height
+carries rank: `elevation="high"` stands proud (first place, your own row),
+`"rest"` is the default, `"low"` sits pressed in (the bottom). A row may be
+marked `is-chosen` only to show the viewer's own pick, which it shows the
+same way a control does.
 
-**Field** (`<Field>`, `.lycra-field`). Sunken. Always has a visible
-`.calm-label` above it (placeholders are examples, never labels).
-Textareas and selects take the same class.
+**Field** (`<Field>`, `.lycra-field`). A well pressed into the background.
+Always has a visible `.calm-label` above it (placeholders are examples,
+never labels). Textareas and selects take the same class.
 
-**Pane layouts.** `layout="stack"` (default, one control per row),
+**Pane layouts.** `layout="stack"` (default, one surface per row),
 `"split"` (two or three moves side by side, e.g. Previous / Next) and
-`"scale"` (a 1..N rating grid of small plates).
+`"scale"` (a 1..N rating grid of round keys).
 
 **Tabs.** A split pane of controls with `role="tab"`; the current tab is
-chosen (sunk).
+chosen (pressed in).
 
-**Markers.** A check or cross in the pane's left gutter (`.calm-marker`),
-20px, round-capped strokes. Calm's cross is `#ff6b78`, lifted from the
-Calm skill's measured `#dc3545`, which only holds 2.4:1 over the ground's
-brightest pool. Only for a settled answer. Always paired with
-text that says the same thing for screen readers.
+**Markers.** A check or cross (`.calm-marker`, 20px, round-capped strokes)
+in `--esc-correct` or `--esc-wrong`, at the end of the answer it belongs
+to. Only for a settled answer. Always paired with text that says the same
+thing for screen readers.
 
 **Note** (`<CalmNote>`). Status, hints and errors around the surface, in
 `--esc-ink-muted`. Errors are notes too: say what happened and what to do
@@ -216,21 +234,25 @@ controls live in the host's own tab or pane, never mixed into a guest's.
 
 ## 7. Accessibility (both themes)
 
-- **Contrast:** text 4.5:1 against what it sits on (including a sequin),
-  large text and non-text (markers, focus ring, field edges in high
-  contrast) 3:1. `src/design/contrast.test.ts` checks the tokens.
-- **Targets:** controls at least 48px tall; links and the switch at least
-  44px.
+- **Contrast:** text 4.5:1 against what it sits on (the background, every
+  face, and a sequin), large text and non-text (markers, focus ring, edges
+  in high contrast) 3:1. `src/design/contrast.test.ts` checks the tokens.
+- **Shadows are never the only cue.** Chosen also takes the accent and
+  `aria-pressed`; the edge of a control is also its label and its target
+  size; with `prefers-contrast: more` every control and field gets a
+  visible 1px edge.
+- **Targets:** controls and fields at least 52px tall; links and the switch
+  at least 44px.
 - **Focus:** one ring everywhere, 2px in `--esc-focus` with a 3px offset.
   Never remove it without replacing it.
-- **Motion:** `prefers-reduced-motion: reduce` stops every animation and
-  transform except the press's shadow change, in both themes. Sparkle
-  without motion is still Sparkle: the sequins, foil and stars stay, still.
-- **Colour is never alone:** correctness is a glyph plus text; chosen is a
-  sink plus `aria-pressed` or `aria-selected`.
-- **Forced colours and more contrast:** in Windows High Contrast every
-  control, field and pane gets a real border and the glitter is removed;
-  with `prefers-contrast: more` controls and fields get a visible edge.
+- **Motion:** nothing moves position, ever: a press is a shadow change.
+  `prefers-reduced-motion: reduce` also stops every animation, in both
+  themes. Sparkle without motion is still Sparkle: the sequins, foil and
+  stars stay, still.
+- **Colour is never alone:** correctness is a glyph plus text; chosen is
+  pressed in plus the accent plus `aria-pressed` or `aria-selected`.
+- **Forced colours:** in Windows High Contrast every control and field gets
+  a real border and the glitter is removed.
 - **Semantics:** one `<h1>` per screen, real `<button>`s for actions and
   links for navigation, labelled fields, lists as lists, `role="status"`
   (or `aria-live="polite"`) for scores and timers that change on their own.
@@ -242,30 +264,36 @@ controls live in the host's own tab or pane, never mixed into a guest's.
 | Do | Don't |
 | --- | --- |
 | Build every screen from `CalmPage` + `Ground` / `Pane` / `Control` | Write a `styled.button` or a card of your own |
-| Read colours, fonts and sizes from tokens | Write hex values, `theme.colors.*`, or font names in a page |
-| Raise the most important control | Make it bigger, bolder or a different colour |
-| Put controls straight into the pane | Wrap each control in a row `div` |
+| Let surfaces sit straight on the background | Put a border, outline, rim or boxed card around anything |
+| Read colours, fonts, sizes and shadows from tokens | Write hex values, `theme.colors.*`, shadows or font names in a page |
+| Raise the most important control further | Make it bigger, bolder or a different colour |
+| Separate groups with space | Add dividers or a darker panel behind a group |
 | Say errors in a note with a way out | Show red text, a white card or `alert()` |
 | Keep emoji to content (a flag next to a country) | Put emoji in titles or buttons |
-| Gate every animation on reduced motion | Animate anything that carries meaning only in motion |
+| Gate every animation on reduced motion | Move a control when it is pressed |
 
 ## 9. Checklist for a PR that touches UI
 
 - [ ] The screen renders through `CalmPage` and the `src/design` primitives.
-- [ ] No hex values, `theme.colors`, or font names added outside `src/design/`.
+- [ ] No borders, frames or boxed groups; surfaces connect with the
+      background.
+- [ ] No hex values, `theme.colors`, shadows or font names added outside
+      `src/design/`.
 - [ ] Looked at in both Calm and Sparkle (flip the switch), and with
       reduced motion on.
 - [ ] Loading, empty and error states exist and follow section 6.
 - [ ] Keyboard only: everything reachable, focus visible, order sensible.
-- [ ] `npm test` (includes `contrast.test.ts`) and, for a new screen, an
-      entry in `e2e/theme.spec.ts` so the Calm self-check measures it.
+- [ ] `npm test` (includes `contrast.test.ts`) and, for a new screen, a
+      `judge()` call in `e2e/theme.spec.ts` so its surface is measured.
 
 ## Where the rules are enforced
 
-- `src/design/contrast.test.ts` — token contrast in both themes.
-- `e2e/theme.spec.ts` — measures live screens with the Calm skill's
-  `tools/check.py` (two type sizes, three shadow layers, no tint, direct
-  siblings, accent budget, reduced motion) and checks the theme switch.
-- `.claude/skills/escparty-calm/` and `.claude/skills/escparty-sparkle/` —
-  the measured DNA behind the surface, for anyone changing the surface
-  itself rather than building on it.
+- `src/design/contrast.test.ts` — token contrast in both themes, and that
+  Calm's surfaces are the background colour.
+- `e2e/theme.spec.ts` — measures live screens: no frames, controls made of
+  the background and raised by a light and a dark shadow, chosen pressed
+  in, at most four text sizes, nothing moving with reduced motion, and a
+  small budget for green and red; then checks the theme switch.
+- `.claude/skills/escparty-calm/` and `.claude/skills/escparty-sparkle/`
+  describe the earlier lycra surface and the `/fabric-ui` demo, and are
+  kept for that demo only; this file wins where they differ.
