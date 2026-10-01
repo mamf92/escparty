@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { hostParty, joinParty, rateActs } from "./helpers";
+import { answerOptions, hostParty, joinParty, rateActs } from "./helpers";
 
 /*
  * Theme compliance for the scoreboard party screens (#90), judged against
@@ -195,6 +195,24 @@ test("Sparkle mode switches every screen, is remembered, and keeps still with re
     await expect(page.locator(".esc-sparkles > i").first()).toBeVisible();
     const running = await page.evaluate(() => document.getAnimations().length);
     expect(running).toBe(0);
+
+    await page.context().close();
+});
+
+test("the quiz screen follows the surface rules, open, chosen and settled", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/#/quiz/easy");
+    const lockIn = page.getByRole("button", { name: "Lock in my answer" });
+    await expect(lockIn).toBeVisible();
+    await judge(page, "quiz-open");
+
+    await answerOptions(page).nth(1).click();
+    await expect(answerOptions(page).nth(1)).toHaveAttribute("aria-pressed", "true");
+    await judge(page, "quiz-chosen");
+
+    await lockIn.click();
+    await expect(page.locator(".calm-marker").first()).toBeVisible();
+    await judge(page, "quiz-settled");
 
     await page.context().close();
 });

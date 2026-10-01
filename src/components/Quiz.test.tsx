@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
-import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
-import { theme } from "../styles/theme";
 import type { QuizQuestion } from "../utils/QuizDataProvider";
 import { ScoreWriteRejected, type Room } from "../utils/roomsFirestore";
 import Quiz from "./Quiz";
@@ -48,40 +46,81 @@ beforeEach(() => {
 
 describe("Quiz answer selection (#22)", () => {
   it("doesn't reveal the correct answer before the answer is submitted", async () => {
+    const user = userEvent.setup();
     renderQuiz({ multiplayer: false });
 
     const correct = await screen.findByRole("button", { name: "Sweden" });
     const wrong = screen.getByRole("button", { name: "Norway" });
     const other = screen.getByRole("button", { name: "Ireland" });
 
-    // Whichever option is picked, right or wrong, it looks the same, and
-    // the unpicked ones all look alike. (Compared with each other rather
-    // than against fixed colours: jsdom matches :hover rules regardless of
-    // the pointer, so the absolute colours here are the hover ones. fireEvent
-    // rather than user-event for the same reason.)
-    const look = (element: HTMLElement) => getComputedStyle(element).background;
+    // Whichever option is picked, right or wrong, it's only chosen (sunk),
+    // and nothing is marked yet.
+    await user.click(wrong);
+    expect(wrong).toHaveAttribute("aria-pressed", "true");
+    expect(wrong).toHaveClass("is-chosen");
+    expect(correct).toHaveAttribute("aria-pressed", "false");
+    expect(other).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(wrong);
-    const pickedLook = look(wrong);
-    const unpickedLook = look(correct);
-    expect(pickedLook).not.toBe(unpickedLook);
-    expect(look(other)).toBe(unpickedLook);
-
-    fireEvent.click(correct);
-    expect(look(correct)).toBe(pickedLook);
-    expect(look(wrong)).toBe(unpickedLook);
-    expect(look(other)).toBe(unpickedLook);
+    await user.click(correct);
+    expect(correct).toHaveClass("is-chosen");
+    expect(wrong).not.toHaveClass("is-chosen");
+    expect(document.querySelector(".calm-marker")).toBeNull();
   });
 
-  it("marks right and wrong only once the answer is submitted", async () => {
+  it("marks right and wrong only once the answer is submitted, with a glyph and in words", async () => {
     const user = userEvent.setup();
     renderQuiz({ multiplayer: false });
 
     await user.click(await screen.findByRole("button", { name: "Norway" }));
-    await user.click(screen.getByRole("button", { name: "Submit Answer" }));
+    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
 
-    expect(screen.getByRole("button", { name: "Sweden" })).toHaveStyle({ background: theme.colors.accentgreen });
-    expect(screen.getByRole("button", { name: "Norway" })).toHaveStyle({ background: theme.colors.incorrectRed });
+    const marker = (name: string) => screen.getByRole("button", { name }).querySelector(".calm-marker")?.getAttribute("data-marker");
+    expect(marker("Sweden")).toBe("correct");
+    expect(marker("Norway")).toBe("wrong");
+    expect(marker("Ireland")).toBeUndefined();
+    expect(screen.getByRole("status")).toHaveTextContent("Nul points this time. The answer was Sweden.");
+    expect(screen.getByRole("button", { name: /Next question in \d+s/ })).toBeDisabled();
+  });
+
+  it("says the points for a right answer", async () => {
+    const user = userEvent.setup();
+    renderQuiz({ multiplayer: false });
+
+    await user.click(await screen.findByRole("button", { name: "Sweden" }));
+    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent(/^Douze points! That's right: \+\d+ points\.$/);
+  });
+});
+
+describe("Quiz screen (#171)", () => {
+  it("names the quiz and the question, with the clock as text", async () => {
+    renderQuiz({ multiplayer: false });
+    expect(await screen.findByRole("heading", { level: 1, name: "Classic: Easy" })).toBeInTheDocument();
+    expect(screen.getByText("Question 1 of 1")).toBeInTheDocument();
+    expect(screen.getByRole("timer")).toHaveTextContent(/^\d+ seconds? left$/);
+    expect(screen.getByRole("group", { name: "Answers" })).toBeInTheDocument();
+  });
+
+  it("asks before leaving the quiz", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route path="/quiz/:difficulty" element={<Quiz />} />
+        <Route path="/" element={<p>home</p>} />
+      </Routes>,
+      { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: false } }] },
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Leave the quiz" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("This run won't be saved.");
+    await user.click(screen.getByRole("button", { name: "Keep playing" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("home")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Leave the quiz" }));
+    await user.click(screen.getByRole("button", { name: "Leave the quiz" }));
+    expect(await screen.findByText("home")).toBeInTheDocument();
   });
 });
 
@@ -92,9 +131,11 @@ describe("Quiz sources (#72)", () => {
     expect(await screen.findByRole("heading", { name: "How many points is the famous 'douze points'?" })).toBeInTheDocument();
   });
 
-  it("shows an error for a quiz this build doesn't know", async () => {
+  it("says it can't find a quiz this build doesn't know, with the way back", async () => {
     renderQuiz({ multiplayer: false }, "/quiz/t-no-such-quiz");
-    expect(await screen.findByText("Unknown quiz: t-no-such-quiz")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("We can't find that quiz.");
+    expect(screen.getByRole("heading", { level: 1, name: "Quiz unavailable" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to the quiz library" })).toBeInTheDocument();
   });
 });
 
@@ -121,7 +162,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
     const user = userEvent.setup();
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "ghost" });
     await user.click(await screen.findByRole("button", { name: "Sweden" }));
-    await user.click(screen.getByRole("button", { name: "Submit Answer" }));
+    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
   };
 
   it("tells the player once when the room doesn't know them, without retrying", async () => {
@@ -182,7 +223,7 @@ describe("Quiz solo clock (#160)", () => {
       const start = Date.now();
       // Ten seconds with no answer: the question locks with feedback.
       await vi.advanceTimersByTimeAsync(10_200);
-      expect(screen.getByRole("button", { name: /Next Question in/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Next question in/ })).toBeInTheDocument();
       expect(screen.queryByText("results")).not.toBeInTheDocument();
 
       // Five seconds of feedback, then the results, saved once. The clock

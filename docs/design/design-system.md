@@ -179,7 +179,10 @@ chosen (pressed in).
 **Markers.** A check or cross (`.calm-marker`, 20px, round-capped strokes)
 in `--esc-correct` or `--esc-wrong`, at the end of the answer it belongs
 to. Only for a settled answer. Always paired with text that says the same
-thing for screen readers.
+thing for screen readers. Use `<Marker kind="correct" | "wrong" />` from
+`src/design` as the control's first child and give the control
+`is-marked` (which keeps its label clear of the glyph); the right answer
+may stand proud (`is-high`) and a wrong pick sit pressed in (`is-low`).
 
 **Note** (`<CalmNote>`). Status, hints and errors around the surface, in
 `--esc-ink-muted`. Errors are notes too: say what happened and what to do

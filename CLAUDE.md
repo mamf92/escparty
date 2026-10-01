@@ -39,7 +39,7 @@ red run doesn't yet block merge (branch protection, #49). See
 
 `src/pages/` holds most screens; `src/components/` has `MobileFrame.tsx`
 (the phone-frame chrome), `CalmPage.tsx` (chrome for Calm screens) and
-`Quiz.tsx` (~890 lines — the biggest single file in the app, despite the
+`Quiz.tsx` (~700 lines — the biggest single file in the app, despite the
 folder name most "components" are pages). `src/data/` holds the question
 bank and premade quizzes; `quizModel.ts` and `quizCatalog.ts` in
 `src/utils/` are the quiz data model and what a quiz key names, and

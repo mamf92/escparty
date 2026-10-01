@@ -12,12 +12,12 @@ test("a solo quiz from the home screen to the scoreboard", async ({ page }) => {
 
     // Ten questions: answer each with its first option and move on.
     for (let question = 1; question <= 10; question++) {
-        const submit = page.getByRole("button", { name: "Submit Answer" });
+        const submit = page.getByRole("button", { name: "Lock in my answer" });
         await expect(submit).toBeVisible();
         const text = await page.getByRole("heading", { level: 2 }).textContent();
         await answerOptions(page).first().click();
         await submit.click();
-        await expect(page.getByRole("button", { name: /Next Question in/ })).toBeVisible();
+        await expect(page.getByRole("button", { name: /Next question in/ })).toBeVisible();
         if (question < 10) await expect(page.getByRole("heading", { level: 2 })).not.toHaveText(text ?? "");
     }
 

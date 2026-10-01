@@ -1,0 +1,9 @@
+/* The quiz screen (#171): layout only, the look comes from src/design. */
+
+/* Asking before leaving takes the footer's whole width. */
+.quiz-leave {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-space-3);
+  width: 100%;
+}

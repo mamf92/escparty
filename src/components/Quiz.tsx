@@ -1,7 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import styled from "styled-components";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { FaHome } from "react-icons/fa";
 import { updatePlayerScore, listenToRoom, advanceQuestion, Room, ScoreWriteRejected } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { filterEnabledQuestions, isFallbackQuizData, QuizQuestion } from "../utils/QuizDataProvider";
@@ -11,6 +9,13 @@ import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../u
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { useQuizTitle } from "../hooks/useQuizTitle";
+import { Control, Ground, Pane } from "../design";
+import { CalmNote, CalmPage } from "./CalmPage";
+import { QuestionPane } from "./quiz/QuestionPane";
+import { QuizStatus } from "./quiz/QuizStatus";
+import { LeaveQuiz } from "./quiz/LeaveQuiz";
+import "./quiz/quiz.css";
 
 
 const Quiz = () => {
@@ -31,14 +36,13 @@ const Quiz = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(locationState?.score || 0);
-  const [quizCompleted, setQuizCompleted] = useState(false);
   const [isMultiplayer, setIsMultiplayer] = useState(locationState?.multiplayer || false);
   const [roomCode, setRoomCode] = useState<string | null>(locationState?.roomCode || null);
   const [playerId, setPlayerId] = useState<string | null>(locationState?.playerId || null);
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); // Used in useEffect and conditional rendering
-  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing..."); // Used in loading state display
+  const [loadingStatus, setLoadingStatus] = useState<string>("Getting the quiz ready…"); // Used in loading state display
   const [timeLeft, setTimeLeft] = useState(QUESTION_MS / 1000);
   const [timeLeftMs, setTimeLeftMs] = useState(QUESTION_MS); // More precise millisecond timer for scoring
   const [showFeedback, setShowFeedback] = useState(false);
@@ -48,6 +52,7 @@ const Quiz = () => {
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
+  const quizName = useQuizTitle(difficulty);
 
   // In multiplayer the room drives progression (#62): every client shows
   // room.currentQuestionIndex and times it from room.phaseStartedAt, so they
@@ -91,7 +96,7 @@ const Quiz = () => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
     setLoading(true);
-    setLoadingStatus("Initializing quiz...");
+    setLoadingStatus("Getting the quiz ready…");
 
     // Track component mounting for debug purposes
     console.log("🚀 Quiz component mounted", {
@@ -105,7 +110,7 @@ const Quiz = () => {
     // The route names a classic difficulty or a premade quiz (quizCatalog.ts)
     if (!isKnownQuizKey(difficulty)) {
       console.error(`❌ Unknown quiz: ${difficulty}`);
-      setError(`Unknown quiz: ${difficulty}`);
+      setError("We can't find that quiz. The link may be wrong, or the quiz was deleted.");
       setLoading(false);
       return;
     }
@@ -140,7 +145,7 @@ const Quiz = () => {
       setIsMultiplayer(true);
       setRoomCode(multiplayerData.roomCode);
       setPlayerId(multiplayerData.playerId);
-      setLoadingStatus("Connecting to game room...");
+      setLoadingStatus("Finding the room…");
 
       // Store multiplayer info in session storage (for page refresh recovery)
       // (with the difficulty, which pages opened without router state
@@ -160,7 +165,7 @@ const Quiz = () => {
         } else {
           console.error("❌ Game room not found");
           // Room doesn't exist, go back to multiplayer lobby
-          setError("Game room no longer exists");
+          setError("This game room has closed. Taking you back to the game menu…");
           setTimeout(() => navigate("/multiplayer"), 2000);
         }
       });
@@ -172,7 +177,7 @@ const Quiz = () => {
     console.log(`🎮 Difficulty parameter: ${difficulty}`);
 
     // Load quiz data using our QuizDataProvider
-    setLoadingStatus("Loading quiz data...");
+    setLoadingStatus("Loading the questions…");
 
     // Use Promise.race with a timeout to prevent infinite loading
     const quizLoaderPromise = loadQuiz(difficulty);
@@ -186,7 +191,7 @@ const Quiz = () => {
         console.log("✅ Fetched Quiz Data:", quizData);
         if (!quizData || !Array.isArray(quizData)) {
           console.error("❌ Quiz data is not in expected format:", quizData);
-          setError("Quiz data format is invalid");
+          setError(LOAD_FAILED);
           setLoading(false);
           return;
         }
@@ -204,7 +209,7 @@ const Quiz = () => {
         console.log(`📋 Loaded ${filteredQuestions.length} questions for ${difficulty} difficulty`);
 
         if (filteredQuestions.length === 0) {
-          setError("This quiz has no questions to play");
+          setError("This quiz has no questions to play yet.");
           setLoading(false);
           return;
         }
@@ -216,7 +221,7 @@ const Quiz = () => {
       })
       .catch((error) => {
         console.error("❌ Error loading quiz data:", error);
-        setError(`Failed to load quiz: ${error.message}`);
+        setError(LOAD_FAILED);
         setLoading(false);
       });
 
@@ -244,7 +249,7 @@ const Quiz = () => {
   // time, and time's up is handled here, never inside a state updater
   // (which React may run twice).
   useEffect(() => {
-    if (quizCompleted || loading || isMultiplayer || showFeedback) return;
+    if (loading || isMultiplayer || showFeedback) return;
     const deadline = Date.now() + QUESTION_MS;
     questionDeadlineRef.current = deadline;
     const tick = setInterval(() => {
@@ -257,7 +262,7 @@ const Quiz = () => {
       }
     }, 100);
     return () => clearInterval(tick);
-  }, [currentQuestionIndex, quizCompleted, loading, showFeedback, isMultiplayer]);
+  }, [currentQuestionIndex, loading, showFeedback, isMultiplayer]);
 
   // Single player: the feedback countdown, then the next question. It lasts
   // until the deadline submitAnswer or handleTimeUp set.
@@ -629,300 +634,72 @@ const Quiz = () => {
     }
   };
 
-  const restartQuiz = () => {
-    savedRunRef.current = false;
-    setCurrentQuestionIndex(0);
-    setScore(0);
-    setQuizCompleted(false);
-    setSelectedAnswer(null);
-    setIsSubmitted(false);
-    setIsTimerVisible(true); // Show timer when restarting the quiz
-  };
+  // A player who picked "Leave the quiz" and confirmed it.
+  const leaveQuiz = () => navigate("/");
 
-  // Render loading state
+  // Loading: a note in place of the questions.
   if (loading) {
     return (
-      <LoadingContainer>
-        <LoadingSpinner />
-        <Loading>{loadingStatus}</Loading>
-      </LoadingContainer>
+      <CalmPage title={quizName}>
+        <CalmNote role="status">{loadingStatus}</CalmNote>
+      </CalmPage>
     );
   }
 
-  // Render error state
+  // Couldn't play: what happened, and the way out.
   if (error || legacyRoom) {
     return (
-      <ErrorContainer>
-        <ErrorMessage>{error ?? LEGACY_ROOM_MESSAGE}</ErrorMessage>
-        <RetryButton onClick={() => navigate("/")}>
-          Back to Home
-        </RetryButton>
-      </ErrorContainer>
+      <CalmPage title="Quiz unavailable">
+        <CalmNote role="alert">{error ?? LEGACY_ROOM_MESSAGE}</CalmNote>
+        <Ground>
+          <Pane>
+            {isMultiplayer
+              ? <Control onClick={() => navigate("/multiplayer")}>Back to the game menu</Control>
+              : <Control onClick={() => navigate("/quizzes")}>Back to the quiz library</Control>}
+          </Pane>
+        </Ground>
+      </CalmPage>
     );
   }
 
-  return quizCompleted ? (
-    <Container>
-      <QuestionText>🎉 Quiz Completed! 🎤</QuestionText>
-      <ScoreText>You scored {score}!</ScoreText>
-      <SubmitButton onClick={restartQuiz}>Restart Quiz</SubmitButton>
-    </Container>
-  ) : (
-    <Container>
-      {isTimerVisible ? (
-        <QuizHeader>
-          <TimerContainer
-            $timeRunningOut={timeLeft <= 3 && !showFeedback}
-            $isFeedback={showFeedback}
-            $isVisible={true}
+  return (
+    <CalmPage
+      title={quizName}
+      subtitle={`Question ${currentQuestionIndex + 1} of ${questions.length}`}
+      footer={<LeaveQuiz multiplayer={isMultiplayer} onLeave={leaveQuiz} />}
+    >
+      <QuizStatus
+        timeLeft={timeLeft}
+        settled={isSubmitted}
+        picked={selectedAnswer}
+        correctAnswer={currentQuestion.correctAnswer}
+        points={currentQuestionPoints}
+        timerVisible={isTimerVisible}
+      />
+      {scoreSyncError && <CalmNote role="alert">{scoreSyncError}</CalmNote>}
+      <QuestionPane
+        question={currentQuestion.question}
+        options={currentQuestion.options}
+        picked={selectedAnswer}
+        correctAnswer={currentQuestion.correctAnswer}
+        settled={isSubmitted}
+        onPick={handleAnswer}
+      />
+      <Ground>
+        <Pane>
+          <Control
+            onClick={() => !showFeedback ? submitAnswer(selectedAnswer || "") : undefined}
+            disabled={(!showFeedback && !selectedAnswer) || (isSubmitted && !showFeedback) || showFeedback}
           >
-            <TimerText>{timeLeft}s</TimerText>
-          </TimerContainer>
-        </QuizHeader>
-      ) : (
-        <PointsDisplay>
-          <span className="points-value">{currentQuestionPoints}</span>
-          points!
-        </PointsDisplay>
-      )}
-      {scoreSyncError && <SyncWarning role="alert">{scoreSyncError}</SyncWarning>}
-      <QuestionText>{currentQuestion.question}</QuestionText>
-      <OptionsContainer>
-        {currentQuestion.options.map((option) => (
-          <OptionButton
-            key={option}
-            onClick={() => handleAnswer(option)}
-            disabled={isSubmitted}
-            $isSelected={selectedAnswer === option}
-            $isCorrect={isSubmitted && option === currentQuestion.correctAnswer}
-            $isWrong={isSubmitted && option !== currentQuestion.correctAnswer && option === selectedAnswer}
-          >
-            {option}
-          </OptionButton>
-        ))}
-      </OptionsContainer>
-      <SubmitButton
-        onClick={() => !showFeedback ? submitAnswer(selectedAnswer || "") : undefined}
-        disabled={(!showFeedback && !selectedAnswer) || (isSubmitted && !showFeedback) || showFeedback}
-      >
-        {showFeedback ? `Next Question in ${timeLeft}s...` : "Submit Answer"}
-      </SubmitButton>
-      <QuitButton onClick={() => navigate("/")}>
-        <FaHome size={20} />
-      </QuitButton>
-    </Container>
+            {showFeedback ? `Next question in ${timeLeft}s` : "Lock in my answer"}
+          </Control>
+        </Pane>
+      </Ground>
+    </CalmPage>
   );
 };
 
+/** Any failure to load a quiz's questions, said without the raw error. */
+const LOAD_FAILED = "We couldn't load this quiz. Check your connection and try again, or pick another from the library.";
+
 export default Quiz;
-
-// Styled Components
-const Container = styled.div`
-  position: relative;
-  width: 100%;
-  max-width: 31.25rem; /* 500px */
-  margin: auto;
-  text-align: center;
-  padding: 1.25rem; /* 20px */
-  background: ${({ theme }) => theme.colors.magnolia};
-  overflow-x: hidden;
-`;
-
-const QuizHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  width: 100%;
-`;
-
-const PointsDisplay = styled.div`
-  width: 100%;
-  text-align: center;
-  padding: 0.5rem 0;
-  font-weight: bold;
-  font-size: 1.5rem;
-  color: ${({ theme }) => theme.colors.purple};
-  margin-bottom: 1rem;
-  
-  .points-value {
-    font-size: 1.8rem;
-    margin-right: 0.5rem;
-  }
-`;
-
-const TimerContainer = styled.div<{ $timeRunningOut: boolean; $isFeedback: boolean; $isVisible?: boolean }>`
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  display: flex; /* Always display the container to maintain layout */
-  align-items: center;
-  justify-content: center;
-  background-color: ${({ $timeRunningOut, $isFeedback, theme }) =>
-    $isFeedback ? theme.colors.amethyst :
-      $timeRunningOut ? theme.colors.incorrectRed : theme.colors.purple};
-  transition: background-color 0.3s ease;
-  animation: ${({ $timeRunningOut }) =>
-    $timeRunningOut ? 'pulse 1s infinite' : 'none'};
-  
-  @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-  }
-`;
-
-const TimerText = styled.span`
-  color: white;
-  font-weight: bold;
-  font-size: 1.2rem;
-`;
-
-const QuestionText = styled.h2`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.night};
-  font-size: 1.5rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const OptionsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const OptionButton = styled.button<{ $isSelected: boolean; $isCorrect: boolean; $isWrong: boolean }>`
-  background: ${({ $isSelected, $isCorrect, $isWrong, theme }) =>
-    $isCorrect ? theme.colors.accentgreen :
-      $isWrong ? theme.colors.incorrectRed :
-        $isSelected ? theme.colors.pinkLavender : theme.colors.gray};
-  color: white;
-  font-size: 1rem;
-  font-weight: bold;
-  padding: 1rem;
-  border: none;
-  cursor: pointer;
-  transition: 0.3s;
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  &:hover:not(:disabled) {
-    background: ${({ $isSelected, theme }) => ($isSelected ? theme.colors.night : theme.colors.amethyst)};
-  }
-`;
-
-const SubmitButton = styled.button`
-  margin-top: 1.25rem; /* 20px */
-  background: ${({ theme }) => theme.colors.purple};
-  color: white;
-  font-size: 1rem;
-  font-weight: bold;
-  padding: 1rem;
-  border: none;
-  cursor: pointer;
-  transition: 0.3s;
-  width: 100%;
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.darkpurple};
-  }
-`;
-
-const LoadingContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2.5rem 1.25rem; /* 40px 20px */
-  background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 0;
-  margin: auto;
-  max-width: 31.25rem; /* 500px */
-`;
-
-const Loading = styled.p`
-  text-align: center;
-  font-size: 1.2rem;
-  color: ${({ theme }) => theme.colors.night};
-  margin-top: 1.25rem; /* 20px */
-`;
-
-const LoadingSpinner = styled.div`
-  border: 0.25rem solid rgba(0, 0, 0, 0.1); /* 4px */
-  border-radius: 50%;
-  border-top: 0.25rem solid ${({ theme }) => theme.colors.amethyst}; /* 4px */
-  width: 2.5rem; /* 40px */
-  height: 2.5rem; /* 40px */
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-
-const ScoreText = styled.p`
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: ${({ theme }) => theme.colors.amethyst};
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const QuitButton = styled.button`
-  position: relative;
-  margin-top: 1.25rem; /* 20px */
-  background: ${({ theme }) => theme.colors.darkpurple};
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 2.5rem; /* 40px */
-  height: 2.5rem; /* 40px */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.3s;
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.purple};
-  }
-`;
-
-const ErrorContainer = styled.div`
-  width: 100%;
-  max-width: 31.25rem; /* 500px */
-  margin: auto;
-  text-align: center;
-  padding: 2.5rem 1.25rem; /* 40px 20px */
-  background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 0; /* Changed from 10px to match square design */
-`;
-
-const SyncWarning = styled.p`
-  color: ${({ theme }) => theme.colors.incorrectRed};
-  font-size: 0.9rem;
-  margin: 0 0 1rem;
-`;
-
-const ErrorMessage = styled.p`
-  color: ${({ theme }) => theme.colors.incorrectRed};
-  font-size: 1.2rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const RetryButton = styled(SubmitButton)`
-  max-width: 12.5rem; /* 200px */
-  margin: 0.625rem auto; /* 10px auto */
-  display: block;
-`;
-
-
-

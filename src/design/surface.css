@@ -169,7 +169,8 @@
 }
 
 /* A settled answer is the most important thing on screen, not a dimmed one. */
-.esc-app .lycra.is-marked:disabled {
+.esc-app .lycra.is-marked:disabled,
+.esc-app .lycra.is-marked:disabled:not(.is-chosen):not(.is-selected) {
   opacity: 1;
   cursor: default;
 }
@@ -273,6 +274,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.esc-app .calm-marker.is-correct {
+  color: var(--esc-correct);
+}
+
+.esc-app .calm-marker.is-wrong {
+  color: var(--esc-wrong);
+}
+
+/* A marked control keeps its label clear of the glyph at its end, and centred. */
+.esc-app .lycra.is-marked {
+  padding-inline: calc(var(--esc-space-4) + 20px + var(--esc-space-3));
 }
 
 /* The big screen: the same surface for a TV across the room. */
