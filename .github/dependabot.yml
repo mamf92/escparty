@@ -9,8 +9,15 @@ updates:
       - "dependencies"
     groups:
       # react-dom checks at runtime that it matches react exactly, so the
-      # four always move in one PR.
+      # four always move in one PR, for version and security updates alike.
       react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      react-security:
+        applies-to: security-updates
         patterns:
           - "react"
           - "react-dom"
@@ -19,7 +26,9 @@ updates:
       dev-dependencies:
         dependency-type: "development"
     # @react-three/fiber 9.8 supports react >=19 <19.4; raise this once it
-    # supports 19.4 (package.json pins react and react-dom to ~19.3.0).
+    # supports 19.4 (package.json pins react and react-dom to ~19.3.0). The
+    # types are held with them so they never describe APIs the installed
+    # React doesn't have.
     ignore:
       - dependency-name: "react"
         versions: [">=19.4.0"]
