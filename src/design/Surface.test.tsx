@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "../test/test-utils";
-import { Control, Field, Ground, Pane } from "./Surface";
+import { Control, Field, Ground, Pane, Row } from "./Surface";
 
 describe("Surface", () => {
   it("renders ground, pane and controls with no wrappers between them", () => {
@@ -22,15 +22,23 @@ describe("Surface", () => {
   it("a list pane holds information rows as list items, not buttons", () => {
     render(
       <Pane as="ol" aria-label="Standings">
-        <Control as="li" info block>Norway</Control>
-        <Control as="li" info block>Sweden</Control>
+        <Row as="li" elevation="high">Norway</Row>
+        <Row as="li">Sweden</Row>
+        <Row as="li" elevation="low">Finland</Row>
       </Pane>,
     );
     const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(2);
-    expect(items[0]).toHaveClass("lycra", "is-static", "is-block");
+    expect(items).toHaveLength(3);
+    for (const item of items) expect(item).toHaveClass("lycra", "is-block", "is-static");
+    expect(items[0]).toHaveClass("is-high");
+    expect(items[2]).toHaveClass("is-low");
     expect(items[0].parentElement).toBe(screen.getByRole("list", { name: "Standings" }));
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("a row defaults to a div", () => {
+    const { container } = render(<Row>Info</Row>);
+    expect(container.firstElementChild?.tagName).toBe("DIV");
   });
 
   it("maps the layout to the scale and split classes", () => {
@@ -48,11 +56,11 @@ describe("Surface", () => {
     expect(screen.getByRole("button", { name: "Plain" })).not.toHaveAttribute("aria-pressed");
   });
 
-  it("maps block, info and low to their classes and defaults to type=button", async () => {
+  it("a block control is a left-aligned row, type=button by default", async () => {
     const onClick = vi.fn();
-    render(<Control block info low onClick={onClick}>Row</Control>);
+    render(<Control block onClick={onClick}>Row</Control>);
     const row = screen.getByRole("button", { name: "Row" });
-    expect(row).toHaveClass("is-block", "is-static", "is-low");
+    expect(row).toHaveClass("lycra", "is-block");
     expect(row).toHaveAttribute("type", "button");
     await userEvent.setup().click(row);
     expect(onClick).toHaveBeenCalled();

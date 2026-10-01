@@ -42,9 +42,11 @@ scoped to `fabric-ui`'s own renderer abstraction, not something every live
 page automatically plugs into (see the `fabric-ui` note in
 `docs/agent/architecture.md`).
 
-Outside `fabric-ui`, a live page that wants the Calm look (e.g.
-`Scoreboard.tsx`) applies it directly by importing `calm.css` and adding a
-page-scoped override stylesheet — there's no `OverlayItem` involved on that
+Outside `fabric-ui`, live pages get the surface from the app-wide
+stylesheet (`src/design/design-system.css`, imported once in `main.tsx`;
+never import `calm.css` or `lycra-surface.css` again from a page, a second
+copy lands after the design system's rules and undoes them) plus, where
+needed, a page-scoped override stylesheet — there's no `OverlayItem` involved on that
 path. If you're adding a new interactive state, decide which path you're
 on: inside the demo's shared model, or a direct CSS adoption on a real page.
 
@@ -62,8 +64,8 @@ Sparkle's renderer and the `OverlayItem` model live in `src/fabric-ui/` (see
 `docs/agent/architecture.md`) and, as of this writing, are not confirmed
 wired into any live page — only the standalone `/fabric-ui` demo route uses
 them. Calm's CSS (`calm.css`, vendored per the notes in
-`.claude/skills/escparty-calm/SKILL.md`) is also authored in `fabric-ui/`
-but *is* imported directly by at least one live page (`Scoreboard.tsx`).
+`.claude/skills/escparty-calm/SKILL.md`) is also authored in `fabric-ui/`,
+and is loaded app-wide by `src/design/design-system.css`.
 Don't duplicate the skills' `dna.json`/`PROMPT.md` content here or in
 `CLAUDE.md` — if you need the measured values or build workflow, load the
 skill.

@@ -1,5 +1,6 @@
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import styled from "styled-components";
+import { cx } from "../design/cx";
 
 /**
  * Page chrome for every screen (docs/design/design-system.md, "Page
@@ -19,7 +20,7 @@ export const CalmPage = ({ title, subtitle, children, footer, className }: {
   /** Extra classes, e.g. `calm-screen` for the big-screen sizes. */
   className?: string;
 }) => (
-  <Page className={className ? `calm-page ${className}` : "calm-page"}>
+  <Page className={cx("calm-page", className)}>
     <Header>
       <h1 className="esc-title"><span className="esc-title-text">{title}</span></h1>
       {subtitle && <p className="esc-subtitle">{subtitle}</p>}
@@ -31,12 +32,12 @@ export const CalmPage = ({ title, subtitle, children, footer, className }: {
 
 /** The quiet underlined link pages use for "back" and secondary moves. */
 export const CalmLink = ({ className, type = "button", ...props }: ComponentPropsWithRef<"button">) => (
-  <button type={type} className={className ? `esc-link ${className}` : "esc-link"} {...props} />
+  <button type={type} className={cx("esc-link", className)} {...props} />
 );
 
 /** A note under or between panes: status, errors, hints. */
 export const CalmNote = ({ className, ...props }: ComponentPropsWithRef<"p">) => (
-  <p className={className ? `esc-note ${className}` : "esc-note"} {...props} />
+  <p className={cx("esc-note", className)} {...props} />
 );
 
 const Page = styled.div`

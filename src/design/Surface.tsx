@@ -5,14 +5,15 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
  *
  *   <Ground>            the dark, never-flat ground (.calm-ground)
  *     <Pane>            one sheet; controls are direct children (.lycra-pane)
- *       <Control />     a raised control (.lycra)
+ *       <Control />     a raised control, always a <button> (.lycra)
+ *       <Row />         a raised row of information, not a control (.lycra.is-static)
  *       <Field />       a sunken field (.lycra-field)
  *
  * These render the classes and nothing else: no wrapper elements, so
  * controls stay direct siblings and the neighbour tug keeps working.
  */
 
-const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
+import { cx } from "./cx";
 
 export const Ground = ({ className, ...props }: ComponentPropsWithRef<"div">) => (
   <div className={cx("calm-ground", className)} {...props} />
@@ -33,36 +34,43 @@ export const Pane = ({ as: Tag = "div", layout = "stack", className, ...props }:
 };
 
 type ControlProps = ComponentPropsWithRef<"button"> & {
-  /**
-   * A control is a <button>. An information row in a list or grid renders
-   * as an `li` or `div` instead (with `info`), so it isn't a tab stop.
-   */
-  as?: "button" | "li" | "div";
   /** Chosen holds the sink: the answer or option someone picked. */
   chosen?: boolean;
   /** A row with a title and detail under it, left aligned. */
   block?: boolean;
-  /** Information on the surface, not a control: no pointer, no hover. */
-  info?: boolean;
-  /** The bottom of the elevation ladder: flush with the sheet. */
-  low?: boolean;
 };
 
-export const Control = ({ as = "button", chosen, block, info, low, className, type = "button", ...props }: ControlProps) => {
-  const classes = cx("lycra", block && "is-block", info && "is-static", low && "is-low", chosen && "is-chosen", className);
-  if (as !== "button") {
-    const Tag = as;
-    return <Tag className={classes} {...(props as object)} />;
-  }
-  return (
-    <button
-      type={type}
-      className={classes}
-      aria-pressed={chosen === undefined ? undefined : chosen}
-      {...props}
-    />
-  );
-};
+export const Control = ({ chosen, block, className, type = "button", ...props }: ControlProps) => (
+  <button
+    type={type}
+    className={cx("lycra", block && "is-block", chosen && "is-chosen", className)}
+    aria-pressed={chosen === undefined ? undefined : chosen}
+    {...props}
+  />
+);
+
+type RowProps = {
+  /** `li` inside a list pane (`<Pane as="ol">`), `div` anywhere else. */
+  as?: "li" | "div";
+  /**
+   * Its step on the elevation ladder: `high` stands proud (first place,
+   * your own row), `low` sits flush (the bottom of a ladder).
+   */
+  elevation?: "high" | "rest" | "low";
+  className?: string;
+  children?: ReactNode;
+} & Omit<ComponentPropsWithRef<"li">, "className" | "children">;
+
+/**
+ * Information on the surface: raised like a control, but no pointer, no
+ * hover, no press and no tab stop. Anything you can act on is a Control.
+ */
+export const Row = ({ as: Tag = "div", elevation = "rest", className, ...props }: RowProps) => (
+  <Tag
+    className={cx("lycra", "is-block", "is-static", elevation === "high" && "is-high", elevation === "low" && "is-low", className)}
+    {...(props as object)}
+  />
+);
 
 export const Field = ({ className, ...props }: ComponentPropsWithRef<"input">) => (
   <input className={cx("lycra-field", className)} {...props} />

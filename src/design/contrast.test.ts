@@ -51,12 +51,13 @@ const brightest = (stops: Rgb[]) => stops.reduce((a, b) => (luminance(a) > lumin
 
 /*
  * The brightest spot of a ground: each solid stop, and each translucent pool
- * or glitter dot laid over the ground's base colour (its last stop).
+ * or glitter dot laid over the ground's brightest solid stop (the worst case:
+ * a pool may sit right where the base is lightest).
  */
 const groundPeak = (themeBlock: string) => {
   const decl = declaration(themeBlock, "--esc-ground");
   const solid = hexes(decl);
-  const base = solid[solid.length - 1];
+  const base = brightest(solid);
   return brightest([...solid, ...rgbas(decl).map(({ colour, alpha }) => over(colour, alpha, base))]);
 };
 
@@ -66,7 +67,9 @@ const calmPane = over([255, 255, 255], 0.05, groundPeak(calm));
 const calmFace = over([255, 255, 255], 0.05, calmPane);
 
 // Sparkle's pane is its padding-box tint (sparkle.css) over its ground.
-const sparklePaneTint = rgbas(sparkle.slice(sparkle.indexOf(".lycra-pane {")))[0];
+const paneRule = sparkle.indexOf(".lycra-pane {");
+if (paneRule < 0) throw new Error("sparkle.css has no .lycra-pane rule to read the pane tint from");
+const sparklePaneTint = rgbas(sparkle.slice(paneRule))[0];
 const sparklePane = over(sparklePaneTint.colour, sparklePaneTint.alpha, groundPeak(glam));
 // Sparkle's faces: the brightest stop of each sheet, under its brightest sequin.
 const sequin = (face: Rgb) => over([255, 255, 255], 0.3, face);

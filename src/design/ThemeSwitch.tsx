@@ -1,3 +1,4 @@
+import { cx } from "./cx";
 import { useDesignTheme } from "./useDesignTheme";
 
 /**
@@ -13,7 +14,7 @@ export const ThemeSwitch = ({ className }: { className?: string }) => {
       type="button"
       role="switch"
       aria-checked={on}
-      className={className ? `esc-theme-switch ${className}` : "esc-theme-switch"}
+      className={cx("esc-theme-switch", className)}
       onClick={() => setTheme(on ? "calm" : "sparkle")}
     >
       <span className="esc-theme-switch-track" aria-hidden="true">

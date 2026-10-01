@@ -74,6 +74,33 @@ body {
   color: var(--esc-link);
 }
 
+/*
+  An information row (.is-static) is not a control: pressing it must not
+  sink it or tug its neighbours, which the vendored :active rules would.
+*/
+.lycra.is-static:active,
+.lycra.is-static:active + .lycra,
+.lycra:has(+ .lycra.is-static:active) {
+  transform: none;
+}
+
+.lycra.is-static:active:not(.is-low):not(.is-chosen):not(.is-high) {
+  background: var(--lyc-face);
+  box-shadow: var(--lyc-rise);
+}
+
+/* A proud information row: first place, or your own row. */
+.lycra.is-static.is-high,
+.lycra.is-static.is-high:active {
+  background: var(--lyc-face);
+  box-shadow: var(--lyc-rise-high);
+}
+
+.lycra.is-static.is-low:active {
+  background: var(--lyc-face-down);
+  box-shadow: var(--lyc-groove);
+}
+
 /* One focus ring everywhere, in the theme's focus colour. */
 .esc-app :focus-visible {
   outline: 2px solid var(--esc-focus);

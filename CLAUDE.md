@@ -62,9 +62,9 @@ game), and `pathUtils.ts`
 
 One design language, two themes, rules in `docs/design/design-system.md`
 (read it before building or restyling any screen) and code in
-`src/design/` (tokens, the theme switch, `Ground`/`Pane`/`Control`/`Field`).
-Screens render through `CalmPage` on those primitives and never write
-their own colours, fonts or buttons. The older screens still on
+`src/design/` (tokens, the theme switch, `Ground`/`Pane`/`Control`/`Row`/`Field`).
+New and migrated screens render through `CalmPage` on those primitives
+and never write their own colours, fonts or buttons. The older screens still on
 styled-components and `theme.colors` (Home, the quiz, multiplayer entry,
 the break and host views) are being moved over under epic #166; don't copy
 their pattern.

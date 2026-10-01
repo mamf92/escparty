@@ -13,8 +13,8 @@ export const theme: DefaultTheme = {
         gray: "#59595D", // Medium gray
         amethyst: "#A56DC6", // Purple
         pinkLavender: "#D5B8E6", // Light pinkish-purple
-        correctGreen: "#28a745",  // Green for correct answers
-        incorrectRed: "#dc3545",    // Red for incorrect answers
+        correctGreen: "#28a745",  // The check: --esc-correct in src/design/tokens.css
+        incorrectRed: "#ff6b78",    // The cross: --esc-wrong in src/design/tokens.css
         white: "#FFFFFF", // White
         black: "#000000", // Black
         darkpurple: "#73168C", // Dark purple

@@ -171,5 +171,5 @@ export const SURFACE_INDEX: Record<MaterialPreset['surface'], number> = {
  */
 export const MARKER_COLOR = {
     correct: theme.colors.correctGreen, // #28a745
-    wrong: theme.colors.incorrectRed, // #dc3545
+    wrong: theme.colors.incorrectRed, // #ff6b78, lifted from #dc3545 for 3:1 (design-system.md)
 } as const;

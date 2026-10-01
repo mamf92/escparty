@@ -10,13 +10,15 @@ import { hostParty, joinParty, rateActs } from "./helpers";
  * place. Measured inside the surface (`.calm-ground`); the page title and
  * the notes around the ground are chrome, as dna.json says.
  *
- * Sparkle isn't measured: it is the opt-in WebGL demo behind /fabric-ui,
- * and live pages take Calm's CSS directly (docs/agent/theming.md).
+ * Sparkle is the same anatomy re-skinned (docs/design/design-system.md):
+ * its contrast is checked from the tokens (src/design/contrast.test.ts), and
+ * the last test here checks the switch itself.
  */
 
 const CHECK = ".claude/skills/escparty-calm/tools/check.py";
-// The check and cross colours (--esc-correct, --esc-wrong), at any alpha.
-const ACCENT = /rgba?\((40, 167, 69|255, 107, 120)[,)]/.source;
+// The check and cross colours (--esc-correct, --esc-wrong, and the cross's
+// earlier #dc3545 so a leftover is still counted), at any alpha.
+const ACCENT = /rgba?\((40, 167, 69|255, 107, 120|220, 53, 69)[,)]/.source;
 
 const measure = (page: Page) => page.evaluate((accentSource) => {
     const accent = new RegExp(accentSource);

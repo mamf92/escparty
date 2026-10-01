@@ -12,7 +12,7 @@ const STARS: readonly [number, number, number, number, string][] = [
 ];
 
 /**
- * Sparkle's glitter: decorative stars over the frame, hidden from assistive
+ * Sparkle's glitter: decorative stars behind the screen's content, hidden from assistive
  * tech and from the pointer, shown only in Sparkle and only twinkling when
  * the system allows motion (sparkle.css).
  */

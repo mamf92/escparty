@@ -33,8 +33,8 @@ Mostly not small reusable pieces, despite the folder name:
   link, enter the real result, edit the running order, open the awards.
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
-  (except `/fabric-ui` and the big screen), with the app bar: the home link
-  and the Sparkle mode switch.
+  (except `/fabric-ui` and the big screen), with the app bar: the brand
+  (not a link: mid-game screens own their exits) and the Sparkle mode switch.
 - `Quiz.tsx` — ~880 lines, the largest file in the app. Handles single-player
   and multiplayer quiz flow, answer selection/scoring, and the multiplayer
   progression timer. A change here is rarely "just a component change" —
@@ -187,7 +187,7 @@ the theme switch and the forced-colours / more-contrast rules;
 `DesignThemeProvider`/`useDesignTheme` hold the active theme,
 `ThemeSwitch` is the app bar's Sparkle mode switch, `Sparkles` the
 decorative glitter layer, and `Surface.tsx` the `Ground`/`Pane`/`Control`/
-`Field` primitives screens are built from.
+`Row`/`Field` primitives screens are built from.
 
 ## `src/styles/theme.ts`
 

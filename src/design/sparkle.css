@@ -137,8 +137,8 @@
     animation: esc-twinkle var(--dur, 2.8s) ease-in-out var(--delay, 0s) infinite;
   }
 
-  :root[data-theme="sparkle"] .esc-app .lycra:not(.is-static):not(:disabled):hover::after,
-  :root[data-theme="sparkle"] .esc-app .lycra:not(.is-static):not(:disabled):focus-visible::after {
+  :root[data-theme="sparkle"] .esc-app .lycra:not(.is-static):not(:disabled):not([aria-disabled="true"]):hover::after,
+  :root[data-theme="sparkle"] .esc-app .lycra:not(.is-static):not(:disabled):not([aria-disabled="true"]):focus-visible::after {
     opacity: 1;
     animation: esc-glint 900ms ease-out;
   }

@@ -101,6 +101,7 @@ MobileFrame (or the big screen)
    ├─ Ground          <Ground>  the dark, never-flat ground
    │  └─ Pane         <Pane>    one sheet of controls
    │     ├─ Control   <Control> a raised button, a direct child
+   │     ├─ Row       <Row>     a raised row of information
    │     └─ Field     <Field>   a sunken input
    ├─ Notes           <CalmNote> status, hints, errors, between grounds
    └─ Footer          <CalmLink> the way back
@@ -109,7 +110,7 @@ MobileFrame (or the big screen)
 - Every screen renders through `CalmPage` (`src/components/CalmPage.tsx`).
   No screen builds its own header, background or container.
 - Use the primitives from `src/design` (`Ground`, `Pane`, `Control`,
-  `Field`). They render the surface classes (`calm-ground`, `lycra-pane`,
+  `Row`, `Field`). They render the surface classes (`calm-ground`, `lycra-pane`,
   `lycra`, `lycra-field`; the names are historical) and nothing else.
 - **Controls are direct children of their pane.** No row wrapper `div`s:
   the neighbour tug, and the Calm check, depend on it.
@@ -117,8 +118,8 @@ MobileFrame (or the big screen)
   `<h2>` labels outside the ground, set as a note.
 - Group related controls in one pane; separate unrelated groups into
   separate grounds rather than adding dividers.
-- A list of things reads as a list: `<Pane as="ol">` with
-  `<Control as="li" info>` rows (an `<li>`, not a button, and no tab stop).
+- A list of things reads as a list: `<Pane as="ol">` with `<Row as="li">`
+  rows (an `<li>`, not a button, and no tab stop).
 
 ## 5. Components
 
@@ -131,13 +132,19 @@ case, verb first ("Host a party", "Lock in", "Next act"). States:
 | Hover | Face lightens slightly | Glint crosses the face | — |
 | Pressed | Sinks (80ms in, 420ms overshoot out) | Same | `:active` |
 | Chosen | Holds the sink | Holds the sink, dark-gold sequins, gold ring | `chosen` → `.is-chosen` + `aria-pressed` |
-| Proud (ranked first) | Raised further | Stronger gold glow | `.is-high` (ladders only) |
-| Flush (bottom of a ladder) | Flush with the sheet | Same | `low` → `.is-low` |
-| Information row | Raised, no pointer, no glint | Same | `info` → `.is-static`, usually `as="li"` or `as="div"` |
 | Disabled | Faded into a groove | Same | `disabled` |
 
 Rows with a title and detail use `block`: title in the control size, detail
 in `.calm-sub`, laid out left to right with `.calm-row`.
+
+**Row** (`<Row>`, `.lycra.is-block.is-static`). Information on the surface:
+raised like a control, but no pointer, hover, press, glint or tab stop.
+Anything you can act on is a `Control`; a row never takes `onClick`.
+`as="li"` inside a list pane. Its place on the elevation ladder carries
+rank: `elevation="high"` stands proud (first place, your own row),
+`"rest"` is the default, `"low"` sits flush (the bottom). Never mark an
+information row `is-chosen`: chosen means *picked*, and only a control
+can be picked.
 
 **Field** (`<Field>`, `.lycra-field`). Sunken. Always has a visible
 `.calm-label` above it (placeholders are examples, never labels).
