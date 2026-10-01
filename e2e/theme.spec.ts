@@ -198,3 +198,23 @@ test("Sparkle mode switches every screen, is remembered, and keeps still with re
 
     await page.context().close();
 });
+
+test("the multiplayer create and join screen follows the surface rules (#172)", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    await page.goto("/#/multiplayer");
+    await expect(page.getByRole("button", { name: /^Host a game/ })).toBeVisible();
+    await judge(page, "multiplayer-choose");
+
+    await page.getByRole("button", { name: /^Host a game/ }).click();
+    await expect(page.getByRole("button", { name: /^Host and play/ })).toBeVisible();
+    await judge(page, "multiplayer-host");
+
+    await page.getByRole("button", { name: "Back to host or join" }).click();
+    await page.getByRole("button", { name: /^Join a game/ }).click();
+    await page.getByRole("button", { name: "Join the game" }).click();
+    await expect(page.getByText("A game code is four letters, like ABBA.")).toBeVisible();
+    await judge(page, "multiplayer-join");
+
+    await page.context().close();
+});
