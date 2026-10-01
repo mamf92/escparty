@@ -8,8 +8,27 @@ updates:
     labels:
       - "dependencies"
     groups:
+      # react-dom checks at runtime that it matches react exactly, so the
+      # four always move in one PR.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
       dev-dependencies:
         dependency-type: "development"
+    # @react-three/fiber 9.8 supports react >=19 <19.4; raise this once it
+    # supports 19.4 (package.json pins react and react-dom to ~19.3.0).
+    ignore:
+      - dependency-name: "react"
+        versions: [">=19.4.0"]
+      - dependency-name: "react-dom"
+        versions: [">=19.4.0"]
+      - dependency-name: "@types/react"
+        versions: [">=19.4.0"]
+      - dependency-name: "@types/react-dom"
+        versions: [">=19.4.0"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
