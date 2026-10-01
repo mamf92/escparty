@@ -1,17 +1,16 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import styled from "styled-components";
-import "../fabric-ui/lycra-surface.css";
-import "../fabric-ui/calm.css";
-import "../styles/calm-page.css";
+import { cx } from "../design/cx";
 
 /**
- * Page chrome for a screen on the Calm surface (see
- * `.claude/skills/escparty-calm/` and `docs/agent/theming.md`).
+ * Page chrome for every screen (docs/design/design-system.md, "Page
+ * anatomy"). The design system's stylesheet is loaded once, in main.tsx,
+ * and the theme (Calm or Sparkle) comes from `data-theme` on <html>.
  *
  * Only the content goes on the surface: put controls in
- * `<div className="calm-ground"><div className="lycra-pane">...` as direct
- * children of the pane (the neighbour tug needs it). Titles, notes and
- * the back link stay outside it, as here.
+ * `<Ground><Pane>...` (src/design) as direct children of the pane (the
+ * neighbour tug needs it). Titles, notes and the back link stay outside
+ * it, as here.
  */
 export const CalmPage = ({ title, subtitle, children, footer, className }: {
   title: string;
@@ -21,74 +20,45 @@ export const CalmPage = ({ title, subtitle, children, footer, className }: {
   /** Extra classes, e.g. `calm-screen` for the big-screen sizes. */
   className?: string;
 }) => (
-  <Page className={className ? `calm-page ${className}` : "calm-page"}>
+  <Page className={cx("calm-page", className)}>
     <Header>
-      <Title>{title}</Title>
-      {subtitle && <Subtitle>{subtitle}</Subtitle>}
+      <h1 className="esc-title"><span className="esc-title-text">{title}</span></h1>
+      {subtitle && <p className="esc-subtitle">{subtitle}</p>}
     </Header>
     {children}
     {footer && <Footer>{footer}</Footer>}
   </Page>
 );
 
-/** The quiet underlined link Calm pages use for "back" and secondary moves. */
-export const CalmLink = styled.button`
-  font-family: ${({ theme }) => theme.fonts.body};
-  font-size: 0.85rem;
-  background: none;
-  border: none;
-  padding: 0.25rem;
-  cursor: pointer;
-  text-decoration: underline;
-  color: ${({ theme }) => theme.colors.pinkLavender};
-`;
+/** The quiet underlined link pages use for "back" and secondary moves. */
+export const CalmLink = ({ className, type = "button", ...props }: ComponentPropsWithRef<"button">) => (
+  <button type={type} className={cx("esc-link", className)} {...props} />
+);
 
 /** A note under or between panes: status, errors, hints. */
-export const CalmNote = styled.p`
-  margin: 0.5rem 0 0;
-  font-family: ${({ theme }) => theme.fonts.body};
-  font-size: 0.8rem;
-  line-height: 1.5;
-  text-align: center;
-  color: ${({ theme }) => theme.colors.magnolia};
-  opacity: 0.8;
-`;
+export const CalmNote = ({ className, ...props }: ComponentPropsWithRef<"p">) => (
+  <p className={cx("esc-note", className)} {...props} />
+);
 
 const Page = styled.div`
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 1rem;
+  gap: var(--esc-space-4);
   width: 100%;
-  padding: 0.5rem 0 1.5rem;
-  color: ${({ theme }) => theme.colors.magnolia};
-  font-family: ${({ theme }) => theme.fonts.body};
+  padding: var(--esc-space-2) 0 var(--esc-space-6);
+  color: var(--esc-ink);
+  font-family: var(--esc-font-body);
 `;
 
-const Header = styled.header`
+// Not a <header>: the app bar is the page's one banner landmark.
+const Header = styled.div`
   text-align: center;
-`;
-
-const Title = styled.h1`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  font-size: 1.5rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.pinkLavender};
-  margin: 0;
-`;
-
-const Subtitle = styled.p`
-  margin: 0.5rem 0 0;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: ${({ theme }) => theme.colors.magnolia};
-  opacity: 0.75;
 `;
 
 const Footer = styled.footer`
   display: flex;
   justify-content: center;
-  gap: 1rem;
+  gap: var(--esc-space-4);
   flex-wrap: wrap;
 `;

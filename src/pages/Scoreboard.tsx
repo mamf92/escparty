@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
-import "../fabric-ui/lycra-surface.css";
-import "../fabric-ui/calm.css";
-import "../styles/calm-page.css";
 import "./scoreboard-calm.css";
 import { quizTitle } from "../utils/quizCatalog";
 
@@ -22,12 +19,10 @@ type Level = "high" | "rest" | "low";
 /*
   Score leads, because the ladder has to read on arrival.
 
-  The ranked-ladder archetype carries an unstated premise, found by measuring
-  the real render rather than by reading the spec: the list has to be ordered
-  by whatever elevation encodes. `--lyc-rise-high` is only about 10% stronger
-  than the resting rise, which is a relative signal — plenty when the proud row
-  sits beside its peers, invisible when it is scattered somewhere down a list
-  of six. Sorted by score, the ladder descends and the eye reads a slope; the
+  The ranked ladder has to be ordered by whatever elevation encodes. A
+  surface's lift is a relative signal: plain when the proud row sits beside
+  its peers, easy to miss when it is scattered somewhere down a list of six.
+  Sorted by score, the ladder descends and the eye reads a slope; the
   other two sorts are still honest (the best and worst stay marked) but they
   are a history, not a ranking.
 */
@@ -77,10 +72,8 @@ function levelsFor(entries: ScoreEntry[]): Map<ScoreEntry, Level> {
 
 function rowClass(level: Level): string {
     const out = ["lycra", "is-block", "is-static", "is-rank"];
-    // `is-selected` carries the taller shadow; `is-high` is what calm.css keys
-    // the settled-result overrides off. The membrane renderer reads the same
-    // pair, so the two modes agree on what "proud" means.
-    if (level === "high") out.push("is-selected", "is-high");
+    // `is-high` is the proud lift (src/design/surface.css).
+    if (level === "high") out.push("is-high");
     if (level === "low") out.push("is-low");
     return out.join(" ");
 }

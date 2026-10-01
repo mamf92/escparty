@@ -7,13 +7,13 @@ import { describe, expect, it } from "vitest";
  *
  * Every `.ts`/`.tsx` module under src/pages, src/components and src/hooks
  * needs a sibling `<name>.test.ts(x)` or `<name>.spec.ts(x)`. In
- * src/fabric-ui and src/store only components (`.tsx`) and hooks (`use*.ts`)
- * do: their plain `.ts` files are shader constants and presets.
+ * src/design, src/fabric-ui and src/store only components (`.tsx`) and hooks (`use*.ts`)
+ * do: their plain `.ts` files are constants, presets and helpers.
  * UNTESTED is the debt that predates the rule (#59): it may only shrink, so
  * when you add a test for one of these, delete its line here too (the second
  * test below fails until you do).
  */
-const CHECKED_FOLDERS = ["src/pages", "src/components", "src/hooks", "src/fabric-ui", "src/store"];
+const CHECKED_FOLDERS = ["src/pages", "src/components", "src/hooks", "src/design", "src/fabric-ui", "src/store"];
 
 const UNTESTED = new Set([
   "src/fabric-ui/CalmSurface.tsx",

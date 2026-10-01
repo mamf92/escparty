@@ -1,3 +1,5 @@
+// The demo keeps the original lycra surface. The app's own surface
+// (src/design/surface.css) is scoped to `.esc-app` and outranks these.
 import './lycra-surface.css';
 import './calm.css';
 import { MARKER_COLOR } from './presets';

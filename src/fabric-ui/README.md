@@ -283,7 +283,7 @@ Correctness is called out separately, by a marker glyph in the left gutter:
 
 - A **check mark** beside the correct answer, in `correctGreen`.
 - A **cross** beside the answer the player picked, if it was wrong, in
-  `incorrectRed`.
+  `#ff7b86` (`--esc-wrong`).
 
 The glyphs are `matte` features. The weave and the tension ridges are suppressed
 across them and their highlight tightens, so they read as hard objects sitting in

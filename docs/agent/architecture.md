@@ -25,15 +25,16 @@ the party's big screen, which fills the window for a TV.
 Mostly not small reusable pieces, despite the folder name:
 
 - `CalmPage.tsx` — page chrome (title, subtitle, footer, `CalmLink`,
-  `CalmNote`) for screens on the Calm surface, plus the shared
-  `src/styles/calm-page.css` that fits Calm into the phone frame. New
-  screens use it; see `docs/agent/theming.md`.
+  `CalmNote`) every screen renders through, in either theme; the surface
+  itself is `src/design/surface.css`. See
+  `docs/design/design-system.md`.
 
 - `PartyHostTools.tsx` — the host's tab in a scoreboard party: share the
   link, enter the real result, edit the running order, open the awards.
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
-  (except `/fabric-ui`).
+  (except `/fabric-ui` and the big screen), with the app bar: the brand
+  (not a link: mid-game screens own their exits) and the Sparkle mode switch.
 - `Quiz.tsx` — ~880 lines, the largest file in the app. Handles single-player
   and multiplayer quiz flow, answer selection/scoring, and the multiplayer
   progression timer. A change here is rarely "just a component change" —
@@ -175,17 +176,33 @@ Firebase app + Firestore init from `VITE_FIREBASE_*` env vars. Connects to
 the local emulator only when `isDevelopmentEnvironment()` is true **and**
 `VITE_USE_FIREBASE_EMULATOR=true`.
 
+## `src/design/`
+
+The design system (rules: `docs/design/design-system.md`). `tokens.css`
+holds every colour, font, size, radius, face and shadow per theme
+(`data-theme` on `<html>`); `surface.css` draws the frameless neumorphic
+surface classes from them; `sparkle.css` is Sparkle's decoration (glint,
+stars);
+`base.css` the page chrome classes (`esc-title`, `esc-note`, `esc-link`),
+the theme switch and the forced-colours / more-contrast rules;
+`design-system.css` imports them all once, from `main.tsx`.
+`DesignThemeProvider`/`useDesignTheme` hold the active theme,
+`ThemeSwitch` is the app bar's Sparkle mode switch, `Sparkles` the
+decorative glitter layer, and `Surface.tsx` the `Ground`/`Pane`/`Control`/
+`Row`/`Field` primitives screens are built from.
+
 ## `src/styles/theme.ts`
 
-The shared styled-components theme (colors, fonts) both design themes pull
-their tokens from. See `docs/agent/theming.md`.
+Legacy styled-components theme: its fonts point at the design tokens, and
+its named colours remain only for screens not yet moved onto
+`src/design/`. Don't use `theme.colors` in new code.
 
 ## `src/test/`
 
 Test harness only — no app code imports it. `setup.ts` is Vitest's per-file
 setup (jest-dom matchers, Testing Library cleanup) and `test-utils.tsx`
 exports `renderWithProviders`, which wraps a component in the same
-`ThemeProvider` + router pair `App.tsx` mounts screens under. Tests
+`ThemeProvider` + `DesignThemeProvider` + router that `App.tsx` mounts screens under. Tests
 themselves live next to the code they cover, not here. See
 `docs/agent/testing.md`.
 

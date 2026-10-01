@@ -1,9 +1,13 @@
 ---
 name: escparty-sparkle
-description: Build anything in the ESCParty Sparkle design language — the opt-in glittering variant where a bright magenta sequin membrane is rendered as a real displaced height field in WebGL, dead-on at rest and tilting with device or pointer parallax. Use whenever asked for the sparkly, glittery, sequin, party, Eurovision, or "make it sparkle" version of an ESCParty screen or component, or when working on the fabric-ui membrane, the sequin shader, or the sparkle toggle. Sparkle is OPT-IN and never the landing state — for the default accessible surface, and for anything where reduced motion matters, use escparty-calm instead.
+description: Work on the /fabric-ui demo's WebGL sequin membrane — a magenta sequin height field with device or pointer parallax, the sequin shader, and the demo's toggle. Demo only: for the Sparkle theme on live ESCParty screens, follow docs/design/design-system.md instead.
 ---
 
 # ESCParty Sparkle
+
+> **Scope:** this skill describes the `/fabric-ui` demo's surface only. Live
+> app screens follow `docs/design/design-system.md` (modern soft
+> neumorphism, no frames); where the two differ, that file wins.
 
 The opt-in surface. A bright magenta sequin membrane rendered as a real displaced height field in WebGL — dead flat to the eye at rest, tilting with device orientation or pointer as you move.
 

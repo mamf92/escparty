@@ -1,19 +1,33 @@
 import React from 'react';
 import styled from 'styled-components';
+import { Sparkles, ThemeSwitch } from '../design';
 
 interface MobileFrameProps {
   children: React.ReactNode;
 }
 
+/**
+ * The phone-frame chrome every app screen sits in (docs/design/design-system.md,
+ * "Page anatomy"): a bezel on wide screens, full bleed on a phone, and the
+ * app bar with the brand and the theme switch. The brand is deliberately not
+ * a home link: several screens are mid-game and have their own way out.
+ * Sparkle's stars sit behind the scrolling content, fixed to the screen.
+ */
 const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
   return (
     <FrameContainer>
       <PhoneFrame>
-        <PhoneNotch />
-        <PhoneScreen>
-          <ContentConstraint>
-            {children}
-          </ContentConstraint>
+        <PhoneScreen className="esc-app">
+          <Sparkles />
+          <Scroller>
+            <AppBar>
+              <Brand className="esc-title-text">ESCParty</Brand>
+              <ThemeSwitch />
+            </AppBar>
+            <ContentConstraint>
+              {children}
+            </ContentConstraint>
+          </Scroller>
         </PhoneScreen>
         <PhoneButton />
       </PhoneFrame>
@@ -31,7 +45,7 @@ const FrameContainer = styled.div`
   width: 100%;
   height: 100%;
   padding: 20px;
-  background-color: #f0f2f5;
+  background: var(--esc-backdrop);
   position: fixed;
   top: 0;
   left: 0;
@@ -40,9 +54,9 @@ const FrameContainer = styled.div`
 
   @media (max-width: 768px) {
     padding: 0;
-    background-color: transparent;
     position: relative;
     height: 100vh;
+    height: 100dvh;
   }
 `;
 
@@ -52,9 +66,9 @@ const PhoneFrame = styled.div`
   max-width: 100%;
   height: 80vh;
   max-height: 812px;
-  background-color: #1a1a1a;
+  background-color: var(--esc-frame);
   border-radius: 40px;
-  box-shadow: 0 0 0 10px #111, 0 0 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 10px var(--esc-bezel), 0 0 30px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -63,7 +77,7 @@ const PhoneFrame = styled.div`
 
   @media (max-width: 768px) {
     width: 100%;
-    height: 100vh;
+    height: 100%;
     max-height: none;
     border-radius: 0;
     box-shadow: none;
@@ -71,30 +85,12 @@ const PhoneFrame = styled.div`
   }
 `;
 
-const PhoneNotch = styled.div`
-  position: absolute;
-  top: 0;
-  width: 150px;
-  height: 30px;
-  background-color: #1a1a1a;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
-  z-index: 10;
-
-  @media (max-width: 768px) {
-    display: none;
-  }
-`;
-
 const PhoneScreen = styled.div`
   width: 100%;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background-color: ${({ theme }) => theme.colors.deepblue};
+  overflow: hidden;
+  background: var(--esc-screen);
   border-radius: 30px;
-  display: flex;
-  flex-direction: column;
   position: relative;
 
   @media (max-width: 768px) {
@@ -102,17 +98,46 @@ const PhoneScreen = styled.div`
   }
 `;
 
+// The content scrolls over the screen's background and its stars.
+const Scroller = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+`;
+
+const AppBar = styled.header`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esc-space-3);
+  padding: var(--esc-space-2) var(--esc-space-4) 0;
+`;
+
+const Brand = styled.span`
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-control);
+  font-weight: 700;
+  letter-spacing: var(--esc-title-tracking);
+  text-transform: uppercase;
+  color: var(--esc-title);
+`;
+
 const ContentConstraint = styled.div`
   width: 100%;
-  height: 100%;
   max-width: 355px;
   margin: 0 auto;
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 15px 10px;
-  overflow-y: auto;
-  
+  padding: var(--esc-space-2) var(--esc-space-3) var(--esc-space-4);
+
   @media (max-width: 768px) {
     max-width: 100%;
   }

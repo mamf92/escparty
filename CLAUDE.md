@@ -58,22 +58,30 @@ game), and `pathUtils.ts`
 (base-path/env helpers). `src/hooks/` holds shared React hooks. Full layout:
 `docs/agent/architecture.md`.
 
-## Design themes
+## Design system
 
-Two design languages. Inside the `src/fabric-ui/` demo they render from the
-same `OverlayItem[]` content model so they never disagree on *what* they
-show, only *how* — see `docs/agent/theming.md` for how that scopes to live
-pages, which today adopt Calm's CSS directly rather than going through
-`OverlayItem`:
+One design language, two themes, rules in `docs/design/design-system.md`
+(read it before building or restyling any screen) and code in
+`src/design/` (tokens, the theme switch, `Ground`/`Pane`/`Control`/`Row`/`Field`).
+New and migrated screens render through `CalmPage` on those primitives
+and never write their own colours, fonts or buttons. The older screens still on
+styled-components and `theme.colors` (Home, the quiz, multiplayer entry,
+the break and host views) are being moved over under epic #166; don't copy
+their pattern.
 
-- **Calm** — dark violet CSS surface, no motion beyond a press, the default
-  and accessible landing experience. Skill: `.claude/skills/escparty-calm/`.
-- **Sparkle** — glittering WebGL sequin membrane with device/pointer
-  parallax, opt-in only, never the landing state. Skill:
-  `.claude/skills/escparty-sparkle/`.
+The language is modern soft neumorphism: one background, and frameless
+surfaces of the same colour raised out of it or pressed into it.
 
-One paragraph bridging the two, without repeating the skills' content:
-`docs/agent/theming.md`.
+- **Calm** — the accessible default and landing state: one flat violet,
+  no motion beyond a press.
+- **Sparkle** — opt-in via the **Sparkle mode** switch: the same shapes in
+  sequins, gold foil and glitter, animated only when the system allows
+  motion.
+
+The `escparty-calm`/`escparty-sparkle` skills describe the older lycra
+surface kept for the `/fabric-ui` demo only.
+
+How the switch works and how the two relate: `docs/agent/theming.md`.
 
 ## Do not change without explicit instruction
 
@@ -128,7 +136,8 @@ end-to-end should use the `steward` skill
   `onSnapshot` and not WebSockets (0001).
 - `docs/agent/multiplayer-sync.md` — how room create/join/start/progress/
   results actually flows today.
-- `docs/agent/theming.md` — how Calm and Sparkle relate; pointers to both
+- `docs/design/design-system.md` — the design system's rules and PR checklist.
+- `docs/agent/theming.md` — how Calm and Sparkle relate and switch; pointers to both
   skills.
 - `docs/agent/scoreboard-party.md` — the scoreboard party: screens, the
   fictive 2027 lineups and how to enter the real ones, scoring, awards,

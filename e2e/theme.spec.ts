@@ -1,27 +1,50 @@
-import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
- * Theme compliance for the scoreboard party screens (#90). Each screen is
- * measured in the browser and judged by the Calm skill's own self-check,
- * `.claude/skills/escparty-calm/tools/check.py`, so the rules live in one
- * place. Measured inside the surface (`.calm-ground`); the page title and
- * the notes around the ground are chrome, as dna.json says.
+ * Theme compliance for the scoreboard party screens (#90), judged against
+ * the rules in docs/design/design-system.md as the browser actually renders
+ * them, in Calm with reduced motion:
  *
- * Sparkle isn't measured: it is the opt-in WebGL demo behind /fabric-ui,
- * and live pages take Calm's CSS directly (docs/agent/theming.md).
+ *   - no frames: nothing on the surface draws a border, and the ground and
+ *     pane are layout only (no fill, no shadow);
+ *   - a control at rest is the background colour, raised by a pair of soft
+ *     shadows (one light, one dark), and a chosen one is pressed in;
+ *   - at most four text sizes on a surface;
+ *   - nothing moves with reduced motion;
+ *   - the check and cross colours stay a small share of the surface.
+ *
+ * Sparkle dresses the same shapes: its contrast is checked from the tokens
+ * (src/design/contrast.test.ts), and the last test here checks the switch.
  */
 
-const CHECK = ".claude/skills/escparty-calm/tools/check.py";
-// Signal green and signal red, at any alpha.
-const ACCENT = /rgba?\((40, 167, 69|220, 53, 69)[,)]/.source;
+// The check and cross colours (--esc-correct, --esc-wrong), at any alpha.
+const MARKS = /rgba?\((90, 212, 138|255, 123, 134)[,)]/.source;
 
-const measure = (page: Page) => page.evaluate((accentSource) => {
-    const accent = new RegExp(accentSource);
+const measure = (page: Page) => page.evaluate((marksSource) => {
+    const marks = new RegExp(marksSource);
     const grounds = [...document.querySelectorAll<HTMLElement>(".calm-ground")];
     const inGround = (el: Element) => grounds.some(ground => ground.contains(el));
+    const layers = (shadow: string) => shadow === "none" ? [] : shadow.split(/,(?![^(]*\))/).map(layer => layer.trim());
+
+    // Anything on the surface that draws an edge.
+    const framed: string[] = [];
+    const describe = (el: Element) => `${el.tagName.toLowerCase()}.${[...el.classList].join(".")}`;
+    for (const ground of grounds) {
+        for (const el of [ground, ...ground.querySelectorAll<HTMLElement>("*")]) {
+            const style = getComputedStyle(el);
+            const edge = ["Top", "Right", "Bottom", "Left"].some(side =>
+                parseFloat(style.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0
+                && style.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none");
+            if (edge) framed.push(describe(el));
+        }
+        for (const el of [ground, ...ground.querySelectorAll<HTMLElement>(".lycra-pane")]) {
+            const style = getComputedStyle(el);
+            const filled = style.backgroundColor !== "rgba(0, 0, 0, 0)" || style.backgroundImage !== "none";
+            if (filled || style.boxShadow !== "none") framed.push(`${describe(el)} (filled)`);
+        }
+    }
 
     // Every size a piece of visible text is set in.
     const sizes = new Set<number>();
@@ -35,79 +58,73 @@ const measure = (page: Page) => page.evaluate((accentSource) => {
         }
     }
 
-    // A control at rest: the blurs of its outer ink shadows (the lit,
-    // white counterparts at the top left aren't counted, per dna.json).
+    // A control at rest, and a chosen one if the screen has one.
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--esc-bg").trim();
+    const probe = document.createElement("i");
+    probe.style.color = bg;
+    document.body.append(probe);
+    const bgColour = getComputedStyle(probe).color;
+    probe.remove();
+
     const rest = [...document.querySelectorAll<HTMLElement>("button.lycra")]
-        .find(el => inGround(el) && !el.matches(".is-chosen, .is-selected, :disabled, :hover"));
-    const blurs = rest
-        ? getComputedStyle(rest).boxShadow.split(/,(?![^(]*\))/)
-            .filter((layer: string) => !layer.includes("inset") && !layer.includes("255, 255, 255"))
-            .map((layer: string) => parseFloat(layer.replace(/rgba?\([^)]*\)/, "").trim().split(/\s+/)[2]))
-        : undefined;
-
-    // A chosen control may sink, never lighten.
-    const tinted: string[] = [];
+        .find(el => inGround(el) && !el.matches(".is-chosen, .is-selected, .is-low, :disabled, :hover"));
+    const restShadow = rest ? layers(getComputedStyle(rest).boxShadow) : [];
     const chosen = [...document.querySelectorAll<HTMLElement>(".lycra.is-chosen")].find(inGround);
-    if (rest && chosen) {
-        const alpha = (el: HTMLElement) => {
-            const match = getComputedStyle(el).backgroundImage.match(/rgba\(255, 255, 255, ([\d.]+)\)/)
-                ?? getComputedStyle(el).backgroundColor.match(/rgba\(255, 255, 255, ([\d.]+)\)/);
-            return match ? parseFloat(match[1]) : 0;
-        };
-        if (alpha(chosen) > alpha(rest)) tinted.push("chosen");
-    }
 
-    // Controls must be direct children of their pane.
     const controls = [...document.querySelectorAll<HTMLElement>(".lycra")].filter(inGround);
-    const wrapped = controls.filter(el => !el.parentElement?.classList.contains("lycra-pane")).length;
 
     // Green and red, as a share of the surface.
-    let accentArea = 0;
+    let markArea = 0;
     let surfaceArea = 0;
     for (const ground of grounds) {
         const box = ground.getBoundingClientRect();
         surfaceArea += box.width * box.height;
         for (const el of ground.querySelectorAll<HTMLElement>("*")) {
             const style = getComputedStyle(el);
-            const painted = [style.backgroundColor, style.color, style.borderTopColor, style.fill, style.stroke];
-            if (painted.some(value => accent.test(value))) {
+            if ([style.backgroundColor, style.color, style.fill, style.stroke].some(value => marks.test(value))) {
                 const r = el.getBoundingClientRect();
-                accentArea += r.width * r.height;
+                markArea += r.width * r.height;
             }
         }
     }
 
-    // Only what was actually measured: check.py skips a missing key, and
-    // an empty one would pass without checking anything.
     return {
-        ...(sizes.size ? { type_sizes_px: [...sizes] } : {}),
-        ...(blurs ? { outer_shadow_blurs_px: blurs } : {}),
-        ...(rest && chosen ? { tinted_control_states: tinted } : {}),
-        ...(controls.length ? {
-            controls_not_direct_children: wrapped,
-            reduced_motion_transforms: controls.map(el => getComputedStyle(el).transform),
-        } : {}),
-        ...(surfaceArea ? { accent_coverage_pct: Math.round((accentArea / surfaceArea) * 10000) / 100 } : {}),
+        framed,
+        sizes: [...sizes],
+        rest: rest ? {
+            background: getComputedStyle(rest).backgroundColor,
+            image: getComputedStyle(rest).backgroundImage,
+            bg: bgColour,
+            outer: restShadow.filter(layer => !layer.includes("inset")),
+        } : undefined,
+        chosenShadow: chosen ? getComputedStyle(chosen).boxShadow : undefined,
+        transforms: controls.map(el => getComputedStyle(el).transform),
+        markPct: surfaceArea ? (markArea / surfaceArea) * 100 : 0,
     };
-}, ACCENT);
+}, MARKS);
 
 const judge = async (page: Page, name: string) => {
     await expect(page.locator(".calm-ground").first()).toBeVisible();
-    const measurements = await measure(page);
+    const m = await measure(page);
     const file = test.info().outputPath(`${name}.json`);
-    writeFileSync(file, JSON.stringify(measurements, null, 2));
+    writeFileSync(file, JSON.stringify(m, null, 2));
     await test.info().attach(name, { path: file, contentType: "application/json" });
 
-    const run = spawnSync("python3", [CHECK, file], { encoding: "utf8" });
-    if (run.error || (run.status !== 0 && run.status !== 1)) {
-        // Not a verdict on the page: python3 is missing or check.py broke.
-        throw new Error(`Couldn't run ${CHECK} on ${name}: ${run.error ?? `exit ${run.status}`}\n${run.stderr}${run.stdout}`);
+    expect(m.framed, `${name}: nothing on the surface has a frame`).toEqual([]);
+    expect(m.sizes.length, `${name}: at most four text sizes (${m.sizes})`).toBeLessThanOrEqual(4);
+    if (m.rest) {
+        expect(m.rest.background, `${name}: a control is the background colour`).toBe(m.rest.bg);
+        expect(m.rest.image, `${name}: a Calm control has a flat face`).toBe("none");
+        expect(m.rest.outer.length, `${name}: raised by a pair of shadows`).toBe(2);
+        expect(m.rest.outer.some(layer => /rgba\(255, 255, 255/.test(layer)), `${name}: one light`).toBe(true);
+        expect(m.rest.outer.some(layer => !/rgba\(255, 255, 255/.test(layer)), `${name}: one dark`).toBe(true);
     }
-    if (run.status === 1) throw new Error(`${name} isn't Calm:\n${run.stdout}`);
-    test.info().annotations.push({ type: name, description: run.stdout.split("\n").filter(line => line.startsWith("[")).join("; ") });
+    if (m.chosenShadow) expect(m.chosenShadow, `${name}: a chosen control is pressed in`).toContain("inset");
+    expect(m.transforms.filter(t => t !== "none"), `${name}: nothing moves with reduced motion`).toEqual([]);
+    expect(m.markPct, `${name}: check and cross stay a small share`).toBeLessThan(2);
 };
 
-test("the scoreboard party screens pass Calm's self-check", async ({ browser }) => {
+test("the scoreboard party screens follow the surface rules", async ({ browser }) => {
     const host = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
     const guest = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
 
@@ -154,4 +171,30 @@ test("the scoreboard party screens pass Calm's self-check", async ({ browser }) 
     await judge(guest, "party-big-screen");
 
     await Promise.all([host, guest].map(page => page.context().close()));
+});
+
+test("Sparkle mode switches every screen, is remembered, and keeps still with reduced motion", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/#/quizzes");
+    const toggle = page.getByRole("switch", { name: "Sparkle mode" });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "calm");
+
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
+    // The sequin skin (its magenta sheet, #760c52) reaches a control on the surface.
+    const control = page.locator(".calm-ground button.lycra").first();
+    await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
+
+    // Remembered across a reload, with no flash of Calm first.
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
+    await expect(page.getByRole("switch", { name: "Sparkle mode" })).toHaveAttribute("aria-checked", "true");
+
+    // Reduced motion: the stars are there, but nothing animates.
+    await expect(page.locator(".esc-sparkles > i").first()).toBeVisible();
+    const running = await page.evaluate(() => document.getAnimations().length);
+    expect(running).toBe(0);
+
+    await page.context().close();
 });

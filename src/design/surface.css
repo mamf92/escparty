@@ -1,0 +1,296 @@
+/*
+  The surface: every shape on a screen, in both themes
+  (docs/design/design-system.md, "Anatomy").
+
+  Modern soft neumorphism. The screen is one colour, and every surface is
+  made of that same colour: a control is lifted out of it by a pair of soft
+  shadows (light to the top left, shade to the bottom right) and pressed
+  into it by the same pair turned inwards. There are no borders, no frames
+  and no cards around groups; space alone groups things.
+
+  The class names are the ones the screens already use (calm-ground,
+  lycra-pane, lycra, lycra-field ...). They are kept so no page has to
+  change to take the new look; `Ground`, `Pane`, `Control`, `Row` and
+  `Field` in Surface.tsx write them for you.
+
+  Everything is scoped to `.esc-app` (the phone frame and the big screen).
+  The /fabric-ui demo loads its own vendored lycra-surface.css and calm.css
+  for the same class names, so every property those set is set again here,
+  which keeps the app right after someone has visited the demo.
+*/
+
+/* Ground and pane are layout only: no colour, no edge, no shadow. */
+.esc-app .calm-ground {
+  position: relative;
+  width: 100%;
+  padding: var(--esc-space-2) 0;
+  border-radius: 0;
+  background: none;
+}
+
+.esc-app .calm-ground + .calm-ground {
+  margin-top: var(--esc-space-4);
+}
+
+.esc-app .lycra-pane {
+  position: relative;
+  isolation: auto;
+  display: grid;
+  gap: var(--esc-space-4);
+  margin: 0;
+  /*
+    Room for the shadows. With the page's own gutter this is about 28px,
+    which holds everything but the faintest tail of the proud lift.
+  */
+  padding: var(--esc-space-3) var(--esc-space-4);
+  list-style: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The control: the background, raised. */
+.esc-app .lycra {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--esc-space-2);
+  box-sizing: border-box;
+  min-height: var(--esc-target-min);
+  padding: var(--esc-space-3) var(--esc-space-5);
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--esc-font-body);
+  font-size: var(--esc-text-control);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--esc-ink);
+  border: 0;
+  border-radius: var(--esc-radius-control);
+  background: var(--esc-face);
+  box-shadow: var(--esc-raise);
+  transform: none;
+  transition:
+    box-shadow var(--esc-press),
+    background-color var(--esc-press),
+    color var(--esc-press);
+}
+
+.esc-app .lycra:hover {
+  background: var(--esc-face-hover);
+}
+
+/* Pressed and chosen: the same surface, pushed into the background. */
+.esc-app .lycra:active,
+.esc-app .lycra.is-pressed,
+.esc-app .lycra.is-chosen,
+.esc-app .lycra.is-chosen:hover,
+.esc-app .lycra.is-selected,
+.esc-app .lycra.is-selected:active,
+.esc-app .lycra.is-static.is-chosen,
+.esc-app .lycra.is-static.is-chosen:hover,
+.esc-app .lycra.is-static.is-chosen:active {
+  transform: none;
+  background: var(--esc-face-pressed);
+  box-shadow: var(--esc-inset);
+}
+
+/* Chosen also takes the one accent, so it never rests on shadow alone. */
+.esc-app .lycra.is-chosen,
+.esc-app .lycra.is-selected {
+  color: var(--esc-accent);
+}
+
+/* Neighbours stay put: there is no fabric to tug any more. */
+.esc-app .lycra:active + .lycra,
+.esc-app .lycra:has(+ .lycra:active) {
+  transform: none;
+}
+
+.esc-app .lycra:disabled:not(.is-chosen):not(.is-selected),
+.esc-app .lycra[aria-disabled="true"]:not(.is-chosen):not(.is-selected) {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  background: var(--esc-face);
+  box-shadow: var(--esc-raise-sm);
+}
+
+/* A chosen control that is busy or locked stays pressed in, only dimmed. */
+.esc-app .lycra.is-chosen:disabled,
+.esc-app .lycra.is-chosen[aria-disabled="true"] {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* A full-width row: a title with its detail under it, read left to right. */
+.esc-app .lycra.is-block {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--esc-space-1);
+  text-align: left;
+}
+
+/*
+  Information, not a control: a quieter lift, and nothing happens when it
+  is pointed at or pressed.
+*/
+.esc-app .lycra.is-static,
+.esc-app .lycra.is-static:hover,
+.esc-app .lycra.is-static:active {
+  cursor: default;
+  background: var(--esc-face);
+  box-shadow: var(--esc-raise-sm);
+}
+
+/* The proud row (first place, your own row) stands further out. */
+.esc-app .lycra.is-high,
+.esc-app .lycra.is-static.is-high,
+.esc-app .lycra.is-static.is-high:hover,
+.esc-app .lycra.is-static.is-high:active,
+.esc-app .lycra.is-marked.is-high:disabled {
+  background: var(--esc-face);
+  box-shadow: var(--esc-raise-lg);
+}
+
+/* The bottom of a ladder sits in the background rather than on it. */
+.esc-app .lycra.is-low,
+.esc-app .lycra.is-static.is-low,
+.esc-app .lycra.is-static.is-low:hover,
+.esc-app .lycra.is-static.is-low:active,
+.esc-app .lycra.is-marked.is-low:disabled {
+  background: var(--esc-face-pressed);
+  box-shadow: var(--esc-inset-sm);
+}
+
+/* A settled answer is the most important thing on screen, not a dimmed one. */
+.esc-app .lycra.is-marked:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+/* Fields are wells: pressed into the background, always. */
+.esc-app .lycra-field,
+.esc-app .lycra-well {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--esc-target-min);
+  padding: var(--esc-space-3) var(--esc-space-4);
+  font-family: var(--esc-font-body);
+  font-size: var(--esc-text-control);
+  color: var(--esc-ink);
+  border: 0;
+  border-radius: var(--esc-radius-field);
+  background: var(--esc-bg);
+  box-shadow: var(--esc-well);
+}
+
+.esc-app .lycra-field::placeholder {
+  color: var(--esc-ink-muted);
+  opacity: 0.85;
+}
+
+.esc-app .lycra-field:focus-visible {
+  outline: 2px solid var(--esc-focus);
+  outline-offset: 3px;
+  box-shadow: var(--esc-well);
+}
+
+.esc-app textarea.lycra-field {
+  resize: vertical;
+  min-height: 5rem;
+  line-height: 1.4;
+}
+
+.esc-app select.lycra-field {
+  appearance: none;
+}
+
+/* Detail text: the second type size, muted. */
+.esc-app .calm-sub {
+  font-size: var(--esc-text-sub);
+  font-weight: 400;
+  color: var(--esc-ink-muted);
+  opacity: 1;
+}
+
+.esc-app .lycra.is-chosen .calm-sub {
+  color: inherit;
+}
+
+/* A field's caption. */
+.esc-app .calm-label {
+  display: block;
+  margin-bottom: var(--esc-space-2);
+  font-size: var(--esc-text-sub);
+  font-weight: 600;
+  color: var(--esc-ink-muted);
+  opacity: 1;
+}
+
+/* A title and its value at the two ends of one line. */
+.esc-app .calm-row,
+.esc-app .rank-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esc-space-3);
+  width: 100%;
+}
+
+/* Two or three moves side by side (previous / next). */
+.esc-app .lycra-pane.calm-split {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: var(--esc-space-3);
+}
+
+/* A rating scale: the numbers 1..max as a grid of small round keys. */
+.esc-app .lycra-pane.calm-scale {
+  grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
+  gap: var(--esc-space-3);
+}
+
+.esc-app .calm-scale .lycra {
+  min-width: 0;
+  padding: var(--esc-space-3) 0;
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+
+/* Correct and wrong: a glyph in the colour, never the colour alone. */
+.esc-app .calm-marker {
+  position: absolute;
+  left: auto;
+  right: var(--esc-space-4);
+  top: 50%;
+  translate: 0 -50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The big screen: the same surface for a TV across the room. */
+.esc-app .calm-page.calm-screen {
+  font-size: 1.35rem;
+}
+
+.esc-app .calm-screen .lycra {
+  min-height: 3.75rem;
+  font-size: 1.35rem;
+}
+
+.esc-app .calm-screen .calm-sub {
+  font-size: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esc-app .lycra {
+    transition: none;
+  }
+}

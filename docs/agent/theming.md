@@ -1,70 +1,69 @@
 # Theming
 
 Read this when a task touches which design language a screen should use, or
-how Calm and Sparkle relate to each other. For the actual visual rules,
-measurements, and how-to-build guidance, go to the skills — this file is
-just the bridge between them.
+how Calm and Sparkle relate to each other. **The rulebook for building any
+screen is `docs/design/design-system.md`** (tokens, page anatomy,
+components, UX patterns, accessibility, PR checklist); the code is in
+`src/design/`. This file is the bridge between that and the code.
+
+## How the theme is switched on live pages
+
+One design language (modern soft neumorphism: one background, frameless
+surfaces raised out of it or pressed into it), two themes.
+`data-theme="calm" | "sparkle"` sits on `<html>`: `index.html` sets it from
+`localStorage["escparty-theme"]` before first paint and
+`DesignThemeProvider` (in `App.tsx`) keeps it in sync with the **Sparkle
+mode** switch in the app bar (`MobileFrame`) and on the big screen.
+
+- `src/design/tokens.css` sets every token per theme: colours, fonts,
+  sizes, the surface faces and the raise/inset shadows. Most of Sparkle is
+  just different token values.
+- `src/design/surface.css` draws every surface class (`calm-ground`,
+  `lycra-pane`, `lycra`, `lycra-field`, …) from those tokens.
+- `src/design/sparkle.css` adds Sparkle's decoration: the glint, the stars,
+  the marker glow.
+
+All of it is scoped to `.esc-app`, so `/fabric-ui` is untouched, and is
+imported once, from `main.tsx`, via `src/design/design-system.css`. Never
+import a surface stylesheet from a page.
 
 ## The two themes
 
-- **Calm** (`.claude/skills/escparty-calm/SKILL.md`) — the default and
-  accessible landing experience. A dark violet CSS surface with controls
-  pushed up as stacked box shadows, running entirely on the CPU, with no
-  motion beyond the press itself.
-- **Sparkle** (`.claude/skills/escparty-sparkle/SKILL.md`) — an opt-in
-  glittering WebGL sequin membrane with device/pointer parallax. Never the
-  landing state, and a system-level reduced-motion preference overrides the
-  toggle even when a user has opted in.
+- **Calm** — the default and accessible landing experience. One flat
+  violet background; controls are the same colour, raised by soft light
+  and shade, with no motion beyond the press.
+- **Sparkle** — opt-in, never the landing state. The same shapes in
+  magenta sequins that flip to gold when chosen, on a glitter stage, with
+  gold-foil titles. Its animations (twinkle, glint, foil) only run when the
+  system allows motion.
 
-## Why they can't drift apart in meaning
+## The /fabric-ui demo
 
-Inside the `src/fabric-ui/` proof-of-concept, both renderers read from the
-same `OverlayItem[]` content model produced by the screen builders — they
-can differ in *how* they present a given UI state (raised/pressed/selected/
-correct/wrong) but never in *what* state is being shown. That guarantee is
-scoped to `fabric-ui`'s own renderer abstraction, not something every live
-page automatically plugs into (see the `fabric-ui` note in
-`docs/agent/architecture.md`).
-
-Outside `fabric-ui`, a live page that wants the Calm look (e.g.
-`Scoreboard.tsx`) applies it directly by importing `calm.css` and adding a
-page-scoped override stylesheet — there's no `OverlayItem` involved on that
-path. If you're adding a new interactive state, decide which path you're
-on: inside the demo's shared model, or a direct CSS adoption on a real page.
-
-New screens take the direct path through `src/components/CalmPage.tsx`,
-which imports the vendored stylesheet, `calm.css`, and
-`src/styles/calm-page.css` (the phone-frame fit the Scoreboard first worked
-out; the Scoreboard carries the `calm-page` class too, and keeps only its
-proud-step rules in `scoreboard-calm.css`). Controls go straight into a `.lycra-pane`;
-fields use the vendored `.lycra-field` groove.
-
-## Where the implementation lives
-
-Sparkle's renderer and the `OverlayItem` model live in `src/fabric-ui/` (see
-`docs/agent/architecture.md`) and, as of this writing, are not confirmed
-wired into any live page — only the standalone `/fabric-ui` demo route uses
-them. Calm's CSS (`calm.css`, vendored per the notes in
-`.claude/skills/escparty-calm/SKILL.md`) is also authored in `fabric-ui/`
-but *is* imported directly by at least one live page (`Scoreboard.tsx`).
-Don't duplicate the skills' `dna.json`/`PROMPT.md` content here or in
-`CLAUDE.md` — if you need the measured values or build workflow, load the
-skill.
+`src/fabric-ui/` is a standalone proof of concept on `/fabric-ui` with two
+renderers (a CSS one, `CalmSurface.tsx`, and a WebGL sequin membrane) that
+read the same `OverlayItem[]` content model. It keeps the earlier lycra
+surface (`lycra-surface.css`, `calm.css`, imported by `CalmSurface.tsx`)
+and the skills that describe it (`.claude/skills/escparty-calm/`,
+`.claude/skills/escparty-sparkle/`). Those rules apply to the demo only;
+live pages follow `docs/design/design-system.md`, and the app's
+`.esc-app`-scoped surface outranks the demo's stylesheets after a visit to
+the demo.
 
 ## Picking a theme for new work
 
-Default to Calm unless the task explicitly asks for Sparkle, party mode, or
-similar — see each skill's description for the exact trigger wording.
+There's no picking per screen: every screen is built once, on the design
+system, and must look right in both themes. Calm is what everyone lands
+on; Sparkle is the user's switch.
 
 ## Checking a live page
 
 `e2e/theme.spec.ts` renders each scoreboard party screen (home, setup,
 join, rate, my ranking, the room, host tools, awards, big screen) with
-reduced motion on, measures it inside `.calm-ground`, and runs the Calm
-skill's own `tools/check.py` on the measurements (#90), so the rules stay
-in the skill. The measurements are attached to the Playwright report. Two checks
-stay manual because no script can decide them: the neighbour tug and the
-squint ladder. Add a screen there when you build a new Calm page. Sparkle
-isn't checked on live pages: they take Calm's CSS directly, and Sparkle
-is only the opt-in `/fabric-ui` demo, so a Sparkle pass needs a live page
-built on `OverlayItem` first.
+reduced motion on and measures it with `judge()`: no frames, controls made
+of the background and raised by a light and a dark shadow, chosen pressed
+in, at most four text sizes, nothing moving, and a small budget for green
+and red. The measurements are attached to the Playwright report. Add a
+`judge()` call when you build a new screen. Sparkle's contrast is checked
+from its tokens (`src/design/contrast.test.ts`), and `e2e/theme.spec.ts`
+checks the switch: it turns Sparkle on, survives a reload, and stops
+animating with reduced motion.

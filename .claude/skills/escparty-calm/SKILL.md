@@ -1,9 +1,13 @@
 ---
 name: escparty-calm
-description: Build anything in the ESCParty Calm design language — the accessible, motion-free surface where controls push up through a dark violet sheet as stacked box shadows, and no colour appears except a green check and a red cross. Use whenever building or restyling an ESCParty screen, component, or page that should match the app's landing state, or when asked for the calm/accessible/quiet/default/non-sparkly version of an ESCParty surface. Also use when reviewing whether an existing ESCParty screen still matches Calm. This is the DEFAULT ESCParty language — reach for it unless sparkle is explicitly asked for. For the opt-in glittering WebGL sequin variant, use escparty-sparkle instead.
+description: Work on the /fabric-ui demo's CSS lycra renderer (CalmSurface.tsx, calm.css, the vendored lycra-surface.css) — controls pushed up through a dark violet sheet as stacked box shadows. Demo only: for any live ESCParty screen, follow docs/design/design-system.md instead.
 ---
 
 # ESCParty Calm
+
+> **Scope:** this skill describes the `/fabric-ui` demo's surface only. Live
+> app screens follow `docs/design/design-system.md` (modern soft
+> neumorphism, no frames); where the two differ, that file wins.
 
 The landing surface for ESCParty. A dark violet sheet with controls pushed up through it as stacked box shadows, running entirely on the CPU, with no motion beyond the press itself.
 
