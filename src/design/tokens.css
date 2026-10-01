@@ -47,6 +47,10 @@
   --esc-surface: #2a2142;
   --esc-backdrop: #1d1630;
   --esc-frame: #141018;
+  --esc-bezel: #0d0a10;
+  /* The Sparkle mode switch when on: a gold coin, in either theme. */
+  --esc-switch-on: radial-gradient(circle at 35% 30%, #fff3c4, #ffc93c 55%, #b07a12);
+  --esc-on-switch: #2a1600;
   --esc-ink: #f1ecf7;
   --esc-ink-muted: #c3b8d6;
   --esc-accent: #f2a7dc;
@@ -73,6 +77,8 @@
   --esc-raise-lg: -8px -8px 22px var(--esc-light), 9px 9px 24px var(--esc-shade);
   --esc-inset: inset 5px 5px 12px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
   --esc-inset-sm: inset 2px 2px 6px var(--esc-shade), inset -2px -2px 6px var(--esc-light);
+  /* A field's well: pressed in like chosen, but never with chosen's glow. */
+  --esc-well: inset 5px 5px 12px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
 
   /* A surface's face: flat, the background colour. */
   --esc-face: var(--esc-surface);
@@ -119,6 +125,7 @@
   --esc-raise: -5px -5px 14px var(--esc-light), 5px 5px 14px var(--esc-shade), 0 0 18px rgba(255, 31, 143, 0.28);
   --esc-raise-lg: -8px -8px 22px var(--esc-light), 9px 9px 24px var(--esc-shade), 0 0 26px rgba(255, 201, 60, 0.4);
   --esc-inset: inset 4px 4px 10px var(--esc-shade), inset -4px -4px 10px var(--esc-light), 0 0 14px rgba(255, 201, 60, 0.35);
+  --esc-well: inset 4px 4px 10px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
 
   /*
     Sequins: two offset dot lattices over a magenta sheet. Kept dark enough

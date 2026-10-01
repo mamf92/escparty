@@ -176,8 +176,8 @@ body {
 
 .esc-theme-switch[aria-checked="true"] .esc-theme-switch-thumb {
   transform: translateX(18px);
-  color: #2a1600;
-  background: radial-gradient(circle at 35% 30%, #fff3c4, #ffc93c 55%, #b07a12);
+  color: var(--esc-on-switch);
+  background: var(--esc-switch-on);
 }
 
 @media (prefers-reduced-motion: reduce) {

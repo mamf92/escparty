@@ -32,7 +32,7 @@
 :root[data-theme="sparkle"] .esc-app .lycra-field {
   color: var(--esc-ink);
   background: rgba(16, 2, 24, 0.75);
-  box-shadow: var(--esc-inset);
+  box-shadow: var(--esc-well);
 }
 
 :root[data-theme="sparkle"] .esc-app .lycra-field::placeholder {
@@ -40,7 +40,7 @@
 }
 
 :root[data-theme="sparkle"] .esc-app .lycra-field:focus-visible {
-  box-shadow: var(--esc-inset);
+  box-shadow: var(--esc-well);
 }
 
 /* Correct and wrong keep their glyphs; Sparkle only lets them glow. */

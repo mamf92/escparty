@@ -34,17 +34,22 @@ export const Pane = ({ as: Tag = "div", layout = "stack", className, ...props }:
 };
 
 type ControlProps = ComponentPropsWithRef<"button"> & {
-  /** Chosen holds the sink: the answer or option someone picked. */
+  /** Chosen stays pressed in: the answer or option someone picked. */
   chosen?: boolean;
   /** A row with a title and detail under it, left aligned. */
   block?: boolean;
 };
 
+/*
+ * Chosen is announced as `aria-pressed` on a plain toggle button. A control
+ * given a role (`radio`, `tab`, `option`) states its own choice instead
+ * (`aria-checked`, `aria-selected`), where `aria-pressed` isn't allowed.
+ */
 export const Control = ({ chosen, block, className, type = "button", ...props }: ControlProps) => (
   <button
     type={type}
     className={cx("lycra", block && "is-block", chosen && "is-chosen", className)}
-    aria-pressed={chosen === undefined ? undefined : chosen}
+    aria-pressed={chosen === undefined || props.role ? undefined : chosen}
     {...props}
   />
 );
@@ -54,7 +59,7 @@ type RowProps = {
   as?: "li" | "div";
   /**
    * Its step on the elevation ladder: `high` stands proud (first place,
-   * your own row), `low` sits flush (the bottom of a ladder).
+   * your own row), `low` sits pressed in (the bottom of a ladder).
    */
   elevation?: "high" | "rest" | "low";
   className?: string;

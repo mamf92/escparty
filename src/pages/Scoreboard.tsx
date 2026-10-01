@@ -72,10 +72,8 @@ function levelsFor(entries: ScoreEntry[]): Map<ScoreEntry, Level> {
 
 function rowClass(level: Level): string {
     const out = ["lycra", "is-block", "is-static", "is-rank"];
-    // `is-selected` carries the taller shadow; `is-high` is what calm.css keys
-    // the settled-result overrides off. The membrane renderer reads the same
-    // pair, so the two modes agree on what "proud" means.
-    if (level === "high") out.push("is-selected", "is-high");
+    // `is-high` is the proud lift (src/design/surface.css).
+    if (level === "high") out.push("is-high");
     if (level === "low") out.push("is-low");
     return out.join(" ");
 }

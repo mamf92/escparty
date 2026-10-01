@@ -38,8 +38,11 @@
   display: grid;
   gap: var(--esc-space-4);
   margin: 0;
-  /* Room for the shadows, so the edge of the scroller never cuts them. */
-  padding: var(--esc-space-2) var(--esc-space-3);
+  /*
+    Room for the shadows. With the page's own gutter this is about 28px,
+    which holds everything but the faintest tail of the proud lift.
+  */
+  padding: var(--esc-space-3) var(--esc-space-4);
   list-style: none;
   background: none;
   border: 0;
@@ -108,13 +111,20 @@
   transform: none;
 }
 
-.esc-app .lycra:disabled,
-.esc-app .lycra[aria-disabled="true"] {
+.esc-app .lycra:disabled:not(.is-chosen):not(.is-selected),
+.esc-app .lycra[aria-disabled="true"]:not(.is-chosen):not(.is-selected) {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
   background: var(--esc-face);
   box-shadow: var(--esc-raise-sm);
+}
+
+/* A chosen control that is busy or locked stays pressed in, only dimmed. */
+.esc-app .lycra.is-chosen:disabled,
+.esc-app .lycra.is-chosen[aria-disabled="true"] {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* A full-width row: a title with its detail under it, read left to right. */
@@ -177,7 +187,7 @@
   border: 0;
   border-radius: var(--esc-radius-field);
   background: var(--esc-bg);
-  box-shadow: var(--esc-inset);
+  box-shadow: var(--esc-well);
 }
 
 .esc-app .lycra-field::placeholder {
@@ -188,7 +198,7 @@
 .esc-app .lycra-field:focus-visible {
   outline: 2px solid var(--esc-focus);
   outline-offset: 3px;
-  box-shadow: var(--esc-inset);
+  box-shadow: var(--esc-well);
 }
 
 .esc-app textarea.lycra-field {

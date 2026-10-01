@@ -48,12 +48,20 @@ describe("Surface", () => {
     expect(split).toHaveClass("calm-split");
   });
 
-  it("a chosen control holds the sink and says it's pressed", () => {
+  it("a chosen control is pressed in and says it's pressed", () => {
     render(<><Control chosen>Picked</Control><Control chosen={false}>Not picked</Control><Control>Plain</Control></>);
     expect(screen.getByRole("button", { name: "Picked" })).toHaveClass("lycra", "is-chosen");
     expect(screen.getByRole("button", { name: "Picked" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Not picked" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Plain" })).not.toHaveAttribute("aria-pressed");
+  });
+
+  it("a chosen control with a role states its choice its own way, not as pressed", () => {
+    render(<Control role="radio" aria-checked chosen>Douze</Control>);
+    const radio = screen.getByRole("radio", { name: "Douze" });
+    expect(radio).toHaveClass("is-chosen");
+    expect(radio).toHaveAttribute("aria-checked", "true");
+    expect(radio).not.toHaveAttribute("aria-pressed");
   });
 
   it("a block control is a left-aligned row, type=button by default", async () => {

@@ -68,7 +68,7 @@ const PhoneFrame = styled.div`
   max-height: 812px;
   background-color: var(--esc-frame);
   border-radius: 40px;
-  box-shadow: 0 0 0 10px #0d0a10, 0 0 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 10px var(--esc-bezel), 0 0 30px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   display: flex;
   flex-direction: column;

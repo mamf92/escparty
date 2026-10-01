@@ -51,7 +51,8 @@ const Page = styled.div`
   font-family: var(--esc-font-body);
 `;
 
-const Header = styled.header`
+// Not a <header>: the app bar is the page's one banner landmark.
+const Header = styled.div`
   text-align: center;
 `;
 
