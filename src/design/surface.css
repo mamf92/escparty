@@ -233,6 +233,24 @@
   opacity: 1;
 }
 
+/*
+  A label and a field's note are siblings of the field in the pane, so the
+  pane's gap would hold them as far from their field as from the next one.
+  Pull each up to the field it belongs to; the gap stays between fields.
+*/
+.esc-app .lycra-pane > .calm-label {
+  margin-bottom: calc(var(--esc-space-2) - var(--esc-space-4));
+}
+
+.esc-app .lycra-pane > p.calm-sub {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.esc-app .lycra-pane > .lycra-field + p.calm-sub {
+  margin-top: calc(var(--esc-space-2) - var(--esc-space-4));
+}
+
 /* A title and its value at the two ends of one line. */
 .esc-app .calm-row,
 .esc-app .rank-line {

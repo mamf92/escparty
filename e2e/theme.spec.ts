@@ -3,7 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
- * Theme compliance for the scoreboard party screens (#90), judged against
+ * Theme compliance for the scoreboard party screens (#90) and the quiz
+ * library and builder (#177), judged against
  * the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
@@ -171,6 +172,36 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await judge(guest, "party-big-screen");
 
     await Promise.all([host, guest].map(page => page.context().close()));
+});
+
+test("the quiz library and builder follow the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    await page.goto("/#/quizzes");
+    await page.getByRole("radio", { name: /Quick Fire/ }).click();
+    await expect(page.getByRole("button", { name: "Make my own version" })).toBeVisible();
+    await judge(page, "quiz-library");
+
+    // The builder, from a premade quiz, with a question picked.
+    await page.getByRole("button", { name: "Make my own version" }).click();
+    const questions = page.getByRole("radiogroup", { name: "Questions in this quiz" }).getByRole("radio");
+    await expect(questions).toHaveCount(10);
+    await questions.nth(1).click();
+    await expect(page.getByRole("button", { name: "Edit this question" })).toBeVisible();
+    await judge(page, "quiz-builder");
+
+    await page.getByRole("button", { name: "Add from the bank" }).click();
+    await expect(page.getByRole("group", { name: "Bank questions" })).toBeVisible();
+    await judge(page, "quiz-builder-bank");
+    await page.getByRole("button", { name: "Use these questions" }).click();
+
+    // The question editor, with its notes beside the fields.
+    await page.getByRole("button", { name: "Write a question" }).click();
+    await page.getByRole("button", { name: "Add to the quiz" }).click();
+    await expect(page.getByText("Write the question.")).toBeVisible();
+    await judge(page, "quiz-builder-write");
+
+    await page.context().close();
 });
 
 test("Sparkle mode switches every screen, is remembered, and keeps still with reduced motion", async ({ browser }) => {

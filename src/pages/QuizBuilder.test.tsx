@@ -69,7 +69,12 @@ describe("QuizBuilder", () => {
 
     await user.click(screen.getByRole("button", { name: "Save quiz" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Give the quiz a name. Add at least one question.");
+    // What's wrong with the name is said beside it, and focus goes there.
+    const name = screen.getByLabelText("Name");
+    expect(name).toHaveFocus();
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    expect(name).toHaveAccessibleDescription("Give the quiz a name.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Add at least one question.");
     expect(mocks.saveCustomQuiz).not.toHaveBeenCalled();
   });
 
@@ -91,7 +96,7 @@ describe("QuizBuilder", () => {
     await user.click(melodi);
     expect(melodi).toHaveAttribute("aria-pressed", "false");
     await user.click(melodi);
-    await user.click(screen.getByRole("button", { name: "Done" }));
+    await user.click(screen.getByRole("button", { name: "Use these questions" }));
 
     await writeQuestion(user, "Who sang 'Lipstick'?", ["Bros", "Jedward", "Zig and Zag"], "Jedward");
 
@@ -124,7 +129,13 @@ describe("QuizBuilder", () => {
     await user.type(screen.getByLabelText("Answer 2"), "same");
     await user.click(screen.getByRole("button", { name: "Add to the quiz" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Write the question. Two answers are the same. Mark which answer is correct.");
+    // Each problem is said beside its field, and focus goes to the first.
+    const question = screen.getByLabelText("Question");
+    expect(question).toHaveFocus();
+    expect(question).toHaveAccessibleDescription("Write the question.");
+    expect(screen.getByLabelText("Answer 1")).toHaveAccessibleDescription("Two answers are the same.");
+    expect(screen.getByLabelText("Answer 2")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("radiogroup", { name: "Correct answer" })).toHaveAccessibleDescription("Mark which answer is correct.");
 
     // Up to six answers, and back down to two.
     for (let i = 0; i < 4; i++) await user.click(screen.getByRole("button", { name: "Add another answer" }));
@@ -146,11 +157,15 @@ describe("QuizBuilder", () => {
     await writeQuestion(user, "Second?", ["C", "D"], "D");
 
     await user.click(within(questionList()).getByRole("radio", { name: /Second\?/ }));
-    expect(screen.queryByRole("button", { name: "Move down" })).not.toBeInTheDocument();
+    // At the end, the move that can't be made stays put, disabled.
+    expect(screen.getByRole("button", { name: "Move down" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Move up" }));
     expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("1. Second?");
+    // Now at the top: focus moves to the move that's still possible.
+    expect(screen.getByRole("button", { name: "Move up" })).toBeDisabled();
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: "Move down" })).toHaveFocus());
 
-    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Edit this question" }));
     expect(screen.getByLabelText("Question")).toHaveValue("Second?");
     expect(screen.getByRole("radio", { name: "D" })).toHaveAttribute("aria-checked", "true");
     await user.clear(screen.getByLabelText("Question"));
@@ -159,7 +174,13 @@ describe("QuizBuilder", () => {
     expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("1. Second, edited?");
 
     await user.click(within(questionList()).getByRole("radio", { name: /First\?/ }));
-    await user.click(screen.getByRole("button", { name: "Take out" }));
+    // Taking a question out asks first, and keeping it changes nothing.
+    await user.click(screen.getByRole("button", { name: "Remove this question" }));
+    expect(screen.getByRole("button", { name: "Yes, remove it" })).toHaveAccessibleDescription("Take question 2 out of this quiz?");
+    await user.click(screen.getByRole("button", { name: "Keep it" }));
+    expect(within(questionList()).getAllByRole("radio")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Remove this question" }));
+    await user.click(screen.getByRole("button", { name: "Yes, remove it" }));
     expect(within(questionList()).getAllByRole("radio")).toHaveLength(1);
   });
 
@@ -174,15 +195,44 @@ describe("QuizBuilder", () => {
 
     // Opened and kept without a change, it stays the bank's.
     await user.click(rows[0]);
-    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Edit this question" }));
     await user.click(screen.getByRole("button", { name: "Keep these changes" }));
     expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("Bank ·");
 
     await user.click(within(questionList()).getAllByRole("radio")[0]);
-    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Edit this question" }));
     await user.type(screen.getByLabelText("Question"), " Really?");
     await user.click(screen.getByRole("button", { name: "Keep these changes" }));
     expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("Really?Yours");
+  });
+
+  it("says so when no bank question matches the filters", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await user.click(screen.getByRole("button", { name: "Add from the bank" }));
+    const category = await screen.findByLabelText("Category");
+    await screen.findByRole("group", { name: "Bank questions" });
+    // The bank has no hard spectacle questions.
+    await user.selectOptions(category, "spectacle");
+    await user.selectOptions(screen.getByLabelText("Difficulty"), "hard");
+    expect(screen.queryByRole("group", { name: "Bank questions" })).not.toBeInTheDocument();
+    expect(screen.getByText(/No questions match that category and difficulty/)).toBeInTheDocument();
+  });
+
+  it("moves through the questions with the arrow keys", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await writeQuestion(user, "First?", ["A", "B"], "A");
+    await writeQuestion(user, "Second?", ["C", "D"], "D");
+
+    const [first, second] = within(questionList()).getAllByRole("radio");
+    expect(first).toHaveAttribute("tabindex", "0");
+    expect(second).toHaveAttribute("tabindex", "-1");
+    first.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("group", { name: "Question 2" })).toBeInTheDocument();
   });
 
   it("edits a saved quiz, saving the new version in its place", async () => {
@@ -205,7 +255,7 @@ describe("QuizBuilder", () => {
     const user = userEvent.setup();
     mocks.fetchCustomQuiz.mockResolvedValue(null);
     renderBuilder(`/quizzes/edit/${ID}`);
-    expect(await screen.findByRole("status")).toHaveTextContent("That quiz couldn't be loaded");
+    expect(await screen.findByText(/That quiz couldn.t be loaded/)).toHaveAttribute("role", "status");
     expect(screen.getByText(/No questions yet/)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Name"), "Fresh");
@@ -222,7 +272,7 @@ describe("QuizBuilder", () => {
     await writeQuestion(user, "Q?", ["A", "B"], "A");
 
     await user.click(screen.getByRole("button", { name: "Save quiz" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("couldn't be saved");
+    expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be saved");
 
     await user.click(screen.getByRole("button", { name: "Save quiz" }));
     expect(await screen.findByText(/at \/quizzes/)).toBeInTheDocument();

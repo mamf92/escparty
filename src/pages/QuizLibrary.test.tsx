@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InitialEntry } from "react-router-dom";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
@@ -81,7 +81,16 @@ describe("QuizLibrary", () => {
     saveOne();
     renderLibrary();
     await user.click(screen.getByRole("radio", { name: /Jedward's Revenge/ }));
+    // Removing asks first, lands on the safe answer, and keeping changes nothing.
     await user.click(screen.getByRole("button", { name: "Remove from this device" }));
+    expect(screen.getByRole("button", { name: "Yes, remove it" })).toHaveAccessibleDescription(/Take Jedward's Revenge off this device's list\?/);
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: "Keep it" })).toHaveFocus());
+    await user.click(screen.getByRole("button", { name: "Keep it" }));
+    expect(screen.getByRole("radio", { name: /Jedward's Revenge/ })).toBeInTheDocument();
+    expect(localStorage.getItem("escparty.myQuizzes")).not.toBe("[]");
+
+    await user.click(screen.getByRole("button", { name: "Remove from this device" }));
+    await user.click(screen.getByRole("button", { name: "Yes, remove it" }));
     expect(screen.queryByRole("radio", { name: /Jedward's Revenge/ })).not.toBeInTheDocument();
     expect(localStorage.getItem("escparty.myQuizzes")).toBe("[]");
   });
@@ -95,7 +104,21 @@ describe("QuizLibrary", () => {
     expect(screen.getByRole("radio", { name: /Private mode quiz/ })).toHaveAttribute("aria-checked", "true");
 
     await user.click(screen.getByRole("button", { name: "Remove from this device" }));
+    await user.click(screen.getByRole("button", { name: "Yes, remove it" }));
     expect(screen.queryByRole("radio", { name: /Private mode quiz/ })).not.toBeInTheDocument();
+  });
+
+  it("moves the pick with the arrow keys, one tab stop for the list", async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const radios = screen.getAllByRole("radio");
+    expect(radios.filter(radio => radio.tabIndex === 0)).toEqual([radios[0]]);
+    radios[0].focus();
+    await user.keyboard("{ArrowDown}");
+    expect(radios[1]).toHaveFocus();
+    expect(radios[1]).toHaveAttribute("aria-checked", "true");
+    await user.keyboard("{ArrowUp}{ArrowUp}");
+    expect(radios[radios.length - 1]).toHaveFocus();
   });
 
   it("opens a saved quiz in the builder to edit", async () => {

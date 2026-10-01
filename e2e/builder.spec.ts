@@ -15,7 +15,7 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
     await page.getByRole("button", { name: "Add from the bank" }).click();
     const bank = page.getByRole("group", { name: "Bank questions" });
     for (let index = 0; index < 3; index++) await bank.getByRole("button").nth(index).click();
-    await page.getByRole("button", { name: "Done" }).click();
+    await page.getByRole("button", { name: "Use these questions" }).click();
 
     await page.getByRole("button", { name: "Write a question" }).click();
     await page.getByLabel("Question", { exact: true }).fill("Who sang 'Lipstick' for Ireland in 2011?");
