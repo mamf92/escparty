@@ -44,7 +44,7 @@ screen is wrong, not the theme.
 | Pane | Translucent sheet, 1px light edge | Same sheet with a gold, silver and pink foil rim |
 | Page title | Lavender, uppercase, tracked | Gold foil, framed by ✦ stars |
 | Motion | The press only | The press, a glint across a hovered control, twinkling stars, foil shimmer — **only** when the system allows motion |
-| Markers | `#28a745` check, `#dc3545` cross | Brighter green and red, with a glow |
+| Markers | `#28a745` check, `#ff6b78` cross | Brighter green and red, with a glow |
 
 What a theme may change: token values (`src/design/tokens.css`), the
 surface shadows and faces (`--lyc-*`, re-skinned in `src/design/sparkle.css`),
@@ -95,7 +95,7 @@ migrated (see the design system epic). Don't use `theme.colors` in new code.
 
 ```
 MobileFrame (or the big screen)
-├─ App bar            ESCParty home link · Sparkle mode switch
+├─ App bar            ESCParty brand · Sparkle mode switch
 └─ CalmPage           every screen's chrome
    ├─ Page header     <h1> title (one per page) · optional subtitle
    ├─ Ground          <Ground>  the dark, never-flat ground
@@ -117,7 +117,8 @@ MobileFrame (or the big screen)
   `<h2>` labels outside the ground, set as a note.
 - Group related controls in one pane; separate unrelated groups into
   separate grounds rather than adding dividers.
-- A list of things reads as a list: `<Pane as="ol">` with `<li>` rows.
+- A list of things reads as a list: `<Pane as="ol">` with
+  `<Control as="li" info>` rows (an `<li>`, not a button, and no tab stop).
 
 ## 5. Components
 
@@ -132,7 +133,7 @@ case, verb first ("Host a party", "Lock in", "Next act"). States:
 | Chosen | Holds the sink | Holds the sink, dark-gold sequins, gold ring | `chosen` → `.is-chosen` + `aria-pressed` |
 | Proud (ranked first) | Raised further | Stronger gold glow | `.is-high` (ladders only) |
 | Flush (bottom of a ladder) | Flush with the sheet | Same | `low` → `.is-low` |
-| Information row | Raised, no pointer | Same | `info` → `.is-static` |
+| Information row | Raised, no pointer, no glint | Same | `info` → `.is-static`, usually `as="li"` or `as="div"` |
 | Disabled | Faded into a groove | Same | `disabled` |
 
 Rows with a title and detail use `block`: title in the control size, detail
@@ -150,7 +151,9 @@ Textareas and selects take the same class.
 chosen (sunk).
 
 **Markers.** A check or cross in the pane's left gutter (`.calm-marker`),
-20px, round-capped strokes. Only for a settled answer. Always paired with
+20px, round-capped strokes. Calm's cross is `#ff6b78`, lifted from the
+Calm skill's measured `#dc3545`, which only holds 2.4:1 over the ground's
+brightest pool. Only for a settled answer. Always paired with
 text that says the same thing for screen readers.
 
 **Note** (`<CalmNote>`). Status, hints and errors around the surface, in
@@ -166,9 +169,10 @@ only the sizes scale up, together.
 ## 6. UX patterns
 
 **Navigation.**
-- The brand in the app bar always goes home. Every screen also has one
-  explicit way back in its footer, named for where it goes ("Back to the
-  quiz library", not "Back").
+- The app bar carries the brand and the Sparkle mode switch, and is not a
+  home link: several screens are mid-game and need their own way out.
+  Every screen has one explicit way back in its footer, named for where it
+  goes ("Back to the quiz library", not "Back").
 - Leaving a game in progress (a quiz, a lobby, a party) asks first or says
   what happens ("Leave the waiting room"). Never strand someone mid-game
   with a bare home button.

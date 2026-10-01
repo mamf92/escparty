@@ -55,7 +55,11 @@
   --esc-link: #d5b8e6;
   --esc-focus: #eee8f0;
   --esc-correct: #28a745;
-  --esc-wrong: #dc3545;
+  /*
+    Lifted from the skill's #dc3545, which falls to 2.4:1 over the ground's
+    brightest pool; markers need 3:1 (contrast.test.ts).
+  */
+  --esc-wrong: #ff6b78;
   --esc-frame: #141018;
 
   /* The ground behind a pane: dark and never flat (the pane refracts it). */

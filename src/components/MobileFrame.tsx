@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { Sparkles, ThemeSwitch } from '../design';
 
@@ -10,24 +9,26 @@ interface MobileFrameProps {
 /**
  * The phone-frame chrome every app screen sits in (docs/design/design-system.md,
  * "Page anatomy"): a bezel on wide screens, full bleed on a phone, and the
- * app bar with the way home and the theme switch.
+ * app bar with the brand and the theme switch. The brand is deliberately not
+ * a home link: several screens are mid-game and have their own way out.
+ * Sparkle's stars sit behind the scrolling content, fixed to the screen.
  */
 const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
   return (
     <FrameContainer>
       <PhoneFrame>
         <PhoneScreen className="esc-app">
-          <AppBar>
-            <Brand to="/" aria-label="ESCParty home">
-              <span className="esc-title-text">ESCParty</span>
-            </Brand>
-            <ThemeSwitch />
-          </AppBar>
-          <ContentConstraint>
-            {children}
-          </ContentConstraint>
+          <Sparkles />
+          <Scroller>
+            <AppBar>
+              <Brand className="esc-title-text">ESCParty</Brand>
+              <ThemeSwitch />
+            </AppBar>
+            <ContentConstraint>
+              {children}
+            </ContentConstraint>
+          </Scroller>
         </PhoneScreen>
-        <Sparkles />
         <PhoneButton />
       </PhoneFrame>
     </FrameContainer>
@@ -87,18 +88,25 @@ const PhoneFrame = styled.div`
 const PhoneScreen = styled.div`
   width: 100%;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   background: var(--esc-screen);
-  background-attachment: local;
   border-radius: 30px;
-  display: flex;
-  flex-direction: column;
   position: relative;
 
   @media (max-width: 768px) {
     border-radius: 0;
   }
+`;
+
+// The content scrolls over the screen's background and its stars.
+const Scroller = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 `;
 
 const AppBar = styled.header`
@@ -109,7 +117,7 @@ const AppBar = styled.header`
   padding: var(--esc-space-2) var(--esc-space-4) 0;
 `;
 
-const Brand = styled(Link)`
+const Brand = styled.span`
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -118,7 +126,6 @@ const Brand = styled(Link)`
   font-weight: 700;
   letter-spacing: var(--esc-title-tracking);
   text-transform: uppercase;
-  text-decoration: none;
   color: var(--esc-title);
 `;
 

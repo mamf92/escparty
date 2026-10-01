@@ -39,16 +39,38 @@ const ratio = (a: Rgb, b: Rgb) => {
 const calm = block(':root[data-theme="calm"]');
 const glam = block(':root[data-theme="sparkle"] {');
 
-// Calm's raised face: 5% white over its ground.
-const calmFace = over([255, 255, 255], 0.05, rgb("#190c31"));
-// Sparkle's faces: the brightest stop of each sheet, under its brightest sequin.
-const faceStops = (name: string) => {
-  const start = sparkle.indexOf(`${name}:`);
-  const decl = sparkle.slice(start, sparkle.indexOf(";", start));
-  return [...decl.matchAll(/#[0-9a-f]{6}/gi)].map(m => rgb(m[0]));
+const declaration = (css: string, name: string) => {
+  const start = css.indexOf(`${name}:`);
+  if (start < 0) throw new Error(`${name} isn't declared`);
+  return css.slice(start, css.indexOf(";", start));
 };
+const hexes = (decl: string) => [...decl.matchAll(/#[0-9a-f]{6}/gi)].map(m => rgb(m[0]));
+const rgbas = (decl: string) => [...decl.matchAll(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/g)]
+  .map(m => ({ colour: [+m[1], +m[2], +m[3]] as Rgb, alpha: +m[4] }));
 const brightest = (stops: Rgb[]) => stops.reduce((a, b) => (luminance(a) > luminance(b) ? a : b));
+
+/*
+ * The brightest spot of a ground: each solid stop, and each translucent pool
+ * or glitter dot laid over the ground's base colour (its last stop).
+ */
+const groundPeak = (themeBlock: string) => {
+  const decl = declaration(themeBlock, "--esc-ground");
+  const solid = hexes(decl);
+  const base = solid[solid.length - 1];
+  return brightest([...solid, ...rgbas(decl).map(({ colour, alpha }) => over(colour, alpha, base))]);
+};
+
+// Calm's pane is 5% white (lycra-surface.css) over its ground, and a raised
+// face another 5% on top of that.
+const calmPane = over([255, 255, 255], 0.05, groundPeak(calm));
+const calmFace = over([255, 255, 255], 0.05, calmPane);
+
+// Sparkle's pane is its padding-box tint (sparkle.css) over its ground.
+const sparklePaneTint = rgbas(sparkle.slice(sparkle.indexOf(".lycra-pane {")))[0];
+const sparklePane = over(sparklePaneTint.colour, sparklePaneTint.alpha, groundPeak(glam));
+// Sparkle's faces: the brightest stop of each sheet, under its brightest sequin.
 const sequin = (face: Rgb) => over([255, 255, 255], 0.3, face);
+const faceStops = (name: string) => hexes(declaration(sparkle, name));
 
 describe("design token contrast", () => {
   it("Calm: text on a control and on the screen holds 4.5:1", () => {
@@ -59,9 +81,9 @@ describe("design token contrast", () => {
     expect(ratio(rgb(token(calm, "--esc-link")), rgb(token(calm, "--esc-screen")))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("Calm: markers and the focus ring hold 3:1", () => {
+  it("Calm: markers and the focus ring hold 3:1 on the pane they sit on", () => {
     for (const name of ["--esc-correct", "--esc-wrong", "--esc-focus"]) {
-      expect(ratio(rgb(token(calm, name)), calmFace), name).toBeGreaterThanOrEqual(3);
+      expect(ratio(rgb(token(calm, name)), calmPane), name).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -73,12 +95,8 @@ describe("design token contrast", () => {
   });
 
   it("Sparkle: markers and the focus ring hold 3:1 on the pane they sit on", () => {
-    // Markers sit in the pane's gutter and the ring 3px outside a control,
-    // so both are read against the pane: rgba(46,8,62,.94) over the ground's
-    // brightest stop.
-    const pane = over([46, 8, 62], 0.94, rgb("#3b0a52"));
     for (const name of ["--esc-correct", "--esc-wrong", "--esc-focus"]) {
-      expect(ratio(rgb(token(glam, name)), pane), name).toBeGreaterThanOrEqual(3);
+      expect(ratio(rgb(token(glam, name)), sparklePane), name).toBeGreaterThanOrEqual(3);
     }
   });
 });

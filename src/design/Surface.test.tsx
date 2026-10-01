@@ -7,16 +7,30 @@ describe("Surface", () => {
   it("renders ground, pane and controls with no wrappers between them", () => {
     render(
       <Ground data-testid="ground">
-        <Pane as="ol" aria-label="Answers">
+        <Pane aria-label="Answers" role="group">
           <Control>One</Control>
           <Control>Two</Control>
         </Pane>
       </Ground>,
     );
-    const pane = screen.getByRole("list", { name: "Answers" });
+    const pane = screen.getByRole("group", { name: "Answers" });
     expect(pane).toHaveClass("lycra-pane");
     expect(pane.parentElement).toHaveClass("calm-ground");
     for (const control of screen.getAllByRole("button")) expect(control.parentElement).toBe(pane);
+  });
+
+  it("a list pane holds information rows as list items, not buttons", () => {
+    render(
+      <Pane as="ol" aria-label="Standings">
+        <Control as="li" info block>Norway</Control>
+        <Control as="li" info block>Sweden</Control>
+      </Pane>,
+    );
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveClass("lycra", "is-static", "is-block");
+    expect(items[0].parentElement).toBe(screen.getByRole("list", { name: "Standings" }));
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("maps the layout to the scale and split classes", () => {

@@ -33,6 +33,11 @@ export const Pane = ({ as: Tag = "div", layout = "stack", className, ...props }:
 };
 
 type ControlProps = ComponentPropsWithRef<"button"> & {
+  /**
+   * A control is a <button>. An information row in a list or grid renders
+   * as an `li` or `div` instead (with `info`), so it isn't a tab stop.
+   */
+  as?: "button" | "li" | "div";
   /** Chosen holds the sink: the answer or option someone picked. */
   chosen?: boolean;
   /** A row with a title and detail under it, left aligned. */
@@ -43,14 +48,21 @@ type ControlProps = ComponentPropsWithRef<"button"> & {
   low?: boolean;
 };
 
-export const Control = ({ chosen, block, info, low, className, type = "button", ...props }: ControlProps) => (
-  <button
-    type={type}
-    className={cx("lycra", block && "is-block", info && "is-static", low && "is-low", chosen && "is-chosen", className)}
-    aria-pressed={chosen === undefined ? undefined : chosen}
-    {...props}
-  />
-);
+export const Control = ({ as = "button", chosen, block, info, low, className, type = "button", ...props }: ControlProps) => {
+  const classes = cx("lycra", block && "is-block", info && "is-static", low && "is-low", chosen && "is-chosen", className);
+  if (as !== "button") {
+    const Tag = as;
+    return <Tag className={classes} {...(props as object)} />;
+  }
+  return (
+    <button
+      type={type}
+      className={classes}
+      aria-pressed={chosen === undefined ? undefined : chosen}
+      {...props}
+    />
+  );
+};
 
 export const Field = ({ className, ...props }: ComponentPropsWithRef<"input">) => (
   <input className={cx("lycra-field", className)} {...props} />

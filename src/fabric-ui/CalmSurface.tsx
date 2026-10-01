@@ -1,5 +1,6 @@
-import './lycra-surface.css';
-import './calm.css';
+// lycra-surface.css and calm.css load app-wide, once, from
+// src/design/design-system.css: a second copy here would land after the
+// design system's rules and undo them.
 import { MARKER_COLOR } from './presets';
 import type { OverlayItem } from './screens';
 

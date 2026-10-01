@@ -15,8 +15,8 @@ import { hostParty, joinParty, rateActs } from "./helpers";
  */
 
 const CHECK = ".claude/skills/escparty-calm/tools/check.py";
-// Signal green and signal red, at any alpha.
-const ACCENT = /rgba?\((40, 167, 69|220, 53, 69)[,)]/.source;
+// The check and cross colours (--esc-correct, --esc-wrong), at any alpha.
+const ACCENT = /rgba?\((40, 167, 69|255, 107, 120)[,)]/.source;
 
 const measure = (page: Page) => page.evaluate((accentSource) => {
     const accent = new RegExp(accentSource);

@@ -39,23 +39,30 @@ const FramedLayout = () => (
 // switch, so the host can put the TV in Sparkle too.
 const TvLayout = ({ children }: { children: ReactNode }) => (
   <TvScreen className="esc-app">
-    <TvBar><ThemeSwitch /></TvBar>
-    {children}
     <Sparkles />
+    <TvScroll>
+      <TvBar><ThemeSwitch /></TvBar>
+      {children}
+    </TvScroll>
   </TvScreen>
 );
 
+// The stars stay put behind the content, which scrolls over them.
 const TvScreen = styled.div`
   position: fixed;
   inset: 0;
+  overflow: hidden;
+  background: var(--esc-screen);
+`;
+
+const TvScroll = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   overflow-y: auto;
   padding: 2rem 1.5rem;
-  background: var(--esc-screen);
-  background-attachment: fixed;
 
-  & > :not(.esc-sparkles) {
-    position: relative;
-    z-index: 1;
+  & > * {
     max-width: 960px;
     margin: 0 auto;
   }

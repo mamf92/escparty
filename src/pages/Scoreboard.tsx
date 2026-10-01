@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
-import "../fabric-ui/lycra-surface.css";
-import "../fabric-ui/calm.css";
-import "../styles/calm-page.css";
 import "./scoreboard-calm.css";
 import { quizTitle } from "../utils/quizCatalog";
 

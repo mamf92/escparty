@@ -73,7 +73,7 @@
   text-shadow: 0 1px 2px rgba(20, 0, 20, 0.7);
 }
 
-/* A glint that crosses a control when it is hovered or focused. */
+/* A glint that crosses a live control when it is hovered or focused. */
 :root[data-theme="sparkle"] .esc-app .lycra::after {
   content: "";
   position: absolute;
@@ -104,7 +104,9 @@
 
 /*
   The glitter layer: a decorative, aria-hidden element (<Sparkles />) that
-  scatters four-point stars over the frame. It never takes a pointer.
+  scatters four-point stars behind the content of the frame (or the big
+  screen), fixed while the content scrolls over it. It never takes a
+  pointer.
 */
 .esc-sparkles {
   display: none;
@@ -135,8 +137,8 @@
     animation: esc-twinkle var(--dur, 2.8s) ease-in-out var(--delay, 0s) infinite;
   }
 
-  :root[data-theme="sparkle"] .esc-app .lycra:hover::after,
-  :root[data-theme="sparkle"] .esc-app .lycra:focus-visible::after {
+  :root[data-theme="sparkle"] .esc-app .lycra:not(.is-static):not(:disabled):hover::after,
+  :root[data-theme="sparkle"] .esc-app .lycra:not(.is-static):not(:disabled):focus-visible::after {
     opacity: 1;
     animation: esc-glint 900ms ease-out;
   }
