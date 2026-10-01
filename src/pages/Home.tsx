@@ -1,85 +1,38 @@
 import { useNavigate } from "react-router-dom";
-import styled from "styled-components";
-import { getAssetPath } from "../utils/pathUtils";
+import { CalmPage } from "../components/CalmPage";
+import { Control, Ground, Pane } from "../design";
 
-const BACKGROUND_PATH = getAssetPath('concert-bg.jpg');
+/**
+ * The landing screen (#169): the five ways into ESCParty, one pane of
+ * controls on the ground. It's the root, so it has no way back.
+ */
+const DESTINATIONS = [
+  { label: "Host or join a quiz room", path: "/multiplayer" },
+  { label: "Browse the quiz library", path: "/quizzes" },
+  { label: "Play a quiz solo", path: "/select-difficulty" },
+  { label: "Build your own quiz", path: "/quizzes/new" },
+  { label: "Throw a scoreboard party", path: "/party" },
+] as const;
 
 const Home = () => {
   const navigate = useNavigate();
 
   return (
-    <Container>
-      <BackgroundImage $backgroundPath={BACKGROUND_PATH} />
-      <Overlay>
-        <Title>ESC Party 🎤</Title>
-        <ButtonContainer>
-          <QuizButton onClick={() => navigate("/multiplayer")}>Multiplayer quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/quizzes")}>Quiz library</QuizButton>
-          <QuizButton onClick={() => navigate("/select-difficulty")}>Single-player quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/quizzes/new")}>Create quiz</QuizButton>
-          <QuizButton onClick={() => navigate("/party")}>Scoreboard party</QuizButton>
-        </ButtonContainer>
-      </Overlay>
-    </Container>
+    <CalmPage
+      title="ESCParty"
+      subtitle="Quizzes, douze points and a shared scoreboard for your Eurovision and Melodi Grand Prix night."
+    >
+      <Ground>
+        <Pane role="group" aria-label="Where to start">
+          {DESTINATIONS.map(({ label, path }) => (
+            <Control key={path} onClick={() => navigate(path)}>
+              {label}
+            </Control>
+          ))}
+        </Pane>
+      </Ground>
+    </CalmPage>
   );
 };
 
 export default Home;
-
-// Styled Components
-const Container = styled.div`
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-`;
-
-const BackgroundImage = styled.div<{ $backgroundPath: string }>`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: ${props => props.$backgroundPath ? `url('${props.$backgroundPath}') center/cover no-repeat` : 'black'};
-  filter: brightness(50%);
-`;
-
-const Overlay = styled.div`
-  position: relative;
-  z-index: 2;
-  text-align: center;
-  width: 100%;
-  max-width: 31.25rem; /* 500px - standardizing container width */
-  padding: 1.25rem; /* 20px */
-`;
-
-const Title = styled.h1`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 2rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const ButtonContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.9375rem; /* 15px */
-  padding: 0 0.75rem; /* 0 12px */
-`;
-
-const QuizButton = styled.button`
-  background: ${({ theme }) => theme.colors.purple};
-  color: white;
-  font-family: ${({ theme }) => theme.fonts.body};
-  font-size: 1rem;
-  font-weight: bold;
-  padding: 1rem; /* Standardized to 1rem */
-  border: none;
-  cursor: pointer;
-  transition: 0.3s;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.darkpurple};
-  }
-`;

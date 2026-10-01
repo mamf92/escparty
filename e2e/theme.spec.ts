@@ -173,6 +173,21 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await Promise.all([host, guest].map(page => page.context().close()));
 });
 
+test("the home screen follows the surface rules in both themes", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Browse the quiz library" })).toBeVisible();
+    await judge(page, "home");
+
+    // Home re-skins with the switch like every other screen: no photo, no own colours.
+    await page.getByRole("switch", { name: "Sparkle mode" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
+    for (const control of await page.locator(".calm-ground button.lycra").all()) {
+        await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
+    }
+    await page.context().close();
+});
+
 test("Sparkle mode switches every screen, is remembered, and keeps still with reduced motion", async ({ browser }) => {
     const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
     await page.goto("/#/quizzes");

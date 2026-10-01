@@ -1,45 +1,47 @@
 import { describe, expect, it } from "vitest";
 import { Route, Routes } from "react-router-dom";
-import { renderWithProviders, screen, userEvent } from "../test/test-utils";
-import { theme } from "../styles/theme";
+import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
 import Home from "./Home";
 
-// Smoke test for the test harness itself as much as for Home: it proves a
-// real page renders under styled-components' ThemeProvider and a router, and
-// that user-event can drive it. Keep it cheap — per-page behaviour belongs in
-// that page's own test file.
+const DESTINATIONS = [
+  ["Host or join a quiz room", "/multiplayer"],
+  ["Browse the quiz library", "/quizzes"],
+  ["Play a quiz solo", "/select-difficulty"],
+  ["Build your own quiz", "/quizzes/new"],
+  ["Throw a scoreboard party", "/party"],
+] as const;
+
+// Also a smoke test for the harness: a real page renders under the
+// providers and a router, and user-event can drive it.
 describe("Home", () => {
-  it("renders the title and the entry points", () => {
+  it("renders the brand title and the five ways in, on the design system", () => {
     renderWithProviders(<Home />);
 
-    expect(screen.getByRole("heading", { name: /esc party/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Multiplayer quiz" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Quiz library" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Single-player quiz" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create quiz" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "ESCParty" })).toBeInTheDocument();
+    const group = screen.getByRole("group", { name: "Where to start" });
+    expect(group).toHaveClass("lycra-pane");
+    expect(group.closest(".calm-ground")).not.toBeNull();
+
+    const buttons = within(group).getAllByRole("button");
+    expect(buttons.map(button => button.textContent)).toEqual(DESTINATIONS.map(([label]) => label));
+    for (const button of buttons) {
+      expect(button).toHaveClass("lycra");
+      // Controls are direct children of their pane, with no wrappers.
+      expect(button.parentElement).toBe(group);
+    }
   });
 
-  it("resolves theme values in styled-components", () => {
-    renderWithProviders(<Home />);
-
-    // A styled block that reads `theme.colors.*` throws without a
-    // ThemeProvider, so this failing means the harness, not Home, is broken.
-    expect(screen.getByRole("heading", { name: /esc party/i })).toHaveStyle({
-      color: theme.colors.white,
-    });
-  });
-
-  it("navigates to the multiplayer lobby", async () => {
+  it.each(DESTINATIONS)("%s goes to %s", async (label, path) => {
     const user = userEvent.setup();
     renderWithProviders(
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/multiplayer" element={<h1>Multiplayer lobby</h1>} />
+        <Route path={path} element={<p>Arrived at {path}</p>} />
       </Routes>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Multiplayer quiz" }));
+    await user.click(screen.getByRole("button", { name: label }));
 
-    expect(screen.getByRole("heading", { name: "Multiplayer lobby" })).toBeInTheDocument();
+    expect(screen.getByText(`Arrived at ${path}`)).toBeInTheDocument();
   });
 });
