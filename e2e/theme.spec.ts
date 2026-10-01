@@ -155,3 +155,29 @@ test("the scoreboard party screens pass Calm's self-check", async ({ browser }) 
 
     await Promise.all([host, guest].map(page => page.context().close()));
 });
+
+test("Sparkle mode switches every screen, is remembered, and keeps still with reduced motion", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/#/quizzes");
+    const toggle = page.getByRole("switch", { name: "Sparkle mode" });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "calm");
+
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
+    // The sequin skin (its magenta sheet, #760c52) reaches a control on the surface.
+    const control = page.locator(".calm-ground button.lycra").first();
+    await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
+
+    // Remembered across a reload, with no flash of Calm first.
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
+    await expect(page.getByRole("switch", { name: "Sparkle mode" })).toHaveAttribute("aria-checked", "true");
+
+    // Reduced motion: the stars are there, but nothing animates.
+    await expect(page.locator(".esc-sparkles > i").first()).toBeVisible();
+    const running = await page.evaluate(() => document.getAnimations().length);
+    expect(running).toBe(0);
+
+    await page.context().close();
+});

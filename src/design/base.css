@@ -1,0 +1,187 @@
+/*
+  App-wide base and accessibility rules for both themes
+  (docs/design/design-system.md). Everything here reads tokens.css.
+*/
+
+html,
+body {
+  background: var(--esc-backdrop);
+  color: var(--esc-ink);
+  font-family: var(--esc-font-body);
+}
+
+/* The page title: chrome, outside the surface. */
+.esc-title {
+  margin: 0;
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-title);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: var(--esc-title-tracking);
+  text-transform: uppercase;
+  color: var(--esc-title);
+}
+
+/*
+  Sparkle sets the title in gold foil. The fill is a background clipped to
+  the glyphs, so a theme without one (Calm sets it to none) keeps the plain
+  colour above.
+*/
+:root[data-theme="sparkle"] .esc-title-text {
+  background: var(--esc-title-fill) 0 50% / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 201, 60, 0.45));
+}
+
+:root[data-theme="sparkle"] .esc-title::before,
+:root[data-theme="sparkle"] .esc-title::after {
+  content: "✦";
+  content: "✦" / "";
+  color: var(--esc-title);
+  margin: 0 0.4em;
+  font-size: 0.7em;
+  vertical-align: 0.2em;
+}
+
+.esc-subtitle {
+  margin: var(--esc-space-2) 0 0;
+  font-size: var(--esc-text-link);
+  line-height: 1.5;
+  color: var(--esc-ink-muted);
+}
+
+.esc-note {
+  margin: var(--esc-space-2) 0 0;
+  font-size: var(--esc-text-note);
+  line-height: 1.5;
+  text-align: center;
+  color: var(--esc-ink-muted);
+}
+
+/* The quiet underlined link for "back" and secondary moves. */
+.esc-link {
+  font-family: var(--esc-font-body);
+  font-size: var(--esc-text-link);
+  min-height: 44px;
+  background: none;
+  border: none;
+  padding: var(--esc-space-1) var(--esc-space-2);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  color: var(--esc-link);
+}
+
+/* One focus ring everywhere, in the theme's focus colour. */
+.esc-app :focus-visible {
+  outline: 2px solid var(--esc-focus);
+  outline-offset: 3px;
+}
+
+/*
+  Windows High Contrast / forced colours drops every box-shadow, and the
+  surface draws its edges with nothing else. Give controls and fields a
+  real border so they stay findable.
+*/
+@media (forced-colors: active) {
+  .lycra,
+  .lycra-field,
+  .lycra-well,
+  .lycra-pane {
+    border: 1px solid CanvasText;
+  }
+
+  .lycra {
+    border-color: ButtonText;
+  }
+
+  .lycra.is-chosen,
+  .lycra.is-selected {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .esc-sparkles {
+    display: none !important;
+  }
+}
+
+/*
+  Someone who asked for more contrast gets a visible edge on every control
+  and field (3:1 or better against the pane), in both themes.
+*/
+@media (prefers-contrast: more) {
+  .esc-app .lycra,
+  .esc-app .lycra-field {
+    outline: 1px solid rgba(255, 255, 255, 0.6);
+    outline-offset: -1px;
+  }
+
+  .esc-app .lycra:focus-visible,
+  .esc-app .lycra-field:focus-visible {
+    outline: 2px solid var(--esc-focus);
+    outline-offset: 3px;
+  }
+
+  .esc-note,
+  .esc-subtitle {
+    color: var(--esc-ink);
+  }
+}
+
+/* The theme switch in the app bar: a labelled pill switch. */
+.esc-theme-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esc-space-2);
+  min-height: 44px;
+  padding: 0 var(--esc-space-1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--esc-font-body);
+  font-size: var(--esc-text-sub);
+  font-weight: 600;
+  color: var(--esc-ink);
+}
+
+.esc-theme-switch-track {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--lyc-groove);
+}
+
+.esc-theme-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--esc-ink-muted);
+  background: var(--lyc-face-hover);
+  box-shadow: var(--lyc-rise);
+  transition: transform var(--lyc-out);
+}
+
+.esc-theme-switch[aria-checked="true"] .esc-theme-switch-thumb {
+  transform: translateX(18px);
+  color: #2a1600;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #ffc93c 55%, #b07a12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esc-theme-switch-thumb {
+    transition: none;
+  }
+}

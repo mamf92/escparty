@@ -5,41 +5,32 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* Ensures padding is included in width calculations */
 }
 
-/* Root styles */
+/*
+  Colours and fonts come from the design system (src/design/tokens.css);
+  this file only resets the box model and sizes the root.
+*/
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #070926;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ensure all elements fill their containers properly */
 html {
   width: 100%;
   height: 100%;
-  background-color: #f0f2f5;
 }
 
-/* Set background color and prevent overflow */
 body {
   width: 100%;
   height: 100%;
-  margin: 0;
-  padding: 0;
   overflow-x: hidden;
-  background-color: #f0f2f5;
 }
 
-/* Style the root element to take full space */
 #root {
   width: 100%;
   height: 100%;
@@ -47,22 +38,13 @@ body {
   flex-direction: column;
 }
 
-/* Route content should fill available space inside MobileFrame */
-.app-content {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
 /* All page components should fill their container */
-#root>div {
+#root > div {
   display: flex;
   flex-direction: column;
   flex: 1;
 }
 
-/* Ensure all route pages take full height within their container */
 [role="main"],
 main,
 section,

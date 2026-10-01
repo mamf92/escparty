@@ -1,6 +1,11 @@
 import { DefaultTheme } from "styled-components";
 
-// Define your theme
+/*
+ * LEGACY. Colours and fonts are decided in src/design/tokens.css and read as
+ * CSS variables (docs/design/design-system.md). These named colours remain
+ * only for the screens not yet moved onto the design system; don't use them
+ * in new code. The fonts already point at the tokens.
+ */
 export const theme: DefaultTheme = {
     colors: {
         magnolia: "#EEE8F0", // Lightest color
@@ -23,7 +28,7 @@ export const theme: DefaultTheme = {
 
     },
     fonts: {
-        body: "'Open Sans', sans-serif",
-        heading: "'Montserrat', sans-serif",
+        body: "var(--esc-font-body)",
+        heading: "var(--esc-font-display)",
     },
 };

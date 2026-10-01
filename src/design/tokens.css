@@ -1,0 +1,100 @@
+/*
+  ESCParty design tokens — the one place a colour, font, size or radius is
+  decided. Rules: docs/design/design-system.md.
+
+  Every page reads these variables; no page writes a hex value of its own.
+  The two themes set the same variables to different values, and that is
+  the only way they differ in colour and type:
+
+    :root / [data-theme="calm"]   Calm, the accessible default
+    [data-theme="sparkle"]        Sparkle, the opt-in sequins-and-glitter skin
+
+  The surface shadows (--lyc-*) are owned by the vendored
+  src/fabric-ui/lycra-surface.css; Sparkle re-skins them in sparkle.css.
+*/
+
+:root,
+:root[data-theme="calm"] {
+  /* Type. Two families, loaded in index.html. */
+  --esc-font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
+  --esc-font-body: "Open Sans", "Segoe UI", system-ui, sans-serif;
+
+  /*
+    The type scale. Inside a ground only --esc-text-control and
+    --esc-text-sub are allowed (Calm's two-size rule, 1.25:1). The others
+    are chrome: the page title, notes and links around the surface.
+  */
+  --esc-text-title: 1.5rem;
+  --esc-text-display: 2rem;
+  --esc-text-control: 15px;
+  --esc-text-sub: 12px;
+  --esc-text-note: 0.8125rem;
+  --esc-text-link: 0.875rem;
+  --esc-title-tracking: 0.08em;
+
+  /* Space, on a 4px step. */
+  --esc-space-1: 0.25rem;
+  --esc-space-2: 0.5rem;
+  --esc-space-3: 0.75rem;
+  --esc-space-4: 1rem;
+  --esc-space-5: 1.25rem;
+  --esc-space-6: 1.5rem;
+  --esc-space-8: 2rem;
+
+  --esc-radius-control: 12px;
+  --esc-radius-pane: 22px;
+  --esc-target-min: 48px;
+
+  /* Colour. */
+  --esc-backdrop: #0b0618;
+  --esc-screen: #281259;
+  --esc-ink: #eee8f0;
+  --esc-ink-muted: rgba(238, 232, 240, 0.78);
+  --esc-title: #d5b8e6;
+  --esc-title-fill: none;
+  --esc-link: #d5b8e6;
+  --esc-focus: #eee8f0;
+  --esc-correct: #28a745;
+  --esc-wrong: #dc3545;
+  --esc-frame: #141018;
+
+  /* The ground behind a pane: dark and never flat (the pane refracts it). */
+  --esc-ground:
+    radial-gradient(80% 28% at 10% 8%, #3a1a63 0%, transparent 62%),
+    radial-gradient(80% 28% at 90% 92%, #3a1a63 0%, transparent 62%),
+    radial-gradient(62% 22% at 88% 34%, #4a1f6e 0%, transparent 66%),
+    radial-gradient(62% 22% at 12% 68%, #4a1f6e 0%, transparent 66%),
+    #190c31;
+
+  color-scheme: dark;
+}
+
+:root[data-theme="sparkle"] {
+  --esc-font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
+  --esc-title-tracking: 0.12em;
+
+  --esc-backdrop: #07020f;
+  --esc-screen:
+    radial-gradient(120% 45% at 50% -8%, rgba(255, 31, 143, 0.55) 0%, transparent 60%),
+    radial-gradient(70% 35% at 0% 40%, rgba(255, 201, 60, 0.22) 0%, transparent 65%),
+    radial-gradient(70% 35% at 100% 70%, rgba(45, 226, 230, 0.2) 0%, transparent 65%),
+    linear-gradient(180deg, #2a0640 0%, #14031f 55%, #1d0434 100%);
+  --esc-ink: #fff7fb;
+  --esc-ink-muted: rgba(255, 247, 251, 0.85);
+  --esc-title: #ffd86b;
+  --esc-title-fill: linear-gradient(100deg, #fff3c4 0%, #ffd86b 22%, #c9952b 45%, #fff3c4 58%, #ffc93c 78%, #fff3c4 100%);
+  --esc-link: #ffd86b;
+  --esc-focus: #ffd86b;
+  --esc-correct: #3ddc84;
+  --esc-wrong: #ff5a6e;
+  --esc-frame: #1a0f1f;
+
+  --esc-ground:
+    radial-gradient(circle at 50% 50%, rgba(255, 236, 170, 0.5) 0 0.8px, transparent 1.4px) 0 0 / 23px 23px,
+    radial-gradient(circle at 50% 50%, rgba(255, 140, 210, 0.45) 0 0.8px, transparent 1.4px) 11px 7px / 31px 31px,
+    radial-gradient(circle at 50% 50%, rgba(160, 240, 255, 0.35) 0 0.7px, transparent 1.3px) 5px 17px / 41px 41px,
+    radial-gradient(90% 40% at 15% 0%, rgba(255, 31, 143, 0.5) 0%, transparent 62%),
+    radial-gradient(90% 40% at 85% 100%, rgba(255, 201, 60, 0.28) 0%, transparent 62%),
+    linear-gradient(160deg, #3b0a52 0%, #1f0533 50%, #2c0742 100%);
+
+}

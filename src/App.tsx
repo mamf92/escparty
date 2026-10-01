@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { HashRouter as Router, Outlet, Route, Routes } from "react-router-dom";
 import styled, { ThemeProvider } from "styled-components";
 import { theme } from "./styles/theme";
@@ -20,6 +20,7 @@ import PartyRoom from "./pages/PartyRoom";
 import PartyScreen from "./pages/PartyScreen";
 import PartyAwards from "./pages/PartyAwards";
 import MobileFrame from "./components/MobileFrame";
+import { DesignThemeProvider, Sparkles, ThemeSwitch } from "./design";
 
 // Lazy so that three, react-three-fiber and leva stay out of the app's main
 // bundle. Only the demo route pays for them.
@@ -34,18 +35,35 @@ const FramedLayout = () => (
 );
 
 // The party's big screen is for a TV across the room, so it fills the
-// window instead of sitting in the phone frame (#84).
-const TvLayout = styled.div`
+// window instead of sitting in the phone frame (#84). It keeps the theme
+// switch, so the host can put the TV in Sparkle too.
+const TvLayout = ({ children }: { children: ReactNode }) => (
+  <TvScreen className="esc-app">
+    <TvBar><ThemeSwitch /></TvBar>
+    {children}
+    <Sparkles />
+  </TvScreen>
+);
+
+const TvScreen = styled.div`
   position: fixed;
   inset: 0;
   overflow-y: auto;
   padding: 2rem 1.5rem;
-  background-color: ${({ theme }) => theme.colors.deepblue};
+  background: var(--esc-screen);
+  background-attachment: fixed;
 
-  & > * {
+  & > :not(.esc-sparkles) {
+    position: relative;
+    z-index: 1;
     max-width: 960px;
     margin: 0 auto;
   }
+`;
+
+const TvBar = styled.div`
+  display: flex;
+  justify-content: flex-end;
 `;
 
 const FabricLoading = styled.div`
@@ -53,14 +71,15 @@ const FabricLoading = styled.div`
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: ${({ theme }) => theme.colors.nightblue};
-  color: ${({ theme }) => theme.colors.pinkLavender};
-  font-family: ${({ theme }) => theme.fonts.body};
+  background: var(--esc-backdrop);
+  color: var(--esc-title);
+  font-family: var(--esc-font-body);
 `;
 
 const App = () => {
   return (
     <ThemeProvider theme={theme}>
+      <DesignThemeProvider>
       <Router>
         <Routes>
           <Route
@@ -93,6 +112,7 @@ const App = () => {
           </Route>
         </Routes>
       </Router>
+      </DesignThemeProvider>
     </ThemeProvider>
   );
 };

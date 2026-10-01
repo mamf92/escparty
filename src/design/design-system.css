@@ -1,0 +1,10 @@
+/*
+  The ESCParty design system, in load order. Imported once, from main.tsx.
+  Rules: docs/design/design-system.md.
+*/
+@import "./tokens.css";
+@import "../fabric-ui/lycra-surface.css";
+@import "../fabric-ui/calm.css";
+@import "../styles/calm-page.css";
+@import "./base.css";
+@import "./sparkle.css";

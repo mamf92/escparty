@@ -30,12 +30,8 @@
     but the pools are mirrored top and bottom so vertical position carries no
     brightness of its own and the shadows are left to say everything.
   */
-  background:
-    radial-gradient(80% 28% at 10% 8%, #3a1a63 0%, transparent 62%),
-    radial-gradient(80% 28% at 90% 92%, #3a1a63 0%, transparent 62%),
-    radial-gradient(62% 22% at 88% 34%, #4a1f6e 0%, transparent 66%),
-    radial-gradient(62% 22% at 12% 68%, #4a1f6e 0%, transparent 66%),
-    #190c31;
+  /* The values live in src/design/tokens.css as --esc-ground (Sparkle swaps it). */
+  background: var(--esc-ground);
 }
 
 /*
