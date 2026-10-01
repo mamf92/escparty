@@ -9,7 +9,10 @@ updates:
       - "dependencies"
     groups:
       # react-dom checks at runtime that it matches react exactly, so the
-      # four always move in one PR, for version and security updates alike.
+      # four move in one PR. A security PR only bumps the packages its
+      # advisory names: if it moves react or react-dom alone, bump the other
+      # to the same version in that PR before merging. Keep these two lists
+      # and the ignore list below in sync.
       react:
         patterns:
           - "react"
@@ -28,7 +31,8 @@ updates:
     # @react-three/fiber 9.8 supports react >=19 <19.4; raise this once it
     # supports 19.4 (package.json pins react and react-dom to ~19.3.0). The
     # types are held with them so they never describe APIs the installed
-    # React doesn't have.
+    # React doesn't have. This also blocks security updates to 19.4+: such an
+    # alert stays on the Security tab until fiber supports 19.4.
     ignore:
       - dependency-name: "react"
         versions: [">=19.4.0"]
