@@ -43,12 +43,12 @@ const NOT_FOUND_NOTE = "No game has that code. Check the four letters with the h
 const STARTED_NOTE = "That game has already started. Ask the host to start a new one.";
 
 // What went wrong joining, as a note that says what to do next (#172).
-// joinRoom answers "no such game" and "already started" with false, and
-// throws for a full room (a JoinRejected as the cause) or a failure.
+// joinRoom answers "no such game" and "already started" with false (see
+// refusedNote), and throws only for a full room (a JoinRejected as the
+// cause) or a failure.
 const joinErrorNote = (error: unknown): string => {
   const cause = (error as { cause?: unknown } | null)?.cause;
   if (cause instanceof JoinRejected && cause.reason === "full") return "This game is full. Ask the host to start a new one.";
-  if (cause instanceof JoinRejected) return cause.reason === "started" ? STARTED_NOTE : NOT_FOUND_NOTE;
   const message = (error as { message?: string } | null)?.message ?? "";
   if (message.includes("Security rules")) return "The room didn't let you in. Try again, or check the code with the host.";
   return "We couldn't join the game. Check your connection and try again.";
@@ -65,6 +65,11 @@ const refusedNote = async (code: string): Promise<string> => {
 };
 
 type StoredPlayer = { id: string; name: string };
+
+// A player's name without its emoji ("Loreen 🇸🇪" → "Loreen"), for a
+// button label: the design system keeps emoji out of buttons (§8).
+const plainName = (name: string): string =>
+  name.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\u{FE0F}\u{200D}]/gu, "").trim() || name;
 
 /**
  * The way into a multiplayer quiz: host a game (playing along, or only
@@ -322,7 +327,7 @@ const MultiplayerLobby = () => {
                 {rejoinAs ? (
                   <>
                     <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
-                    <Control ref={rejoinButton} disabled={loading} onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {rejoinAs.name}</Control>
+                    <Control ref={rejoinButton} disabled={loading} onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(rejoinAs.name)}</Control>
                   </>
                 ) : (
                   <Control type="submit" disabled={loading} onClick={remember}>Join the game</Control>

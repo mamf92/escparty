@@ -209,6 +209,19 @@ describe("MultiplayerLobby", () => {
     expect(screen.getByText("at /lobby")).toBeInTheDocument();
   });
 
+  it("keeps the emoji out of the rejoin button", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-dana");
+    localStorage.setItem("playerName", "Dana International 🏳️‍🌈");
+    renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    expect(screen.getByText(/You were in this game as Dana International 🏳️‍🌈/)).toBeInTheDocument();
+    await user.click(button("Rejoin as Dana International"));
+    expect(joinRoom).toHaveBeenCalledWith("ABBA", "p-dana", "Dana International 🏳️‍🌈");
+  });
+
   it("joins the same game as someone new when that's not you", async () => {
     const user = userEvent.setup();
     localStorage.setItem("gameCode", "ABBA");
