@@ -186,8 +186,7 @@ test("the green room and the results follow the surface rules", async ({ browser
     await page.getByRole("button", { name: "Nul Points" }).click();
     await expect(page.getByRole("button", { name: "Start anyway" })).toBeVisible();
     await judge(page, "lobby-host");
-    const code = (await page.locator("strong").first().textContent())!.trim();
-    const playerId = await page.evaluate(() => localStorage.getItem("playerId"));
+    const { code, playerId } = await page.evaluate(() => ({ code: localStorage.getItem("gameCode"), playerId: localStorage.getItem("playerId") }));
 
     // The same room's standings (one player on nought), fully revealed.
     await page.evaluate(game => sessionStorage.setItem("multiplayerGame", JSON.stringify(game)), { multiplayer: true, roomCode: code, playerId });

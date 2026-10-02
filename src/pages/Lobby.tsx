@@ -7,7 +7,7 @@ import { observerRouteState, playingPlayers, shouldObserve } from "../utils/room
 import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
 import { customQuizKey, listMyQuizzes } from "../utils/customQuizzes";
 import { useQuizTitle } from "../hooks/useQuizTitle";
-import { startGate } from "../utils/lobbyGate";
+import { roomGuests, startGate } from "../utils/lobbyGate";
 
 interface Identity {
     gameCode: string;
@@ -95,6 +95,8 @@ const Lobby = () => {
         navigate("/multiplayer");
     };
     const leave = <CalmLink type="button" onClick={leaveRoom}>Leave the waiting room</CalmLink>;
+    /** The footer's way back from a waiting room this tab isn't in. */
+    const backToMultiplayer = <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Back to join or host</CalmLink>;
     /** The way out of a waiting room that can't go on. */
     const wayOut = (label: string, onClick: () => void) => (
         <Ground>
@@ -106,7 +108,7 @@ const Lobby = () => {
 
     if (!identity) {
         return (
-            <CalmPage title="The green room">
+            <CalmPage title="The green room" footer={backToMultiplayer}>
                 <CalmNote role="alert">This tab isn't in a game yet. Taking you to join or host one…</CalmNote>
                 {wayOut("Join or host a game", () => navigate("/multiplayer"))}
             </CalmPage>
@@ -121,7 +123,7 @@ const Lobby = () => {
     }
     if (room === null || error) {
         return (
-            <CalmPage title="The green room">
+            <CalmPage title="The green room" footer={leave}>
                 <CalmNote role="alert">
                     {error ?? "This game has closed, or the code is wrong. Join with another code, or host your own."}
                 </CalmNote>
@@ -137,7 +139,7 @@ const Lobby = () => {
     // Taken out by the host: this tab isn't in the room any more.
     if (!me) {
         return (
-            <CalmPage title="The green room">
+            <CalmPage title="The green room" footer={backToMultiplayer}>
                 <CalmNote role="alert">The host took you out of this game. You can join again with the code.</CalmNote>
                 {wayOut("Join a game", () => navigate("/multiplayer"))}
             </CalmPage>
@@ -146,7 +148,7 @@ const Lobby = () => {
 
     const ready = room.readyPlayers ?? [];
     const players = playingPlayers(room);
-    const guests = room.players.filter(p => p.id !== room.hostId);
+    const guests = roomGuests(room);
     const gate = startGate(room);
     const amReady = ready.includes(playerId);
     const chosen = isHost ? guests.find(p => p.id === selected) : undefined;
@@ -173,11 +175,13 @@ const Lobby = () => {
         }
     };
 
-    // The room's `difficulty` names the quiz (quizCatalog.ts). Nothing was
-    // written if the quiz couldn't be read, so the host can pick again; a
-    // refused write is a dead end as before.
+    // The room's `difficulty` names the quiz (quizCatalog.ts). Only the
+    // rules refusing the write is a dead end (the pick is one-shot there);
+    // anything else (the quiz couldn't be read, the network) wrote nothing,
+    // so the host can pick again.
     const handleSelectQuiz = (quizKey: string) => run("set the quiz", () => setRoomQuiz(gameCode, quizKey), (err) => {
-        if (String(err).includes("Failed to set difficulty")) {
+        const cause = err instanceof Error ? err.cause as { code?: unknown } | undefined : undefined;
+        if (cause?.code === "permission-denied") {
             setError("This room wouldn't take the quiz, so the show can't go on here. Host a new game to start again.");
         } else {
             setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
@@ -241,6 +245,7 @@ const Lobby = () => {
                                 <Control
                                     key={guest.id}
                                     chosen={selected === guest.id}
+                                    disabled={busy}
                                     onClick={() => setSelected(selected === guest.id ? null : guest.id)}
                                 >
                                     {guest.name}
@@ -251,7 +256,7 @@ const Lobby = () => {
                                     disabled={busy}
                                     onClick={() => run(`remove ${chosen.name}`, async () => {
                                         await removePlayerFromRoom(gameCode, chosen);
-                                        setSelected(null);
+                                        setSelected(current => current === chosen.id ? null : current);
                                     })}
                                 >
                                     Take {chosen.name} out of the game
@@ -287,7 +292,12 @@ const Lobby = () => {
                     {gate.canStart !== "no" && (
                         <Ground>
                             <Pane>
-                                <Control disabled={busy} onClick={() => run("start the game", () => startGame(gameCode))}>
+                                {/* Everyone ready: the next step stands proudest (design-system.md section 6). */}
+                                <Control
+                                    className={gate.canStart === "yes" ? "is-high" : undefined}
+                                    disabled={busy}
+                                    onClick={() => run("start the game", () => startGame(gameCode))}
+                                >
                                     {gate.canStart === "yes" ? "Start the show" : "Start anyway"}
                                 </Control>
                             </Pane>

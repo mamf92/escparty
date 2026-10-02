@@ -132,7 +132,7 @@ describe("Lobby", () => {
   it("says when a quiz can't be loaded", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     as("host", "Martin");
-    mocks.setRoomQuiz.mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("Failed to set difficulty: denied"));
+    mocks.setRoomQuiz.mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("Failed to set difficulty: denied", { cause: { code: "permission-denied" } }));
     renderLobby();
     act(() => mocks.onRoom(room()));
     const user = userEvent.setup();
@@ -143,6 +143,27 @@ describe("Lobby", () => {
     expect(screen.queryByText(/Failed to set difficulty/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Join or host a game" }));
     expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
+  it("lets the host pick again when the quiz write fails for another reason", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    as("host", "Martin");
+    mocks.setRoomQuiz.mockRejectedValueOnce(new Error("Failed to set difficulty: unavailable", { cause: { code: "unavailable" } }));
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Classic: Easy" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("That quiz couldn't be loaded");
+    expect(screen.getByRole("button", { name: "Classic: Easy" })).toBeEnabled();
+  });
+
+  it("keeps a way back in the footer of every dead end", () => {
+    as("p2", "Loreen");
+    renderLobby();
+    act(() => mocks.onRoom(null));
+    expect(screen.getByRole("button", { name: "Leave the waiting room" })).toBeInTheDocument();
+    act(() => mocks.onRoom(room({ players: [{ id: "host", name: "Martin", score: 0 }] })));
+    expect(screen.getByRole("alert")).toHaveTextContent("The host took you out");
+    expect(screen.getByRole("button", { name: "Back to join or host" })).toBeInTheDocument();
   });
 
   it("lets the host take a player out", async () => {
@@ -231,6 +252,7 @@ describe("Lobby", () => {
     const start = screen.getByRole("button", { name: "Start the show" });
     expect(start).not.toHaveClass("is-chosen");
     expect(start).not.toHaveAttribute("aria-pressed");
+    expect(start).toHaveClass("is-high");
     expect(screen.getByRole("heading", { level: 2, name: "3 players" })).toHaveAttribute("aria-live", "polite");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });

@@ -65,3 +65,24 @@ export const nextRevealLabel = (placed: Placed[], shown: number): string => {
     const tied = placed.filter(entry => entry.place === next.place).length > 1;
     return `${next.place === 2 ? "2nd" : "3rd"} place${tied ? " (a tie)" : ""}`;
 };
+
+/**
+ * What the reveal says out loud after `step` taps (0 before the first):
+ * how many are on the board, then the rows the last tap added, then the
+ * winner line once everyone is showing. The standings list isn't a live
+ * region, so a screen reader hears each reveal from this line instead.
+ */
+export const revealAnnouncement = (placed: Placed[], step: number): string => {
+    const steps = revealSteps(placed);
+    if (step === 0 || steps.length === 0) {
+        return `${placed.length === 1 ? "1 player is" : `${placed.length} players are`} on the scoreboard. Start the reveal when the room is ready.`;
+    }
+    const at = Math.min(step, steps.length);
+    if (at === steps.length) return winnerLine(placed) ?? "";
+    const shown = steps[at - 1];
+    const before = at === 1 ? 0 : steps[at - 2];
+    return `On the board: ${placed
+        .slice(placed.length - shown, placed.length - before)
+        .map(({ player, place }) => `place ${place}, ${player.name}, ${player.score} points`)
+        .join("; ")}.`;
+};

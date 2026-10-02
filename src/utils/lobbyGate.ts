@@ -7,6 +7,9 @@ export interface StartGate {
     message: string;
 }
 
+/** Everyone in the room but the host: who has to be ready, and who the host can take out. */
+export const roomGuests = (room: Pick<Room, "hostId" | "players">) => room.players.filter(p => p.id !== room.hostId);
+
 /**
  * Whether the host can start (#65): once at least one guest has joined and
  * every guest is ready. Before that a playing host can still "Start anyway"
@@ -14,7 +17,7 @@ export interface StartGate {
  * someone to play.
  */
 export const startGate = (room: Pick<Room, "hostId" | "hostIsObserver" | "players" | "readyPlayers">): StartGate => {
-    const guests = room.players.filter(p => p.id !== room.hostId);
+    const guests = roomGuests(room);
     const ready = room.readyPlayers ?? [];
     const waiting = guests.filter(p => !ready.includes(p.id));
 

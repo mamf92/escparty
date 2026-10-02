@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { startGate } from "./lobbyGate";
+import { roomGuests, startGate } from "./lobbyGate";
 
 const host = { id: "host", name: "Martin", score: 0 };
 const guest = (id: string, name: string) => ({ id, name, score: 0 });
@@ -31,5 +31,11 @@ describe("startGate", () => {
     });
     expect(startGate({ hostId: "host", players: [host, guest("a", "Loreen"), guest("b", "Lordi")], readyPlayers: ["b", "a"] }).message)
       .toBe("All 2 guests are ready.");
+  });
+});
+
+describe("roomGuests", () => {
+  it("is everyone but the host, in join order", () => {
+    expect(roomGuests({ hostId: "host", players: [guest("p2", "Loreen"), host, guest("p3", "Lordi")] }).map(p => p.id)).toEqual(["p2", "p3"]);
   });
 });

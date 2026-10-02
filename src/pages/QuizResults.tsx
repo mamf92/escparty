@@ -14,7 +14,7 @@ import {
 import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealSteps, winnerLine } from "../utils/finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealAnnouncement, revealSteps } from "../utils/finale";
 
 interface ScoreEntry {
   score: number;
@@ -138,7 +138,8 @@ const QuizResults = () => {
         </Ground>
         <Ground>
           <Pane>
-            <Control onClick={() => leave("/quizzes")}>Play another quiz</Control>
+            {/* The next step stands proudest (design-system.md section 6). */}
+            <Control className="is-high" onClick={() => leave("/quizzes")}>Play another quiz</Control>
             <Control onClick={() => leave("/scoreboard")}>See the scoreboard</Control>
           </Pane>
         </Ground>
@@ -168,15 +169,10 @@ const QuizResults = () => {
   const shown = step === 0 ? 0 : steps[Math.min(step, steps.length) - 1];
   const revealed = placed.slice(placed.length - shown);
   const done = steps.length > 0 && step >= steps.length;
-  // What the last tap put on the board, said out loud: the list itself
-  // isn't a live region, so a screen reader hears each reveal here.
-  const before = step <= 1 ? 0 : steps[Math.min(step, steps.length) - 2];
-  const justRevealed = placed.slice(placed.length - shown, placed.length - before);
-  const revealLine = done
-    ? winnerLine(placed)
-    : step === 0
-      ? `${placed.length === 1 ? "1 player is" : `${placed.length} players are`} on the scoreboard. Start the reveal when the room is ready.`
-      : `On the board: ${justRevealed.map(({ player, place }) => `place ${place}, ${player.name}, ${player.score} points`).join("; ")}.`;
+  // One status line for the whole reveal, mounted from the first render so
+  // screen readers announce each change to it: collecting, then how many
+  // are on the board, then what each tap added, then the winner.
+  const statusLine = error ? "" : placed.length === 0 ? "Collecting the final scores…" : revealAnnouncement(placed, step);
   const isHost = isRoomHost(room, gameData.playerId);
   // This player's name in this room (the host included, from the full
   // list), before this device's last-used name, which another tab may have
@@ -240,7 +236,6 @@ const QuizResults = () => {
           </Ground>
         </>
       )}
-      {placed.length === 0 && !error && <CalmNote role="status">Collecting the final scores…</CalmNote>}
 
       {revealed.length > 0 && (
         <Ground>
@@ -262,7 +257,7 @@ const QuizResults = () => {
         </Ground>
       )}
 
-      {placed.length > 0 && <CalmNote role="status">{revealLine}</CalmNote>}
+      <CalmNote role="status">{statusLine}</CalmNote>
       {!done && placed.length > 0 && (
         <Ground>
           <Pane layout="split">
@@ -274,14 +269,15 @@ const QuizResults = () => {
         </Ground>
       )}
 
-      {room && isHost && !room.nextRoomCode && (
+      {/* A room that's gone can't take a next round: the way out above is all. */}
+      {room && isHost && !room.nextRoomCode && !error && (
         <Ground>
           <Pane>
             <Control disabled={nextRound === "busy"} onClick={playAgain}>Play again with everyone</Control>
           </Pane>
         </Ground>
       )}
-      {room?.nextRoomCode && (
+      {room?.nextRoomCode && !error && (
         <>
           <CalmNote>{isHost ? "You've started another round." : "The host has started another round."}</CalmNote>
           <Ground>

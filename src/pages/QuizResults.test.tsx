@@ -139,6 +139,27 @@ describe("QuizResults", () => {
     expect(screen.getAllByRole("button", { name: "Join or host another game" })).toHaveLength(1);
   });
 
+  it("offers the host no next round once the room is gone", () => {
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
+    act(() => mocks.onRoom(room()));
+    expect(screen.getByRole("button", { name: "Play again with everyone" })).toBeInTheDocument();
+    act(() => mocks.onRoom(null));
+    expect(screen.getByRole("alert")).toHaveTextContent("no longer exists");
+    expect(screen.queryByRole("button", { name: "Play again with everyone" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join or host another game" })).toBeInTheDocument();
+  });
+
+  it("keeps one status line through the whole reveal", async () => {
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Collecting the final scores");
+    act(() => mocks.onRoom(room()));
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent("5 players are on the scoreboard.");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show everything" }));
+    expect(screen.getByRole("status")).toBe(status);
+  });
+
   it("offers a way out when the room goes after the scores came in", async () => {
     renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
     act(() => mocks.onRoom(room()));
