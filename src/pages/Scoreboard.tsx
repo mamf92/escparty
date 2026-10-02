@@ -96,16 +96,25 @@ const Scoreboard = () => {
     // without changing how high any of them sits.
     const levels = useMemo(() => levelsFor(scoreHistory), [scoreHistory]);
 
+    // Each run once with its stored place (a stable row key, so a re-sort
+    // moves rows) and its quiz's title, which can mean a storage read.
+    const rows = useMemo(() => scoreHistory.map((entry, index) => ({
+        entry,
+        index,
+        // A run saved without its quiz was still played; it's only unknown.
+        title: entry.difficulty ? quizTitle(entry.difficulty) : "Unknown quiz",
+    })), [scoreHistory]);
+
     const sortedScores = useMemo(() => {
-        const rows = [...scoreHistory];
+        const sorted = [...rows];
         if (sortKey === "date") {
-            return rows.sort((a, b) => timeOf(b) - timeOf(a) || 0);
+            return sorted.sort((a, b) => timeOf(b.entry) - timeOf(a.entry) || 0);
         }
         if (sortKey === "difficulty") {
-            return rows.sort((a, b) => difficultyRank(a) - difficultyRank(b) || quizTitle(a.difficulty).localeCompare(quizTitle(b.difficulty)));
+            return sorted.sort((a, b) => difficultyRank(a.entry) - difficultyRank(b.entry) || a.title.localeCompare(b.title));
         }
-        return rows.sort((a, b) => pointsOf(b) - pointsOf(a));
-    }, [scoreHistory, sortKey]);
+        return sorted.sort((a, b) => pointsOf(b.entry) - pointsOf(a.entry));
+    }, [rows, sortKey]);
 
     const tabs = useRovingTabs(SORT_KEYS, sortKey, setSortKey);
 
@@ -123,16 +132,15 @@ const Scoreboard = () => {
                         <span className="calm-sub">Play a quiz and your scores land here.</span>
                     </Row>
                 ) : (
-                    sortedScores.map(entry => (
+                    sortedScores.map(({ entry, index, title }) => (
                         <Row
                             as="li"
-                            // Keyed by its place in the stored history, so a re-sort moves rows.
-                            key={scoreHistory.indexOf(entry)}
+                            key={index}
                             elevation={levels.get(entry) ?? "rest"}
                         >
                             <span className="calm-row">
                                 <span>{entry.score} points</span>
-                                <span className="calm-sub">{quizTitle(entry.difficulty)}</span>
+                                <span className="calm-sub">{title}</span>
                             </span>
                             <span className="calm-sub">
                                 {entry.total === undefined ? "" : `${entry.total} ${entry.total === 1 ? "question" : "questions"} · `}
@@ -159,9 +167,10 @@ const Scoreboard = () => {
                 <Ground>
                     <Pane layout="split" role="tablist" aria-label="Sort scores by">
                         {SORTS.map(({ key, label }) => (
-                            // A tab states its choice with aria-selected; Control
-                            // leaves aria-pressed off any control given a role.
-                            <Control key={key} chosen={sortKey === key} {...tabs.tab(key)}>
+                            // The hook decides which tab is chosen, so its look and its
+                            // aria-selected can't disagree; Control leaves aria-pressed
+                            // off any control given a role.
+                            <Control key={key} {...tabs.tab(key)}>
                                 {label}
                             </Control>
                         ))}

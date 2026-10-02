@@ -137,7 +137,7 @@ describe("Scoreboard", () => {
     expect(screen.getByText("4 runs. Your best stands highest.")).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("tab", { name: "Date" }));
     expect(rows().map(row => row.textContent?.match(/^\d+ points/)?.[0])).toEqual(["5 points", "1 points", "3 points", "4 points"]);
-    expect(rows()[1]).toHaveTextContent("Not chosen");
+    expect(rows()[1]).toHaveTextContent("Unknown quiz");
     expect(rows()[1]).not.toHaveTextContent("question");
   });
 

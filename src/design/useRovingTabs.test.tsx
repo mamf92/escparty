@@ -3,6 +3,7 @@ import { useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useRovingTabs } from "./useRovingTabs";
+import { Control } from "./Surface";
 
 const KEYS = ["one", "two", "three"] as const;
 type Key = (typeof KEYS)[number];
@@ -14,7 +15,7 @@ const Tabs = ({ start = "one" }: { start?: Key }) => {
     <>
       <div role="tablist" aria-label="Numbers">
         {KEYS.map(key => (
-          <button key={key} type="button" {...tabs.tab(key)}>{key}</button>
+          <Control key={key} {...tabs.tab(key)}>{key}</Control>
         ))}
       </div>
       <div {...tabs.panel}>Showing {chosen}</div>
@@ -72,6 +73,8 @@ describe("useRovingTabs", () => {
   it("keeps the first tab as the tab stop when the choice isn't one of the tabs", () => {
     render(<Tabs start={"four" as Key} />);
     expect(screen.getByRole("tab", { name: "one" })).toHaveAttribute("tabindex", "0");
+    // It looks chosen too, so the look never disagrees with aria-selected.
+    expect(screen.getByRole("tab", { name: "one" })).toHaveClass("is-chosen");
     expect(screen.getByRole("tabpanel", { name: "one" })).toBeInTheDocument();
   });
 });

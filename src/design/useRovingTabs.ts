@@ -4,11 +4,12 @@ import { useId, type KeyboardEvent } from "react";
  * The WAI-ARIA tabs pattern for a row of `Control`s (docs/design/design-system.md,
  * section 5): one tab stop for the whole tablist (the chosen tab), the arrow
  * keys, Home and End move the choice and the focus together, and every tab
- * labels and controls one tab panel.
+ * labels and controls one tab panel. `tab()` also returns `chosen`, so the
+ * pressed-in look always follows the same choice as aria-selected.
  *
  *   const tabs = useRovingTabs(KEYS, chosen, setChosen);
  *   <Pane layout="split" role="tablist" aria-label="…">
- *     {KEYS.map(key => <Control key={key} chosen={key === chosen} {...tabs.tab(key)}>…</Control>)}
+ *     {KEYS.map(key => <Control key={key} {...tabs.tab(key)}>…</Control>)}
  *   </Pane>
  *   <Ground {...tabs.panel}>…</Ground>
  *
@@ -49,6 +50,8 @@ export function useRovingTabs<K extends string>(
       id: tabId(key),
       role: "tab" as const,
       "aria-selected": isSelected,
+      // For Control: the pressed-in look follows the same choice.
+      chosen: isSelected,
       "aria-controls": panelId,
       tabIndex: isSelected ? 0 : -1,
       onClick: () => onSelect(key),

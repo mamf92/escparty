@@ -175,8 +175,8 @@ never labels). Textareas and selects take the same class.
 
 **Tabs.** A split pane of controls with `role="tab"`; the current tab is
 chosen (pressed in). `useRovingTabs` (`src/design/`) gives each tab and its
-tab panel their ids, roles and keys: one tab stop, arrows, Home and End move
-the choice, and the panel is focusable.
+tab panel their ids, roles, keys and chosen look: one tab stop, arrows, Home
+and End move the choice, and the panel is focusable.
 
 **Markers.** A check or cross (`.calm-marker`, 20px, round-capped strokes)
 in `--esc-correct` or `--esc-wrong`, at the end of the answer it belongs
