@@ -11,8 +11,11 @@ export interface Placed {
     place: number;
 }
 
+/** A score in words: "1 point", "700 points". */
+export const points = (score: number) => (score === 1 ? "1 point" : `${score} points`);
+
 /** Players best first, ties sharing a place, then by name so the order is stable. */
-export const placePlayers = (players: Player[]): Placed[] => {
+export const placePlayers = (players: readonly Player[]): Placed[] => {
     const sorted = [...players].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
     return sorted.map(player => ({
         player,
@@ -43,9 +46,6 @@ export const PODIUM_POINTS: Record<number, string> = {
     2: "Dix points",
     3: "Huit points",
 };
-
-/** "1 point", "7 points". */
-const points = (score: number): string => `${score} ${score === 1 ? "point" : "points"}`;
 
 /** The line that crowns the winner, or null without players. */
 export const winnerLine = (placed: Placed[]): string | null => {
