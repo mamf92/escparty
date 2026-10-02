@@ -3,13 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane, Row, useRovingTabs } from "../design";
 import { quizTitle } from "../utils/quizCatalog";
-
-interface ScoreEntry {
-    score: number;
-    total: number;
-    difficulty: string;
-    date: string;
-}
+import { readScoreHistory, type ScoreEntry } from "../utils/scoreHistory";
 
 type SortKey = "date" | "difficulty" | "score";
 
@@ -29,7 +23,9 @@ type Level = "high" | "rest" | "low";
 const SORTS: { key: SortKey; label: string }[] = [
     { key: "score", label: "Score" },
     { key: "date", label: "Date" },
-    { key: "difficulty", label: "Difficulty" },
+    // "Quiz", not "Difficulty": it orders by the quiz each row names (the
+    // classics easiest first), and a ten-letter label overran its tab at 320px.
+    { key: "difficulty", label: "Quiz" },
 ];
 const SORT_KEYS = SORTS.map(sort => sort.key);
 
@@ -78,14 +74,6 @@ function difficultyRank(entry: ScoreEntry): number {
     return rank === -1 ? CLASSIC_ORDER.length : rank;
 }
 
-/** A stored run worth showing: anything else in the history is skipped. */
-function isScoreEntry(value: unknown): value is ScoreEntry {
-    if (typeof value !== "object" || value === null) return false;
-    const entry = value as Record<string, unknown>;
-    return Number.isFinite(entry.score) && Number.isFinite(entry.total)
-        && typeof entry.difficulty === "string" && typeof entry.date === "string";
-}
-
 /** Newest first; a run with an unreadable date sorts last. */
 function timeOf(entry: ScoreEntry): number {
     const time = new Date(entry.date).getTime();
@@ -101,14 +89,7 @@ function formatDate(iso: string): string {
 
 const Scoreboard = () => {
     const navigate = useNavigate();
-    const [scoreHistory] = useState<ScoreEntry[]>(() => {
-        try {
-            const stored = JSON.parse(localStorage.getItem("quizScores") || "[]");
-            return Array.isArray(stored) ? stored.filter(isScoreEntry) : [];
-        } catch {
-            return [];
-        }
-    });
+    const [scoreHistory] = useState(readScoreHistory);
     const [sortKey, setSortKey] = useState<SortKey>("score");
 
     // Levels are computed from the unsorted history, so re-sorting moves rows
@@ -142,10 +123,11 @@ const Scoreboard = () => {
                         <span className="calm-sub">Play a quiz and your scores land here.</span>
                     </Row>
                 ) : (
-                    sortedScores.map((entry, index) => (
+                    sortedScores.map(entry => (
                         <Row
                             as="li"
-                            key={`${entry.date}-${index}`}
+                            // Keyed by its place in the stored history, so a re-sort moves rows.
+                            key={scoreHistory.indexOf(entry)}
                             elevation={levels.get(entry) ?? "rest"}
                         >
                             <span className="calm-row">
@@ -153,7 +135,8 @@ const Scoreboard = () => {
                                 <span className="calm-sub">{quizTitle(entry.difficulty)}</span>
                             </span>
                             <span className="calm-sub">
-                                {entry.total} {entry.total === 1 ? "question" : "questions"} · {formatDate(entry.date)}
+                                {entry.total === undefined ? "" : `${entry.total} ${entry.total === 1 ? "question" : "questions"} · `}
+                                {formatDate(entry.date)}
                             </span>
                         </Row>
                     ))
@@ -172,22 +155,20 @@ const Scoreboard = () => {
             }
             footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
         >
-            {sortable ? (
-                <>
-                    <Ground>
-                        <Pane layout="split" role="tablist" aria-label="Sort scores by">
-                            {SORTS.map(({ key, label }) => (
-                                // A tab states its choice with aria-selected; Control
-                                // leaves aria-pressed off any control given a role.
-                                <Control key={key} chosen={sortKey === key} {...tabs.tab(key)}>
-                                    {label}
-                                </Control>
-                            ))}
-                        </Pane>
-                    </Ground>
-                    {runs}
-                </>
-            ) : runs}
+            {sortable && (
+                <Ground>
+                    <Pane layout="split" role="tablist" aria-label="Sort scores by">
+                        {SORTS.map(({ key, label }) => (
+                            // A tab states its choice with aria-selected; Control
+                            // leaves aria-pressed off any control given a role.
+                            <Control key={key} chosen={sortKey === key} {...tabs.tab(key)}>
+                                {label}
+                            </Control>
+                        ))}
+                    </Pane>
+                </Ground>
+            )}
+            {runs}
         </CalmPage>
     );
 };

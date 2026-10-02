@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useId, type KeyboardEvent } from "react";
 
 /*
  * The WAI-ARIA tabs pattern for a row of `Control`s (docs/design/design-system.md,
@@ -21,8 +21,9 @@ export function useRovingTabs<K extends string>(
   onSelect: (key: K) => void,
 ) {
   const baseId = useId();
-  const refs = useRef(new Map<K, HTMLButtonElement>());
   const tabId = (key: K) => `${baseId}-tab-${key}`;
+  // A choice outside the tabs still leaves the first tab as the tab stop.
+  const current = keys.includes(selected) ? selected : keys[0];
   const panelId = `${baseId}-panel`;
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -38,17 +39,13 @@ export function useRovingTabs<K extends string>(
     if (next === undefined) return;
     event.preventDefault();
     onSelect(keys[next]);
-    refs.current.get(keys[next])?.focus();
+    document.getElementById(tabId(keys[next]))?.focus();
   };
 
   const tab = (key: K) => {
     const index = keys.indexOf(key);
-    const isSelected = key === selected;
+    const isSelected = key === current;
     return {
-      ref: (el: HTMLButtonElement | null) => {
-        if (el) refs.current.set(key, el);
-        else refs.current.delete(key);
-      },
       id: tabId(key),
       role: "tab" as const,
       "aria-selected": isSelected,
@@ -62,7 +59,7 @@ export function useRovingTabs<K extends string>(
   const panel = {
     id: panelId,
     role: "tabpanel" as const,
-    "aria-labelledby": tabId(selected),
+    "aria-labelledby": tabId(current),
     tabIndex: 0,
   };
 

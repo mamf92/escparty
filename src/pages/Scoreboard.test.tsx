@@ -52,7 +52,7 @@ describe("Scoreboard", () => {
     expect(rows()[0]).toHaveTextContent("2 points");
     expect(rows()[0]).toHaveClass("is-low");
 
-    await user.click(screen.getByRole("tab", { name: "Difficulty" }));
+    await user.click(screen.getByRole("tab", { name: "Quiz" }));
     // Easiest first.
     expect(rows().map(row => row.textContent?.match(/^\d+ points/)?.[0])).toEqual(["2 points", "5 points", "9 points"]);
   });
@@ -87,7 +87,7 @@ describe("Scoreboard", () => {
       { score: 2, total: 10, difficulty: "hard", date: "2026-05-16T00:00:00Z" },
     ]));
     renderScoreboard();
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Difficulty" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: "Quiz" }));
     expect(rows()[0]).toHaveTextContent("2 points");
   });
 
@@ -114,11 +114,11 @@ describe("Scoreboard", () => {
     expect(date).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel", { name: "Date" })).toBeInTheDocument();
     await user.keyboard("{End}");
-    expect(screen.getByRole("tab", { name: "Difficulty" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Quiz" })).toHaveFocus();
     await user.keyboard("{ArrowRight}");
     expect(screen.getByRole("tab", { name: "Score" })).toHaveFocus();
     await user.keyboard("{ArrowLeft}");
-    expect(screen.getByRole("tab", { name: "Difficulty" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Quiz" })).toHaveFocus();
     await user.keyboard("{Home}");
     expect(screen.getByRole("tab", { name: "Score" })).toHaveAttribute("aria-selected", "true");
   });
@@ -130,11 +130,15 @@ describe("Scoreboard", () => {
       { score: 3, total: 10, difficulty: "easy", date: "2026-05-10T00:00:00Z" },
       { score: 4, total: 10, difficulty: "easy", date: "not a date" },
       { score: 5, total: 10, difficulty: "easy", date: "2026-05-16T00:00:00Z" },
+      // The results screen shows a run without its details, so this does too.
+      { score: 1, date: "2026-05-12T00:00:00Z" },
     ]));
     renderScoreboard();
-    expect(screen.getByText("3 runs. Your best stands highest.")).toBeInTheDocument();
+    expect(screen.getByText("4 runs. Your best stands highest.")).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("tab", { name: "Date" }));
-    expect(rows().map(row => row.textContent?.match(/^\d+ points/)?.[0])).toEqual(["5 points", "3 points", "4 points"]);
+    expect(rows().map(row => row.textContent?.match(/^\d+ points/)?.[0])).toEqual(["5 points", "1 points", "3 points", "4 points"]);
+    expect(rows()[1]).toHaveTextContent("Not chosen");
+    expect(rows()[1]).not.toHaveTextContent("question");
   });
 
   it("shows one run without tabs", () => {

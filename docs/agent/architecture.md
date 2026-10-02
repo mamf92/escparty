@@ -124,6 +124,12 @@ plan that also removes the ad hoc storage it would duplicate.
   rendering the component, plus `bestKnownScore` (a multiplayer player's
   local score or the room's, whichever is higher, #63). Pure functions, no
   React, no Firestore.
+- `scoreHistory.ts` — `readScoreHistory()`, the solo score history
+  (`localStorage` `quizScores`) read forgivingly: a run needs only a
+  numeric score (missing details come back unknown), broken entries are
+  skipped and unreadable storage is an empty history (#174). The solo
+  scoreboard reads it; the results page still parses `quizScores` itself
+  until #176 moves it over.
 - `quizTiming.ts` — multiplayer question timing (#62): the 10s + 5s slot,
   `phaseAfterQuestion` (next question, mid-quiz break after every 5th, or
   results), `questionClock` (where a question is, given its

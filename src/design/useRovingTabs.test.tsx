@@ -7,8 +7,8 @@ import { useRovingTabs } from "./useRovingTabs";
 const KEYS = ["one", "two", "three"] as const;
 type Key = (typeof KEYS)[number];
 
-const Tabs = () => {
-  const [chosen, setChosen] = useState<Key>("one");
+const Tabs = ({ start = "one" }: { start?: Key }) => {
+  const [chosen, setChosen] = useState<Key>(start);
   const tabs = useRovingTabs(KEYS, chosen, setChosen);
   return (
     <>
@@ -67,5 +67,11 @@ describe("useRovingTabs", () => {
       expect(notCancelled).toBe(true);
     }
     expect(one).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("keeps the first tab as the tab stop when the choice isn't one of the tabs", () => {
+    render(<Tabs start={"four" as Key} />);
+    expect(screen.getByRole("tab", { name: "one" })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tabpanel", { name: "one" })).toBeInTheDocument();
   });
 });
