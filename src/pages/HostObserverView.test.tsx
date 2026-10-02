@@ -47,6 +47,8 @@ describe("HostObserverView", () => {
     // No ready marks outside a break.
     expect(rows.map(row => row.textContent)).toEqual(["1. Lordi900 points", "2. Loreen700 points"]);
     expect(rows[0]).toHaveClass("is-high");
+    // Not live: the status note says what changed, not every score write.
+    expect(screen.getByRole("list", { name: "Standings" })).not.toHaveAttribute("aria-live");
     const button = screen.getByRole("button", { name: "Continue the quiz" });
     expect(button).toBeDisabled();
     // Why, as text tied to the control rather than a tooltip.
@@ -87,6 +89,21 @@ describe("HostObserverView", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("says the quiz is over when it can't follow to the results", () => {
+    renderWithProviders(<HostObserverView />, { initialEntries: [{ pathname: "/host-observer", state: { roomCode: "ABBA", players: [] } }] });
+    act(() => mocks.onRoom(room({ phase: "results" })));
+    expect(screen.getByRole("status")).toHaveTextContent("The quiz is over.");
+  });
+
+  it("says it's continuing while the resume is in flight", async () => {
+    mocks.resumeAfterMidQuiz.mockResolvedValue(true);
+    renderView();
+    act(() => mocks.onRoom(room({ phase: "mid-scoreboard", playersAtMidQuiz: ["p2", "p3"] })));
+    await act(async () => screen.getByRole("button", { name: "Continue the quiz" }).click());
+    const button = screen.getByRole("button", { name: "Continuing…" });
+    expect(button).toHaveAccessibleDescription("Continuing the quiz for everyone…");
   });
 
   it("says when there's no room to watch", () => {

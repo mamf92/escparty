@@ -78,6 +78,7 @@ const HostObserverView = () => {
 
     useEffect(() => {
         if (!roomCode) return;
+        let goneTimer: ReturnType<typeof setTimeout> | undefined;
         const unsubscribe = listenToRoom(roomCode, (snapshot) => {
             if (snapshot && !snapshot.phase) {
                 setError(LEGACY_ROOM_MESSAGE); // no phase: no break to continue from
@@ -85,10 +86,14 @@ const HostObserverView = () => {
                 setRoom(snapshot);
             } else {
                 setError("This game has closed. Taking you back to multiplayer…");
-                setTimeout(() => navigate("/multiplayer"), 2000);
+                clearTimeout(goneTimer);
+                goneTimer = setTimeout(() => navigate("/multiplayer"), 2000);
             }
         });
-        return () => unsubscribe();
+        return () => {
+            unsubscribe();
+            clearTimeout(goneTimer);
+        };
     }, [roomCode, navigate]);
 
     // The quiz is over for everyone at once (the room's phase, #62): take
@@ -118,14 +123,17 @@ const HostObserverView = () => {
     const waiting = players.length > 0 && !allPlayersReady;
     const readyCount = players.length - missing.length;
     // Where the room is and why Continue is (or isn't) available, as text
-    // beside the control rather than a tooltip, in the same order as the
-    // disabled check below.
+    // beside the control rather than a tooltip: the most decisive reason
+    // first (a finished quiz beats who's watching), then the disabled check
+    // below in order.
     const status = !room
         ? "Connecting to the room…"
-        : !isRoomObserver
-        ? "Only the room's host can continue."
         : room.phase === "results"
         ? "The quiz is over."
+        : !isRoomObserver
+        ? "Only the room's host can continue."
+        : resuming
+        ? "Continuing the quiz for everyone…"
         : !inBreak
         ? "The players are answering. Continue opens at the next scoreboard break."
         : waiting

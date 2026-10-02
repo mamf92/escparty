@@ -11,6 +11,9 @@ export interface Placed {
     place: number;
 }
 
+/** A score in words: "1 point", "700 points". */
+export const points = (score: number) => (score === 1 ? "1 point" : `${score} points`);
+
 /** Players best first, ties sharing a place, then by name so the order is stable. */
 export const placePlayers = (players: Player[]): Placed[] => {
     const sorted = [...players].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));

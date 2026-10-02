@@ -211,6 +211,13 @@ describe("MidQuizScoreboard", () => {
     expect(screen.queryByText("Fetching the scores…")).not.toBeInTheDocument();
   });
 
+  it("says so in a row when the room's snapshot has nobody playing", () => {
+    renderBreak({ ...multiplayer("p2"), players: [] });
+    act(() => mocks.onRoom(room({ players: [] })));
+    expect(screen.queryByText("Fetching the scores…")).not.toBeInTheDocument();
+    expect(screen.getByRole("listitem")).toHaveTextContent("Nobody's on the scoreboard yet.");
+  });
+
   it("shares first place on a tie and raises this player's own row", () => {
     renderBreak(multiplayer("p3"));
     act(() => mocks.onRoom(room({ players: [
@@ -219,7 +226,7 @@ describe("MidQuizScoreboard", () => {
       { id: "p3", name: "Lordi", score: 1 },
     ] })));
     const rows = screen.getAllByRole("listitem");
-    expect(rows.map(row => row.textContent)).toEqual(["1. Martin700 points", "1. Loreen700 points", "3. Lordi (you)1 point"]);
+    expect(rows.map(row => row.textContent)).toEqual(["1. Loreen700 points", "1. Martin700 points", "3. Lordi (you)1 point"]);
     expect(rows.map(row => row.classList.contains("is-high"))).toEqual([true, true, true]);
   });
 

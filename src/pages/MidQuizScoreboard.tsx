@@ -8,6 +8,7 @@ import { LEGACY_ROOM_MESSAGE, isObserverHost, isRoomHost, observerRouteState, pl
 import { readStoredGame } from "../utils/multiplayerSession";
 import { CalmNote, CalmPage } from "../components/CalmPage";
 import { Standings } from "../components/Standings";
+import { points } from "../utils/finale";
 import { Control, Ground, Pane } from "../design";
 
 const TITLE = "Scoreboard break";
@@ -49,6 +50,9 @@ const MidQuizScoreboard = () => {
   });
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
+  // Whether the room's first snapshot is in: until then the standings are
+  // whatever the quiz handed over, or a note that they're on their way.
+  const [scoresLoaded, setScoresLoaded] = useState(false);
   const [error, setError] = useState<string | null>(
     stored.unreadable ? "This tab lost track of your game. Join it again from multiplayer." : null
   );
@@ -167,6 +171,7 @@ const MidQuizScoreboard = () => {
         if (room) {
           // Always update players array to ensure real-time score updates
           setPlayers(playingPlayers(room));
+          setScoresLoaded(true);
 
           // A room from before #61 has no phase to follow (see Quiz.tsx).
           if (!room.phase) {
@@ -243,12 +248,13 @@ const MidQuizScoreboard = () => {
   const nextQuestion = gameData.currentQuestionIndex + 1;
 
   return (
-    <CalmPage title={TITLE} subtitle={`You have ${myScore} ${myScore === 1 ? "point" : "points"} so far.`}>
-      {gameData.multiplayer && (players.length > 0 ? (
+    <CalmPage title={TITLE} subtitle={`You have ${points(myScore)} so far.`}>
+      {gameData.multiplayer && (players.length > 0 || scoresLoaded ? (
         <Standings
           players={players}
           label="Standings at the break"
           meId={gameData.playerId}
+          live
           empty="Nobody's on the scoreboard yet."
         />
       ) : (

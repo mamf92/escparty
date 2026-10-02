@@ -1,31 +1,19 @@
 import type { ReactNode } from "react";
 import { Ground, Pane, Row } from "../design";
 import type { Player } from "../utils/roomsFirestore";
-
-/** "1 point", "700 points". */
-const points = (score: number) => (score === 1 ? "1 point" : `${score} points`);
-
-/**
- * Players in order, highest score first, each with their place. Players on
- * the same score share a place (two on 900 are both 1st; the next is 3rd).
- */
-const rankPlayers = (players: readonly Player[]) => {
-  const sorted = [...players].sort((a, b) => b.score - a.score);
-  return sorted.map(player => ({
-    player,
-    place: sorted.findIndex(other => other.score === player.score) + 1,
-  }));
-};
+import { placePlayers, points } from "../utils/finale";
 
 /**
  * The room's standings as a list on the surface (docs/design/design-system.md,
  * "Row"): the mid-quiz break and the observer host's screen share it.
  *
- * Elevation carries the rank: the leader (all of them, on a tie) and your
- * own row stand proud, everyone else rests. The list is a polite live
- * region, since the scores and the ready marks change on their own.
+ * Places and their order are the final results' (`placePlayers`): players
+ * on the same score share a place, by name within it. Elevation carries
+ * the rank: the leader (all of them, on a tie) and your own row stand
+ * proud, everyone else rests; when nobody leads (everyone level), only your
+ * own row does.
  */
-export const Standings = ({ players, label, meId, detail, empty }: {
+export const Standings = ({ players, label, meId, detail, empty, live = false }: {
   players: readonly Player[];
   /** The list's accessible name, e.g. "Standings at the break". */
   label: string;
@@ -35,18 +23,25 @@ export const Standings = ({ players, label, meId, detail, empty }: {
   detail?: (player: Player) => ReactNode;
   /** The information row shown when there's nobody to rank yet. */
   empty: string;
+  /**
+   * Announce changes politely. For a list that settles while the screen is
+   * up (the break); leave it off where a status note already says what
+   * changed (the host's view), or every score write is read out.
+   */
+  live?: boolean;
 }) => {
-  const ranked = rankPlayers(players);
+  const ranked = placePlayers([...players]);
+  const someoneLeads = ranked.some(({ place }) => place > 1);
   return (
     <Ground>
-      <Pane as="ol" aria-label={label} aria-live="polite">
+      <Pane as="ol" aria-label={label} aria-live={live ? "polite" : undefined}>
         {ranked.length === 0 ? (
           <Row as="li">{empty}</Row>
         ) : ranked.map(({ player, place }) => {
           const mine = !!meId && player.id === meId;
           const extra = detail?.(player);
           return (
-            <Row key={player.id} as="li" elevation={place === 1 || mine ? "high" : "rest"}>
+            <Row key={player.id} as="li" elevation={(someoneLeads && place === 1) || mine ? "high" : "rest"}>
               <span className="calm-row">
                 <span>{place}. {player.name}{mine ? " (you)" : ""}</span>
                 <span>{points(player.score)}</span>
