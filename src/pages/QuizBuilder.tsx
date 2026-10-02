@@ -4,6 +4,7 @@ import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Control, Field, Ground, Pane, Row } from "../design";
 import { customQuizKey, saveCustomQuiz } from "../utils/customQuizzes";
 import { loadQuizForEditing } from "../utils/quizCatalog";
+import { focusSoon } from "../utils/focusSoon";
 import { radioGroupKeys, radioTabIndex } from "../utils/radioGroupKeys";
 import type { QuizDifficulty } from "../utils/QuizDataProvider";
 import {
@@ -13,9 +14,10 @@ import {
     DIFFICULTY_LABELS,
     QUESTION_LIMITS,
     QUIZ_LIMITS,
+    badOptions,
     isBreakAfter,
-    questionProblems,
-    quizProblems,
+    questionFieldProblems,
+    quizFieldProblems,
     type AnyQuestion,
     type BankQuestion,
     type BreakEvery,
@@ -44,26 +46,9 @@ const sourceLabel = (question: AnyQuestion) =>
 let customCounter = 0;
 const newCustomId = () => `mine-${Date.now().toString(36)}-${(customCounter++).toString(36)}`;
 
-/** Focus an element once React has put it on the page. */
-const focusSoon = (find: () => HTMLElement | null | undefined) =>
-    requestAnimationFrame(() => find()?.focus());
-
-/*
- * quizModel's problems, sorted to the field each one is about, so each note
- * sits beside its field (docs/design/design-system.md, "Forms").
- */
-const isNameProblem = (problem: string) => /\bname\b/.test(problem);
-const isQuestionTextProblem = (problem: string) => problem === "Write the question." || problem.startsWith("Keep the question");
-const isCorrectProblem = (problem: string) => problem.startsWith("Mark which");
-
-/** Which answers a problem note is about: empty, too long, or a repeat. */
-const badAnswers = (options: string[]) => {
-    const trimmed = options.map(option => option.trim());
-    return trimmed.map((option, index) =>
-        !option ||
-        option.length > QUESTION_LIMITS.maxOptionLength ||
-        trimmed.some((other, i) => i !== index && other && other.toLowerCase() === option.toLowerCase()));
-};
+/** The messages of the problems about one field. */
+const messagesFor = <Field extends string>(problems: { field: Field; message: string }[], field: Field) =>
+    problems.filter(problem => problem.field === field).map(problem => problem.message);
 
 /**
  * Build a quiz (#73-#76): name it, pick questions from the bank, write your
@@ -150,9 +135,14 @@ const QuizBuilder = () => {
 
     const inQuiz = useMemo(() => new Set(questions.map(question => question.id)), [questions]);
     const full = questions.length >= QUIZ_LIMITS.maxQuestions;
-    const problems = quizProblems({ title, questions, breakEvery });
-    const nameProblems = saveTried ? problems.filter(isNameProblem) : [];
-    const quizWideProblems = saveTried ? problems.filter(problem => !isNameProblem(problem)) : [];
+    // Each problem is said beside the field it's about
+    // (docs/design/design-system.md, "Forms").
+    const quizFieldIssues = quizFieldProblems({ title, questions, breakEvery });
+    const problems = quizFieldIssues.map(problem => problem.message);
+    const nameProblems = saveTried ? messagesFor(quizFieldIssues, "name") : [];
+    const quizWideProblems = saveTried
+        ? quizFieldIssues.filter(problem => problem.field !== "name").map(problem => problem.message)
+        : [];
 
     const select = (index: number | null) => {
         setSelected(index);
@@ -223,22 +213,26 @@ const QuizBuilder = () => {
         options: draft.options,
         correctAnswer: draft.correct === null ? "" : draft.options[draft.correct] ?? "",
     };
-    const draftProblems = questionProblems(draftQuestion);
-    const shownDraftProblems = draftTried ? draftProblems : [];
-    const questionTextProblems = shownDraftProblems.filter(isQuestionTextProblem);
-    const correctProblems = shownDraftProblems.filter(isCorrectProblem);
-    const answerProblems = shownDraftProblems.filter(problem => !isQuestionTextProblem(problem) && !isCorrectProblem(problem));
-    const answersInvalid = answerProblems.length > 0 ? badAnswers(draft.options) : draft.options.map(() => false);
+    const draftIssues = questionFieldProblems(draftQuestion);
+    const draftProblems = draftIssues.map(problem => problem.message);
+    const shownDraftIssues = draftTried ? draftIssues : [];
+    const shownDraftProblems = shownDraftIssues.map(problem => problem.message);
+    const questionTextProblems = messagesFor(shownDraftIssues, "question");
+    const correctProblems = messagesFor(shownDraftIssues, "correct");
+    const answerProblems = messagesFor(shownDraftIssues, "answers");
+    const answersInvalid = answerProblems.length > 0 ? badOptions(draft.options) : draft.options.map(() => false);
 
     const saveDraft = () => {
         setDraftTried(true);
         if (draftProblems.length > 0) {
             // Take them to the first thing to fix once its note is on the
             // page, so the note is read with it.
-            const firstBadAnswer = badAnswers(draft.options).indexOf(true);
-            if (draftProblems.some(isQuestionTextProblem)) focusSoon(() => questionRef.current);
-            else if (firstBadAnswer >= 0) focusSoon(() => answersRef.current?.querySelectorAll<HTMLElement>("input")[firstBadAnswer]);
-            else if (draftProblems.some(isCorrectProblem)) focusSoon(() => correctRef.current?.querySelector<HTMLElement>('[role="radio"]'));
+            const firstBadAnswer = badOptions(draft.options).indexOf(true);
+            const about = (field: string) => draftIssues.some(problem => problem.field === field);
+            if (about("question")) focusSoon(() => questionRef.current);
+            else if (about("answers") && firstBadAnswer >= 0) {
+                focusSoon(() => answersRef.current?.querySelectorAll<HTMLElement>("input")[firstBadAnswer]);
+            } else if (about("correct")) focusSoon(() => correctRef.current?.querySelector<HTMLElement>('[role="radio"]'));
             return;
         }
         const trimmed = {
@@ -284,7 +278,7 @@ const QuizBuilder = () => {
     const saveQuiz = async () => {
         setSaveTried(true);
         if (problems.length > 0) {
-            if (problems.some(isNameProblem)) focusSoon(() => nameRef.current);
+            if (quizFieldIssues.some(problem => problem.field === "name")) focusSoon(() => nameRef.current);
             return;
         }
         if (saving) return;
@@ -317,25 +311,25 @@ const QuizBuilder = () => {
                 <Ground>
                     <Pane>
                         <label className="calm-label" htmlFor={fieldId("category")}>Category</label>
-                        <select
+                        <Field
+                            as="select"
                             id={fieldId("category")}
-                            className="lycra-field"
                             value={category}
                             onChange={event => setCategory(event.target.value as QuestionCategory | "all")}
                         >
                             <option value="all">All categories</option>
                             {Object.entries(CATEGORY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                        </select>
+                        </Field>
                         <label className="calm-label" htmlFor={fieldId("difficulty")}>Difficulty</label>
-                        <select
+                        <Field
+                            as="select"
                             id={fieldId("difficulty")}
-                            className="lycra-field"
                             value={difficulty}
                             onChange={event => setDifficulty(event.target.value as QuizDifficulty | "all")}
                         >
                             <option value="all">Any difficulty</option>
                             {Object.entries(DIFFICULTY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                        </select>
+                        </Field>
                     </Pane>
                 </Ground>
                 {bankFailed ? (
@@ -393,10 +387,10 @@ const QuizBuilder = () => {
                 <Ground>
                     <Pane ref={answersRef}>
                         <label className="calm-label" htmlFor={fieldId("question")}>Question</label>
-                        <textarea
+                        <Field
+                            as="textarea"
                             ref={questionRef}
                             id={fieldId("question")}
-                            className="lycra-field"
                             value={draft.question}
                             maxLength={QUESTION_LIMITS.maxQuestionLength}
                             placeholder="Which act sang in wolf masks?"
@@ -497,14 +491,14 @@ const QuizBuilder = () => {
                     />
                     {nameProblems.length > 0 && <p className="calm-sub" id={fieldId("name-note")}>{nameProblems.join(" ")}</p>}
                     <label className="calm-label" htmlFor={fieldId("break")}>Scoreboard break</label>
-                    <select
+                    <Field
+                        as="select"
                         id={fieldId("break")}
-                        className="lycra-field"
                         value={breakEvery}
                         onChange={event => setBreakEvery(Number(event.target.value) as BreakEvery)}
                     >
                         {BREAK_CHOICES.map(choice => <option key={choice} value={choice}>{breakLabel(choice)}</option>)}
-                    </select>
+                    </Field>
                 </Pane>
             </Ground>
 

@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane } from "../design";
 import { QUIZ_CHOICES } from "../utils/quizCatalog";
 import { customQuizId, customQuizKey, forgetMyQuiz, isCustomQuizKey, listMyQuizzes, type MyQuiz } from "../utils/customQuizzes";
+import { focusSoon } from "../utils/focusSoon";
 import { radioGroupKeys, radioTabIndex } from "../utils/radioGroupKeys";
 
 /**
@@ -27,6 +28,7 @@ const QuizLibrary = () => {
     const listRef = useRef<HTMLDivElement>(null);
     const removeRef = useRef<HTMLButtonElement>(null);
     const keepRef = useRef<HTMLButtonElement>(null);
+    const confirmId = useId();
     const justSaved = returned?.saved && !myQuizzes.some(quiz => quiz.id === returned.saved?.id)
         ? [{ ...returned.saved, savedAt: 0 }]
         : [];
@@ -52,12 +54,12 @@ const QuizLibrary = () => {
     const askToForget = () => {
         setConfirming(true);
         // Land on the safe answer, which is where the move was.
-        requestAnimationFrame(() => keepRef.current?.focus());
+        focusSoon(() => keepRef.current);
     };
 
     const keep = () => {
         setConfirming(false);
-        requestAnimationFrame(() => removeRef.current?.focus());
+        focusSoon(() => removeRef.current);
     };
 
     const forget = (key: string) => {
@@ -69,7 +71,7 @@ const QuizLibrary = () => {
         if (location.state) navigate(location.pathname, { replace: true, state: null });
         // The moves pane is gone: back to the list's tab stop, which with
         // nothing picked is the first quiz.
-        requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')?.focus());
+        focusSoon(() => listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]'));
     };
 
     return (
@@ -132,10 +134,10 @@ const QuizLibrary = () => {
                         )}
                         {mine && confirming && (
                             <>
-                                <p className="calm-sub" id="forget-quiz-confirm">
+                                <p className="calm-sub" id={confirmId}>
                                     Take {choice.title} off this device's list? The quiz itself isn't deleted, but you won't find it here again.
                                 </p>
-                                <Control aria-describedby="forget-quiz-confirm" onClick={() => forget(choice.key)}>Yes, remove it</Control>
+                                <Control aria-describedby={confirmId} onClick={() => forget(choice.key)}>Yes, remove it</Control>
                                 <Control ref={keepRef} onClick={keep}>Keep it</Control>
                             </>
                         )}
