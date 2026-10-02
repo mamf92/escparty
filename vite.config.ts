@@ -25,7 +25,7 @@ export default defineConfig({
     globals: false,
     setupFiles: ['./src/test/setup.ts'],
     // styled-components generates its CSS at runtime, but plain .css
-    // imports (App.css, scoreboard-calm.css) still have to resolve.
+    // imports (the design system's stylesheets) still have to resolve.
     css: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     restoreMocks: true,
