@@ -160,6 +160,23 @@ describe("QuizResults", () => {
     expect(screen.getByRole("status")).toBe(status);
   });
 
+  it("gives the next round back when the room comes back", () => {
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+    act(() => mocks.onRoom(null));
+    expect(screen.getByRole("alert")).toHaveTextContent("no longer exists");
+    act(() => mocks.onRoom(room({ nextRoomCode: "NEXT" })));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join the next round" })).toBeInTheDocument();
+  });
+
+  it("still announces the reveal after the room has gone", async () => {
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+    act(() => mocks.onRoom(room()));
+    act(() => mocks.onRoom(null));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show everything" }));
+    expect(screen.getByRole("status")).toHaveTextContent(/wins with/);
+  });
+
   it("offers a way out when the room goes after the scores came in", async () => {
     renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
     act(() => mocks.onRoom(room()));

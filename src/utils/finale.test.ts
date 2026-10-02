@@ -27,6 +27,7 @@ describe("finale", () => {
     it("names the podium and the winner", () => {
         expect(PODIUM_POINTS[1]).toBe("Douze points");
         expect(winnerLine(placePlayers([p("Loreen", 12), p("Lordi", 3)]))).toBe("Loreen wins with 12 points!");
+        expect(winnerLine(placePlayers([p("Lordi", 1), p("Loreen", 0)]))).toBe("Lordi wins with 1 point!");
         expect(winnerLine(placePlayers([p("Loreen", 12), p("Abba", 12)]))).toBe("A tie at the top: Abba and Loreen, 12 points each!");
         expect(winnerLine([])).toBeNull();
     });
@@ -44,7 +45,7 @@ describe("finale", () => {
     it("says out loud what each tap put on the board", () => {
         const four = placePlayers([p("A", 9), p("B", 5), p("C", 5), p("D", 1)]);
         expect(revealAnnouncement(four, 0)).toBe("4 players are on the scoreboard. Start the reveal when the room is ready.");
-        expect(revealAnnouncement(four, 1)).toBe("On the board: place 4, D, 1 points.");
+        expect(revealAnnouncement(four, 1)).toBe("On the board: place 4, D, 1 point.");
         // A tie comes out, and is said, together.
         expect(revealAnnouncement(four, 2)).toBe("On the board: place 2, B, 5 points; place 2, C, 5 points.");
         expect(revealAnnouncement(four, 3)).toBe("A wins with 9 points!");

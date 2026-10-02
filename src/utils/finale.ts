@@ -44,13 +44,16 @@ export const PODIUM_POINTS: Record<number, string> = {
     3: "Huit points",
 };
 
+/** "1 point", "7 points". */
+const points = (score: number): string => `${score} ${score === 1 ? "point" : "points"}`;
+
 /** The line that crowns the winner, or null without players. */
 export const winnerLine = (placed: Placed[]): string | null => {
     const winners = placed.filter(entry => entry.place === 1).map(entry => entry.player);
     if (winners.length === 0) return null;
     const score = winners[0].score;
-    if (winners.length === 1) return `${winners[0].name} wins with ${score} points!`;
-    return `A tie at the top: ${winners.map(winner => winner.name).join(" and ")}, ${score} points each!`;
+    if (winners.length === 1) return `${winners[0].name} wins with ${points(score)}!`;
+    return `A tie at the top: ${winners.map(winner => winner.name).join(" and ")}, ${points(score)} each!`;
 };
 
 /**
@@ -83,6 +86,6 @@ export const revealAnnouncement = (placed: Placed[], step: number): string => {
     const before = at === 1 ? 0 : steps[at - 2];
     return `On the board: ${placed
         .slice(placed.length - shown, placed.length - before)
-        .map(({ player, place }) => `place ${place}, ${player.name}, ${player.score} points`)
+        .map(({ player, place }) => `place ${place}, ${player.name}, ${points(player.score)}`)
         .join("; ")}.`;
 };

@@ -33,11 +33,13 @@ const Lobby = () => {
     const navigate = useNavigate();
     const [identity] = useState(readIdentity);
     const [room, setRoom] = useState<Room | null | undefined>(undefined);
-    const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     // A second tap in the same render can't see `busy` yet.
     const inFlight = useRef(false);
     const [pickError, setPickError] = useState<string | null>(null);
+    // The rules refused the quiz pick. A dead end only while the room still
+    // has no quiz: the refusal can also mean another tab already picked one.
+    const [quizRefused, setQuizRefused] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
     const roomQuizTitle = useQuizTitle(room?.difficulty);
     // This device's saved quizzes, offered alongside the premade ones.
@@ -121,11 +123,14 @@ const Lobby = () => {
             </CalmPage>
         );
     }
-    if (room === null || error) {
+    const refusedForGood = quizRefused && !room?.difficulty;
+    if (room === null || refusedForGood) {
         return (
             <CalmPage title="The green room" footer={leave}>
                 <CalmNote role="alert">
-                    {error ?? "This game has closed, or the code is wrong. Join with another code, or host your own."}
+                    {refusedForGood
+                        ? "This room wouldn't take the quiz, so the show can't go on here. Host a new game to start again."
+                        : "This game has closed, or the code is wrong. Join with another code, or host your own."}
                 </CalmNote>
                 {wayOut("Join or host a game", leaveRoom)}
             </CalmPage>
@@ -175,14 +180,14 @@ const Lobby = () => {
         }
     };
 
-    // The room's `difficulty` names the quiz (quizCatalog.ts). Only the
-    // rules refusing the write is a dead end (the pick is one-shot there);
-    // anything else (the quiz couldn't be read, the network) wrote nothing,
-    // so the host can pick again.
+    // The room's `difficulty` names the quiz (quizCatalog.ts). The rules
+    // refusing the write (the pick is one-shot there) ends this room unless
+    // its snapshot shows a quiz after all; anything else (the quiz couldn't
+    // be read, the network) wrote nothing, so the host can pick again.
     const handleSelectQuiz = (quizKey: string) => run("set the quiz", () => setRoomQuiz(gameCode, quizKey), (err) => {
         const cause = err instanceof Error ? err.cause as { code?: unknown } | undefined : undefined;
         if (cause?.code === "permission-denied") {
-            setError("This room wouldn't take the quiz, so the show can't go on here. Host a new game to start again.");
+            setQuizRefused(true);
         } else {
             setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
         }

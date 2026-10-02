@@ -145,6 +145,20 @@ describe("Lobby", () => {
     expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
   });
 
+  it("goes on when a refused pick finds the room already has a quiz", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    as("host", "Martin");
+    mocks.setRoomQuiz.mockRejectedValueOnce(new Error("Failed to set difficulty: denied", { cause: { code: "permission-denied" } }));
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Classic: Easy" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("This room wouldn't take the quiz");
+    // Another tab of this host picked first: the room has its quiz after all.
+    act(() => mocks.onRoom(room({ difficulty: "easy" })));
+    expect(screen.queryByText(/wouldn't take the quiz/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Start/ })).toBeInTheDocument();
+  });
+
   it("lets the host pick again when the quiz write fails for another reason", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     as("host", "Martin");

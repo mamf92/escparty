@@ -96,6 +96,9 @@ const QuizResults = () => {
     // the host's next round arrives on this room too.
     return listenToRoom(gameData.roomCode, (next) => {
       if (next) {
+        // A room that comes back (a cache-only miss, then the server) is
+        // playable again: drop the "gone" notice and its way out.
+        setError(null);
         setRoom(next);
         setPlayers(playingPlayers(next));
         setIsObserver(isObserverHost(next, gameData.playerId));
@@ -172,7 +175,9 @@ const QuizResults = () => {
   // One status line for the whole reveal, mounted from the first render so
   // screen readers announce each change to it: collecting, then how many
   // are on the board, then what each tap added, then the winner.
-  const statusLine = error ? "" : placed.length === 0 ? "Collecting the final scores…" : revealAnnouncement(placed, step);
+  // With the room gone there is nothing left to collect, but scores the
+  // page already holds can still be revealed and announced.
+  const statusLine = placed.length > 0 ? revealAnnouncement(placed, step) : error ? "" : "Collecting the final scores…";
   const isHost = isRoomHost(room, gameData.playerId);
   // This player's name in this room (the host included, from the full
   // list), before this device's last-used name, which another tab may have

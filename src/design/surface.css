@@ -158,6 +158,16 @@
   box-shadow: var(--esc-raise-lg);
 }
 
+/* A proud control (the screen's next step) still answers a point and a press. */
+.esc-app .lycra.is-high:not(.is-static):not(:disabled):hover {
+  background: var(--esc-face-hover);
+}
+
+.esc-app .lycra.is-high:not(.is-static):not(:disabled):active {
+  background: var(--esc-face-pressed);
+  box-shadow: var(--esc-inset);
+}
+
 /* The bottom of a ladder sits in the background rather than on it. */
 .esc-app .lycra.is-low,
 .esc-app .lycra.is-static.is-low,

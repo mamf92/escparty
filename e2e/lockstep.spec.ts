@@ -40,19 +40,23 @@ test("host and a throttled guest see the same questions through a break", async 
     await host.getByText("Create game").click();
     await host.getByText("Host & Play").click();
     await expect(host.getByRole("heading", { name: "The green room" })).toBeVisible();
-    const code = (await host.locator("strong").first().textContent())!.trim();
+    const code = await host.evaluate(() => localStorage.getItem("gameCode"));
     expect(code).toMatch(/^[A-Z]{4}$/);
     await host.getByRole("button", { name: "Nul Points" }).click();
 
     // The guest joins with the code and says they're ready.
     await guest.goto("/#/multiplayer");
     await guest.getByText("Join game").click();
-    await guest.getByPlaceholder("code").fill(code);
+    await guest.getByPlaceholder("code").fill(code!);
     await guest.getByRole("button", { name: "Join Game" }).click();
     await expect(guest.getByRole("heading", { name: "The green room" })).toBeVisible();
     await guest.getByRole("button", { name: "I'm ready" }).click();
 
     await host.getByRole("button", { name: "Start the show" }).click();
+    // The green room has headings of its own: read the question only once
+    // the host has left it for the quiz.
+    await expect(host.getByRole("heading", { name: "The green room" })).toBeHidden();
+    await expect(guest.getByRole("heading", { name: "The green room" })).toBeHidden({ timeout: 30_000 });
 
     // Questions 1 to 4, the same on both phones.
     for (let index = 0; index < 4; index++) {
