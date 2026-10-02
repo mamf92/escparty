@@ -1,4 +1,4 @@
-import { act } from "@testing-library/react";
+import { act, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen } from "../test/test-utils";
@@ -42,9 +42,16 @@ describe("HostObserverView", () => {
   it("shows the players' standings, not the observing host", () => {
     renderView();
     act(() => mocks.onRoom(room()));
-    const rows = screen.getAllByRole("row").slice(1).map(row => row.textContent);
-    expect(rows).toEqual(["Lordi900", "Loreen700"]);
-    expect(screen.getByRole("button", { name: "Continue Quiz" })).toBeDisabled();
+    expect(screen.getByRole("heading", { level: 1, name: "The host's view" })).toBeInTheDocument();
+    const rows = within(screen.getByRole("list", { name: "Standings" })).getAllByRole("listitem");
+    // No ready marks outside a break.
+    expect(rows.map(row => row.textContent)).toEqual(["1. Lordi900 points", "2. Loreen700 points"]);
+    expect(rows[0]).toHaveClass("is-high");
+    const button = screen.getByRole("button", { name: "Continue the quiz" });
+    expect(button).toBeDisabled();
+    // Why, as text tied to the control rather than a tooltip.
+    expect(button).toHaveAccessibleDescription("The players are answering. Continue opens at the next scoreboard break.");
+    expect(button).not.toHaveAttribute("title");
   });
 
   it("follows the room to the results when the quiz is over (#21)", () => {
@@ -59,11 +66,13 @@ describe("HostObserverView", () => {
       mocks.resumeAfterMidQuiz.mockResolvedValue(true);
       renderView();
       act(() => mocks.onRoom(room({ phase: "mid-scoreboard", playersAtMidQuiz: ["p3"] })));
-      expect(screen.getByText("Still waiting for Loreen.")).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("1 of 2 ready. Still waiting for Loreen.");
+      expect(screen.getAllByRole("listitem").map(row => row.textContent)).toEqual(["1. Lordi900 pointsReady", "2. Loreen700 pointsOn the way"]);
       expect(screen.getByRole("button", { name: "Continue without them" })).toBeDisabled();
       act(() => vi.advanceTimersByTime(MISSING_PLAYER_GRACE_MS));
       const button = screen.getByRole("button", { name: "Continue without them" });
       expect(button).toBeEnabled();
+      expect(screen.getByRole("status")).toHaveTextContent("1 of 2 ready. Still waiting for Loreen. You can go on without them.");
       await act(async () => button.click());
       expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledWith("ABBA");
 
@@ -72,8 +81,9 @@ describe("HostObserverView", () => {
       act(() => mocks.onRoom(room({ phase: "mid-scoreboard", currentQuestionIndex: 9, playersAtMidQuiz: [] })));
       expect(screen.getByRole("button", { name: "Continue without them" })).toBeDisabled();
       act(() => mocks.onRoom(room({ phase: "mid-scoreboard", currentQuestionIndex: 9, playersAtMidQuiz: ["p2", "p3"] })));
-      expect(screen.getByRole("button", { name: "Continue Quiz" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Continue the quiz" })).toBeEnabled();
       expect(screen.queryByText(/Still waiting/)).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Everyone's at the break. Continue when you're ready.");
     } finally {
       vi.useRealTimers();
     }
@@ -81,6 +91,41 @@ describe("HostObserverView", () => {
 
   it("says when there's no room to watch", () => {
     renderWithProviders(<HostObserverView />, { initialEntries: ["/host-observer"] });
-    expect(screen.getByText("Unable to find this game. Please return to the lobby.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("This tab lost track of the game. Find it again from multiplayer.");
+    expect(screen.getByRole("button", { name: "Back to multiplayer" })).toBeInTheDocument();
+  });
+  it("says it's connecting until the room's first snapshot", () => {
+    renderView();
+    expect(screen.getByRole("status")).toHaveTextContent("Connecting to the room…");
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue the quiz" })).toBeDisabled();
+  });
+
+  it("shows an empty room as a row, not an empty list", () => {
+    renderView();
+    act(() => mocks.onRoom(room({ players: [{ id: "host", name: "Host", score: 0 }] })));
+    expect(screen.getByRole("listitem")).toHaveTextContent("Nobody's playing in this room yet.");
+  });
+
+  it("says why a Continue failed, as an alert", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.resumeAfterMidQuiz.mockRejectedValue(new Error("offline"));
+    renderView();
+    act(() => mocks.onRoom(room({ phase: "mid-scoreboard", playersAtMidQuiz: ["p2", "p3"] })));
+    await act(async () => screen.getByRole("button", { name: "Continue the quiz" }).click());
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't continue the quiz. Check your connection and try again.");
+  });
+
+  it("goes back to the multiplayer page when the room is gone", async () => {
+    vi.useFakeTimers();
+    try {
+      renderView();
+      act(() => mocks.onRoom(null));
+      expect(screen.getByRole("alert")).toHaveTextContent("This game has closed. Taking you back to multiplayer…");
+      await act(async () => vi.advanceTimersByTime(2000));
+      expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

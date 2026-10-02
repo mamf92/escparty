@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import styled from "styled-components";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, Room, listenToRoom, markPlayerAtMidQuiz } from "../utils/roomsFirestore";
 import { useResumeRoom } from "../hooks/useResumeRoom";
@@ -7,6 +6,11 @@ import { hasLeftBreak } from "../utils/quizTiming";
 import { bestKnownScore } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, isRoomHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { readStoredGame } from "../utils/multiplayerSession";
+import { CalmNote, CalmPage } from "../components/CalmPage";
+import { Standings } from "../components/Standings";
+import { Control, Ground, Pane } from "../design";
+
+const TITLE = "Scoreboard break";
 
 const MidQuizScoreboard = () => {
   const location = useLocation();
@@ -46,7 +50,7 @@ const MidQuizScoreboard = () => {
 
   const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(
-    stored.unreadable ? "Unable to retrieve game data. Please return to the lobby." : null
+    stored.unreadable ? "This tab lost track of your game. Join it again from multiplayer." : null
   );
   // Whether this user is the host: set only from the room's snapshot (see
   // the listener below).
@@ -206,7 +210,7 @@ const MidQuizScoreboard = () => {
             returnToQuiz(room);
           }
         } else {
-          setError("Game room no longer exists");
+          setError("This game has closed. Taking you back to multiplayer…");
           goneTimer = setTimeout(() => navigate("/multiplayer"), 2000);
         }
       });
@@ -222,135 +226,52 @@ const MidQuizScoreboard = () => {
 
   if (error) {
     return (
-      <Container>
-        <Title>Error</Title>
-        <ErrorMessage>{error}</ErrorMessage>
-        <NextButton onClick={() => navigate("/multiplayer")}>Return to Multiplayer</NextButton>
-      </Container>
+      <CalmPage title={TITLE}>
+        <CalmNote role="alert">{error}</CalmNote>
+        <Ground>
+          <Pane>
+            <Control onClick={() => navigate("/multiplayer")}>Back to multiplayer</Control>
+          </Pane>
+        </Ground>
+      </CalmPage>
     );
   }
 
-  return (
-    <Container>
-      <Title>📊 Mid-Quiz Scoreboard</Title>
-      <Score>You scored {myScore} so far!</Score>
-      <ScoreTitle>🏆 Current Standings</ScoreTitle>
-      <ScoreTable>
-        <thead>
-          <tr>
-            <th>Player</th>
-            <th>Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[...players]
-            .sort((a: Player, b: Player) => b.score - a.score)
-            .map((player: Player) => (
-              <tr key={player.id}>
-                <td>{player.name}{player.id === gameData.playerId ? " (You)" : ""}</td>
-                <td>{player.score}</td>
-              </tr>
-            ))}
-        </tbody>
-      </ScoreTable>
+  // The host continues in multiplayer, anyone in single player; a guest
+  // waits for the room to move on.
+  const canContinue = isHost || !gameData.multiplayer;
+  const nextQuestion = gameData.currentQuestionIndex + 1;
 
-      {/* Only show continue button for the host in multiplayer mode, or for anyone in single-player */}
-      {(isHost || !gameData.multiplayer) ? (
-        <>
-          <NextButton onClick={continueQuiz} disabled={resuming}>
-            {resuming ? "Continuing..." : "Continue Quiz"}
-          </NextButton>
-          {resumeError && <ErrorMessage>{resumeError}</ErrorMessage>}
-        </>
+  return (
+    <CalmPage title={TITLE} subtitle={`You have ${myScore} ${myScore === 1 ? "point" : "points"} so far.`}>
+      {gameData.multiplayer && (players.length > 0 ? (
+        <Standings
+          players={players}
+          label="Standings at the break"
+          meId={gameData.playerId}
+          empty="Nobody's on the scoreboard yet."
+        />
       ) : (
-        <WaitingMessage>Waiting for the host to continue...</WaitingMessage>
+        <CalmNote role="status">Fetching the scores…</CalmNote>
+      ))}
+      {!gameData.multiplayer && gameData.totalQuestions > 0 && (
+        <CalmNote>Catch your breath: question {nextQuestion} of {gameData.totalQuestions} is up next.</CalmNote>
       )}
-    </Container>
+
+      {canContinue ? (
+        <Ground>
+          <Pane>
+            <Control onClick={continueQuiz} disabled={resuming}>
+              {resuming ? "Continuing…" : "Continue the quiz"}
+            </Control>
+          </Pane>
+        </Ground>
+      ) : (
+        <CalmNote role="status">Waiting for the host to continue…</CalmNote>
+      )}
+      {resumeError && <CalmNote role="alert">{resumeError}</CalmNote>}
+    </CalmPage>
   );
 };
 
 export default MidQuizScoreboard;
-
-// Styled Components
-const Container = styled.div`
-  width: 100%;
-  max-width: 31.25rem; /* 500px */
-  margin: auto;
-  text-align: center;
-  padding: 1.25rem; /* 20px */
-  background: ${({ theme }) => theme.colors.magnolia};
-  border-radius: 0; /* Changed to match square design */
-`;
-
-const Title = styled.h2`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.night};
-  font-size: 1.5rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const Score = styled.p`
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: ${({ theme }) => theme.colors.purple};
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const ScoreTitle = styled.h3`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.night};
-  margin-top: 1.25rem; /* 20px */
-`;
-
-const ScoreTable = styled.table`
-  width: 100%;
-  margin-top: 0.625rem; /* 10px */
-  border-collapse: collapse;
-  font-size: 1rem;
-  
-  th, td {
-    border: 0.0625rem solid ${({ theme }) => theme.colors.gray}; /* 1px */
-    padding: 0.5rem; /* 8px */
-    text-align: center;
-  }
-
-  th {
-    background: ${({ theme }) => theme.colors.nightblue};
-    color: white;
-  }
-
-  td {
-    color: ${({ theme }) => theme.colors.black};
-  }
-`;
-
-const NextButton = styled.button`
-  margin-top: 1.25rem; /* 20px */
-  padding: 1rem 2rem; /* 16px 32px */
-  font-size: 1rem;
-  font-weight: bold;
-  background-color: ${({ theme }) => theme.colors.purple};
-  color: white;
-  border: none;
-  cursor: pointer;
-  transition: 0.3s;
-  &:hover {
-    background: ${({ theme }) => theme.colors.darkpurple};
-  }
-`;
-
-const ErrorMessage = styled.p`
-  color: ${({ theme }) => theme.colors.incorrectRed};
-  font-size: 1.2rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const WaitingMessage = styled.p`
-  color: ${({ theme }) => theme.colors.purple};
-  font-size: 1.2rem;
-  font-weight: bold;
-  margin-top: 1.25rem; /* 20px */
-  padding: 1rem;
-  border: 1px solid ${({ theme }) => theme.colors.pinkLavender};
-  background-color: ${({ theme }) => theme.colors.magnolia};
-`;
