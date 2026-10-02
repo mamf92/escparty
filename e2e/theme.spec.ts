@@ -3,7 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
- * Theme compliance for the scoreboard party screens (#90), judged against
+ * Theme compliance for the scoreboard party screens (#90), Home (#169) and
+ * the single-player entry (#170), judged against
  * the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *

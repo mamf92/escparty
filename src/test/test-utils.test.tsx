@@ -7,7 +7,7 @@ import { theme } from "../styles/theme";
 // `theme.colors.*`, which throws without the ThemeProvider. If this fails,
 // the harness is broken, not the screen under test.
 const Probe = styled.p`
-  color: ${({ theme }) => theme.colors.white};
+  color: ${({ theme: provided }) => provided.colors.white};
 `;
 
 describe("renderWithProviders", () => {
