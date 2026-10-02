@@ -173,7 +173,7 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await Promise.all([host, guest].map(page => page.context().close()));
 });
 
-test("the home screen follows the surface rules in both themes", async ({ browser }) => {
+test("the home screen follows the surface rules, and re-skins in Sparkle", async ({ browser }) => {
     const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
     await page.goto("/");
     await expect(page.getByRole("button", { name: "Browse the quiz library" })).toBeVisible();
@@ -182,7 +182,11 @@ test("the home screen follows the surface rules in both themes", async ({ browse
     // Home re-skins with the switch like every other screen: no photo, no own colours.
     await page.getByRole("switch", { name: "Sparkle mode" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
-    for (const control of await page.locator(".calm-ground button.lycra").all()) {
+    // judge() holds Calm's flat-face rules, so Sparkle is checked here: every
+    // one of the five controls wears the sequin sheet.
+    const controls = page.locator(".calm-ground button.lycra");
+    await expect(controls).toHaveCount(5);
+    for (const control of await controls.all()) {
         await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
     }
     await page.context().close();

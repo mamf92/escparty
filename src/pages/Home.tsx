@@ -2,10 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane } from "../design";
 
-/**
- * The landing screen (#169): the five ways into ESCParty, one pane of
- * controls on the ground. It's the root, so it has no way back.
- */
 const DESTINATIONS = [
   { label: "Host or join a quiz room", path: "/multiplayer" },
   { label: "Browse the quiz library", path: "/quizzes" },
@@ -14,12 +10,16 @@ const DESTINATIONS = [
   { label: "Throw a scoreboard party", path: "/party" },
 ] as const;
 
+/**
+ * The landing screen (#169): the five ways into ESCParty, one pane of
+ * controls on the ground. It's the root, so it has no way back.
+ */
 const Home = () => {
   const navigate = useNavigate();
 
   return (
     <CalmPage
-      title="ESCParty"
+      title="Welcome to ESCParty"
       subtitle="Quizzes, douze points and a shared scoreboard for your Eurovision and Melodi Grand Prix night."
     >
       <Ground>

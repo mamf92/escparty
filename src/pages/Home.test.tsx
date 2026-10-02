@@ -14,10 +14,10 @@ const DESTINATIONS = [
 // Also a smoke test for the harness: a real page renders under the
 // providers and a router, and user-event can drive it.
 describe("Home", () => {
-  it("renders the brand title and the five ways in, on the design system", () => {
+  it("renders the welcome title and the five ways in, on the design system", () => {
     renderWithProviders(<Home />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "ESCParty" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Welcome to ESCParty" })).toBeInTheDocument();
     const group = screen.getByRole("group", { name: "Where to start" });
     expect(group).toHaveClass("lycra-pane");
     expect(group.closest(".calm-ground")).not.toBeNull();

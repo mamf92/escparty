@@ -57,8 +57,9 @@ on; Sparkle is the user's switch.
 
 ## Checking a live page
 
-`e2e/theme.spec.ts` renders each scoreboard party screen (home, setup,
-join, rate, my ranking, the room, host tools, awards, big screen) with
+`e2e/theme.spec.ts` renders the app's Home screen and each scoreboard
+party screen (home, setup, join, rate, my ranking, the room, host tools,
+awards, big screen) with
 reduced motion on and measures it with `judge()`: no frames, controls made
 of the background and raised by a light and a dark shadow, chosen pressed
 in, at most four text sizes, nothing moving, and a small budget for green
