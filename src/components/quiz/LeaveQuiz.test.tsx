@@ -10,8 +10,10 @@ describe("LeaveQuiz", () => {
 
     await user.click(screen.getByRole("button", { name: "Leave the quiz" }));
     expect(onLeave).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent("Leave the quiz? This run won't be saved.");
+    // Said once, as the focused button's description, not as an alert over it.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Keep playing" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Keep playing" })).toHaveAccessibleDescription("Leave the quiz? This run won't be saved.");
 
     await user.click(screen.getByRole("button", { name: "Leave the quiz" }));
     expect(onLeave).toHaveBeenCalledTimes(1);
@@ -24,7 +26,7 @@ describe("LeaveQuiz", () => {
 
     await user.click(screen.getByRole("button", { name: "Leave the quiz" }));
     await user.click(screen.getByRole("button", { name: "Keep playing" }));
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(/This run won't be saved/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Leave the quiz" })).toHaveFocus();
     expect(onLeave).not.toHaveBeenCalled();
   });
@@ -33,6 +35,6 @@ describe("LeaveQuiz", () => {
     const user = userEvent.setup();
     renderWithProviders(<LeaveQuiz multiplayer onLeave={() => { }} />);
     await user.click(screen.getByRole("button", { name: "Leave the quiz" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("The game carries on without you.");
+    expect(screen.getByRole("button", { name: "Keep playing" })).toHaveAccessibleDescription(/The game carries on without you\./);
   });
 });

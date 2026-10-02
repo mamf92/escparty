@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import type { QuizQuestion } from "../utils/QuizDataProvider";
 import { ScoreWriteRejected, type Room } from "../utils/roomsFirestore";
@@ -29,6 +30,12 @@ vi.mock("../utils/QuizDataProvider", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../utils/QuizDataProvider")>();
   return { ...actual, loadQuizData: vi.fn(async () => QUESTIONS) };
 });
+
+vi.mock("../utils/customQuizzes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/customQuizzes")>()),
+  // Every saved quiz in these tests has since been deleted.
+  fetchCustomQuiz: vi.fn(async () => null),
+}));
 
 const renderQuiz = (state: Record<string, unknown>, pathname = "/quiz/easy") =>
   renderWithProviders(
@@ -79,7 +86,7 @@ describe("Quiz answer selection (#22)", () => {
     expect(marker("Norway")).toBe("wrong");
     expect(marker("Ireland")).toBeUndefined();
     expect(screen.getByRole("status")).toHaveTextContent("Nul points this time. The answer was Sweden.");
-    expect(screen.getByRole("button", { name: /Next question in \d+s/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Results in \d+s$/ })).toBeDisabled();
   });
 
   it("says the points for a right answer", async () => {
@@ -113,9 +120,9 @@ describe("Quiz screen (#171)", () => {
     );
 
     await user.click(await screen.findByRole("button", { name: "Leave the quiz" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("This run won't be saved.");
+    expect(screen.getByRole("button", { name: "Keep playing" })).toHaveAccessibleDescription(/This run won't be saved\./);
     await user.click(screen.getByRole("button", { name: "Keep playing" }));
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Keep playing" })).not.toBeInTheDocument();
     expect(screen.queryByText("home")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Leave the quiz" }));
@@ -136,6 +143,40 @@ describe("Quiz sources (#72)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("We can't find that quiz.");
     expect(screen.getByRole("heading", { level: 1, name: "Quiz unavailable" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back to the quiz library" })).toBeInTheDocument();
+  });
+});
+
+describe("Quiz unavailable (#171)", () => {
+  it("says a deleted custom quiz can't be found, rather than blaming the connection", async () => {
+    renderQuiz({ multiplayer: false }, "/quiz/c-abcdefghij0123456789");
+    expect(await screen.findByRole("alert")).toHaveTextContent("We can't find that quiz. The link may be wrong, or the quiz was deleted.");
+  });
+
+  it("goes to the game menu once when the room closes, even if the player takes the button first", async () => {
+    mocks.listenToRoom.mockImplementation((_code: string, callback: (room: Room | null) => void) => {
+      callback(null);
+      return () => { };
+    });
+    const visits: string[] = [];
+    const Menu = () => {
+      const { key } = useLocation();
+      useEffect(() => { visits.push(key); }, [key]);
+      return <p>menu</p>;
+    };
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route path="/quiz/:difficulty" element={<Quiz />} />
+        <Route path="/multiplayer" element={<Menu />} />
+      </Routes>,
+      { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: true, roomCode: "ABCD", playerId: "p1" } }] },
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Back to the game menu" }));
+    expect(await screen.findByText("menu")).toBeInTheDocument();
+    // Past the 2s the closed-room message waits before taking the player back itself.
+    await new Promise(resolve => setTimeout(resolve, 2300));
+    expect(visits).toHaveLength(1);
   });
 });
 
@@ -164,6 +205,14 @@ describe("Quiz multiplayer score writes (#131)", () => {
     await user.click(await screen.findByRole("button", { name: "Sweden" }));
     await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
   };
+
+  it("says a question settled before a refresh is closed, without claiming it was answered", async () => {
+    givenRoom();
+    sessionStorage.setItem("answeredQuestion:ABCD", "0");
+    renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+    expect(await screen.findByText("This question closed for you before you came back. The answer was Sweden.")).toBeInTheDocument();
+    expect(screen.queryByText(/You answered/)).not.toBeInTheDocument();
+  });
 
   it("tells the player once when the room doesn't know them, without retrying", async () => {
     givenRoom();
@@ -223,7 +272,7 @@ describe("Quiz solo clock (#160)", () => {
       const start = Date.now();
       // Ten seconds with no answer: the question locks with feedback.
       await vi.advanceTimersByTimeAsync(10_200);
-      expect(screen.getByRole("button", { name: /Next question in/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Results in \d+s$/ })).toBeInTheDocument();
       expect(screen.queryByText("results")).not.toBeInTheDocument();
 
       // Five seconds of feedback, then the results, saved once. The clock

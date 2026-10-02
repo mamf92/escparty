@@ -3,17 +3,17 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { updatePlayerScore, listenToRoom, advanceQuestion, Room, ScoreWriteRejected } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { filterEnabledQuestions, isFallbackQuizData, QuizQuestion } from "../utils/QuizDataProvider";
-import { isKnownQuizKey, loadQuiz } from "../utils/quizCatalog";
+import { QUIZ_NOT_SAVED, isKnownQuizKey, loadQuiz } from "../utils/quizCatalog";
 import { DEFAULT_BREAK_EVERY, isBreakAfter } from "../utils/quizModel";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
-import { FEEDBACK_MS, QUESTION_MS, QUESTION_SLOT_MS, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { FEEDBACK_MS, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { Control, Ground, Pane } from "../design";
 import { CalmNote, CalmPage } from "./CalmPage";
 import { QuestionPane } from "./quiz/QuestionPane";
-import { QuizStatus } from "./quiz/QuizStatus";
+import { QuizOutcome, QuizStatus } from "./quiz/QuizStatus";
 import { LeaveQuiz } from "./quiz/LeaveQuiz";
 import "./quiz/quiz.css";
 
@@ -46,7 +46,8 @@ const Quiz = () => {
   const [timeLeft, setTimeLeft] = useState(QUESTION_MS / 1000);
   const [timeLeftMs, setTimeLeftMs] = useState(QUESTION_MS); // More precise millisecond timer for scoring
   const [showFeedback, setShowFeedback] = useState(false);
-  const [isTimerVisible, setIsTimerVisible] = useState(true);
+  // How the current question was settled, once it is: said by QuizStatus.
+  const [outcome, setOutcome] = useState<QuizOutcome | null>(null);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
   const [scoreSyncError, setScoreSyncError] = useState<string | null>(null); // A multiplayer score write that failed for good
 
@@ -110,7 +111,7 @@ const Quiz = () => {
     // The route names a classic difficulty or a premade quiz (quizCatalog.ts)
     if (!isKnownQuizKey(difficulty)) {
       console.error(`❌ Unknown quiz: ${difficulty}`);
-      setError("We can't find that quiz. The link may be wrong, or the quiz was deleted.");
+      setError(NOT_FOUND);
       setLoading(false);
       return;
     }
@@ -140,6 +141,7 @@ const Quiz = () => {
 
     // Set multiplayer state if we have valid data
     let unsubscribeRoom: () => void = () => { };
+    let roomClosedTimer: ReturnType<typeof setTimeout> | undefined;
     if (multiplayerData?.multiplayer && multiplayerData.roomCode && multiplayerData.playerId) {
       console.log("🔄 Setting up multiplayer mode...");
       setIsMultiplayer(true);
@@ -166,7 +168,8 @@ const Quiz = () => {
           console.error("❌ Game room not found");
           // Room doesn't exist, go back to multiplayer lobby
           setError("This game room has closed. Taking you back to the game menu…");
-          setTimeout(() => navigate("/multiplayer"), 2000);
+          clearTimeout(roomClosedTimer);
+          roomClosedTimer = setTimeout(() => navigate("/multiplayer"), 2000);
         }
       });
     }
@@ -221,7 +224,8 @@ const Quiz = () => {
       })
       .catch((error) => {
         console.error("❌ Error loading quiz data:", error);
-        setError(LOAD_FAILED);
+        // A deleted custom quiz isn't a connection problem: retrying won't help.
+        setError(error instanceof Error && error.message === QUIZ_NOT_SAVED ? NOT_FOUND : LOAD_FAILED);
         setLoading(false);
       });
 
@@ -229,6 +233,9 @@ const Quiz = () => {
     return () => {
       // Clean up room listener if it was set
       unsubscribeRoom();
+      // Don't send a page that has already gone (the player took the
+      // button) to the game menu a second time.
+      clearTimeout(roomClosedTimer);
       console.log("🧹 Quiz component unmounting, cleaned up listeners");
     };
   }, [difficulty, navigate, location]);
@@ -287,7 +294,7 @@ const Quiz = () => {
   const lastAdvanceAttemptRef = useRef(0);
   const advanceInFlightRef = useRef(false);
   const markTimeUpRef = useRef<() => void>(() => { });
-  const lockQuestionRef = useRef<(options: { hideTimer: boolean }) => void>(() => { });
+  const lockQuestionRef = useRef<(how: QuizOutcome) => void>(() => { });
 
   // Whoever ends a question first wins and everyone else's attempt is a
   // no-op, but each attempt is a transaction on the same document. So one
@@ -341,7 +348,7 @@ const Quiz = () => {
       setSelectedAnswer(null);
       setIsSubmitted(false);
       setShowFeedback(false);
-      setIsTimerVisible(true);
+      setOutcome(null);
       setCurrentQuestionPoints(0);
       setTimeLeft(QUESTION_MS / 1000);
       setTimeLeftMs(QUESTION_MS);
@@ -354,9 +361,9 @@ const Quiz = () => {
     if (!sharedClock || room?.phase !== "question") return;
     if ((room.currentQuestionIndex ?? 0) !== currentQuestionIndex) return;
     if (answeredIndex >= currentQuestionIndex && !isSubmitted) {
-      // Keep the timer: its points display would read 0 for a question
-      // that was scored before the refresh.
-      lockQuestionRef.current({ hideTimer: false });
+      // This page never saw how it was settled (answered or timed out),
+      // only that it was.
+      lockQuestionRef.current("restored");
     }
   }, [sharedClock, room?.phase, room?.currentQuestionIndex, currentQuestionIndex, answeredIndex, isSubmitted]);
 
@@ -450,11 +457,11 @@ const Quiz = () => {
   }, [sharedClock, room, loading, observing, score, questions.length, difficulty, roomCode, playerId, navigate]);
 
   // Lock the current question: no more answers, show its feedback.
-  const lockQuestion = ({ hideTimer }: { hideTimer: boolean }) => {
+  const lockQuestion = (how: QuizOutcome) => {
     isSubmittedRef.current = true;
     setIsSubmitted(true);
     setShowFeedback(true);
-    if (hideTimer) setIsTimerVisible(false);
+    setOutcome(how);
   };
 
   // Time's up without an answer (both clocks): lock the question with 0
@@ -463,7 +470,7 @@ const Quiz = () => {
   // with real score writes. (A failed answer write is retried where it
   // fails, in submitAnswer.)
   const markTimeUp = () => {
-    lockQuestion({ hideTimer: true });
+    lockQuestion("timed-out");
     setCurrentQuestionPoints(0);
     rememberAnswered(currentQuestionIndex);
   };
@@ -504,7 +511,7 @@ const Quiz = () => {
         setIsSubmitted(false);
         setTimeLeft(QUESTION_MS / 1000); // Reset timer for new question
         setTimeLeftMs(QUESTION_MS); // Reset precise timer for new question
-        setIsTimerVisible(true); // Show timer again for the next question
+        setOutcome(null); // The next question is open
         setCurrentQuestionPoints(0); // Reset points for new question
       }
     } else {
@@ -555,7 +562,7 @@ const Quiz = () => {
     if (sharedClock && roomStartMs !== null && !questionClock(roomStartMs, Date.now()).answeringOpen) return;
 
     const answeredQuestion = currentQuestionIndex;
-    lockQuestion({ hideTimer: true }); // also flags the ref the shared tick reads
+    lockQuestion("answered"); // also flags the ref the shared tick reads
 
     // Feedback shows right away (lockQuestion above), before awaiting any
     // score write: if the write is slow and the room moves on meanwhile, a
@@ -634,6 +641,18 @@ const Quiz = () => {
     }
   };
 
+  // Where the room (or the solo run) goes once this question's feedback
+  // ends, for the button's countdown: the same arithmetic advanceQuestion
+  // and moveToNextQuestion use.
+  const nextPhase = phaseAfterQuestion(
+    currentQuestionIndex,
+    questions.length,
+    sharedClock ? room?.breakEvery : breakEvery,
+  ).phase;
+  const nextLabel = nextPhase === "results" ? "Results"
+    : nextPhase === "mid-scoreboard" ? "Scoreboard"
+    : "Next question";
+
   // A player who picked "Leave the quiz" and confirmed it.
   const leaveQuiz = () => navigate("/");
 
@@ -674,7 +693,7 @@ const Quiz = () => {
         picked={selectedAnswer}
         correctAnswer={currentQuestion.correctAnswer}
         points={currentQuestionPoints}
-        timerVisible={isTimerVisible}
+        outcome={outcome}
       />
       {scoreSyncError && <CalmNote role="alert">{scoreSyncError}</CalmNote>}
       <QuestionPane
@@ -683,15 +702,16 @@ const Quiz = () => {
         picked={selectedAnswer}
         correctAnswer={currentQuestion.correctAnswer}
         settled={isSubmitted}
+        lockedIn={outcome === "answered"}
         onPick={handleAnswer}
       />
       <Ground>
         <Pane>
           <Control
-            onClick={() => !showFeedback ? submitAnswer(selectedAnswer || "") : undefined}
-            disabled={(!showFeedback && !selectedAnswer) || (isSubmitted && !showFeedback) || showFeedback}
+            onClick={() => submitAnswer(selectedAnswer ?? "")}
+            disabled={!selectedAnswer || isSubmitted || showFeedback}
           >
-            {showFeedback ? `Next question in ${timeLeft}s` : "Lock in my answer"}
+            {showFeedback ? `${nextLabel} in ${timeLeft}s` : "Lock in my answer"}
           </Control>
         </Pane>
       </Ground>
@@ -699,7 +719,10 @@ const Quiz = () => {
   );
 };
 
-/** Any failure to load a quiz's questions, said without the raw error. */
+/** A quiz key that names nothing, or a custom quiz that was deleted. */
+const NOT_FOUND = "We can't find that quiz. The link may be wrong, or the quiz was deleted.";
+
+/** Any other failure to load a quiz's questions, said without the raw error. */
 const LOAD_FAILED = "We couldn't load this quiz. Check your connection and try again, or pick another from the library.";
 
 export default Quiz;

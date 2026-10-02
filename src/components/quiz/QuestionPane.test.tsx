@@ -70,6 +70,13 @@ describe("QuestionPane", () => {
     expect(document.querySelectorAll(".calm-marker")).toHaveLength(1);
   });
 
+  it("gives a pick the clock beat to it no cross: it was never locked in", () => {
+    renderPane({ picked: "Norway", settled: true, lockedIn: false });
+    expect(markerOf("Sweden")).toBe("correct");
+    expect(markerOf("Norway")).toBeUndefined();
+    expect(screen.getByRole("button", { name: "Norway" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("keeps the markers silent: the verdict is said in words elsewhere", () => {
     renderPane({ picked: "Norway", settled: true });
     for (const marker of document.querySelectorAll(".calm-marker")) {

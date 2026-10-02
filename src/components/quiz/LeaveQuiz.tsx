@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Control, Ground, Pane } from "../../design";
 import { CalmLink, CalmNote } from "../CalmPage";
 
@@ -12,9 +12,11 @@ export const LeaveQuiz = ({ multiplayer, onLeave }: { multiplayer: boolean; onLe
   const stayRef = useRef<HTMLButtonElement>(null);
   const linkRef = useRef<HTMLButtonElement>(null);
   const wasAsking = useRef(false);
+  const promptId = useId();
 
   // Focus follows the question: onto "Keep playing" when it opens, back to
-  // the link when it closes.
+  // the link when it closes. The question is that button's description, so
+  // it's read once with the focus rather than as an alert over it.
   useEffect(() => {
     if (asking) stayRef.current?.focus();
     else if (wasAsking.current) linkRef.current?.focus();
@@ -26,14 +28,14 @@ export const LeaveQuiz = ({ multiplayer, onLeave }: { multiplayer: boolean; onLe
   }
   return (
     <div className="quiz-leave">
-      <CalmNote role="alert">
+      <CalmNote id={promptId}>
         {multiplayer
           ? "Leave the quiz? The game carries on without you."
           : "Leave the quiz? This run won't be saved."}
       </CalmNote>
       <Ground>
         <Pane layout="split">
-          <Control ref={stayRef} onClick={() => setAsking(false)}>Keep playing</Control>
+          <Control ref={stayRef} aria-describedby={promptId} onClick={() => setAsking(false)}>Keep playing</Control>
           <Control onClick={onLeave}>Leave the quiz</Control>
         </Pane>
       </Ground>

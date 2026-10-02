@@ -17,7 +17,7 @@ test("a solo quiz from the home screen to the scoreboard", async ({ page }) => {
         const text = await page.getByRole("heading", { level: 2 }).textContent();
         await answerOptions(page).first().click();
         await submit.click();
-        await expect(page.getByRole("button", { name: /Next question in/ })).toBeVisible();
+        await expect(page.getByRole("button", { name: question < 10 ? /^Next question in \d+s$/ : /^Results in \d+s$/ })).toBeVisible();
         if (question < 10) await expect(page.getByRole("heading", { level: 2 })).not.toHaveText(text ?? "");
     }
 
