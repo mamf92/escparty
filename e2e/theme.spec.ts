@@ -3,7 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
- * Theme compliance for the scoreboard party screens (#90), Home (#169) and
+ * Theme compliance for the scoreboard party screens (#90), Home (#169),
+ * the scoreboard break and the host's view (#173) and
  * the single-player entry (#170), judged against
  * the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
@@ -190,6 +191,22 @@ test("the home screen follows the surface rules, and re-skins in Sparkle", async
     for (const control of await controls.all()) {
         await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
     }
+    await page.context().close();
+});
+
+test("the scoreboard break and the host's view follow the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    // Opened without a game, the break is a single player's (#173).
+    await page.goto("/#/mid-quiz-scoreboard");
+    await expect(page.getByRole("button", { name: "Continue the quiz" })).toBeVisible();
+    await judge(page, "scoreboard-break");
+
+    // The host's view with no room to watch: its error state and way out.
+    await page.goto("/#/host-observer");
+    await expect(page.getByRole("button", { name: "Back to multiplayer" })).toBeVisible();
+    await judge(page, "host-view-no-room");
+
     await page.context().close();
 });
 

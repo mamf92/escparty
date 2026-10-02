@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealSteps, winnerLine } from "./finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealSteps, winnerLine } from "./finale";
 
 const p = (name: string, score: number) => ({ id: name.toLowerCase(), name, score });
 
 describe("finale", () => {
+    it("says a score in words, one point singular", () => {
+        expect([0, 1, 700].map(points)).toEqual(["0 points", "1 point", "700 points"]);
+    });
+
     it("places players best first, ties sharing a place", () => {
         const placed = placePlayers([p("Lordi", 300), p("Abba", 500), p("Loreen", 500), p("Bucks", 100)]);
         expect(placed.map(entry => `${entry.place} ${entry.player.name}`)).toEqual(["1 Abba", "1 Loreen", "3 Lordi", "4 Bucks"]);
