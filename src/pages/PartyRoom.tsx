@@ -109,7 +109,9 @@ const PartyRoom = () => {
                 />
             )}
             {tab === "ranking" && <MyRanking party={party} ballot={{ guestId: identity.guestId, name: identity.name, ...own.ballot }} />}
-            {tab === "room" && <TheRoom party={party} ballots={ballots ?? []} me={identity.guestId} />}
+            {tab === "room" && (ballots === undefined
+                ? !error && <CalmNote role="status">Counting the ratings…</CalmNote>
+                : <TheRoom party={party} ballots={ballots} me={identity.guestId} />)}
             {tab === "host" && isHost && <PartyHostTools party={party} ballots={ballots ?? []} />}
 
             {tab !== "host" && (party.revealed || isHost) && (

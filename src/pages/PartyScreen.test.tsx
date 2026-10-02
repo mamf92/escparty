@@ -50,6 +50,15 @@ describe("PartyScreen", () => {
         await screen.findByRole("img");
     });
 
+    it("says the ratings are on their way rather than showing an empty table", async () => {
+        mocks.data = { party: makeParty(), ballots: undefined, error: null, retry: vi.fn() };
+        renderScreen();
+        expect(screen.getByRole("status")).toHaveTextContent("Counting the ratings…");
+        expect(screen.queryByText(/No ratings yet/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/guests are rating/)).not.toBeInTheDocument();
+        await screen.findByRole("img");
+    });
+
     it("says what the standings wait for before anyone rates", async () => {
         mocks.data = { party: makeParty(), ballots: [], error: null, retry: vi.fn() };
         renderScreen();

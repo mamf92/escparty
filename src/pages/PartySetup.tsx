@@ -52,6 +52,15 @@ const PartySetup = () => {
     // field, the categories' beside Start, so a tap on Start always shows why.
     const sheetProblems = templateId === CUSTOM ? categoryProblems(custom) : [];
     const nameMissing = tried && !name.trim();
+    const sheetProblemShown = tried && sheetProblems.length > 0;
+    // Which category names the problem is about: blank ones and repeats.
+    const labelCounts = new Map<string, number>();
+    for (const category of custom) {
+        const label = category.label.trim().toLowerCase();
+        if (label) labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+    }
+    const labelInvalid = (label: string) =>
+        sheetProblemShown && (!label.trim() || label.trim().length > CATEGORY_LIMITS.maxLabel || (labelCounts.get(label.trim().toLowerCase()) ?? 0) > 1);
 
     const setCategory = (index: number, change: Partial<RatingCategory>) =>
         setCustom(custom.map((category, i) => (i === index ? { ...category, ...change } : category)));
@@ -156,6 +165,8 @@ const PartySetup = () => {
                                         value={category.label}
                                         maxLength={CATEGORY_LIMITS.maxLabel}
                                         placeholder={index === 0 ? "Hair height" : "Costume changes"}
+                                        aria-invalid={labelInvalid(category.label)}
+                                        aria-describedby={labelInvalid(category.label) ? `${ids}-sheet-problem` : undefined}
                                         onChange={event => setCategory(index, { label: event.target.value })}
                                     />
                                     <label className="calm-label party-label-gap" htmlFor={`${ids}-${category.id}-scale`}>
@@ -223,7 +234,8 @@ const PartySetup = () => {
                             />
                             {nameMissing && <CalmNote id={`${ids}-name-problem`} role="alert">Give yourself a name.</CalmNote>}
                         </div>
-                        {tried && sheetProblems.length > 0 && <CalmNote role="alert">{sheetProblems.join(" ")}</CalmNote>}
+                        {/* Beside Start, where the tap was; the fields it's about point here. */}
+                        {sheetProblemShown && <CalmNote id={`${ids}-sheet-problem`} role="alert">{sheetProblems.join(" ")}</CalmNote>}
                         <Control type="submit" disabled={creating}>
                             {creating ? "Starting…" : "Start the party"}
                         </Control>

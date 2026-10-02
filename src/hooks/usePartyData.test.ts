@@ -17,12 +17,10 @@ describe("usePartyData", () => {
     it("follows the party and its ballots, and stops on unmount", () => {
         const { result, unmount } = renderHook(() => usePartyData("ABBA"));
         expect(result.current).toMatchObject({ party: undefined, ballots: undefined, error: null });
-        const [code, onParty, onPartyError] = mocks.listenToParty.mock.calls[0];
+        const [code, onParty] = mocks.listenToParty.mock.calls[0];
         const [, onBallots] = mocks.listenToBallots.mock.calls[0];
         expect(code).toBe("ABBA");
 
-        act(() => onPartyError(new Error("offline")));
-        expect(result.current.error).toMatch(/couldn't be reached/);
         act(() => {
             onParty(makeParty());
             onBallots([makeBallot("g", "Jedward", [12])]);

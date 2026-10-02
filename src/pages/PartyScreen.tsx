@@ -73,34 +73,41 @@ const PartyScreen = () => {
                     </Row>
                 </Pane>
             </Ground>
-            <CalmNote aria-live="polite">{all.length === 1 ? "1 guest is rating." : `${all.length} guests are rating.`}</CalmNote>
             {error && <PartyError error={error} onRetry={retry} />}
+            {/* Until the ratings arrive, say so: an empty table would claim nobody has rated. */}
+            {ballots === undefined ? (
+                !error && <CalmNote role="status">Counting the ratings…</CalmNote>
+            ) : (
+                <>
+                    <CalmNote aria-live="polite">{all.length === 1 ? "1 guest is rating." : `${all.length} guests are rating.`}</CalmNote>
 
-            <h2 className="esc-note">The room's standings</h2>
-            <Ground>
-                {standings.length === 0 ? (
-                    <Pane>
-                        <Row>No ratings yet. The table fills up as soon as someone rates an act.</Row>
-                    </Pane>
-                ) : (
-                    <Pane as="ol" aria-label="The room's standings">
-                        {standings.slice(0, SCREEN_ROWS).map((standing, index) => {
-                            const act = byId.get(standing.actId)!;
-                            const real = party.results.places?.[act.id];
-                            const through = party.results.qualifiers?.includes(act.id);
-                            return (
-                                <Row as="li" key={act.id}>
-                                    <span className="calm-row">
-                                        <span>{ordinal(index + 1)} {act.flag} {act.country}</span>
-                                        <span>{formatScore(standing.average)}</span>
-                                    </span>
-                                    {(real || through) && <span className="calm-sub">{real ? `Really ${ordinal(real)}` : "Through"}</span>}
-                                </Row>
-                            );
-                        })}
-                    </Pane>
-                )}
-            </Ground>
+                    <h2 className="esc-note">The room's standings</h2>
+                    <Ground>
+                        {standings.length === 0 ? (
+                            <Pane>
+                                <Row>No ratings yet. The table fills up as soon as someone rates an act.</Row>
+                            </Pane>
+                        ) : (
+                            <Pane as="ol" aria-label="The room's standings">
+                                {standings.slice(0, SCREEN_ROWS).map((standing, index) => {
+                                    const act = byId.get(standing.actId)!;
+                                    const real = party.results.places?.[act.id];
+                                    const through = party.results.qualifiers?.includes(act.id);
+                                    return (
+                                        <Row as="li" key={act.id}>
+                                            <span className="calm-row">
+                                                <span>{ordinal(index + 1)} {act.flag} {act.country}</span>
+                                                <span>{formatScore(standing.average)}</span>
+                                            </span>
+                                            {(real || through) && <span className="calm-sub">{real ? `Really ${ordinal(real)}` : "Through"}</span>}
+                                        </Row>
+                                    );
+                                })}
+                            </Pane>
+                        )}
+                    </Ground>
+                </>
+            )}
 
             {leaderboard.length > 0 && (
                 <>

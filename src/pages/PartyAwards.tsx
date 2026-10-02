@@ -44,6 +44,7 @@ const PartyAwards = () => {
         return (
             <CalmPage title="The awards" footer={back}>
                 <CalmNote role="status">The host hasn't opened the awards yet. Keep rating!</CalmNote>
+                {error && <PartyError error={error} onRetry={retry} />}
             </CalmPage>
         );
     }
@@ -62,6 +63,7 @@ const PartyAwards = () => {
             subtitle={party.revealed ? party.title : "Only you can see these until you open them for everyone."}
             footer={back}
         >
+            {error && <PartyError error={error} onRetry={retry} />}
             {pages === 0 && (
                 <Ground>
                     <Pane>

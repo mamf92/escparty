@@ -103,17 +103,44 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
  * answer first and focused, so a stray tap or Enter can't wipe anything.
  * Answering hands focus back to the button that asked.
  */
-const useConfirm = () => {
+const useConfirm = (fallbackRef?: RefObject<HTMLButtonElement | null>) => {
     const [asking, setAsking] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const keepRef = useRef<HTMLButtonElement>(null);
     const wasAsking = useRef(false);
+    const handBack = useRef(false);
+    // After a confirmed overwrite the button that asked may be about to go
+    // (a cleared result has nothing to clear), so the fallback comes first.
+    const confirmed = useRef(false);
+    // Runs after every render: the button to hand focus back to can be
+    // disabled while the confirmed write is in flight, or gone once it
+    // lands, so the hand-back waits until there's an enabled one to take it.
     useEffect(() => {
-        if (asking) keepRef.current?.focus();
-        else if (wasAsking.current) triggerRef.current?.focus();
+        if (asking && !wasAsking.current) keepRef.current?.focus();
+        if (!asking && wasAsking.current) handBack.current = true;
         wasAsking.current = asking;
-    }, [asking]);
-    return { asking, setAsking, triggerRef, keepRef };
+        if (!handBack.current) return;
+        // Only while focus is lost: never pull it from where the host moved it.
+        if (document.activeElement && document.activeElement !== document.body) {
+            handBack.current = false;
+            return;
+        }
+        const order = confirmed.current ? [fallbackRef?.current, triggerRef.current] : [triggerRef.current, fallbackRef?.current];
+        const target = order.find(button => button && !button.disabled);
+        if (target) {
+            target.focus();
+            handBack.current = false;
+        }
+    });
+    const ask = () => {
+        confirmed.current = false;
+        setAsking(true);
+    };
+    const answer = (yes: boolean) => {
+        confirmed.current = yes;
+        setAsking(false);
+    };
+    return { asking, ask, answer, setAsking, triggerRef, keepRef };
 };
 
 const ConfirmStep = ({ question, keep, confirm, busy, keepRef, onKeep, onConfirm }: {
@@ -143,9 +170,9 @@ const ConfirmStep = ({ question, keep, confirm, busy, keepRef, onKeep, onConfirm
 
 /** A final's real result, tapped in from the top as the scoreboard reveals it. */
 const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onSave: (results: PartyResults) => void }) => {
-    const { asking: clearing, setAsking: setClearing, triggerRef: clearRef, keepRef: keepResultRef } = useConfirm();
+    // With "Clear" gone once the result is, focus carries on from who came 1st.
     const firstPickRef = useRef<HTMLButtonElement>(null);
-    const cleared = useRef(false);
+    const { asking: clearing, ask: askClear, answer: answerClear, setAsking: setClearing, triggerRef: clearRef, keepRef: keepResultRef } = useConfirm(firstPickRef);
     // Only acts still in the show, in case the lineup changed under the result.
     const places = resultsFor(party.acts, party.results).places ?? {};
     const placed = party.acts.filter(act => places[act.id] !== undefined).sort((a, b) => places[a.id] - places[b.id]);
@@ -153,14 +180,6 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
     // A result emptied some other way (another tab, Undo) closes the question
     // rather than leaving it to come back unasked.
     if (clearing && placed.length === 0) setClearing(false);
-    // Once a confirmed clear lands, the "Clear" button is gone: carry on
-    // from who came 1st.
-    useEffect(() => {
-        if (placed.length === 0 && cleared.current) {
-            cleared.current = false;
-            firstPickRef.current?.focus();
-        }
-    }, [placed.length]);
     const next = placed.length + 1;
     const undo = () => {
         const last = placed[placed.length - 1];
@@ -204,10 +223,9 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
                             confirm="Yes, clear it"
                             busy={busy}
                             keepRef={keepResultRef}
-                            onKeep={() => setClearing(false)}
+                            onKeep={() => answerClear(false)}
                             onConfirm={() => {
-                                cleared.current = true;
-                                setClearing(false);
+                                answerClear(true);
                                 onSave({});
                             }}
                         />
@@ -217,7 +235,7 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
                                 <Control disabled={busy} onClick={undo}>
                                     Undo {placed[placed.length - 1].country}
                                 </Control>
-                                <Control ref={clearRef} disabled={busy} onClick={() => setClearing(true)}>
+                                <Control ref={clearRef} disabled={busy} onClick={askClear}>
                                     Clear the result
                                 </Control>
                             </Pane>
@@ -273,7 +291,7 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
 }) => {
     const actFieldId = useId();
     const [actId, setActId] = useState(party.acts[0].id);
-    const { asking: loading, setAsking: setLoading, triggerRef: loadRef, keepRef: keepLineupRef } = useConfirm();
+    const { asking: loading, ask: askLoad, answer: answerLoad, triggerRef: loadRef, keepRef: keepLineupRef } = useConfirm();
     // The picked act, or the first one if it left the lineup.
     const index = Math.max(party.acts.findIndex(act => act.id === actId), 0);
     const act = party.acts[index];
@@ -323,16 +341,16 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
                     confirm="Yes, load it"
                     busy={busy}
                     keepRef={keepLineupRef}
-                    onKeep={() => setLoading(false)}
+                    onKeep={() => answerLoad(false)}
                     onConfirm={() => {
-                        setLoading(false);
+                        answerLoad(true);
                         onLoadLatest();
                     }}
                 />
             ) : (
                 <Ground>
                     <Pane>
-                        <Control ref={loadRef} disabled={busy} onClick={() => setLoading(true)}>Load the latest lineup</Control>
+                        <Control ref={loadRef} disabled={busy} onClick={askLoad}>Load the latest lineup</Control>
                     </Pane>
                 </Ground>
             )}

@@ -59,6 +59,16 @@ describe("PartyAwards", () => {
         expect(screen.getByText("at /party/ABBA")).toBeInTheDocument();
     });
 
+    it("offers a retry when the connection drops after the awards are up", async () => {
+        const retry = vi.fn();
+        mocks.data = { party: makeParty({ revealed: true }), ballots, error: "The party couldn't be reached. Check your connection.", retry };
+        renderAwards();
+        expect(screen.getByText("The Jedward Twins")).toBeInTheDocument();
+        expect(screen.getByRole("alert")).toHaveTextContent("couldn't be reached");
+        await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+        expect(retry).toHaveBeenCalled();
+    });
+
     it("lets the host preview them", () => {
         savePartyIdentity("ABBA", { guestId: "host-1", name: "Martin", isHost: true });
         mocks.data = { party: makeParty(), ballots, error: null, retry: vi.fn() };

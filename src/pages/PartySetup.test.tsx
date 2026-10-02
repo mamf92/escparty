@@ -55,6 +55,8 @@ describe("PartySetup", () => {
         // Told beside Start, where the tap was, and the name field isn't blamed for it.
         expect(screen.getByRole("alert")).toHaveTextContent("Name every category.");
         expect(screen.getByRole("alert").nextElementSibling).toBe(screen.getByRole("button", { name: "Start the party" }));
+        expect(screen.getByLabelText("Category 1")).toHaveAttribute("aria-invalid", "true");
+        expect(screen.getByLabelText("Category 1")).toHaveAccessibleDescription("Name every category.");
         expect(screen.getByLabelText("Your name at the party")).toHaveAttribute("aria-invalid", "false");
 
         await user.type(screen.getByLabelText("Category 1"), "Hair height");

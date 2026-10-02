@@ -28,12 +28,13 @@ export const usePartyData = (code: string | undefined): PartyData => {
     const key = `${code}#${attempt}`;
     const [party, setParty] = useState<{ code: string; value: Party | null } | null>(null);
     const [ballots, setBallots] = useState<{ code: string; value: Ballot[] } | null>(null);
-    // Kept per listener, so the party's next snapshot doesn't hide that the
-    // ratings stopped coming.
+    // Kept per listener and per attempt: a listener that errored never sends
+    // again, so only a retry clears it.
     const [errors, setErrors] = useState<{ key: string; party: boolean; ballots: boolean } | null>(null);
 
     useEffect(() => {
         if (!code) return;
+        const key = `${code}#${attempt}`;
         const failed = (what: "party" | "ballots") => (err: Error) => {
             console.error(`Couldn't follow the party's ${what === "party" ? "details" : "ratings"}:`, err);
             setErrors(current => ({ ...(current?.key === key ? current : { party: false, ballots: false }), key, [what]: true }));
@@ -41,10 +42,7 @@ export const usePartyData = (code: string | undefined): PartyData => {
         let unsubscribeParty = () => {};
         let unsubscribeBallots = () => {};
         try {
-            unsubscribeParty = listenToParty(code, next => {
-                setParty({ code, value: next });
-                setErrors(current => (current?.key === key && current.party ? { ...current, party: false } : current));
-            }, failed("party"));
+            unsubscribeParty = listenToParty(code, next => setParty({ code, value: next }), failed("party"));
             unsubscribeBallots = listenToBallots(code, next => setBallots({ code, value: next }), failed("ballots"));
         } catch (err) {
             failed("party")(err as Error);
@@ -53,7 +51,7 @@ export const usePartyData = (code: string | undefined): PartyData => {
             unsubscribeParty();
             unsubscribeBallots();
         };
-    }, [code, key]);
+    }, [code, attempt]);
 
     const retry = useCallback(() => setAttempt(current => current + 1), []);
 

@@ -63,7 +63,7 @@ describe("PartyHostTools", () => {
         expect(screen.getByRole("button", { name: "Clear the result" })).toBeInTheDocument();
         // Once the cleared result lands, carry on from who came 1st.
         rerender(<PartyHostTools party={makeParty()} ballots={[]} />);
-        expect(within(screen.getByLabelText("Who came 1st")).getAllByRole("button")[0]).toHaveFocus();
+        expect(within(screen.getByLabelText("Who came 1st")).getAllByRole("button")).toContain(document.activeElement);
 
         // A result emptied elsewhere while the question is open closes it.
         rerender(<PartyHostTools party={makeParty({ results: { places: { fi: 1 } } })} ballots={[]} />);
