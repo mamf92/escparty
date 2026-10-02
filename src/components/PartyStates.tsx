@@ -26,15 +26,16 @@ export const PartyNotFound = ({ code }: { code: string | undefined }) => {
 };
 
 /**
- * The party couldn't be reached before it ever loaded. Firestore keeps
- * retrying on its own; reloading is the way to start over.
+ * The party couldn't be reached: a listener failed, and Firestore doesn't
+ * restart one that has. "Try again" attaches them afresh (usePartyData's
+ * retry), keeping whatever the screen already shows.
  */
-export const PartyError = ({ error }: { error: string }) => (
+export const PartyError = ({ error, onRetry }: { error: string; onRetry: () => void }) => (
     <>
         <CalmNote role="alert">{error}</CalmNote>
         <Ground>
             <Pane>
-                <Control onClick={() => window.location.reload()}>Try again</Control>
+                <Control onClick={onRetry}>Try again</Control>
             </Pane>
         </Ground>
     </>

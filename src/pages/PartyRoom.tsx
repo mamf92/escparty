@@ -37,7 +37,7 @@ const SAVE_NOTES: Record<SaveState, string> = {
 const PartyRoom = () => {
     const navigate = useNavigate();
     const code = useParams().code?.toUpperCase();
-    const { party, ballots, error } = usePartyData(code);
+    const { party, ballots, error, retry } = usePartyData(code);
     const [identity, setIdentity] = useState<PartyIdentity | null>(() => (code ? readPartyIdentity(code) : null));
     const own = useOwnBallot(code, identity, ballots);
     const [tab, setTab] = useState<Tab>("rate");
@@ -47,7 +47,7 @@ const PartyRoom = () => {
     if (party === undefined) {
         return (
             <CalmPage title="Scoreboard party" footer={back}>
-                {error ? <PartyError error={error} /> : <CalmNote role="status">Finding the party…</CalmNote>}
+                {error ? <PartyError error={error} onRetry={retry} /> : <CalmNote role="status">Finding the party…</CalmNote>}
             </CalmPage>
         );
     }
@@ -96,7 +96,7 @@ const PartyRoom = () => {
                     ))}
                 </Pane>
             </Ground>
-            {error && <CalmNote role="alert">{error}</CalmNote>}
+            {error && <PartyError error={error} onRetry={retry} />}
 
             {tab === "rate" && (
                 <RateAct
@@ -329,7 +329,7 @@ const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: 
                         <Row>No ratings yet. The room's standings show up with the first one.</Row>
                     </Pane>
                 ) : (
-                    <Pane as="ol" aria-label="The room's standings" aria-live="polite">
+                    <Pane as="ol" aria-label="The room's standings">
                         {standings.map((standing, index) => {
                             const act = byId.get(standing.actId)!;
                             return (
@@ -350,7 +350,7 @@ const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: 
                     <>
                         <h2 className="esc-note">Closest to the real result</h2>
                         <Ground>
-                            <Pane as="ol" aria-label="Closest to the real result" aria-live="polite">
+                            <Pane as="ol" aria-label="Closest to the real result">
                                 {leaderboard.map((row, index) => (
                                     // Your own row stands proud, and says so in words too.
                                     <Row as="li" key={row.guestId} elevation={row.guestId === me ? "high" : "rest"}>

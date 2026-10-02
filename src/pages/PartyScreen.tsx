@@ -22,7 +22,7 @@ const SCREEN_ROWS = 10;
 const PartyScreen = () => {
     const navigate = useNavigate();
     const code = useParams().code?.toUpperCase();
-    const { party, ballots, error } = usePartyData(code);
+    const { party, ballots, error, retry } = usePartyData(code);
     const [qr, setQr] = useState<string | null>(null);
     const link = code ? partyLink(code) : "";
 
@@ -42,7 +42,7 @@ const PartyScreen = () => {
     if (party === undefined) {
         return (
             <CalmPage title="Scoreboard party" className="calm-screen" footer={back}>
-                {error ? <PartyError error={error} /> : <CalmNote role="status">Finding the party…</CalmNote>}
+                {error ? <PartyError error={error} onRetry={retry} /> : <CalmNote role="status">Finding the party…</CalmNote>}
             </CalmPage>
         );
     }
@@ -74,7 +74,7 @@ const PartyScreen = () => {
                 </Pane>
             </Ground>
             <CalmNote aria-live="polite">{all.length === 1 ? "1 guest is rating." : `${all.length} guests are rating.`}</CalmNote>
-            {error && <CalmNote role="alert">{error}</CalmNote>}
+            {error && <PartyError error={error} onRetry={retry} />}
 
             <h2 className="esc-note">The room's standings</h2>
             <Ground>
@@ -83,7 +83,7 @@ const PartyScreen = () => {
                         <Row>No ratings yet. The table fills up as soon as someone rates an act.</Row>
                     </Pane>
                 ) : (
-                    <Pane as="ol" aria-label="The room's standings" aria-live="polite">
+                    <Pane as="ol" aria-label="The room's standings">
                         {standings.slice(0, SCREEN_ROWS).map((standing, index) => {
                             const act = byId.get(standing.actId)!;
                             const real = party.results.places?.[act.id];
@@ -106,7 +106,7 @@ const PartyScreen = () => {
                 <>
                     <h2 className="esc-note">Closest to the real result</h2>
                     <Ground>
-                        <Pane as="ol" aria-label="Closest to the real result" aria-live="polite">
+                        <Pane as="ol" aria-label="Closest to the real result">
                             {leaderboard.map((row, index) => (
                                 <Row as="li" key={row.guestId}>
                                     <span className="calm-row">

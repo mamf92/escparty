@@ -18,7 +18,7 @@ import { readPartyIdentity } from "../utils/partySession";
 const PartyAwards = () => {
     const navigate = useNavigate();
     const code = useParams().code?.toUpperCase();
-    const { party, ballots, error } = usePartyData(code);
+    const { party, ballots, error, retry } = usePartyData(code);
     const [index, setIndex] = useState(0);
     const identity = code ? readPartyIdentity(code) : null;
 
@@ -34,7 +34,7 @@ const PartyAwards = () => {
     if (party === undefined || ballots === undefined) {
         return (
             <CalmPage title="The awards" footer={back}>
-                {error ? <PartyError error={error} /> : <CalmNote role="status">Counting the votes…</CalmNote>}
+                {error ? <PartyError error={error} onRetry={retry} /> : <CalmNote role="status">Counting the votes…</CalmNote>}
             </CalmPage>
         );
     }
@@ -74,7 +74,7 @@ const PartyAwards = () => {
                 const { who, mine } = awardWinners(award.guestIds, names, party.showNames, identity?.guestId);
                 return (
                     <Ground>
-                        <Pane aria-live="polite">
+                        <Pane>
                             {/* Your own award stands proud, and says so in words too. */}
                             <Row elevation={mine ? "high" : "rest"}>
                                 <span className="calm-label">{award.for}</span>

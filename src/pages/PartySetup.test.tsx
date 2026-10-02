@@ -52,8 +52,9 @@ describe("PartySetup", () => {
         await user.click(screen.getByRole("radio", { name: /Semi-final 2/ }));
         await user.click(screen.getByRole("radio", { name: /Make our own/ }));
         await user.click(screen.getByRole("button", { name: "Start the party" }));
-        // Told beside the categories, and the name field isn't blamed for it.
+        // Told beside Start, where the tap was, and the name field isn't blamed for it.
         expect(screen.getByRole("alert")).toHaveTextContent("Name every category.");
+        expect(screen.getByRole("alert").nextElementSibling).toBe(screen.getByRole("button", { name: "Start the party" }));
         expect(screen.getByLabelText("Your name at the party")).toHaveAttribute("aria-invalid", "false");
 
         await user.type(screen.getByLabelText("Category 1"), "Hair height");

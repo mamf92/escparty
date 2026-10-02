@@ -16,7 +16,7 @@ describe("usePartyData", () => {
 
     it("follows the party and its ballots, and stops on unmount", () => {
         const { result, unmount } = renderHook(() => usePartyData("ABBA"));
-        expect(result.current).toEqual({ party: undefined, ballots: undefined, error: null });
+        expect(result.current).toMatchObject({ party: undefined, ballots: undefined, error: null });
         const [code, onParty, onPartyError] = mocks.listenToParty.mock.calls[0];
         const [, onBallots] = mocks.listenToBallots.mock.calls[0];
         expect(code).toBe("ABBA");
@@ -44,7 +44,7 @@ describe("usePartyData", () => {
         });
         rerender({ code: "LORD" });
         expect(mocks.stopParty).toHaveBeenCalled();
-        expect(result.current).toEqual({ party: undefined, ballots: undefined, error: null });
+        expect(result.current).toMatchObject({ party: undefined, ballots: undefined, error: null });
         expect(mocks.listenToParty.mock.calls[1][0]).toBe("LORD");
     });
 
@@ -52,6 +52,29 @@ describe("usePartyData", () => {
         const { result } = renderHook(() => usePartyData(undefined));
         expect(result.current.party).toBeNull();
         expect(mocks.listenToParty).not.toHaveBeenCalled();
+    });
+
+    it("keeps saying the ratings stopped when the party updates, until a retry", () => {
+        const { result } = renderHook(() => usePartyData("ABBA"));
+        const [, onParty] = mocks.listenToParty.mock.calls[0];
+        const [, onBallots, onBallotsError] = mocks.listenToBallots.mock.calls[0];
+        act(() => {
+            onParty(makeParty());
+            onBallots([makeBallot("g", "Jedward", [12])]);
+            onBallotsError(new Error("permission-denied"));
+        });
+        act(() => onParty(makeParty({ revealed: true })));
+        expect(result.current.error).toMatch(/couldn't be reached/);
+
+        // A retry attaches both listeners afresh and keeps what's on screen.
+        act(() => result.current.retry());
+        expect(mocks.stopParty).toHaveBeenCalled();
+        expect(mocks.stopBallots).toHaveBeenCalled();
+        expect(mocks.listenToParty).toHaveBeenCalledTimes(2);
+        expect(mocks.listenToBallots).toHaveBeenCalledTimes(2);
+        expect(result.current.error).toBeNull();
+        expect(result.current.party?.revealed).toBe(true);
+        expect(result.current.ballots).toHaveLength(1);
     });
 
     it("reports a listener that can't start", () => {

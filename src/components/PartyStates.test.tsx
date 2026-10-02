@@ -24,16 +24,11 @@ describe("PartyStates", () => {
         expect(screen.getByRole("alert")).toHaveTextContent("That link has no party code in it.");
     });
 
-    it("says the party couldn't be reached, and tries again by reloading", async () => {
-        const reload = vi.fn();
-        vi.stubGlobal("location", { ...window.location, reload });
-        try {
-            renderWithProviders(<PartyError error="The party couldn't be reached. Check your connection." />);
-            expect(screen.getByRole("alert")).toHaveTextContent("couldn't be reached");
-            await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
-            expect(reload).toHaveBeenCalled();
-        } finally {
-            vi.unstubAllGlobals();
-        }
+    it("says the party couldn't be reached, and tries again", async () => {
+        const retry = vi.fn();
+        renderWithProviders(<PartyError error="The party couldn't be reached. Check your connection." onRetry={retry} />);
+        expect(screen.getByRole("alert")).toHaveTextContent("couldn't be reached");
+        await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+        expect(retry).toHaveBeenCalled();
     });
 });

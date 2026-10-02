@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { CalmNote } from "./CalmPage";
 import { Control, Field, Ground, Pane } from "../design";
 import type { Act } from "../data/contests2027";
@@ -101,24 +101,40 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
  * A two-step confirm for a host action that overwrites what's there
  * (#178): the first tap swaps the button for a question, with the safe
  * answer first and focused, so a stray tap or Enter can't wipe anything.
+ * Answering hands focus back to the button that asked.
  */
-const ConfirmStep = ({ question, keep, confirm, busy, onKeep, onConfirm }: {
+const useConfirm = () => {
+    const [asking, setAsking] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const keepRef = useRef<HTMLButtonElement>(null);
+    const wasAsking = useRef(false);
+    useEffect(() => {
+        if (asking) keepRef.current?.focus();
+        else if (wasAsking.current) triggerRef.current?.focus();
+        wasAsking.current = asking;
+    }, [asking]);
+    return { asking, setAsking, triggerRef, keepRef };
+};
+
+const ConfirmStep = ({ question, keep, confirm, busy, keepRef, onKeep, onConfirm }: {
     question: string;
     keep: string;
     confirm: string;
     busy: boolean;
+    keepRef: RefObject<HTMLButtonElement | null>;
     onKeep: () => void;
     onConfirm: () => void;
 }) => {
-    const keepRef = useRef<HTMLButtonElement>(null);
-    useEffect(() => keepRef.current?.focus(), []);
+    const questionId = useId();
+    // The question is read with the focused answer, rather than as an alert
+    // talking over it.
     return (
         <>
-            <CalmNote role="alert">{question}</CalmNote>
+            <CalmNote id={questionId}>{question}</CalmNote>
             <Ground>
                 <Pane layout="split">
-                    <Control ref={keepRef} onClick={onKeep}>{keep}</Control>
-                    <Control disabled={busy} onClick={onConfirm}>{confirm}</Control>
+                    <Control ref={keepRef} aria-describedby={questionId} onClick={onKeep}>{keep}</Control>
+                    <Control disabled={busy} aria-describedby={questionId} onClick={onConfirm}>{confirm}</Control>
                 </Pane>
             </Ground>
         </>
@@ -127,11 +143,24 @@ const ConfirmStep = ({ question, keep, confirm, busy, onKeep, onConfirm }: {
 
 /** A final's real result, tapped in from the top as the scoreboard reveals it. */
 const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onSave: (results: PartyResults) => void }) => {
-    const [clearing, setClearing] = useState(false);
+    const { asking: clearing, setAsking: setClearing, triggerRef: clearRef, keepRef: keepResultRef } = useConfirm();
+    const firstPickRef = useRef<HTMLButtonElement>(null);
+    const cleared = useRef(false);
     // Only acts still in the show, in case the lineup changed under the result.
     const places = resultsFor(party.acts, party.results).places ?? {};
     const placed = party.acts.filter(act => places[act.id] !== undefined).sort((a, b) => places[a.id] - places[b.id]);
     const unplaced = party.acts.filter(act => places[act.id] === undefined);
+    // A result emptied some other way (another tab, Undo) closes the question
+    // rather than leaving it to come back unasked.
+    if (clearing && placed.length === 0) setClearing(false);
+    // Once a confirmed clear lands, the "Clear" button is gone: carry on
+    // from who came 1st.
+    useEffect(() => {
+        if (placed.length === 0 && cleared.current) {
+            cleared.current = false;
+            firstPickRef.current?.focus();
+        }
+    }, [placed.length]);
     const next = placed.length + 1;
     const undo = () => {
         const last = placed[placed.length - 1];
@@ -149,9 +178,10 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
             {unplaced.length > 0 && (
                 <Ground>
                     <Pane role="group" aria-label={`Who came ${ordinal(next)}`}>
-                        {unplaced.map(act => (
+                        {unplaced.map((act, i) => (
                             <Control
                                 key={act.id}
+                                ref={i === 0 ? firstPickRef : undefined}
                                 block
                                 disabled={busy}
                                 onClick={() => onSave({ places: { ...places, [act.id]: next } })}
@@ -173,8 +203,10 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
                             keep="Keep the result"
                             confirm="Yes, clear it"
                             busy={busy}
+                            keepRef={keepResultRef}
                             onKeep={() => setClearing(false)}
                             onConfirm={() => {
+                                cleared.current = true;
                                 setClearing(false);
                                 onSave({});
                             }}
@@ -185,7 +217,7 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
                                 <Control disabled={busy} onClick={undo}>
                                     Undo {placed[placed.length - 1].country}
                                 </Control>
-                                <Control disabled={busy} onClick={() => setClearing(true)}>
+                                <Control ref={clearRef} disabled={busy} onClick={() => setClearing(true)}>
                                     Clear the result
                                 </Control>
                             </Pane>
@@ -241,7 +273,7 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
 }) => {
     const actFieldId = useId();
     const [actId, setActId] = useState(party.acts[0].id);
-    const [loading, setLoading] = useState(false);
+    const { asking: loading, setAsking: setLoading, triggerRef: loadRef, keepRef: keepLineupRef } = useConfirm();
     // The picked act, or the first one if it left the lineup.
     const index = Math.max(party.acts.findIndex(act => act.id === actId), 0);
     const act = party.acts[index];
@@ -290,6 +322,7 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
                     keep="Keep this lineup"
                     confirm="Yes, load it"
                     busy={busy}
+                    keepRef={keepLineupRef}
                     onKeep={() => setLoading(false)}
                     onConfirm={() => {
                         setLoading(false);
@@ -299,7 +332,7 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
             ) : (
                 <Ground>
                     <Pane>
-                        <Control disabled={busy} onClick={() => setLoading(true)}>Load the latest lineup</Control>
+                        <Control ref={loadRef} disabled={busy} onClick={() => setLoading(true)}>Load the latest lineup</Control>
                     </Pane>
                 </Ground>
             )}

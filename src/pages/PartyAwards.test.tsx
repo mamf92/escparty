@@ -32,27 +32,27 @@ describe("PartyAwards", () => {
     beforeEach(() => {
         localStorage.clear();
         savePartyIdentity("ABBA", { guestId: "g1", name: "Jedward", isHost: false });
-        mocks.data = { party: makeParty({ revealed: true }), ballots, error: null };
+        mocks.data = { party: makeParty({ revealed: true }), ballots, error: null, retry: vi.fn() };
     });
 
     it("waits for the party and says when there's none", () => {
-        mocks.data = { party: makeParty(), ballots: undefined, error: null };
+        mocks.data = { party: makeParty(), ballots: undefined, error: null, retry: vi.fn() };
         const { unmount } = renderAwards();
         expect(screen.getByRole("status")).toHaveTextContent("Counting the votes");
         unmount();
-        mocks.data = { party: null, ballots: undefined, error: null };
+        mocks.data = { party: null, ballots: undefined, error: null, retry: vi.fn() };
         const { unmount: unmountMissing } = renderAwards();
         expect(screen.getByRole("alert")).toHaveTextContent("no party with the code ABBA");
         expect(screen.getByRole("button", { name: "Try another code" })).toBeInTheDocument();
         unmountMissing();
-        mocks.data = { party: undefined, ballots: undefined, error: "The party couldn't be reached." };
+        mocks.data = { party: undefined, ballots: undefined, error: "The party couldn't be reached.", retry: vi.fn() };
         renderAwards();
         expect(screen.getByRole("alert")).toHaveTextContent("couldn't be reached");
         expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     });
 
     it("keeps guests out until the host opens them", async () => {
-        mocks.data = { party: makeParty(), ballots, error: null };
+        mocks.data = { party: makeParty(), ballots, error: null, retry: vi.fn() };
         renderAwards();
         expect(screen.getByRole("status")).toHaveTextContent("hasn't opened the awards");
         await userEvent.setup().click(screen.getByRole("button", { name: "Back to the party" }));
@@ -61,7 +61,7 @@ describe("PartyAwards", () => {
 
     it("lets the host preview them", () => {
         savePartyIdentity("ABBA", { guestId: "host-1", name: "Martin", isHost: true });
-        mocks.data = { party: makeParty(), ballots, error: null };
+        mocks.data = { party: makeParty(), ballots, error: null, retry: vi.fn() };
         renderAwards();
         expect(screen.getByText(/Only you can see these/)).toBeInTheDocument();
         expect(screen.getByText("The Jedward Twins")).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe("PartyAwards", () => {
     });
 
     it("keeps names out when the host chose anonymous awards", () => {
-        mocks.data = { party: makeParty({ revealed: true, showNames: false }), ballots, error: null };
+        mocks.data = { party: makeParty({ revealed: true, showNames: false }), ballots, error: null, retry: vi.fn() };
         renderAwards();
         expect(card()).toHaveTextContent("You and one other guest");
         expect(card()).not.toHaveTextContent("Lordi");
@@ -96,7 +96,7 @@ describe("PartyAwards", () => {
     it("ends with who came closest, anonymously when names are off", async () => {
         const user = userEvent.setup();
         const results = { places: { se: 1, no: 2, fi: 3, ie: 4 } };
-        mocks.data = { party: makeParty({ revealed: true, results }), ballots, error: null };
+        mocks.data = { party: makeParty({ revealed: true, results }), ballots, error: null, retry: vi.fn() };
         const { unmount } = renderAwards();
         const pages = Number(screen.getByText(/^1 of \d+$/).textContent!.split(" of ")[1]);
         for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
@@ -104,7 +104,7 @@ describe("PartyAwards", () => {
         expect(within(board).getAllByRole("listitem")[0]).toHaveTextContent("1st Jedward48");
         unmount();
 
-        mocks.data = { party: makeParty({ revealed: true, showNames: false, results }), ballots, error: null };
+        mocks.data = { party: makeParty({ revealed: true, showNames: false, results }), ballots, error: null, retry: vi.fn() };
         renderAwards();
         for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
         const anonymous = screen.getByRole("list", { name: "Closest to the real result" });
@@ -113,7 +113,7 @@ describe("PartyAwards", () => {
     });
 
     it("says when there isn't enough to go on", async () => {
-        mocks.data = { party: makeParty({ revealed: true }), ballots: [ballots[0]], error: null };
+        mocks.data = { party: makeParty({ revealed: true }), ballots: [ballots[0]], error: null, retry: vi.fn() };
         renderAwards("/awards");
         expect(screen.getByText(/^Not enough ratings for awards yet/)).toHaveClass("is-static");
         await userEvent.setup().click(screen.getByRole("button", { name: "Back to the party" }));

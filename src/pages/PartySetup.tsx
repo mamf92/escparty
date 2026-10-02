@@ -48,17 +48,17 @@ const PartySetup = () => {
     const template: RatingTemplate = templateId === CUSTOM
         ? { id: CUSTOM, name: "Our own sheet", blurb: "Categories made up for this party.", categories: custom.map(category => ({ ...category, label: category.label.trim() })) }
         : RATING_TEMPLATES.find(entry => entry.id === templateId)!;
-    // Each problem is told beside what it's about, once Start has been tried.
+    // Problems are told once Start has been tried: the name's beside its
+    // field, the categories' beside Start, so a tap on Start always shows why.
     const sheetProblems = templateId === CUSTOM ? categoryProblems(custom) : [];
     const nameMissing = tried && !name.trim();
-    const problems = [...sheetProblems, ...(name.trim() ? [] : ["Give yourself a name."])];
 
     const setCategory = (index: number, change: Partial<RatingCategory>) =>
         setCustom(custom.map((category, i) => (i === index ? { ...category, ...change } : category)));
 
     const create = async () => {
         setTried(true);
-        if (problems.length > 0 || creating) return;
+        if (sheetProblems.length > 0 || !name.trim() || creating) return;
         setCreating(true);
         setFailure(null);
         try {
@@ -173,7 +173,6 @@ const PartySetup = () => {
                             ))}
                         </Pane>
                     </Ground>
-                    {tried && sheetProblems.length > 0 && <CalmNote role="alert">{sheetProblems.join(" ")}</CalmNote>}
                     <Ground>
                         <Pane>
                             {custom.length < CATEGORY_LIMITS.max && (
@@ -224,6 +223,7 @@ const PartySetup = () => {
                             />
                             {nameMissing && <CalmNote id={`${ids}-name-problem`} role="alert">Give yourself a name.</CalmNote>}
                         </div>
+                        {tried && sheetProblems.length > 0 && <CalmNote role="alert">{sheetProblems.join(" ")}</CalmNote>}
                         <Control type="submit" disabled={creating}>
                             {creating ? "Starting…" : "Start the party"}
                         </Control>

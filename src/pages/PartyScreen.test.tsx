@@ -26,7 +26,7 @@ describe("PartyScreen", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.toDataURL.mockResolvedValue("data:image/png;base64,QR");
-        mocks.data = { party: makeParty(), ballots, error: null };
+        mocks.data = { party: makeParty(), ballots, error: null, retry: vi.fn() };
     });
 
     it("shows a QR code and the code to join", async () => {
@@ -38,7 +38,7 @@ describe("PartyScreen", () => {
     });
 
     it("lists the room's standings with the real result, never a guest's own", async () => {
-        mocks.data = { party: makeParty({ showNames: false, results: { places: { no: 1 } } }), ballots: [ballots[0]], error: "offline" };
+        mocks.data = { party: makeParty({ showNames: false, results: { places: { no: 1 } } }), ballots: [ballots[0]], error: "offline", retry: vi.fn() };
         renderScreen();
         const standings = screen.getByRole("list", { name: "The room's standings" });
         expect(within(standings).getAllByRole("listitem").map(item => item.textContent)).toEqual([
@@ -51,7 +51,7 @@ describe("PartyScreen", () => {
     });
 
     it("says what the standings wait for before anyone rates", async () => {
-        mocks.data = { party: makeParty(), ballots: [], error: null };
+        mocks.data = { party: makeParty(), ballots: [], error: null, retry: vi.fn() };
         renderScreen();
         expect(screen.getByText(/^No ratings yet/)).toHaveClass("is-static");
         expect(screen.queryByRole("list")).not.toBeInTheDocument();
@@ -61,7 +61,7 @@ describe("PartyScreen", () => {
     });
 
     it("names the closest guests only when the host chose names", async () => {
-        mocks.data = { party: makeParty({ kind: "semi", qualifiers: 1, results: { qualifiers: ["no"] } }), ballots, error: null };
+        mocks.data = { party: makeParty({ kind: "semi", qualifiers: 1, results: { qualifiers: ["no"] } }), ballots, error: null, retry: vi.fn() };
         renderScreen();
         expect(screen.getAllByText("Through")).toHaveLength(1);
         const board = screen.getByRole("list", { name: "Closest to the real result" });
@@ -72,11 +72,11 @@ describe("PartyScreen", () => {
     it("waits for the party, says when there's none, and goes back", async () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         mocks.toDataURL.mockRejectedValue(new Error("no canvas"));
-        mocks.data = { party: undefined, ballots: undefined, error: null };
+        mocks.data = { party: undefined, ballots: undefined, error: null, retry: vi.fn() };
         const { unmount } = renderScreen();
         expect(screen.getByRole("status")).toHaveTextContent("Finding the party");
         unmount();
-        mocks.data = { party: null, ballots: undefined, error: null };
+        mocks.data = { party: null, ballots: undefined, error: null, retry: vi.fn() };
         renderScreen();
         expect(screen.getByRole("alert")).toHaveTextContent("no party with the code ABBA");
         expect(screen.getByRole("button", { name: "Try another code" })).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe("PartyScreen", () => {
     });
 
     it("goes to the party home without a code", async () => {
-        mocks.data = { party: null, ballots: undefined, error: null };
+        mocks.data = { party: null, ballots: undefined, error: null, retry: vi.fn() };
         renderScreen("/screen");
         await userEvent.setup().click(screen.getByRole("button", { name: "Back to my phone view" }));
         expect(screen.getByText("at /party")).toBeInTheDocument();
