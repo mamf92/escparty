@@ -81,6 +81,7 @@ describe("QuizLibrary", () => {
     saveOne();
     renderLibrary();
     await user.click(screen.getByRole("radio", { name: /Jedward's Revenge/ }));
+    expect(screen.getByRole("group", { name: "What to do with Jedward's Revenge" })).toBeInTheDocument();
     // Removing asks first, lands on the safe answer, and keeping changes nothing.
     await user.click(screen.getByRole("button", { name: "Remove from this device" }));
     expect(screen.getByRole("button", { name: "Yes, remove it" })).toHaveAccessibleDescription(/Take Jedward's Revenge off this device's list\?/);
@@ -93,6 +94,9 @@ describe("QuizLibrary", () => {
     await user.click(screen.getByRole("button", { name: "Yes, remove it" }));
     expect(screen.queryByRole("radio", { name: /Jedward's Revenge/ })).not.toBeInTheDocument();
     expect(localStorage.getItem("escparty.myQuizzes")).toBe("[]");
+    // Focus goes back to the list's tab stop, the first quiz.
+    await vi.waitFor(() => expect(screen.getAllByRole("radio")[0]).toHaveFocus());
+    expect(screen.getAllByRole("radio")[0]).toHaveAttribute("tabindex", "0");
   });
 
   it("lists a just-saved quiz even when this browser couldn't store the list", async () => {

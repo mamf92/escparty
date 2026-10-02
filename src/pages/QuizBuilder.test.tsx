@@ -69,9 +69,10 @@ describe("QuizBuilder", () => {
 
     await user.click(screen.getByRole("button", { name: "Save quiz" }));
 
-    // What's wrong with the name is said beside it, and focus goes there.
+    // What's wrong with the name is said beside it, and focus goes there
+    // once the note is on the page, so the note is read with it.
     const name = screen.getByLabelText("Name");
-    expect(name).toHaveFocus();
+    await vi.waitFor(() => expect(name).toHaveFocus());
     expect(name).toHaveAttribute("aria-invalid", "true");
     expect(name).toHaveAccessibleDescription("Give the quiz a name.");
     expect(screen.getByRole("alert")).toHaveTextContent("Add at least one question.");
@@ -131,8 +132,13 @@ describe("QuizBuilder", () => {
 
     // Each problem is said beside its field, and focus goes to the first.
     const question = screen.getByLabelText("Question");
-    expect(question).toHaveFocus();
+    await vi.waitFor(() => expect(question).toHaveFocus());
     expect(question).toHaveAccessibleDescription("Write the question.");
+    // The problems away from the focused field are announced together.
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "3 things to fix before this question can go in: Write the question. Two answers are the same. Mark which answer is correct.",
+    );
+    expect(screen.getByRole("radio", { name: "Same" })).toHaveAccessibleDescription("Mark which answer is correct.");
     expect(screen.getByLabelText("Answer 1")).toHaveAccessibleDescription("Two answers are the same.");
     expect(screen.getByLabelText("Answer 2")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("radiogroup", { name: "Correct answer" })).toHaveAccessibleDescription("Mark which answer is correct.");
@@ -179,9 +185,16 @@ describe("QuizBuilder", () => {
     expect(screen.getByRole("button", { name: "Yes, remove it" })).toHaveAccessibleDescription("Take question 2 out of this quiz?");
     await user.click(screen.getByRole("button", { name: "Keep it" }));
     expect(within(questionList()).getAllByRole("radio")).toHaveLength(2);
+    // An open question isn't still waiting to be removed after editing it.
+    await user.click(screen.getByRole("button", { name: "Remove this question" }));
+    await user.click(screen.getByRole("button", { name: "Edit this question" }));
+    await user.click(screen.getByRole("button", { name: "Back to your quiz" }));
+    expect(screen.queryByRole("button", { name: "Yes, remove it" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove this question" }));
     await user.click(screen.getByRole("button", { name: "Yes, remove it" }));
     expect(within(questionList()).getAllByRole("radio")).toHaveLength(1);
+    // Focus goes back to the list's tab stop.
+    await vi.waitFor(() => expect(within(questionList()).getAllByRole("radio")[0]).toHaveFocus());
   });
 
   it("starts from a premade quiz, where an edited bank question becomes yours", async () => {

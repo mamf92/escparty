@@ -111,7 +111,10 @@ const QuizBuilder = () => {
     const nameRef = useRef<HTMLInputElement>(null);
     const questionRef = useRef<HTMLTextAreaElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
-    const actionsRef = useRef<HTMLDivElement>(null);
+    const moveUpRef = useRef<HTMLButtonElement>(null);
+    const moveDownRef = useRef<HTMLButtonElement>(null);
+    const askRemoveRef = useRef<HTMLButtonElement>(null);
+    const keepRef = useRef<HTMLButtonElement>(null);
     const answersRef = useRef<HTMLDivElement>(null);
     const correctRef = useRef<HTMLDivElement>(null);
 
@@ -156,10 +159,6 @@ const QuizBuilder = () => {
         setConfirmingRemove(false);
     };
 
-    const actionButton = (name: string) =>
-        [...(actionsRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])]
-            .find(button => button.textContent === name);
-
     const move = (from: number, to: number) => {
         if (to < 0 || to >= questions.length) return;
         const next = [...questions];
@@ -168,27 +167,28 @@ const QuizBuilder = () => {
         select(to);
         // At an end the move just made is disabled, so keep focus on the
         // move that's still possible instead of dropping it.
-        if (to === 0) focusSoon(() => actionButton("Move down"));
-        else if (to === questions.length - 1) focusSoon(() => actionButton("Move up"));
+        if (to === 0) focusSoon(() => moveDownRef.current);
+        else if (to === questions.length - 1) focusSoon(() => moveUpRef.current);
     };
 
     const askToRemove = () => {
         setConfirmingRemove(true);
-        focusSoon(() => actionButton("Keep it"));
+        focusSoon(() => keepRef.current);
     };
 
     const keep = () => {
         setConfirmingRemove(false);
-        focusSoon(() => actionButton("Remove this question"));
+        focusSoon(() => askRemoveRef.current);
     };
 
     const remove = (index: number) => {
         const left = questions.length - 1;
         setQuestions(questions.filter((_, i) => i !== index));
         select(null);
-        // Back to the list where the question was, or to adding one.
+        // Back to the list's tab stop (nothing is picked now, so the first
+        // question), or to adding one when the list is gone.
         focusSoon(() => left > 0
-            ? listRef.current?.querySelectorAll<HTMLElement>('[role="radio"]')[Math.min(index, left - 1)]
+            ? listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')
             : document.getElementById(fieldId("add-from-bank")));
     };
 
@@ -214,6 +214,7 @@ const QuizBuilder = () => {
             });
         }
         setDraftTried(false);
+        setConfirmingRemove(false);
         setMode("write");
     };
 
@@ -232,11 +233,12 @@ const QuizBuilder = () => {
     const saveDraft = () => {
         setDraftTried(true);
         if (draftProblems.length > 0) {
-            // Take them to the first thing to fix; its note is read with it.
+            // Take them to the first thing to fix once its note is on the
+            // page, so the note is read with it.
             const firstBadAnswer = badAnswers(draft.options).indexOf(true);
-            if (draftProblems.some(isQuestionTextProblem)) questionRef.current?.focus();
-            else if (firstBadAnswer >= 0) answersRef.current?.querySelectorAll<HTMLElement>("input")[firstBadAnswer]?.focus();
-            else if (draftProblems.some(isCorrectProblem)) correctRef.current?.querySelector<HTMLElement>('[role="radio"]')?.focus();
+            if (draftProblems.some(isQuestionTextProblem)) focusSoon(() => questionRef.current);
+            else if (firstBadAnswer >= 0) focusSoon(() => answersRef.current?.querySelectorAll<HTMLElement>("input")[firstBadAnswer]);
+            else if (draftProblems.some(isCorrectProblem)) focusSoon(() => correctRef.current?.querySelector<HTMLElement>('[role="radio"]'));
             return;
         }
         const trimmed = {
@@ -282,7 +284,7 @@ const QuizBuilder = () => {
     const saveQuiz = async () => {
         setSaveTried(true);
         if (problems.length > 0) {
-            if (problems.some(isNameProblem)) nameRef.current?.focus();
+            if (problems.some(isNameProblem)) focusSoon(() => nameRef.current);
             return;
         }
         if (saving) return;
@@ -439,6 +441,7 @@ const QuizBuilder = () => {
                                 role="radio"
                                 aria-checked={draft.correct === index}
                                 tabIndex={radioTabIndex(index, draft.correct)}
+                                aria-describedby={correctProblems.length > 0 ? fieldId("correct-note") : undefined}
                                 chosen={draft.correct === index}
                                 onClick={() => setDraft({ ...draft, correct: index })}
                                 onKeyDown={event => radioGroupKeys(event, index, draft.options.length, next => setDraft({ ...draft, correct: next }))}
@@ -449,6 +452,11 @@ const QuizBuilder = () => {
                     </Pane>
                 </Ground>
                 {correctProblems.length > 0 && <CalmNote id={fieldId("correct-note")}>{correctProblems.join(" ")}</CalmNote>}
+                {shownDraftProblems.length > 1 && (
+                    <CalmNote role="alert">
+                        {shownDraftProblems.length} things to fix before this question can go in: {shownDraftProblems.join(" ")}
+                    </CalmNote>
+                )}
                 <Ground>
                     <Pane>
                         {draft.options.length < QUESTION_LIMITS.maxOptions && (
@@ -535,9 +543,9 @@ const QuizBuilder = () => {
 
             {picked && selected !== null && (
                 <Ground>
-                    <Pane ref={actionsRef} role="group" aria-label={`Question ${selected + 1}`}>
-                        <Control disabled={selected === 0} onClick={() => move(selected, selected - 1)}>Move up</Control>
-                        <Control disabled={selected === questions.length - 1} onClick={() => move(selected, selected + 1)}>Move down</Control>
+                    <Pane role="group" aria-label={`Question ${selected + 1}`}>
+                        <Control ref={moveUpRef} disabled={selected === 0} onClick={() => move(selected, selected - 1)}>Move up</Control>
+                        <Control ref={moveDownRef} disabled={selected === questions.length - 1} onClick={() => move(selected, selected + 1)}>Move down</Control>
                         <Control onClick={() => openEditor(selected)}>Edit this question</Control>
                         {confirmingRemove ? (
                             <>
@@ -545,10 +553,10 @@ const QuizBuilder = () => {
                                     Take question {selected + 1} out of this quiz?
                                 </p>
                                 <Control aria-describedby={fieldId("remove-note")} onClick={() => remove(selected)}>Yes, remove it</Control>
-                                <Control onClick={keep}>Keep it</Control>
+                                <Control ref={keepRef} onClick={keep}>Keep it</Control>
                             </>
                         ) : (
-                            <Control onClick={askToRemove}>Remove this question</Control>
+                            <Control ref={askRemoveRef} onClick={askToRemove}>Remove this question</Control>
                         )}
                     </Pane>
                 </Ground>

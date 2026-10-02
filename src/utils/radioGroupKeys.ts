@@ -14,6 +14,9 @@ export const radioGroupKeys = (
     count: number,
     pick: (index: number) => void,
 ) => {
+    // Alt+Arrow is the browser's Back and Forward, Ctrl/Meta+Home and End
+    // scroll the page: leave them to the browser.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     let next: number;
     switch (event.key) {
         case "ArrowDown":

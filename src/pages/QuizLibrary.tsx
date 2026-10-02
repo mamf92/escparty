@@ -67,7 +67,8 @@ const QuizLibrary = () => {
         setConfirming(false);
         // Drop the just-saved copy the router state still carries.
         if (location.state) navigate(location.pathname, { replace: true, state: null });
-        // The moves pane is gone: back to the list, where the quiz was.
+        // The moves pane is gone: back to the list's tab stop, which with
+        // nothing picked is the first quiz.
         requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')?.focus());
     };
 
@@ -110,7 +111,7 @@ const QuizLibrary = () => {
 
             {choice ? (
                 <Ground>
-                    <Pane aria-label={`What to do with ${choice.title}`}>
+                    <Pane role="group" aria-label={`What to do with ${choice.title}`}>
                         <Control onClick={() => navigate(`/quiz/${choice.key}`, { state: { multiplayer: false } })}>
                             Play {choice.title} solo
                         </Control>

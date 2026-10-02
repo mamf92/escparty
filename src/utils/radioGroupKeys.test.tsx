@@ -46,6 +46,15 @@ describe("radioGroupKeys", () => {
     expect(fireEvent.keyDown(radio, { key: "Tab" })).toBe(true);
     expect(pick).not.toHaveBeenCalled();
   });
+
+  it.each([["altKey"], ["ctrlKey"], ["metaKey"]])("leaves the keys to the browser with %s held", modifier => {
+    const pick = vi.fn();
+    render(<Group picked={0} pick={pick} />);
+    const radio = screen.getAllByRole("radio")[0];
+    expect(fireEvent.keyDown(radio, { key: "ArrowLeft", [modifier]: true })).toBe(true);
+    expect(fireEvent.keyDown(radio, { key: "End", [modifier]: true })).toBe(true);
+    expect(pick).not.toHaveBeenCalled();
+  });
 });
 
 describe("radioTabIndex", () => {
