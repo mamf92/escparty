@@ -189,6 +189,22 @@ test("the scoreboard break and the host's view follow the surface rules", async 
     await page.context().close();
 });
 
+test("the single-player entry screens follow the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    await page.goto("/#/select-difficulty");
+    await expect(page.getByRole("heading", { level: 1, name: "Pick a difficulty" })).toBeVisible();
+    await judge(page, "select-difficulty");
+
+    await page.goto("/#/quiz");
+    await expect(page.getByRole("button", { name: "Open the quiz library" })).toBeVisible();
+    await judge(page, "quiz-moved");
+    await page.getByRole("button", { name: "Open the quiz library" }).click();
+    await expect(page).toHaveURL(/#\/quizzes$/);
+
+    await page.context().close();
+});
+
 test("Sparkle mode switches every screen, is remembered, and keeps still with reduced motion", async ({ browser }) => {
     const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
     await page.goto("/#/quizzes");

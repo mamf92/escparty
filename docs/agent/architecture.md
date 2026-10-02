@@ -12,7 +12,8 @@ to play solo, host, or take into the builder), `QuizBuilder.tsx`
 order and break setting, save),
 `MultiplayerLobby.tsx`, `Lobby.tsx`, `MidQuizScoreboard.tsx`,
 `HostObserverView.tsx`, `QuizResults.tsx`, `Scoreboard.tsx`,
-`UnderDevelopment.tsx`, and the scoreboard party's `PartyHome.tsx`
+`UnderDevelopment.tsx` (`/quiz` with no quiz named: says the page moved
+and opens the quiz library), and the scoreboard party's `PartyHome.tsx`
 (`/party`), `PartySetup.tsx` (`/party/new`), `PartyRoom.tsx`
 (`/party/:code`), `PartyScreen.tsx` (`/party/:code/screen`) and
 `PartyAwards.tsx` (`/party/:code/awards`); see
