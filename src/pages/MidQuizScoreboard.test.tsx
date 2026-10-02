@@ -1,4 +1,4 @@
-import { act } from "@testing-library/react";
+import { act, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
@@ -67,20 +67,30 @@ describe("MidQuizScoreboard", () => {
 
   it("lets a single player continue to the next question", async () => {
     renderBreak({ score: 800, currentQuestionIndex: 5, difficulty: "hard", multiplayer: false });
-    expect(screen.getByText("You scored 800 so far!")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Scoreboard break" })).toBeInTheDocument();
+    expect(screen.getByText("You have 800 points so far.")).toBeInTheDocument();
+    // Single player has no room, so no standings either.
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(mocks.listenToRoom).not.toHaveBeenCalled();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Continue Quiz" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Continue the quiz" }));
     expect(stateAt("/quiz/hard")).toMatchObject({ currentQuestionIndex: 5, score: 800, multiplayer: false });
   });
 
   it("shows a guest the room's standings and waits for the host", () => {
     renderBreak(multiplayer("p2"));
     act(() => mocks.onRoom(room()));
-    const rows = screen.getAllByRole("row").slice(1).map(row => row.textContent);
-    expect(rows).toEqual(["Loreen (You)700", "Martin400"]);
+    const standings = screen.getByRole("list", { name: "Standings at the break" });
+    expect(standings).toHaveAttribute("aria-live", "polite");
+    const rows = within(standings).getAllByRole("listitem");
+    expect(rows.map(row => row.textContent)).toEqual(["1. Loreen (you)700 points", "2. Martin400 points"]);
+    // The leader (here also this player) stands proud; the rest sit at rest.
+    expect(rows[0]).toHaveClass("is-high");
+    expect(rows[1]).not.toHaveClass("is-high");
     // The room's copy of this player's score wins when it's higher.
-    expect(screen.getByText("You scored 700 so far!")).toBeInTheDocument();
-    expect(screen.getByText("Waiting for the host to continue...")).toBeInTheDocument();
+    expect(screen.getByText("You have 700 points so far.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for the host to continue…");
+    // No Continue for a guest, only the way out, saying what leaving does.
+    expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["Leave the game, it goes on without you"]);
     // A playing host's room doesn't need ready marks.
     expect(mocks.markPlayerAtMidQuiz).not.toHaveBeenCalled();
   });
@@ -147,7 +157,7 @@ describe("MidQuizScoreboard", () => {
     mocks.resumeAfterMidQuiz.mockResolvedValue(true);
     renderBreak(multiplayer("host"));
     act(() => mocks.onRoom(room()));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Continue Quiz" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Continue the quiz" }));
     expect(mocks.resumeAfterMidQuiz).toHaveBeenCalledWith("ABBA");
     act(() => mocks.onRoom(room({ phase: "question", currentQuestionIndex: 5 })));
     expect(stateAt("/quiz/easy")).toMatchObject({ currentQuestionIndex: 5, score: 400, multiplayer: true, roomCode: "ABBA", playerId: "host" });
@@ -157,7 +167,7 @@ describe("MidQuizScoreboard", () => {
     sessionStorage.setItem("multiplayerGame", JSON.stringify({ multiplayer: true, roomCode: "ABBA", playerId: "p2", difficulty: "easy" }));
     renderBreak();
     act(() => mocks.onRoom(room({ currentQuestionIndex: 10 })));
-    expect(screen.getByText("Waiting for the host to continue...")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for the host to continue…")).toBeInTheDocument();
     act(() => mocks.onRoom(room({ phase: "results", currentQuestionIndex: 14 })));
     expect(screen.getByText(/at \/quiz\/easy/)).toBeInTheDocument();
   });
@@ -172,7 +182,29 @@ describe("MidQuizScoreboard", () => {
     sessionStorage.setItem("multiplayerGame", "{broken");
     vi.spyOn(console, "error").mockImplementation(() => {});
     renderBreak();
-    expect(screen.getByText("Unable to retrieve game data. Please return to the lobby.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("This tab lost track of your game. Join it again from multiplayer.");
+    expect(screen.getByRole("heading", { level: 1, name: "Scoreboard break" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to multiplayer" })).toBeInTheDocument();
+  });
+
+  it("says when a multiplayer break has no room to follow", () => {
+    renderBreak({ ...multiplayer("p2"), roomCode: null });
+    expect(screen.getByRole("alert")).toHaveTextContent("This tab lost track of your game. Join it again from multiplayer.");
+    expect(screen.queryByText("Fetching the scores…")).not.toBeInTheDocument();
+    expect(mocks.listenToRoom).not.toHaveBeenCalled();
+  });
+
+  it("leaves a multiplayer game for the multiplayer page", async () => {
+    renderBreak(multiplayer("p2"));
+    act(() => mocks.onRoom(room()));
+    await userEvent.click(screen.getByRole("button", { name: "Leave the game, it goes on without you" }));
+    expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
+  it("ends a single-player quiz back at ESCParty", async () => {
+    renderBreak({ score: 300, totalQuestions: 20, currentQuestionIndex: 5, difficulty: "easy" });
+    await userEvent.click(screen.getByRole("button", { name: "End the quiz and go back to ESCParty" }));
+    expect(screen.getByText(/^at \/ with/)).toBeInTheDocument();
   });
 
   it("says when the room is from an older version", () => {
@@ -184,13 +216,61 @@ describe("MidQuizScoreboard", () => {
   it("goes back to the multiplayer page when the room is gone", async () => {
     vi.useFakeTimers();
     try {
-      renderBreak(multiplayer("p2"));
+      const { unmount } = renderBreak(multiplayer("p2"));
       act(() => mocks.onRoom(null));
-      expect(screen.getByText("Game room no longer exists")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("This game has closed. Taking you back to multiplayer…");
       await act(async () => vi.advanceTimersByTime(2000));
       expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+      unmount();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("leaves no timer behind when the room is reported gone twice", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderBreak(multiplayer("p2"));
+      act(() => mocks.onRoom(null));
+      act(() => mocks.onRoom(null));
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("says the scores are on their way before the room's first snapshot", () => {
+    renderBreak({ ...multiplayer("p2"), players: [] });
+    expect(screen.getByText("Fetching the scores…")).toHaveAttribute("role", "status");
+    act(() => mocks.onRoom(room()));
+    expect(screen.queryByText("Fetching the scores…")).not.toBeInTheDocument();
+  });
+
+  it("says so in a row when the room's snapshot has nobody playing", () => {
+    renderBreak({ ...multiplayer("p2"), players: [] });
+    act(() => mocks.onRoom(room({ players: [] })));
+    expect(screen.queryByText("Fetching the scores…")).not.toBeInTheDocument();
+    expect(screen.getByRole("listitem")).toHaveTextContent("Nobody's on the scoreboard yet.");
+  });
+
+  it("shares first place on a tie and raises this player's own row", () => {
+    renderBreak(multiplayer("p3"));
+    act(() => mocks.onRoom(room({ players: [
+      { id: "host", name: "Martin", score: 700 },
+      { id: "p2", name: "Loreen", score: 700 },
+      { id: "p3", name: "Lordi", score: 1 },
+    ] })));
+    const rows = screen.getAllByRole("listitem");
+    expect(rows.map(row => row.textContent)).toEqual(["1. Loreen700 points", "1. Martin700 points", "3. Lordi (you)1 point"]);
+    expect(rows.map(row => row.classList.contains("is-high"))).toEqual([true, true, true]);
+  });
+
+  it("says why the host's Continue failed, as an alert", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.resumeAfterMidQuiz.mockRejectedValue(new Error("offline"));
+    renderBreak(multiplayer("host"));
+    act(() => mocks.onRoom(room()));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Continue the quiz" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't continue the quiz. Check your connection and try again.");
   });
 });
