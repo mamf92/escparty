@@ -31,6 +31,7 @@ describe("QuizStatus", () => {
     [{ picked: "Sweden", points: 0, outcome: "timed-out" }, "Time ran out before you locked it in. The answer was Sweden."],
     [{ picked: "Norway", points: 0, outcome: "timed-out" }, "Time ran out before you locked it in. The answer was Sweden."],
     [{ picked: null, points: 0, outcome: "timed-out" }, "Time's up. The answer was Sweden."],
+    [{ picked: "Sweden", points: 820, outcome: "answered", counted: false }, "That's right, but the points didn't reach the room."],
     [{ picked: null, points: 0, outcome: "restored" }, "This question closed for you before you came back. The answer was Sweden."],
   ] as const)("says the verdict in words once settled (%o)", (props, text) => {
     renderWithProviders(<QuizStatus {...base} settled {...props} />);

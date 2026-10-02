@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import { Control, Ground, Marker, Pane } from "../../design";
 
 /**
@@ -11,7 +12,7 @@ import { Control, Ground, Marker, Pane } from "../../design";
  *
  * Presentation only: what's picked and when it settles is Quiz.tsx's.
  */
-export const QuestionPane = ({ question, options, picked, correctAnswer, settled, lockedIn = true, onPick }: {
+export const QuestionPane = ({ question, options, picked, correctAnswer, settled, lockedIn = true, onPick, headingRef }: {
   question: string;
   options: readonly string[];
   picked: string | null;
@@ -21,9 +22,11 @@ export const QuestionPane = ({ question, options, picked, correctAnswer, settled
   /** The pick was locked in as the answer, not left open when time ran out. */
   lockedIn?: boolean;
   onPick: (option: string) => void;
+  /** Where Quiz.tsx puts focus when the control it was on is disabled. */
+  headingRef?: Ref<HTMLHeadingElement>;
 }) => (
   <>
-    <h2 className="esc-heading">{question}</h2>
+    <h2 className="esc-heading" ref={headingRef} tabIndex={-1}>{question}</h2>
     <Ground>
       <Pane role="group" aria-label="Answers" className="quiz-answers">
         {options.map(option => {

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
-import type { QuizQuestion } from "../utils/QuizDataProvider";
+import { loadQuizData, type QuizQuestion } from "../utils/QuizDataProvider";
 import { ScoreWriteRejected, type Room } from "../utils/roomsFirestore";
 import Quiz from "./Quiz";
 
@@ -98,6 +98,17 @@ describe("Quiz answer selection (#22)", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent(/^Douze points! That's right: \+\d+ points\.$/);
   });
+
+  it("keeps a keyboard player's focus on the question once locking in disables the button", async () => {
+    const user = userEvent.setup();
+    renderQuiz({ multiplayer: false });
+
+    await user.click(await screen.findByRole("button", { name: "Sweden" }));
+    screen.getByRole("button", { name: "Lock in my answer" }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("heading", { level: 2, name: "Which country won in 1974?" })).toHaveFocus();
+  });
 });
 
 describe("Quiz screen (#171)", () => {
@@ -149,7 +160,16 @@ describe("Quiz sources (#72)", () => {
 describe("Quiz unavailable (#171)", () => {
   it("says a deleted custom quiz can't be found, rather than blaming the connection", async () => {
     renderQuiz({ multiplayer: false }, "/quiz/c-abcdefghij0123456789");
-    expect(await screen.findByRole("alert")).toHaveTextContent("We can't find that quiz. The link may be wrong, or the quiz was deleted.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("We can't find that quiz. The link may be wrong, or the quiz was deleted or emptied.");
+  });
+
+  it("in a room, points to rejoining rather than the quiz library it can't offer", async () => {
+    mocks.listenToRoom.mockImplementation(() => () => { });
+    vi.mocked(loadQuizData).mockRejectedValueOnce(new Error("offline"));
+    renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "ghost" });
+    expect(await screen.findByRole("alert")).toHaveTextContent("reload the page to rejoin the game");
+    expect(screen.queryByText(/library/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to the game menu" })).toBeInTheDocument();
   });
 
   it("goes to the game menu once when the room closes, even if the player takes the button first", async () => {
@@ -234,6 +254,9 @@ describe("Quiz multiplayer score writes (#131)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The game had already finished");
     expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+    // The verdict doesn't promise the points the alert says didn't count.
+    expect(screen.getByRole("status")).toHaveTextContent("That's right, but the points didn't reach the room.");
+    expect(screen.queryByText(/Douze points/)).not.toBeInTheDocument();
   });
 
   it("adds the answer's points to the room's score when the room already holds more", async () => {

@@ -3,12 +3,12 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { updatePlayerScore, listenToRoom, advanceQuestion, Room, ScoreWriteRejected } from "../utils/roomsFirestore";
 import { isDevelopmentEnvironment } from "../utils/pathUtils";
 import { filterEnabledQuestions, isFallbackQuizData, QuizQuestion } from "../utils/QuizDataProvider";
-import { QUIZ_NOT_SAVED, isKnownQuizKey, loadQuiz } from "../utils/quizCatalog";
+import { QuizNotSavedError, isKnownQuizKey, loadQuiz } from "../utils/quizCatalog";
 import { DEFAULT_BREAK_EVERY, isBreakAfter } from "../utils/quizModel";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
-import { FEEDBACK_MS, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { Control, Ground, Pane } from "../design";
 import { CalmNote, CalmPage } from "./CalmPage";
@@ -147,7 +147,6 @@ const Quiz = () => {
       setIsMultiplayer(true);
       setRoomCode(multiplayerData.roomCode);
       setPlayerId(multiplayerData.playerId);
-      setLoadingStatus("Finding the room…");
 
       // Store multiplayer info in session storage (for page refresh recovery)
       // (with the difficulty, which pages opened without router state
@@ -225,7 +224,7 @@ const Quiz = () => {
       .catch((error) => {
         console.error("❌ Error loading quiz data:", error);
         // A deleted custom quiz isn't a connection problem: retrying won't help.
-        setError(error instanceof Error && error.message === QUIZ_NOT_SAVED ? NOT_FOUND : LOAD_FAILED);
+        setError(error instanceof QuizNotSavedError ? NOT_FOUND : LOAD_FAILED);
         setLoading(false);
       });
 
@@ -647,11 +646,24 @@ const Quiz = () => {
   const nextPhase = phaseAfterQuestion(
     currentQuestionIndex,
     questions.length,
-    sharedClock ? room?.breakEvery : breakEvery,
+    // A room without the setting breaks every MID_QUIZ_EVERY, as advanceQuestion does.
+    sharedClock ? room?.breakEvery ?? MID_QUIZ_EVERY : breakEvery,
   ).phase;
   const nextLabel = nextPhase === "results" ? "Results"
     : nextPhase === "mid-scoreboard" ? "Scoreboard"
     : "Next question";
+
+  // Settling a question disables the button or answer that had focus, which
+  // would drop a keyboard player at the top of the page: give focus to the
+  // question instead, from where the next tab reaches the controls again.
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (!isSubmitted) return;
+    const focused = document.activeElement;
+    if (!focused || focused === document.body || (focused as HTMLButtonElement).disabled) {
+      questionHeadingRef.current?.focus();
+    }
+  }, [isSubmitted, currentQuestionIndex]);
 
   // A player who picked "Leave the quiz" and confirmed it.
   const leaveQuiz = () => navigate("/");
@@ -669,7 +681,7 @@ const Quiz = () => {
   if (error || legacyRoom) {
     return (
       <CalmPage title="Quiz unavailable">
-        <CalmNote role="alert">{error ?? LEGACY_ROOM_MESSAGE}</CalmNote>
+        <CalmNote role="alert">{error === LOAD_FAILED && isMultiplayer ? LOAD_FAILED_ROOM : error ?? LEGACY_ROOM_MESSAGE}</CalmNote>
         <Ground>
           <Pane>
             {isMultiplayer
@@ -694,6 +706,7 @@ const Quiz = () => {
         correctAnswer={currentQuestion.correctAnswer}
         points={currentQuestionPoints}
         outcome={outcome}
+        counted={!scoreSyncError}
       />
       {scoreSyncError && <CalmNote role="alert">{scoreSyncError}</CalmNote>}
       <QuestionPane
@@ -704,6 +717,7 @@ const Quiz = () => {
         settled={isSubmitted}
         lockedIn={outcome === "answered"}
         onPick={handleAnswer}
+        headingRef={questionHeadingRef}
       />
       <Ground>
         <Pane>
@@ -719,10 +733,13 @@ const Quiz = () => {
   );
 };
 
-/** A quiz key that names nothing, or a custom quiz that was deleted. */
-const NOT_FOUND = "We can't find that quiz. The link may be wrong, or the quiz was deleted.";
+/** A quiz key that names nothing, or a custom quiz that was deleted or emptied. */
+const NOT_FOUND = "We can't find that quiz. The link may be wrong, or the quiz was deleted or emptied.";
 
 /** Any other failure to load a quiz's questions, said without the raw error. */
 const LOAD_FAILED = "We couldn't load this quiz. Check your connection and try again, or pick another from the library.";
+
+/** The same in a room, where the way out is the game menu, not the library. */
+const LOAD_FAILED_ROOM = "We couldn't load this quiz. Check your connection and reload the page to rejoin the game.";
 
 export default Quiz;

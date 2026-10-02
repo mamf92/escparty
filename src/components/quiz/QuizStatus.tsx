@@ -17,7 +17,7 @@ export type QuizOutcome = "answered" | "timed-out" | "restored";
  *
  * Presentation only: Quiz.tsx owns the clock and the scoring.
  */
-export const QuizStatus = ({ timeLeft, settled, picked, correctAnswer, points, outcome }: {
+export const QuizStatus = ({ timeLeft, settled, picked, correctAnswer, points, outcome, counted = true }: {
   /** Whole seconds on the question's clock. */
   timeLeft: number;
   settled: boolean;
@@ -27,27 +27,33 @@ export const QuizStatus = ({ timeLeft, settled, picked, correctAnswer, points, o
   points: number;
   /** How it was settled; null while the question is open. */
   outcome: QuizOutcome | null;
+  /** False when the room refused or never got this answer's score. */
+  counted?: boolean;
 }) => (
-  <>
+  // One slot for the clock and then the verdict, so the question below
+  // doesn't move when one replaces the other.
+  <div className="quiz-status">
     {!settled && (
       <CalmNote role="timer" aria-atomic="true">
         {timeLeft === 1 ? "1 second left" : `${timeLeft} seconds left`}
       </CalmNote>
     )}
     <div role="status">
-      {settled && <CalmNote>{verdict({ picked, correctAnswer, points, outcome })}</CalmNote>}
+      {settled && <CalmNote>{verdict({ picked, correctAnswer, points, outcome, counted })}</CalmNote>}
     </div>
-  </>
+  </div>
 );
 
-const verdict = ({ picked, correctAnswer, points, outcome }: {
+const verdict = ({ picked, correctAnswer, points, outcome, counted }: {
   picked: string | null;
   correctAnswer: string;
   points: number;
   outcome: QuizOutcome | null;
+  counted: boolean;
 }) => {
   if (outcome === "restored") return `This question closed for you before you came back. The answer was ${correctAnswer}.`;
   if (outcome === "answered") {
+    if (picked === correctAnswer && !counted) return "That's right, but the points didn't reach the room.";
     return picked === correctAnswer
       ? `Douze points! That's right: +${points} points.`
       : `Nul points this time. The answer was ${correctAnswer}.`;

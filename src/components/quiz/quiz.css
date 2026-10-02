@@ -7,3 +7,10 @@
   gap: var(--esc-space-3);
   width: 100%;
 }
+
+/* The clock and the verdict share one slot in the page's column. */
+.quiz-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}

@@ -9,6 +9,7 @@ import {
     quizTitle,
     setRoomQuiz,
     templateKey,
+    QuizNotSavedError,
 } from "./quizCatalog";
 import { QUIZ_TEMPLATES } from "../data/quizTemplates";
 import { bankQuestion } from "../data/questionBank";
@@ -142,7 +143,7 @@ describe("loadQuiz", () => {
 
     it("rejects a saved quiz that's gone or has nothing playable", async () => {
         mocks.fetchCustomQuiz.mockResolvedValueOnce(null);
-        await expect(loadQuiz(CUSTOM)).rejects.toThrow("This quiz isn't saved any more.");
+        await expect(loadQuiz(CUSTOM)).rejects.toBeInstanceOf(QuizNotSavedError);
         mocks.fetchCustomQuiz.mockResolvedValueOnce({ ...saved, questions: [] });
         await expect(loadQuiz(CUSTOM)).rejects.toThrow("This quiz isn't saved any more.");
     });
