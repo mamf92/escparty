@@ -1,12 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane } from "../design";
+import type { QuizDifficulty } from "../utils/QuizDataProvider";
+import { CLASSIC_KEYS, QUIZ_CHOICES } from "../utils/quizCatalog";
 
-const DIFFICULTIES = [
-  { key: "easy", title: "Easy", detail: "You know who Loreen is" },
-  { key: "medium", title: "Medium", detail: "You know the year Alexander Rybak won ESC" },
-  { key: "hard", title: "Hard", detail: "You know where ESC was held when Dana International won" },
-] as const;
+/** The classic sets, with the same tagline the quiz library shows. */
+const DIFFICULTIES = CLASSIC_KEYS.map(key => ({
+  key,
+  title: key.charAt(0).toUpperCase() + key.slice(1),
+  detail: QUIZ_CHOICES.find(choice => choice.key === key)?.tagline ?? "",
+}));
 
 /**
  * The classic single-player quiz's way in: pick a difficulty, or go to
@@ -17,7 +20,7 @@ const DIFFICULTIES = [
 const SelectDifficulty = () => {
   const navigate = useNavigate();
 
-  const handleSelect = (difficulty: string) => {
+  const handleSelect = (difficulty: QuizDifficulty) => {
     // Explicitly single player, so the quiz doesn't pick up a multiplayer
     // game this tab played earlier from sessionStorage.
     navigate(`/quiz/${difficulty}`, { state: { multiplayer: false } });
@@ -32,9 +35,15 @@ const SelectDifficulty = () => {
       <Ground>
         <Pane role="group" aria-label="Difficulty">
           {DIFFICULTIES.map(({ key, title, detail }) => (
-            <Control key={key} block onClick={() => handleSelect(key)}>
-              <span>{title}</span>
-              <span className="calm-sub">{detail}</span>
+            <Control
+              key={key}
+              block
+              aria-labelledby={`difficulty-${key}`}
+              aria-describedby={`difficulty-${key}-detail`}
+              onClick={() => handleSelect(key)}
+            >
+              <span id={`difficulty-${key}`}>{title}</span>
+              <span id={`difficulty-${key}-detail`} className="calm-sub">{detail}</span>
             </Control>
           ))}
         </Pane>
