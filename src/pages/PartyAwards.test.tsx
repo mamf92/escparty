@@ -41,8 +41,14 @@ describe("PartyAwards", () => {
         expect(screen.getByRole("status")).toHaveTextContent("Counting the votes");
         unmount();
         mocks.data = { party: null, ballots: undefined, error: null };
-        renderAwards();
+        const { unmount: unmountMissing } = renderAwards();
         expect(screen.getByRole("alert")).toHaveTextContent("no party with the code ABBA");
+        expect(screen.getByRole("button", { name: "Try another code" })).toBeInTheDocument();
+        unmountMissing();
+        mocks.data = { party: undefined, ballots: undefined, error: "The party couldn't be reached." };
+        renderAwards();
+        expect(screen.getByRole("alert")).toHaveTextContent("couldn't be reached");
+        expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     });
 
     it("keeps guests out until the host opens them", async () => {
@@ -66,14 +72,16 @@ describe("PartyAwards", () => {
         renderAwards();
         expect(card()).toHaveTextContent("The Jedward Twins");
         expect(card()).toHaveTextContent("Jedward & Lordi (that's you!)");
-        expect(card()).toHaveClass("is-chosen");
-        expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
-        await user.click(screen.getByRole("button", { name: "Next" }));
+        // Your own award stands proud: raised, not marked as a choice.
+        expect(card()).toHaveClass("is-high");
+        expect(card()).not.toHaveClass("is-chosen");
+        expect(screen.getByRole("button", { name: "Previous award" })).toBeDisabled();
+        await user.click(screen.getByRole("button", { name: "Next award" }));
         expect(card()).toHaveTextContent("Lordi & Salvador Sobral");
-        await user.click(screen.getByRole("button", { name: "Previous" }));
+        await user.click(screen.getByRole("button", { name: "Previous award" }));
         expect(card()).toHaveTextContent("The Jedward Twins");
-        while (!screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")) {
-            await user.click(screen.getByRole("button", { name: "Next" }));
+        while (!screen.getByRole("button", { name: "Next award" }).hasAttribute("disabled")) {
+            await user.click(screen.getByRole("button", { name: "Next award" }));
         }
         expect(screen.queryByRole("list")).not.toBeInTheDocument();
     });
@@ -91,14 +99,14 @@ describe("PartyAwards", () => {
         mocks.data = { party: makeParty({ revealed: true, results }), ballots, error: null };
         const { unmount } = renderAwards();
         const pages = Number(screen.getByText(/^1 of \d+$/).textContent!.split(" of ")[1]);
-        for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next" }));
+        for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
         const board = screen.getByRole("list", { name: "Closest to the real result" });
         expect(within(board).getAllByRole("listitem")[0]).toHaveTextContent("1st Jedward48");
         unmount();
 
         mocks.data = { party: makeParty({ revealed: true, showNames: false, results }), ballots, error: null };
         renderAwards();
-        for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next" }));
+        for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
         const anonymous = screen.getByRole("list", { name: "Closest to the real result" });
         expect(within(anonymous).getAllByRole("listitem").map(item => item.textContent)).toEqual(["1st You48"]);
         expect(screen.getByText(/Out of 3 guests/)).toBeInTheDocument();
@@ -107,7 +115,7 @@ describe("PartyAwards", () => {
     it("says when there isn't enough to go on", async () => {
         mocks.data = { party: makeParty({ revealed: true }), ballots: [ballots[0]], error: null };
         renderAwards("/awards");
-        expect(screen.getByRole("status")).toHaveTextContent("Not enough ratings for awards yet");
+        expect(screen.getByText(/^Not enough ratings for awards yet/)).toHaveClass("is-static");
         await userEvent.setup().click(screen.getByRole("button", { name: "Back to the party" }));
         expect(screen.getByText("at /party")).toBeInTheDocument();
     });

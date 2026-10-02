@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { PartyError, PartyNotFound } from "../components/PartyStates";
+import { Control, Ground, Pane, Row } from "../design";
 import { usePartyData } from "../hooks/usePartyData";
 import { predictionLeaderboard } from "../utils/partyModel";
 import { awardWinners, awardsFor, hasResults, ordinal, predictionsFor } from "../utils/partyResults";
@@ -20,14 +22,19 @@ const PartyAwards = () => {
     const [index, setIndex] = useState(0);
     const identity = code ? readPartyIdentity(code) : null;
 
-    const back = <CalmLink type="button" onClick={() => navigate(code ? `/party/${code}` : "/party")}>Back to the party</CalmLink>;
+    const back = <CalmLink onClick={() => navigate(code ? `/party/${code}` : "/party")}>Back to the party</CalmLink>;
 
-    if (party === undefined || party === null || ballots === undefined) {
+    if (party === null) {
         return (
             <CalmPage title="The awards" footer={back}>
-                <CalmNote role={party === null ? "alert" : "status"}>
-                    {party === null ? `There's no party with the code ${code}.` : error ?? "Counting the votes…"}
-                </CalmNote>
+                <PartyNotFound code={code} />
+            </CalmPage>
+        );
+    }
+    if (party === undefined || ballots === undefined) {
+        return (
+            <CalmPage title="The awards" footer={back}>
+                {error ? <PartyError error={error} /> : <CalmNote role="status">Counting the votes…</CalmNote>}
             </CalmPage>
         );
     }
@@ -56,60 +63,64 @@ const PartyAwards = () => {
             footer={back}
         >
             {pages === 0 && (
-                <CalmNote role="status">
-                    Not enough ratings for awards yet: they need at least two guests who each rated three acts.
-                </CalmNote>
+                <Ground>
+                    <Pane>
+                        <Row>Not enough ratings for awards yet: they need at least two guests who each rated three acts.</Row>
+                    </Pane>
+                </Ground>
             )}
 
             {award && (() => {
                 const { who, mine } = awardWinners(award.guestIds, names, party.showNames, identity?.guestId);
                 return (
-                    <div className="calm-ground">
-                        <div className="lycra-pane" aria-live="polite">
-                            <div className={`lycra is-block is-static${mine ? " is-chosen" : ""}`}>
+                    <Ground>
+                        <Pane aria-live="polite">
+                            {/* Your own award stands proud, and says so in words too. */}
+                            <Row elevation={mine ? "high" : "rest"}>
                                 <span className="calm-label">{award.for}</span>
                                 <span>{award.title}</span>
                                 <span>{who}{mine && party.showNames ? " (that's you!)" : ""}</span>
                                 <span className="calm-sub">{award.detail}</span>
                                 <span className="calm-sub">{award.story}</span>
-                            </div>
-                        </div>
-                    </div>
+                            </Row>
+                        </Pane>
+                    </Ground>
                 );
             })()}
 
             {!award && leaderboard.length > 0 && (
                 <>
-                    <CalmNote>Closest to the real result</CalmNote>
-                    <div className="calm-ground">
-                        <ol className="lycra-pane" aria-label="Closest to the real result">
+                    <h2 className="esc-note">Closest to the real result</h2>
+                    <Ground>
+                        <Pane as="ol" aria-label="Closest to the real result">
                             {leaderboard.map((row, place) => {
                                 const mine = row.guestId === identity?.guestId;
                                 if (!party.showNames && !mine) return null;
                                 return (
-                                    <li key={row.guestId} className={`lycra is-block is-static${mine ? " is-chosen" : ""}`}>
+                                    <Row as="li" key={row.guestId} elevation={mine && party.showNames ? "high" : "rest"}>
                                         <span className="calm-row">
                                             <span>{ordinal(place + 1)} {party.showNames ? row.name : "You"}</span>
                                             <span>{row.prediction.points}</span>
                                         </span>
-                                    </li>
+                                        {mine && party.showNames && <span className="calm-sub">That's you</span>}
+                                    </Row>
                                 );
                             })}
-                        </ol>
-                    </div>
+                        </Pane>
+                    </Ground>
                     {!party.showNames && <CalmNote>Out of {leaderboard.length} guests. Everyone else's place is theirs to share.</CalmNote>}
                 </>
             )}
 
             {pages > 1 && (
                 <>
-                    <CalmNote>{page + 1} of {pages}</CalmNote>
-                    <div className="calm-ground">
-                        <div className="lycra-pane calm-split">
-                            <button type="button" className="lycra" disabled={page === 0} onClick={() => setIndex(page - 1)}>Previous</button>
-                            <button type="button" className="lycra" disabled={page === pages - 1} onClick={() => setIndex(page + 1)}>Next</button>
-                        </div>
-                    </div>
+                    <CalmNote aria-live="polite">{page + 1} of {pages}</CalmNote>
+                    <Ground>
+                        <Pane layout="split">
+                            <Control disabled={page === 0} onClick={() => setIndex(page - 1)}>Previous award</Control>
+                            <Control disabled={page === pages - 1} onClick={() => setIndex(page + 1)}>Next award</Control>
+                        </Pane>
+                    </Ground>
                 </>
             )}
         </CalmPage>

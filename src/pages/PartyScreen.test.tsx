@@ -46,8 +46,18 @@ describe("PartyScreen", () => {
         ]);
         expect(screen.getByText("1 guest is rating.")).toBeInTheDocument();
         expect(screen.queryByText(/Jedward/)).not.toBeInTheDocument();
-        expect(screen.getByRole("status")).toHaveTextContent("offline");
+        expect(screen.getByRole("alert")).toHaveTextContent("offline");
         await screen.findByRole("img");
+    });
+
+    it("says what the standings wait for before anyone rates", async () => {
+        mocks.data = { party: makeParty(), ballots: [], error: null };
+        renderScreen();
+        expect(screen.getByText(/^No ratings yet/)).toHaveClass("is-static");
+        expect(screen.queryByRole("list")).not.toBeInTheDocument();
+        expect(screen.getByText("0 guests are rating.")).toHaveAttribute("aria-live", "polite");
+        // The QR code shrinks to fit a phone instead of spilling out of its row.
+        expect(await screen.findByRole("img")).toHaveClass("party-qr");
     });
 
     it("names the closest guests only when the host chose names", async () => {
@@ -69,6 +79,7 @@ describe("PartyScreen", () => {
         mocks.data = { party: null, ballots: undefined, error: null };
         renderScreen();
         expect(screen.getByRole("alert")).toHaveTextContent("no party with the code ABBA");
+        expect(screen.getByRole("button", { name: "Try another code" })).toBeInTheDocument();
         await userEvent.setup().click(screen.getByRole("button", { name: "Back to my phone view" }));
         expect(screen.getByText("at /party/ABBA")).toBeInTheDocument();
         expect(console.error).toHaveBeenCalled();

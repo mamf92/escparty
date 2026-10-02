@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CalmNote } from "./CalmPage";
+import { Control, Field, Ground, Pane } from "../design";
 import type { Act } from "../data/contests2027";
 import {
     fetchContest,
@@ -12,6 +13,8 @@ import {
 import type { Ballot } from "../utils/partyModel";
 import { ordinal, partyLink, resultsFor } from "../utils/partyResults";
 
+type Note = { text: string; failed?: boolean };
+
 /**
  * The host's side of a party (#82, #85, #86, #87): share the code, fix up
  * the running order as the real one is announced, enter the real result as
@@ -19,7 +22,7 @@ import { ordinal, partyLink, resultsFor } from "../utils/partyResults";
  * one write to the party, so every guest's phone follows it live.
  */
 const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] }) => {
-    const [note, setNote] = useState<string | null>(null);
+    const [note, setNote] = useState<Note | null>(null);
     const [busy, setBusy] = useState(false);
 
     const run = async (what: string, write: () => Promise<unknown>, done?: string) => {
@@ -28,10 +31,10 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
         setNote(null);
         try {
             await write();
-            if (done) setNote(done);
+            if (done) setNote({ text: done });
         } catch (error) {
             console.error(`Couldn't ${what}:`, error);
-            setNote(`Couldn't ${what}. Check your connection and try again.`);
+            setNote({ text: `Couldn't ${what}. Check your connection and try again.`, failed: true });
         } finally {
             setBusy(false);
         }
@@ -40,9 +43,9 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
     const share = async () => {
         try {
             await navigator.clipboard.writeText(partyLink(party.code));
-            setNote("The link is copied.");
+            setNote({ text: "The link is copied." });
         } catch {
-            setNote(`Share this link: ${partyLink(party.code)}`);
+            setNote({ text: `Share this link: ${partyLink(party.code)}` });
         }
     };
 
@@ -50,13 +53,17 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
 
     return (
         <>
-            <CalmNote>Guests join with the code {party.code}. {ballots.length === 1 ? "1 guest" : `${ballots.length} guests`} so far.</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button type="button" className="lycra" onClick={share}>Copy the party link</button>
-                </div>
-            </div>
+            <h2 className="esc-note">Guests</h2>
+            <CalmNote aria-live="polite">
+                Guests join with the code {party.code}. {ballots.length === 1 ? "1 guest" : `${ballots.length} guests`} so far.
+            </CalmNote>
+            <Ground>
+                <Pane>
+                    <Control onClick={share}>Copy the party link</Control>
+                </Pane>
+            </Ground>
 
+            <h2 className="esc-note">The real result</h2>
             {party.kind === "final"
                 ? <FinalResults party={party} busy={busy} onSave={saveResults} />
                 : <SemiResults party={party} busy={busy} onSave={saveResults} />}
@@ -72,26 +79,55 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
                 }, "Loaded the latest lineup.")}
             />
 
-            <CalmNote>The awards</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button
-                        type="button"
-                        className="lycra"
+            <h2 className="esc-note">The awards</h2>
+            <Ground>
+                <Pane>
+                    <Control
                         disabled={busy}
                         onClick={() => run("change the awards", () => setPartyRevealed(party.code, !party.revealed))}
                     >
                         {party.revealed ? "Hide the awards again" : "Open the awards for everyone"}
-                    </button>
-                </div>
-            </div>
-            {note && <CalmNote role="status">{note}</CalmNote>}
+                    </Control>
+                </Pane>
+            </Ground>
+            {/* Kept in the page, so a screen reader hears each note as it lands. */}
+            <div role="status">{note && !note.failed && <CalmNote>{note.text}</CalmNote>}</div>
+            {note?.failed && <CalmNote role="alert">{note.text}</CalmNote>}
+        </>
+    );
+};
+
+/**
+ * A two-step confirm for a host action that overwrites what's there
+ * (#178): the first tap swaps the button for a question, with the safe
+ * answer first and focused, so a stray tap or Enter can't wipe anything.
+ */
+const ConfirmStep = ({ question, keep, confirm, busy, onKeep, onConfirm }: {
+    question: string;
+    keep: string;
+    confirm: string;
+    busy: boolean;
+    onKeep: () => void;
+    onConfirm: () => void;
+}) => {
+    const keepRef = useRef<HTMLButtonElement>(null);
+    useEffect(() => keepRef.current?.focus(), []);
+    return (
+        <>
+            <CalmNote role="alert">{question}</CalmNote>
+            <Ground>
+                <Pane layout="split">
+                    <Control ref={keepRef} onClick={onKeep}>{keep}</Control>
+                    <Control disabled={busy} onClick={onConfirm}>{confirm}</Control>
+                </Pane>
+            </Ground>
         </>
     );
 };
 
 /** A final's real result, tapped in from the top as the scoreboard reveals it. */
 const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onSave: (results: PartyResults) => void }) => {
+    const [clearing, setClearing] = useState(false);
     // Only acts still in the show, in case the lineup changed under the result.
     const places = resultsFor(party.acts, party.results).places ?? {};
     const placed = party.acts.filter(act => places[act.id] !== undefined).sort((a, b) => places[a.id] - places[b.id]);
@@ -105,43 +141,56 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
     };
     return (
         <>
-            <CalmNote>
+            <CalmNote aria-live="polite">
                 {unplaced.length === 0
                     ? "The real result is in."
                     : `The real result: tap who came ${ordinal(next)}.`}
             </CalmNote>
             {unplaced.length > 0 && (
-                <div className="calm-ground">
-                    <div className="lycra-pane" aria-label={`Who came ${ordinal(next)}`}>
+                <Ground>
+                    <Pane role="group" aria-label={`Who came ${ordinal(next)}`}>
                         {unplaced.map(act => (
-                            <button
+                            <Control
                                 key={act.id}
-                                type="button"
-                                className="lycra is-block"
+                                block
                                 disabled={busy}
                                 onClick={() => onSave({ places: { ...places, [act.id]: next } })}
                             >
                                 {act.flag} {act.country}
-                            </button>
+                            </Control>
                         ))}
-                    </div>
-                </div>
+                    </Pane>
+                </Ground>
             )}
             {placed.length > 0 && (
                 <>
                     <CalmNote>
                         So far: {placed.map(act => `${ordinal(places[act.id])} ${act.country}`).join(", ")}.
                     </CalmNote>
-                    <div className="calm-ground">
-                        <div className="lycra-pane calm-split">
-                            <button type="button" className="lycra" disabled={busy} onClick={undo}>
-                                Undo {placed[placed.length - 1].country}
-                            </button>
-                            <button type="button" className="lycra" disabled={busy} onClick={() => onSave({})}>
-                                Clear the result
-                            </button>
-                        </div>
-                    </div>
+                    {clearing ? (
+                        <ConfirmStep
+                            question="Clear the whole result? Everyone's closeness points go back to nothing until you tap it in again."
+                            keep="Keep the result"
+                            confirm="Yes, clear it"
+                            busy={busy}
+                            onKeep={() => setClearing(false)}
+                            onConfirm={() => {
+                                setClearing(false);
+                                onSave({});
+                            }}
+                        />
+                    ) : (
+                        <Ground>
+                            <Pane layout="split">
+                                <Control disabled={busy} onClick={undo}>
+                                    Undo {placed[placed.length - 1].country}
+                                </Control>
+                                <Control disabled={busy} onClick={() => setClearing(true)}>
+                                    Clear the result
+                                </Control>
+                            </Pane>
+                        </Ground>
+                    )}
                 </>
             )}
         </>
@@ -156,26 +205,25 @@ const SemiResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onS
         onSave({ qualifiers: qualifiers.includes(actId) ? qualifiers.filter(id => id !== actId) : [...qualifiers, actId] });
     return (
         <>
-            <CalmNote>The real result: tick who goes through ({qualifiers.length} of {party.qualifiers}).</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane" aria-label="Who goes through">
+            <CalmNote aria-live="polite">The real result: tick who goes through ({qualifiers.length} of {party.qualifiers}).</CalmNote>
+            <Ground>
+                <Pane role="group" aria-label="Who goes through">
                     {party.acts.map(act => {
                         const through = qualifiers.includes(act.id);
                         return (
-                            <button
+                            <Control
                                 key={act.id}
-                                type="button"
-                                aria-pressed={through}
-                                className={`lycra is-block${through ? " is-chosen" : ""}`}
+                                block
+                                chosen={through}
                                 disabled={busy || (full && !through)}
                                 onClick={() => toggle(act.id)}
                             >
                                 {act.flag} {act.country}
-                            </button>
+                            </Control>
                         );
                     })}
-                </div>
-            </div>
+                </Pane>
+            </Ground>
         </>
     );
 };
@@ -191,7 +239,9 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
     onSave: (acts: Act[], done?: string) => void;
     onLoadLatest: () => void;
 }) => {
+    const actFieldId = useId();
     const [actId, setActId] = useState(party.acts[0].id);
+    const [loading, setLoading] = useState(false);
     // The picked act, or the first one if it left the lineup.
     const index = Math.max(party.acts.findIndex(act => act.id === actId), 0);
     const act = party.acts[index];
@@ -205,25 +255,25 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
 
     return (
         <>
-            <CalmNote>The running order</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <label>
-                        <span className="calm-label">Act</span>
-                        <select className="lycra-field" value={act.id} onChange={event => setActId(event.target.value)}>
+            <h2 className="esc-note">The running order</h2>
+            <Ground>
+                <Pane>
+                    <div>
+                        <label className="calm-label" htmlFor={actFieldId}>Act</label>
+                        <select id={actFieldId} className="lycra-field" value={act.id} onChange={event => setActId(event.target.value)}>
                             {party.acts.map((entry, i) => (
                                 <option key={entry.id} value={entry.id}>{i + 1}. {entry.country}</option>
                             ))}
                         </select>
-                    </label>
-                </div>
-            </div>
-            <div className="calm-ground">
-                <div className="lycra-pane calm-split">
-                    <button type="button" className="lycra" disabled={busy || index === 0} onClick={() => move(-1)}>Move earlier</button>
-                    <button type="button" className="lycra" disabled={busy || index === party.acts.length - 1} onClick={() => move(1)}>Move later</button>
-                </div>
-            </div>
+                    </div>
+                </Pane>
+            </Ground>
+            <Ground>
+                <Pane layout="split">
+                    <Control disabled={busy || index === 0} onClick={() => move(-1)}>Move earlier</Control>
+                    <Control disabled={busy || index === party.acts.length - 1} onClick={() => move(1)}>Move later</Control>
+                </Pane>
+            </Ground>
             {/* Keyed on what's saved, so a newer lineup refills the fields instead of being overwritten by them. */}
             <ActDetails
                 key={`${act.id}|${act.artist}|${act.song}`}
@@ -234,46 +284,50 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
                     `Saved ${act.country}.`,
                 )}
             />
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button type="button" className="lycra" disabled={busy} onClick={onLoadLatest}>Load the latest lineup</button>
-                </div>
-            </div>
+            {loading ? (
+                <ConfirmStep
+                    question="Load the latest lineup? It replaces this running order, with any artists and songs you've typed in."
+                    keep="Keep this lineup"
+                    confirm="Yes, load it"
+                    busy={busy}
+                    onKeep={() => setLoading(false)}
+                    onConfirm={() => {
+                        setLoading(false);
+                        onLoadLatest();
+                    }}
+                />
+            ) : (
+                <Ground>
+                    <Pane>
+                        <Control disabled={busy} onClick={() => setLoading(true)}>Load the latest lineup</Control>
+                    </Pane>
+                </Ground>
+            )}
         </>
     );
 };
 
 /** One act's artist and song, as the host types them. */
 const ActDetails = ({ act, busy, onSave }: { act: Act; busy: boolean; onSave: (artist: string, song: string) => void }) => {
+    const ids = useId();
     const [artist, setArtist] = useState(act.artist);
     const [song, setSong] = useState(act.song);
     return (
-        <>
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <label>
-                        <span className="calm-label">Artist</span>
-                        <input className="lycra-field" value={artist} maxLength={80} onChange={event => setArtist(event.target.value)} />
-                    </label>
-                    <label>
-                        <span className="calm-label">Song</span>
-                        <input className="lycra-field" value={song} maxLength={80} onChange={event => setSong(event.target.value)} />
-                    </label>
+        <Ground>
+            <Pane>
+                <div>
+                    <label className="calm-label" htmlFor={`${ids}-artist`}>Artist</label>
+                    <Field id={`${ids}-artist`} value={artist} maxLength={80} onChange={event => setArtist(event.target.value)} />
                 </div>
-            </div>
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button
-                        type="button"
-                        className="lycra"
-                        disabled={busy}
-                        onClick={() => onSave(artist.trim() || act.artist, song.trim() || act.song)}
-                    >
-                        Save {act.country}
-                    </button>
+                <div>
+                    <label className="calm-label" htmlFor={`${ids}-song`}>Song</label>
+                    <Field id={`${ids}-song`} value={song} maxLength={80} onChange={event => setSong(event.target.value)} />
                 </div>
-            </div>
-        </>
+                <Control disabled={busy} onClick={() => onSave(artist.trim() || act.artist, song.trim() || act.song)}>
+                    Save {act.country}
+                </Control>
+            </Pane>
+        </Ground>
     );
 };
 

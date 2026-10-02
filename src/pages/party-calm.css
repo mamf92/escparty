@@ -1,0 +1,27 @@
+/*
+  Layout for the scoreboard party screens (#178). Layout only: the look
+  comes from the design system (src/design), so nothing here sets a
+  colour, border, background or shadow.
+*/
+
+/*
+  The big screen's QR code. It's drawn at 240px for a TV across the room,
+  but the same screen opens on a phone too, where the row it sits in is
+  narrower than that: it shrinks to fit rather than spilling out.
+*/
+.party-qr {
+  align-self: center;
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}
+
+/* The join link is one long word; it wraps instead of widening the row. */
+.party-link {
+  overflow-wrap: anywhere;
+}
+
+/* A second label in one field group sits clear of the field above it. */
+.party-label-gap {
+  margin-top: var(--esc-space-3);
+}

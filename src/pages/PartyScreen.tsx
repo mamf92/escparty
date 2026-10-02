@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toDataURL } from "qrcode";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { PartyError, PartyNotFound } from "../components/PartyStates";
+import { Ground, Pane, Row } from "../design";
 import { usePartyData } from "../hooks/usePartyData";
 import { predictionLeaderboard, roomStandings } from "../utils/partyModel";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, partyLink, predictionsFor } from "../utils/partyResults";
+import "./party-calm.css";
 
 /** How many acts the TV lists: the top of the table, readable from the sofa. */
 const SCREEN_ROWS = 10;
@@ -34,14 +37,19 @@ const PartyScreen = () => {
         };
     }, [link]);
 
-    const back = <CalmLink type="button" onClick={() => navigate(code ? `/party/${code}` : "/party")}>Back to my phone view</CalmLink>;
+    const back = <CalmLink onClick={() => navigate(code ? `/party/${code}` : "/party")}>Back to my phone view</CalmLink>;
 
-    if (party === undefined || party === null) {
+    if (party === undefined) {
         return (
             <CalmPage title="Scoreboard party" className="calm-screen" footer={back}>
-                <CalmNote role={party === null ? "alert" : "status"}>
-                    {party === null ? `There's no party with the code ${code}.` : error ?? "Finding the party…"}
-                </CalmNote>
+                {error ? <PartyError error={error} /> : <CalmNote role="status">Finding the party…</CalmNote>}
+            </CalmPage>
+        );
+    }
+    if (party === null) {
+        return (
+            <CalmPage title="Scoreboard party" className="calm-screen" footer={back}>
+                <PartyNotFound code={code} />
             </CalmPage>
         );
     }
@@ -53,57 +61,62 @@ const PartyScreen = () => {
 
     return (
         <CalmPage title={party.title} subtitle="Scan the code with your phone to rate along" className="calm-screen" footer={back}>
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <div className="lycra is-block is-static">
-                        {qr && <img src={qr} alt={`QR code to join party ${party.code}`} width={240} height={240} style={{ alignSelf: "center" }} />}
+            <Ground>
+                <Pane>
+                    <Row>
+                        {qr && <img className="party-qr" src={qr} alt={`QR code to join party ${party.code}`} width={240} height={240} />}
                         <span className="calm-row">
                             <span>Party code</span>
                             <span>{party.code}</span>
                         </span>
-                        <span className="calm-sub">{link}</span>
-                    </div>
-                </div>
-            </div>
-            <CalmNote>{all.length === 1 ? "1 guest is rating." : `${all.length} guests are rating.`}</CalmNote>
-            {error && <CalmNote role="status">{error}</CalmNote>}
+                        <span className="calm-sub party-link">{link}</span>
+                    </Row>
+                </Pane>
+            </Ground>
+            <CalmNote aria-live="polite">{all.length === 1 ? "1 guest is rating." : `${all.length} guests are rating.`}</CalmNote>
+            {error && <CalmNote role="alert">{error}</CalmNote>}
 
-            {standings.length > 0 && (
-                <div className="calm-ground">
-                    <ol className="lycra-pane" aria-label="The room's standings">
+            <h2 className="esc-note">The room's standings</h2>
+            <Ground>
+                {standings.length === 0 ? (
+                    <Pane>
+                        <Row>No ratings yet. The table fills up as soon as someone rates an act.</Row>
+                    </Pane>
+                ) : (
+                    <Pane as="ol" aria-label="The room's standings" aria-live="polite">
                         {standings.slice(0, SCREEN_ROWS).map((standing, index) => {
                             const act = byId.get(standing.actId)!;
                             const real = party.results.places?.[act.id];
                             const through = party.results.qualifiers?.includes(act.id);
                             return (
-                                <li key={act.id} className="lycra is-block is-static">
+                                <Row as="li" key={act.id}>
                                     <span className="calm-row">
                                         <span>{ordinal(index + 1)} {act.flag} {act.country}</span>
                                         <span>{formatScore(standing.average)}</span>
                                     </span>
                                     {(real || through) && <span className="calm-sub">{real ? `Really ${ordinal(real)}` : "Through"}</span>}
-                                </li>
+                                </Row>
                             );
                         })}
-                    </ol>
-                </div>
-            )}
+                    </Pane>
+                )}
+            </Ground>
 
             {leaderboard.length > 0 && (
                 <>
-                    <CalmNote>Closest to the real result</CalmNote>
-                    <div className="calm-ground">
-                        <ol className="lycra-pane" aria-label="Closest to the real result">
+                    <h2 className="esc-note">Closest to the real result</h2>
+                    <Ground>
+                        <Pane as="ol" aria-label="Closest to the real result" aria-live="polite">
                             {leaderboard.map((row, index) => (
-                                <li key={row.guestId} className="lycra is-block is-static">
+                                <Row as="li" key={row.guestId}>
                                     <span className="calm-row">
                                         <span>{ordinal(index + 1)} {row.name}</span>
                                         <span>{row.prediction.points}</span>
                                     </span>
-                                </li>
+                                </Row>
                             ))}
-                        </ol>
-                    </div>
+                        </Pane>
+                    </Ground>
                 </>
             )}
         </CalmPage>

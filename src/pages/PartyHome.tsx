@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { Control, Field, Ground, Pane } from "../design";
 import { lastPartyCode } from "../utils/partySession";
 
 const CODE_PATTERN = /^[A-Z]{4}$/;
@@ -12,6 +13,7 @@ const CODE_PATTERN = /^[A-Z]{4}$/;
  */
 const PartyHome = () => {
     const navigate = useNavigate();
+    const codeId = useId();
     const [code, setCode] = useState("");
     const [tried, setTried] = useState(false);
     const [previous] = useState(lastPartyCode);
@@ -21,52 +23,53 @@ const PartyHome = () => {
         setTried(true);
         if (valid) navigate(path(code));
     };
+    // Enter in the code field joins: the form's one submit, and its last control.
+    const join = (event: FormEvent) => {
+        event.preventDefault();
+        go(value => `/party/${value}`);
+    };
 
     return (
         <CalmPage
             title="Scoreboard party"
             subtitle="Rate every act of Burgas 2027 together, see who called the winner, and find out who in the room rated like twins."
-            footer={<CalmLink type="button" onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
+            footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
         >
-            <div className="calm-ground">
-                <div className="lycra-pane">
+            <Ground>
+                <Pane>
                     {previous && (
-                        <button type="button" className="lycra" onClick={() => navigate(`/party/${previous}`)}>
+                        <Control onClick={() => navigate(`/party/${previous}`)}>
                             Back to party {previous}
-                        </button>
+                        </Control>
                     )}
-                    <button type="button" className="lycra" onClick={() => navigate("/party/new")}>
-                        Host a party
-                    </button>
-                </div>
-            </div>
+                    <Control onClick={() => navigate("/party/new")}>Host a party</Control>
+                </Pane>
+            </Ground>
 
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <label>
-                        <span className="calm-label">Party code</span>
-                        <input
-                            className="lycra-field"
-                            value={code}
-                            maxLength={4}
-                            autoCapitalize="characters"
-                            placeholder="ABBA"
-                            onChange={event => setCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
-                        />
-                    </label>
-                </div>
-            </div>
-            {tried && !valid && <CalmNote role="alert">A party code is four letters.</CalmNote>}
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button type="button" className="lycra" onClick={() => go(value => `/party/${value}`)}>
-                        Join to rate
-                    </button>
-                    <button type="button" className="lycra" onClick={() => go(value => `/party/${value}/screen`)}>
-                        Open the big screen
-                    </button>
-                </div>
-            </div>
+            <h2 className="esc-note">Got a code from the host?</h2>
+            <form onSubmit={join} noValidate>
+                <Ground>
+                    <Pane>
+                        <div>
+                            <label className="calm-label" htmlFor={codeId}>Party code</label>
+                            <Field
+                                id={codeId}
+                                value={code}
+                                maxLength={4}
+                                autoCapitalize="characters"
+                                autoComplete="off"
+                                placeholder="ABBA"
+                                aria-invalid={tried && !valid}
+                                aria-describedby={tried && !valid ? `${codeId}-problem` : undefined}
+                                onChange={event => setCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
+                            />
+                            {tried && !valid && <CalmNote id={`${codeId}-problem`} role="alert">A party code is four letters, like ABBA.</CalmNote>}
+                        </div>
+                        <Control onClick={() => go(value => `/party/${value}/screen`)}>Open the big screen</Control>
+                        <Control type="submit">Join to rate</Control>
+                    </Pane>
+                </Ground>
+            </form>
             <CalmNote>The big screen is for the TV: it shows the room's standings, never anyone's own ratings.</CalmNote>
         </CalmPage>
     );

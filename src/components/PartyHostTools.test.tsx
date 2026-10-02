@@ -47,8 +47,17 @@ describe("PartyHostTools", () => {
         expect(screen.getByText("So far: 1st Finland, 2nd Sweden.")).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Undo Sweden" }));
         expect(mocks.setPartyResults).toHaveBeenLastCalledWith("ABBA", { places: { fi: 1 } });
+        // Clearing asks first, with the safe answer focused.
+        mocks.setPartyResults.mockClear();
         await user.click(screen.getByRole("button", { name: "Clear the result" }));
+        expect(screen.getByRole("alert")).toHaveTextContent("Clear the whole result?");
+        expect(screen.getByRole("button", { name: "Keep the result" })).toHaveFocus();
+        await user.click(screen.getByRole("button", { name: "Keep the result" }));
+        expect(mocks.setPartyResults).not.toHaveBeenCalled();
+        await user.click(screen.getByRole("button", { name: "Clear the result" }));
+        await user.click(screen.getByRole("button", { name: "Yes, clear it" }));
         expect(mocks.setPartyResults).toHaveBeenLastCalledWith("ABBA", {});
+        expect(screen.getByRole("button", { name: "Clear the result" })).toBeInTheDocument();
 
         rerender(<PartyHostTools party={makeParty({ results: { places: { fi: 1, se: 2, no: 3, ie: 4 } } })} ballots={[]} />);
         expect(screen.getByText("The real result is in.")).toBeInTheDocument();
@@ -124,12 +133,22 @@ describe("PartyHostTools", () => {
         const user = userEvent.setup();
         mocks.fetchContest.mockResolvedValueOnce({ acts: [fixtureActs[2]] }).mockResolvedValueOnce(undefined);
         renderTools(makeParty({ results: { places: { se: 1 } } }));
+        // It replaces the running order, so it asks first.
         await user.click(screen.getByRole("button", { name: "Load the latest lineup" }));
+        expect(screen.getByRole("alert")).toHaveTextContent("Load the latest lineup?");
+        expect(screen.getByRole("button", { name: "Keep this lineup" })).toHaveFocus();
+        await user.click(screen.getByRole("button", { name: "Keep this lineup" }));
+        expect(mocks.fetchContest).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole("button", { name: "Load the latest lineup" }));
+        await user.click(screen.getByRole("button", { name: "Yes, load it" }));
         expect(mocks.fetchContest).toHaveBeenCalledWith("burgas-2027-final");
         expect(mocks.updatePartyActs).toHaveBeenLastCalledWith("ABBA", [fixtureActs[2]], { places: { se: 1 } });
         expect(screen.getByRole("status")).toHaveTextContent("Loaded the latest lineup.");
         await user.click(screen.getByRole("button", { name: "Load the latest lineup" }));
-        expect(screen.getByRole("status")).toHaveTextContent("Couldn't load the latest lineup.");
+        await user.click(screen.getByRole("button", { name: "Yes, load it" }));
+        expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load the latest lineup.");
+        expect(screen.getByRole("status")).toBeEmptyDOMElement();
     });
 
     it("opens and hides the awards, ignoring taps while a write is in flight", async () => {
@@ -146,6 +165,6 @@ describe("PartyHostTools", () => {
         rerender(<PartyHostTools party={makeParty({ revealed: true })} ballots={[]} />);
         mocks.setPartyRevealed.mockRejectedValueOnce(new Error("offline"));
         await user.click(screen.getByRole("button", { name: "Hide the awards again" }));
-        expect(screen.getByRole("status")).toHaveTextContent("Couldn't change the awards.");
+        expect(screen.getByRole("alert")).toHaveTextContent("Couldn't change the awards.");
     });
 });

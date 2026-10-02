@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { Control, Field, Ground, Pane } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
 import {
@@ -15,6 +16,7 @@ import {
 } from "../utils/partyModel";
 import { savePartyIdentity } from "../utils/partySession";
 import { randomPartyName } from "../utils/partyNames";
+import "./party-calm.css";
 
 const CUSTOM = "custom";
 
@@ -32,6 +34,7 @@ const newCategory = (): RatingCategory => ({ id: `c${Date.now().toString(36)}${(
  */
 const PartySetup = () => {
     const navigate = useNavigate();
+    const ids = useId();
     const [contestId, setContestId] = useState(CONTESTS_2027[CONTESTS_2027.length - 1].id);
     const [templateId, setTemplateId] = useState(RATING_TEMPLATES[0].id);
     const [custom, setCustom] = useState<RatingCategory[]>(() => [newCategory()]);
@@ -45,10 +48,10 @@ const PartySetup = () => {
     const template: RatingTemplate = templateId === CUSTOM
         ? { id: CUSTOM, name: "Our own sheet", blurb: "Categories made up for this party.", categories: custom.map(category => ({ ...category, label: category.label.trim() })) }
         : RATING_TEMPLATES.find(entry => entry.id === templateId)!;
-    const problems = [
-        ...(templateId === CUSTOM ? categoryProblems(custom) : []),
-        ...(name.trim() ? [] : ["Give yourself a name."]),
-    ];
+    // Each problem is told beside what it's about, once Start has been tried.
+    const sheetProblems = templateId === CUSTOM ? categoryProblems(custom) : [];
+    const nameMissing = tried && !name.trim();
+    const problems = [...sheetProblems, ...(name.trim() ? [] : ["Give yourself a name."])];
 
     const setCategory = (index: number, change: Partial<RatingCategory>) =>
         setCustom(custom.map((category, i) => (i === index ? { ...category, ...change } : category)));
@@ -82,22 +85,27 @@ const PartySetup = () => {
         }
     };
 
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        void create();
+    };
+
     return (
         <CalmPage
             title="Host a party"
             subtitle="Pick the show and how everyone rates. This is fixed once the party starts."
-            footer={<CalmLink type="button" onClick={() => navigate("/party")}>Back</CalmLink>}
+            footer={<CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>}
         >
-            <CalmNote>Which show?</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane" role="radiogroup" aria-label="Show">
+            <h2 className="esc-note" id={`${ids}-show`}>Which show?</h2>
+            <Ground>
+                <Pane role="radiogroup" aria-labelledby={`${ids}-show`}>
                     {CONTESTS_2027.map(contest => (
-                        <button
+                        <Control
                             key={contest.id}
-                            type="button"
+                            block
                             role="radio"
                             aria-checked={contestId === contest.id}
-                            className={`lycra is-block${contestId === contest.id ? " is-chosen" : ""}`}
+                            chosen={contestId === contest.id}
                             onClick={() => setContestId(contest.id)}
                         >
                             <span className="calm-row">
@@ -108,121 +116,121 @@ const PartySetup = () => {
                                 {new Date(`${contest.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
                                 {contest.kind === "semi" ? ` · ${contest.qualifiers} go through` : " · every act ranked"}
                             </span>
-                        </button>
+                        </Control>
                     ))}
-                </div>
-            </div>
+                </Pane>
+            </Ground>
             <CalmNote>The running order is a guess until the real one is announced; the host can edit it any time.</CalmNote>
 
-            <CalmNote>How does everyone rate?</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane" role="radiogroup" aria-label="Rating sheet">
+            <h2 className="esc-note" id={`${ids}-sheet`}>How does everyone rate?</h2>
+            <Ground>
+                <Pane role="radiogroup" aria-labelledby={`${ids}-sheet`}>
                     {[...RATING_TEMPLATES, { id: CUSTOM, name: "Make our own", blurb: "Up to six categories, each on its own scale.", categories: [] }].map(option => (
-                        <button
+                        <Control
                             key={option.id}
-                            type="button"
+                            block
                             role="radio"
                             aria-checked={templateId === option.id}
-                            className={`lycra is-block${templateId === option.id ? " is-chosen" : ""}`}
+                            chosen={templateId === option.id}
                             onClick={() => setTemplateId(option.id)}
                         >
                             <span>{option.name}</span>
                             <span className="calm-sub">
                                 {option.categories.length > 0 ? option.categories.map(category => category.label).join(" · ") : option.blurb}
                             </span>
-                        </button>
+                        </Control>
                     ))}
-                </div>
-            </div>
+                </Pane>
+            </Ground>
 
             {templateId === CUSTOM && (
                 <>
-                    <div className="calm-ground">
-                        <div className="lycra-pane">
+                    <h2 className="esc-note">Your categories</h2>
+                    <Ground>
+                        <Pane>
                             {custom.map((category, index) => (
-                                <label key={category.id}>
-                                    <span className="calm-label">Category {index + 1}</span>
-                                    <input
-                                        className="lycra-field"
+                                <div key={category.id}>
+                                    <label className="calm-label" htmlFor={`${ids}-${category.id}`}>Category {index + 1}</label>
+                                    <Field
+                                        id={`${ids}-${category.id}`}
                                         value={category.label}
                                         maxLength={CATEGORY_LIMITS.maxLabel}
                                         placeholder={index === 0 ? "Hair height" : "Costume changes"}
                                         onChange={event => setCategory(index, { label: event.target.value })}
                                     />
+                                    <label className="calm-label party-label-gap" htmlFor={`${ids}-${category.id}-scale`}>
+                                        Scale for category {index + 1}
+                                    </label>
                                     <select
+                                        id={`${ids}-${category.id}-scale`}
                                         className="lycra-field"
-                                        aria-label={`Scale for category ${index + 1}`}
                                         value={category.max}
                                         onChange={event => setCategory(index, { max: Number(event.target.value) as RatingCategory["max"] })}
                                     >
                                         {SCALE_CHOICES.map(max => <option key={max} value={max}>{scaleLabel(max)}</option>)}
                                     </select>
-                                </label>
+                                </div>
                             ))}
-                        </div>
-                    </div>
-                    <div className="calm-ground">
-                        <div className="lycra-pane">
+                        </Pane>
+                    </Ground>
+                    {tried && sheetProblems.length > 0 && <CalmNote role="alert">{sheetProblems.join(" ")}</CalmNote>}
+                    <Ground>
+                        <Pane>
                             {custom.length < CATEGORY_LIMITS.max && (
-                                <button type="button" className="lycra" onClick={() => setCustom([...custom, newCategory()])}>
-                                    Add a category
-                                </button>
+                                <Control onClick={() => setCustom([...custom, newCategory()])}>Add a category</Control>
                             )}
                             {custom.length > CATEGORY_LIMITS.min && (
-                                <button type="button" className="lycra" onClick={() => setCustom(custom.slice(0, -1))}>
-                                    Remove the last one
-                                </button>
+                                <Control onClick={() => setCustom(custom.slice(0, -1))}>Remove the last one</Control>
                             )}
-                        </div>
-                    </div>
+                        </Pane>
+                    </Ground>
                 </>
             )}
 
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button
-                        type="button"
-                        aria-pressed={bonuses}
-                        className={`lycra is-block${bonuses ? " is-chosen" : ""}`}
-                        onClick={() => setBonuses(!bonuses)}
-                    >
-                        <span>Party bonuses {bonuses ? "on" : "off"}</span>
-                        <span className="calm-sub">{PARTY_BONUSES.map(bonus => `${bonus.label} +${bonus.points}`).join(" · ")}</span>
-                    </button>
-                    <button
-                        type="button"
-                        aria-pressed={showNames}
-                        className={`lycra is-block${showNames ? " is-chosen" : ""}`}
-                        onClick={() => setShowNames(!showNames)}
-                    >
-                        <span>{showNames ? "Name names in the awards" : "Keep the awards anonymous"}</span>
+            <h2 className="esc-note">Extras</h2>
+            <Ground>
+                <Pane>
+                    <Control block chosen={bonuses} onClick={() => setBonuses(!bonuses)}>
+                        <span>Party bonuses</span>
+                        <span className="calm-sub">
+                            {bonuses ? "" : "Off: "}
+                            {PARTY_BONUSES.map(bonus => `${bonus.label} +${bonus.points}`).join(" · ")}
+                        </span>
+                    </Control>
+                    <Control block chosen={showNames} onClick={() => setShowNames(!showNames)}>
+                        <span>Name names in the awards</span>
                         <span className="calm-sub">
                             {showNames
                                 ? "Everyone sees who rated like twins and who was toughest."
-                                : "The awards say \"two of you\" and \"one of you\", and each guest is told which are theirs. It keeps the fun friendly; the ratings themselves aren't secret from the party."}
+                                : "Off: the awards say \"two of you\" and \"one of you\", and each guest is told which are theirs. It keeps the fun friendly; the ratings themselves aren't secret from the party."}
                         </span>
-                    </button>
-                </div>
-            </div>
+                    </Control>
+                </Pane>
+            </Ground>
 
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <label>
-                        <span className="calm-label">Your name at the party</span>
-                        <input className="lycra-field" value={name} maxLength={40} onChange={event => setName(event.target.value)} />
-                    </label>
-                </div>
-            </div>
-
-            {tried && problems.length > 0 && <CalmNote role="alert">{problems.join(" ")}</CalmNote>}
-            {failure && <CalmNote role="status">{failure}</CalmNote>}
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button type="button" className="lycra" disabled={creating} onClick={create}>
-                        {creating ? "Starting…" : "Start the party"}
-                    </button>
-                </div>
-            </div>
+            <h2 className="esc-note">And you?</h2>
+            <form onSubmit={submit} noValidate>
+                <Ground>
+                    <Pane>
+                        <div>
+                            <label className="calm-label" htmlFor={`${ids}-name`}>Your name at the party</label>
+                            <Field
+                                id={`${ids}-name`}
+                                value={name}
+                                maxLength={40}
+                                aria-invalid={nameMissing}
+                                aria-describedby={nameMissing ? `${ids}-name-problem` : undefined}
+                                onChange={event => setName(event.target.value)}
+                            />
+                            {nameMissing && <CalmNote id={`${ids}-name-problem`} role="alert">Give yourself a name.</CalmNote>}
+                        </div>
+                        <Control type="submit" disabled={creating}>
+                            {creating ? "Starting…" : "Start the party"}
+                        </Control>
+                    </Pane>
+                </Ground>
+            </form>
+            {failure && <CalmNote role="alert">{failure}</CalmNote>}
             <CalmNote>The party and everyone's ratings are set to be deleted after {PARTY_LIFETIME_DAYS} days.</CalmNote>
         </CalmPage>
     );
