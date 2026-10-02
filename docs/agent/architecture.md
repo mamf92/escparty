@@ -32,6 +32,9 @@ Mostly not small reusable pieces, despite the folder name:
 
 - `PartyHostTools.tsx` — the host's tab in a scoreboard party: share the
   link, enter the real result, edit the running order, open the awards.
+- `PartyStates.tsx` — the error states every party screen shares: no
+  party with that code ("Try another code") and a party that couldn't be
+  reached ("Try again"). Party page layout lives in `src/pages/party-calm.css`.
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui` and the big screen), with the app bar: the brand
