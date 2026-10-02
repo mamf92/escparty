@@ -1,92 +1,63 @@
 import { useNavigate } from "react-router-dom";
-import styled from "styled-components";
+import { CalmLink, CalmPage } from "../components/CalmPage";
+import { Control, Ground, Pane } from "../design";
+import type { QuizDifficulty } from "../utils/QuizDataProvider";
+import { CLASSIC_KEYS, QUIZ_CHOICES } from "../utils/quizCatalog";
 
+/** The classic sets, with the same tagline the quiz library shows. */
+const DIFFICULTIES = CLASSIC_KEYS.map(key => ({
+  key,
+  title: key.charAt(0).toUpperCase() + key.slice(1),
+  detail: QUIZ_CHOICES.find(choice => choice.key === key)?.tagline ?? "",
+}));
+
+/**
+ * The classic single-player quiz's way in: pick a difficulty, or go to
+ * the quiz library for the premade quizzes and your own. A Calm page
+ * (docs/design/design-system.md): the difficulties share one pane, the
+ * library has its own.
+ */
 const SelectDifficulty = () => {
   const navigate = useNavigate();
 
-  const handleSelect = (difficulty: string) => {
+  const handleSelect = (difficulty: QuizDifficulty) => {
     // Explicitly single player, so the quiz doesn't pick up a multiplayer
     // game this tab played earlier from sessionStorage.
     navigate(`/quiz/${difficulty}`, { state: { multiplayer: false } });
   };
 
   return (
-    <Container>
-      <Title>Choose Difficulty</Title>
-      <ButtonContainer>
-        <Button onClick={() => handleSelect("easy")}>
-          <DifficultyText>Easy</DifficultyText>
-          <DifficultyDescription>You know who Loreen is</DifficultyDescription>
-        </Button>
-        <Button onClick={() => handleSelect("medium")}>
-          <DifficultyText>Medium </DifficultyText>
-          <DifficultyDescription>You know the year Alexander Rybak won ESC</DifficultyDescription>
-        </Button>
-        <Button onClick={() => handleSelect("hard")}>
-          <DifficultyText>Hard</DifficultyText>
-          <DifficultyDescription>You know where ESC was held when Dana International won</DifficultyDescription></Button>
-        <Button onClick={() => navigate("/quizzes")}>
-          <DifficultyText>More quizzes</DifficultyText>
-          <DifficultyDescription>Premade quizzes, and the ones you build yourself</DifficultyDescription>
-        </Button>
-      </ButtonContainer>
-    </Container>
+    <CalmPage
+      title="Pick a difficulty"
+      subtitle="The classic quiz, just you. How well do you know your Eurovision?"
+      footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
+    >
+      <Ground>
+        <Pane role="group" aria-label="Difficulty">
+          {DIFFICULTIES.map(({ key, title, detail }) => (
+            <Control
+              key={key}
+              block
+              aria-labelledby={`difficulty-${key}`}
+              aria-describedby={`difficulty-${key}-detail`}
+              onClick={() => handleSelect(key)}
+            >
+              <span id={`difficulty-${key}`}>{title}</span>
+              <span id={`difficulty-${key}-detail`} className="calm-sub">{detail}</span>
+            </Control>
+          ))}
+        </Pane>
+      </Ground>
+      <Ground>
+        <Pane>
+          <Control block onClick={() => navigate("/quizzes")}>
+            <span>Browse the quiz library</span>
+            <span className="calm-sub">Premade quizzes, and the ones you build yourself</span>
+          </Control>
+        </Pane>
+      </Ground>
+    </CalmPage>
   );
 };
 
 export default SelectDifficulty;
-
-// Styled Components
-const Container = styled.div`
-  width: 100%;
-  max-width: 31.25rem; /* 500px - standardized container width */
-  text-align: center;
-  padding: 1.25rem; /* 20px */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: auto;
-`;
-
-const Title = styled.h2`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 2rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const ButtonContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 31.25rem; /* 500px */
-`;
-
-const Button = styled.button`
-  background: ${({ theme }) => theme.colors.purple};
-  color: white;
-  font-size: 1rem;
-  padding: 1rem;
-  border: none;
-  cursor: pointer;
-  margin: 0.625rem 0; /* 10px */
-  transition: 0.3s;
-  width: 100%;
-  word-wrap: break-word;
-  white-space: normal;
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.darkpurple};
-  }
-`;
-
-const DifficultyText = styled.span`
-  font-size: 1.5rem;
-  font-weight: bold;
-`;
-
-const DifficultyDescription = styled.span`
-  font-size: 1rem;
-  display: block;
-  margin-top: 0.3125rem; /* 5px */
-`;
