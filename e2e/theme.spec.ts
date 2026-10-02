@@ -198,7 +198,8 @@ test("the quiz library and builder follow the surface rules", async ({ browser }
     // The question editor, with its notes beside the fields.
     await page.getByRole("button", { name: "Write a question" }).click();
     await page.getByRole("button", { name: "Add to the quiz" }).click();
-    await expect(page.getByText("Write the question.")).toBeVisible();
+    await expect(page.getByText("Write the question.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("alert")).toContainText("things to fix");
     await judge(page, "quiz-builder-write");
 
     await page.context().close();
