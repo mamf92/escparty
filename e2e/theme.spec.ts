@@ -205,6 +205,22 @@ test("the quiz library and builder follow the surface rules", async ({ browser }
     await page.context().close();
 });
 
+test("the scoreboard break and the host's view follow the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    // Opened without a game, the break is a single player's (#173).
+    await page.goto("/#/mid-quiz-scoreboard");
+    await expect(page.getByRole("button", { name: "Continue the quiz" })).toBeVisible();
+    await judge(page, "scoreboard-break");
+
+    // The host's view with no room to watch: its error state and way out.
+    await page.goto("/#/host-observer");
+    await expect(page.getByRole("button", { name: "Back to multiplayer" })).toBeVisible();
+    await judge(page, "host-view-no-room");
+
+    await page.context().close();
+});
+
 test("the single-player entry screens follow the surface rules", async ({ browser }) => {
     const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
 

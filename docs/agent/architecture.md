@@ -30,6 +30,10 @@ Mostly not small reusable pieces, despite the folder name:
   itself is `src/design/surface.css`. See
   `docs/design/design-system.md`.
 
+- `Standings.tsx` — the room's standings as information rows (places shared
+  on a tie, as `placePlayers` in `src/utils/finale.ts`; the leader and your
+  own row raised), shared by the mid-quiz break and the host's view.
+
 - `PartyHostTools.tsx` — the host's tab in a scoreboard party: share the
   link, enter the real result, edit the running order, open the awards.
 
