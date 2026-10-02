@@ -46,8 +46,8 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
     };
 
     for (let question = 1; question <= 3; question++) await answer();
-    await expect(page.getByText("Mid-Quiz Scoreboard")).toBeVisible({ timeout: 30_000 });
-    await page.getByRole("button", { name: "Continue Quiz" }).click();
+    await expect(page.getByRole("heading", { name: "Scoreboard break" })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Continue the quiz" }).click();
 
     // The last question is the one written here.
     await expect(page.getByRole("heading", { level: 2 })).toHaveText("Who sang 'Lipstick' for Ireland in 2011?", { timeout: 30_000 });
