@@ -10,8 +10,8 @@ import { placePlayers, points } from "../utils/finale";
  * Places and their order are the final results' (`placePlayers`): players
  * on the same score share a place, by name within it. Elevation carries
  * the rank: the leader (all of them, on a tie) and your own row stand
- * proud, everyone else rests; when nobody leads (everyone level), only your
- * own row does.
+ * proud, everyone else rests; when nobody leads (two or more, all level),
+ * only your own row does.
  */
 export const Standings = ({ players, label, meId, detail, empty, live = false }: {
   players: readonly Player[];
@@ -30,8 +30,9 @@ export const Standings = ({ players, label, meId, detail, empty, live = false }:
    */
   live?: boolean;
 }) => {
-  const ranked = placePlayers([...players]);
-  const someoneLeads = ranked.some(({ place }) => place > 1);
+  const ranked = placePlayers(players);
+  // A lone player leads too; only a field that's all level has no leader.
+  const someoneLeads = ranked.length === 1 || ranked.some(({ place }) => place > 1);
   return (
     <Ground>
       <Pane as="ol" aria-label={label} aria-live={live ? "polite" : undefined}>
@@ -46,7 +47,7 @@ export const Standings = ({ players, label, meId, detail, empty, live = false }:
                 <span>{place}. {player.name}{mine ? " (you)" : ""}</span>
                 <span>{points(player.score)}</span>
               </span>
-              {extra && <span className="calm-sub">{extra}</span>}
+              {extra != null && <span className="calm-sub">{extra}</span>}
             </Row>
           );
         })}

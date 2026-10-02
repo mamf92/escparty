@@ -6,7 +6,7 @@ import { hasLeftBreak } from "../utils/quizTiming";
 import { bestKnownScore } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, isRoomHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { readStoredGame } from "../utils/multiplayerSession";
-import { CalmNote, CalmPage } from "../components/CalmPage";
+import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Standings } from "../components/Standings";
 import { points } from "../utils/finale";
 import { Control, Ground, Pane } from "../design";
@@ -53,8 +53,12 @@ const MidQuizScoreboard = () => {
   // Whether the room's first snapshot is in: until then the standings are
   // whatever the quiz handed over, or a note that they're on their way.
   const [scoresLoaded, setScoresLoaded] = useState(false);
+  // A multiplayer break with no room to follow (unreadable stored game, or
+  // router state without a code) can't load scores or ever move on.
   const [error, setError] = useState<string | null>(
-    stored.unreadable ? "This tab lost track of your game. Join it again from multiplayer." : null
+    stored.unreadable || (gameData.multiplayer && !gameData.roomCode)
+      ? "This tab lost track of your game. Join it again from multiplayer."
+      : null
   );
   // Whether this user is the host: set only from the room's snapshot (see
   // the listener below).
@@ -216,6 +220,7 @@ const MidQuizScoreboard = () => {
           }
         } else {
           setError("This game has closed. Taking you back to multiplayer…");
+          clearTimeout(goneTimer);
           goneTimer = setTimeout(() => navigate("/multiplayer"), 2000);
         }
       });
@@ -247,8 +252,16 @@ const MidQuizScoreboard = () => {
   const canContinue = isHost || !gameData.multiplayer;
   const nextQuestion = gameData.currentQuestionIndex + 1;
 
+  // The way out (docs/design/design-system.md, "Navigation"), saying what
+  // leaving does: a multiplayer game goes on without this player.
+  const leave = gameData.multiplayer ? (
+    <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Leave the game, it goes on without you</CalmLink>
+  ) : (
+    <CalmLink type="button" onClick={() => navigate("/")}>End the quiz and go back to ESCParty</CalmLink>
+  );
+
   return (
-    <CalmPage title={TITLE} subtitle={`You have ${points(myScore)} so far.`}>
+    <CalmPage title={TITLE} subtitle={`You have ${points(myScore)} so far.`} footer={leave}>
       {gameData.multiplayer && (players.length > 0 || scoresLoaded ? (
         <Standings
           players={players}

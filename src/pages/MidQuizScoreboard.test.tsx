@@ -89,7 +89,8 @@ describe("MidQuizScoreboard", () => {
     // The room's copy of this player's score wins when it's higher.
     expect(screen.getByText("You have 700 points so far.")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Waiting for the host to continue…");
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    // No Continue for a guest, only the way out, saying what leaving does.
+    expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["Leave the game, it goes on without you"]);
     // A playing host's room doesn't need ready marks.
     expect(mocks.markPlayerAtMidQuiz).not.toHaveBeenCalled();
   });
@@ -186,6 +187,26 @@ describe("MidQuizScoreboard", () => {
     expect(screen.getByRole("button", { name: "Back to multiplayer" })).toBeInTheDocument();
   });
 
+  it("says when a multiplayer break has no room to follow", () => {
+    renderBreak({ ...multiplayer("p2"), roomCode: null });
+    expect(screen.getByRole("alert")).toHaveTextContent("This tab lost track of your game. Join it again from multiplayer.");
+    expect(screen.queryByText("Fetching the scores…")).not.toBeInTheDocument();
+    expect(mocks.listenToRoom).not.toHaveBeenCalled();
+  });
+
+  it("leaves a multiplayer game for the multiplayer page", async () => {
+    renderBreak(multiplayer("p2"));
+    act(() => mocks.onRoom(room()));
+    await userEvent.click(screen.getByRole("button", { name: "Leave the game, it goes on without you" }));
+    expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
+  it("ends a single-player quiz back at ESCParty", async () => {
+    renderBreak({ score: 300, totalQuestions: 20, currentQuestionIndex: 5, difficulty: "easy" });
+    await userEvent.click(screen.getByRole("button", { name: "End the quiz and go back to ESCParty" }));
+    expect(screen.getByText(/^at \/ with/)).toBeInTheDocument();
+  });
+
   it("says when the room is from an older version", () => {
     renderBreak(multiplayer("p2"));
     act(() => mocks.onRoom(room({ phase: undefined })));
@@ -195,11 +216,25 @@ describe("MidQuizScoreboard", () => {
   it("goes back to the multiplayer page when the room is gone", async () => {
     vi.useFakeTimers();
     try {
-      renderBreak(multiplayer("p2"));
+      const { unmount } = renderBreak(multiplayer("p2"));
       act(() => mocks.onRoom(null));
       expect(screen.getByRole("alert")).toHaveTextContent("This game has closed. Taking you back to multiplayer…");
       await act(async () => vi.advanceTimersByTime(2000));
       expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves no timer behind when the room is reported gone twice", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderBreak(multiplayer("p2"));
+      act(() => mocks.onRoom(null));
+      act(() => mocks.onRoom(null));
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }

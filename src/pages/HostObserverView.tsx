@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player, Room, listenToRoom } from "../utils/roomsFirestore";
-import { CalmNote, CalmPage } from "../components/CalmPage";
+import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Standings } from "../components/Standings";
 import { Control, Ground, Pane } from "../design";
 import { LEGACY_ROOM_MESSAGE, ObserverRouteState, isObserverHost, playingPlayers } from "../utils/roomRoles";
@@ -17,6 +17,7 @@ const TITLE = "The host's view";
 const HostObserverView = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const statusId = useId();
 
     // Where this screen is and who's viewing: from the redirect that brought
     // us here (observerRouteState), with anything missing filled from this
@@ -135,14 +136,27 @@ const HostObserverView = () => {
         : resuming
         ? "Continuing the quiz for everyone…"
         : !inBreak
-        ? "The players are answering. Continue opens at the next scoreboard break."
+        ? (room.phase === "lobby"
+            ? "The game hasn't started yet."
+            : "The players are answering. Continue is for scoreboard breaks.")
+        : players.length === 0
+        ? "Nobody's playing any more. You can still continue."
         : waiting
         ? `${readyCount} of ${players.length} ready. Still waiting for ${missing.join(", ")}.${waitedLongEnough ? " You can go on without them." : ""}`
         : "Everyone's at the break. Continue when you're ready.";
     const ready = (player: Player) => (playersAtMidQuiz.includes(player.id) ? "Ready" : "On the way");
 
     return (
-        <CalmPage title={TITLE} subtitle={roomCode ? <>Game code <strong>{roomCode}</strong></> : undefined}>
+        <CalmPage
+            title={TITLE}
+            subtitle={roomCode ? <>Game code <strong>{roomCode}</strong></> : undefined}
+            footer={
+                // Saying what leaving does: nobody else can continue the quiz.
+                <CalmLink type="button" onClick={() => navigate("/multiplayer")}>
+                    Leave the game, it stops at the next break
+                </CalmLink>
+            }
+        >
             {(room || players.length > 0) && (
                 <Standings
                     players={players}
@@ -157,13 +171,13 @@ const HostObserverView = () => {
                     <Control
                         onClick={resume}
                         disabled={resuming || !isRoomObserver || !inBreak || (waiting && !waitedLongEnough)}
-                        aria-describedby="host-observer-status"
+                        aria-describedby={statusId}
                     >
                         {resuming ? "Continuing…" : inBreak && waiting ? "Continue without them" : "Continue the quiz"}
                     </Control>
                 </Pane>
             </Ground>
-            <CalmNote id="host-observer-status" role="status">{status}</CalmNote>
+            <CalmNote id={statusId} role="status">{status}</CalmNote>
             {resumeError && <CalmNote role="alert">{resumeError}</CalmNote>}
         </CalmPage>
     );

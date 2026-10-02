@@ -52,7 +52,7 @@ describe("HostObserverView", () => {
     const button = screen.getByRole("button", { name: "Continue the quiz" });
     expect(button).toBeDisabled();
     // Why, as text tied to the control rather than a tooltip.
-    expect(button).toHaveAccessibleDescription("The players are answering. Continue opens at the next scoreboard break.");
+    expect(button).toHaveAccessibleDescription("The players are answering. Continue is for scoreboard breaks.");
     expect(button).not.toHaveAttribute("title");
   });
 
@@ -131,6 +131,28 @@ describe("HostObserverView", () => {
     act(() => mocks.onRoom(room({ phase: "mid-scoreboard", playersAtMidQuiz: ["p2", "p3"] })));
     await act(async () => screen.getByRole("button", { name: "Continue the quiz" }).click());
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't continue the quiz. Check your connection and try again.");
+  });
+
+  it("says the game hasn't started while the room is in the lobby", () => {
+    renderView();
+    act(() => mocks.onRoom(room({ phase: "lobby" })));
+    expect(screen.getByRole("button", { name: "Continue the quiz" })).toHaveAccessibleDescription("The game hasn't started yet.");
+  });
+
+  it("lets the host continue a break nobody's playing in any more", () => {
+    renderView();
+    act(() => mocks.onRoom(room({ phase: "mid-scoreboard", players: [{ id: "host", name: "Host", score: 0 }] })));
+    expect(screen.getByRole("listitem")).toHaveTextContent("Nobody's playing in this room yet.");
+    const button = screen.getByRole("button", { name: "Continue the quiz" });
+    expect(button).toBeEnabled();
+    expect(button).toHaveAccessibleDescription("Nobody's playing any more. You can still continue.");
+  });
+
+  it("has a way out that says what leaving does", async () => {
+    renderView();
+    act(() => mocks.onRoom(room()));
+    screen.getByRole("button", { name: "Leave the game, it stops at the next break" }).click();
+    expect(await screen.findByText(/at \/multiplayer/)).toBeInTheDocument();
   });
 
   it("goes back to the multiplayer page when the room is gone", async () => {

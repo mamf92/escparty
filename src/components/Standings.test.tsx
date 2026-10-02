@@ -53,6 +53,16 @@ describe("Standings", () => {
     expect(rows.map(row => row.classList.contains("is-high"))).toEqual([false, false, true, false]);
   });
 
+  it("raises a lone player: they lead", () => {
+    renderWithProviders(<Standings players={players.slice(0, 1)} label="Standings" empty="Nobody yet." />);
+    expect(screen.getByRole("listitem")).toHaveClass("is-high");
+  });
+
+  it("shows a detail of 0, not nothing", () => {
+    renderWithProviders(<Standings players={players.slice(0, 1)} label="Standings" detail={() => 0} empty="Nobody yet." />);
+    expect(screen.getByRole("listitem")).toHaveTextContent("1. Loreen700 points0");
+  });
+
   it("adds a detail line under each row", () => {
     renderWithProviders(
       <Standings players={players.slice(0, 2)} label="Standings" detail={p => (p.id === "a" ? "Ready" : "On the way")} empty="Nobody yet." />,
