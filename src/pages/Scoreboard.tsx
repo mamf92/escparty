@@ -1,7 +1,7 @@
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmPage } from "../components/CalmPage";
-import { Control, Ground, Pane, Row } from "../design";
+import { Control, Ground, Pane, Row, useRovingTabs } from "../design";
 import { quizTitle } from "../utils/quizCatalog";
 
 interface ScoreEntry {
@@ -31,6 +31,7 @@ const SORTS: { key: SortKey; label: string }[] = [
     { key: "date", label: "Date" },
     { key: "difficulty", label: "Difficulty" },
 ];
+const SORT_KEYS = SORTS.map(sort => sort.key);
 
 /** Rank by the points each row shows, so the ladder matches its numbers. */
 function pointsOf(entry: ScoreEntry): number {
@@ -77,6 +78,20 @@ function difficultyRank(entry: ScoreEntry): number {
     return rank === -1 ? CLASSIC_ORDER.length : rank;
 }
 
+/** A stored run worth showing: anything else in the history is skipped. */
+function isScoreEntry(value: unknown): value is ScoreEntry {
+    if (typeof value !== "object" || value === null) return false;
+    const entry = value as Record<string, unknown>;
+    return Number.isFinite(entry.score) && Number.isFinite(entry.total)
+        && typeof entry.difficulty === "string" && typeof entry.date === "string";
+}
+
+/** Newest first; a run with an unreadable date sorts last. */
+function timeOf(entry: ScoreEntry): number {
+    const time = new Date(entry.date).getTime();
+    return Number.isNaN(time) ? -Infinity : time;
+}
+
 function formatDate(iso: string): string {
     const d = new Date(iso);
     return Number.isNaN(d.getTime())
@@ -89,7 +104,7 @@ const Scoreboard = () => {
     const [scoreHistory] = useState<ScoreEntry[]>(() => {
         try {
             const stored = JSON.parse(localStorage.getItem("quizScores") || "[]");
-            return Array.isArray(stored) ? stored : [];
+            return Array.isArray(stored) ? stored.filter(isScoreEntry) : [];
         } catch {
             return [];
         }
@@ -103,7 +118,7 @@ const Scoreboard = () => {
     const sortedScores = useMemo(() => {
         const rows = [...scoreHistory];
         if (sortKey === "date") {
-            return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            return rows.sort((a, b) => timeOf(b) - timeOf(a) || 0);
         }
         if (sortKey === "difficulty") {
             return rows.sort((a, b) => difficultyRank(a) - difficultyRank(b) || quizTitle(a.difficulty).localeCompare(quizTitle(b.difficulty)));
@@ -111,31 +126,13 @@ const Scoreboard = () => {
         return rows.sort((a, b) => pointsOf(b) - pointsOf(a));
     }, [scoreHistory, sortKey]);
 
-    const tabsId = useId();
-    const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-    const tabId = (key: SortKey) => `${tabsId}-tab-${key}`;
-    const panelId = `${tabsId}-panel`;
-
-    /** Arrow keys, Home and End move between the sort tabs (WAI-ARIA tabs). */
-    const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-        const last = SORTS.length - 1;
-        const next =
-            event.key === "ArrowRight" ? (index === last ? 0 : index + 1)
-            : event.key === "ArrowLeft" ? (index === 0 ? last : index - 1)
-            : event.key === "Home" ? 0
-            : event.key === "End" ? last
-            : undefined;
-        if (next === undefined) return;
-        event.preventDefault();
-        setSortKey(SORTS[next].key);
-        tabRefs.current[next]?.focus();
-    };
+    const tabs = useRovingTabs(SORT_KEYS, sortKey, setSortKey);
 
     // One run has nothing to sort, so the tabs only appear from two runs up.
     const sortable = scoreHistory.length > 1;
 
     const runs = (
-        <Ground>
+        <Ground {...(sortable ? tabs.panel : {})}>
             <Pane as="ol" aria-label="Your runs">
                 {sortedScores.length === 0 ? (
                     <Row as="li">
@@ -179,32 +176,16 @@ const Scoreboard = () => {
                 <>
                     <Ground>
                         <Pane layout="split" role="tablist" aria-label="Sort scores by">
-                            {SORTS.map(({ key, label }, index) => {
-                                const selected = sortKey === key;
+                            {SORTS.map(({ key, label }) => (
                                 // A tab states its choice with aria-selected; Control
                                 // leaves aria-pressed off any control given a role.
-                                return (
-                                    <Control
-                                        key={key}
-                                        ref={el => { tabRefs.current[index] = el; }}
-                                        id={tabId(key)}
-                                        role="tab"
-                                        aria-selected={selected}
-                                        aria-controls={panelId}
-                                        tabIndex={selected ? 0 : -1}
-                                        chosen={selected}
-                                        onClick={() => setSortKey(key)}
-                                        onKeyDown={event => onTabKey(event, index)}
-                                    >
-                                        {label}
-                                    </Control>
-                                );
-                            })}
+                                <Control key={key} chosen={sortKey === key} {...tabs.tab(key)}>
+                                    {label}
+                                </Control>
+                            ))}
                         </Pane>
                     </Ground>
-                    <div role="tabpanel" id={panelId} aria-labelledby={tabId(sortKey)}>
-                        {runs}
-                    </div>
+                    {runs}
                 </>
             ) : runs}
         </CalmPage>

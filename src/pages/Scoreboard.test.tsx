@@ -123,6 +123,20 @@ describe("Scoreboard", () => {
     expect(screen.getByRole("tab", { name: "Score" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("skips broken runs and sorts unreadable dates last", async () => {
+    localStorage.setItem("quizScores", JSON.stringify([
+      null,
+      { score: "lots" },
+      { score: 3, total: 10, difficulty: "easy", date: "2026-05-10T00:00:00Z" },
+      { score: 4, total: 10, difficulty: "easy", date: "not a date" },
+      { score: 5, total: 10, difficulty: "easy", date: "2026-05-16T00:00:00Z" },
+    ]));
+    renderScoreboard();
+    expect(screen.getByText("3 runs. Your best stands highest.")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("tab", { name: "Date" }));
+    expect(rows().map(row => row.textContent?.match(/^\d+ points/)?.[0])).toEqual(["5 points", "3 points", "4 points"]);
+  });
+
   it("shows one run without tabs", () => {
     localStorage.setItem("quizScores", JSON.stringify([
       { score: 5, total: 1, difficulty: "easy", date: "2026-05-10T00:00:00Z" },

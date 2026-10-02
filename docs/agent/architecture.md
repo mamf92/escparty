@@ -189,7 +189,8 @@ the theme switch and the forced-colours / more-contrast rules;
 `DesignThemeProvider`/`useDesignTheme` hold the active theme,
 `ThemeSwitch` is the app bar's Sparkle mode switch, `Sparkles` the
 decorative glitter layer, and `Surface.tsx` the `Ground`/`Pane`/`Control`/
-`Row`/`Field` primitives screens are built from.
+`Row`/`Field` primitives screens are built from; `useRovingTabs` wires a
+tablist of `Control`s and its tab panel.
 
 ## `src/styles/theme.ts`
 
