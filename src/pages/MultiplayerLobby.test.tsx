@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import MultiplayerLobby from "./MultiplayerLobby";
-import { createRoom, joinRoom, setRoomDifficulty } from "../utils/roomsFirestore";
+import { createRoom, getRoom, joinRoom, JoinRejected, setRoomDifficulty } from "../utils/roomsFirestore";
 
 vi.mock("../utils/roomsFirestore", () => ({
+  JoinRejected: class JoinRejected extends Error {
+    constructor(public readonly reason: string, message: string) {
+      super(message);
+    }
+  },
   createRoom: vi.fn(async () => undefined),
   setRoomDifficulty: vi.fn(async () => undefined),
   joinRoom: vi.fn(async () => true),
@@ -36,6 +41,7 @@ const typeCode = async (user: ReturnType<typeof userEvent.setup>, code: string) 
 describe("MultiplayerLobby", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRoom).mockResolvedValue(null);
     localStorage.clear();
   });
 
@@ -82,6 +88,8 @@ describe("MultiplayerLobby", () => {
     await user.click(button(/^Host a game/));
     await user.click(button(/^Host and play/));
     expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't set up the room. Check your connection and try again.");
+    // Focus goes back to the control that was pressed, for keyboard users.
+    expect(button(/^Host and play/)).toHaveFocus();
 
     await user.click(button(/^Host and play/));
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
@@ -126,7 +134,9 @@ describe("MultiplayerLobby", () => {
     const user = userEvent.setup();
     const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.mocked(joinRoom).mockRejectedValueOnce(new Error("Failed to join room: The room is full (32 players)"));
+    vi.mocked(joinRoom).mockRejectedValueOnce(new Error("Failed to join room: The room is full (32 players)", {
+      cause: new JoinRejected("full", "The room is full (32 players)"),
+    }));
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
@@ -135,13 +145,43 @@ describe("MultiplayerLobby", () => {
     expect(screen.getByLabelText("Game code")).toHaveValue("ABBA");
   });
 
-  it("says when no open game has the code", async () => {
+  it("says when no game has the code", async () => {
     const user = userEvent.setup();
     vi.mocked(joinRoom).mockResolvedValueOnce(false);
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/can't be joined/);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No game has that code.");
+  });
+
+  it("says when the game has already started", async () => {
+    const user = userEvent.setup();
+    vi.mocked(joinRoom).mockResolvedValueOnce(false);
+    vi.mocked(getRoom).mockResolvedValue({ code: "ABBA", players: [] } as never);
+    renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That game has already started.");
+  });
+
+  it("takes only letters in the code field", async () => {
+    const user = userEvent.setup();
+    renderLobby();
+    await typeCode(user, "a1b-ba");
+    expect(screen.getByLabelText("Game code")).toHaveValue("ABBA");
+  });
+
+  it("keeps the way out closed while the room is being set up", async () => {
+    const user = userEvent.setup();
+    let finish = () => {};
+    vi.mocked(createRoom).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    renderLobby();
+    await user.click(button(/^Host a game/));
+    await user.click(button(/^Host and play/));
+    expect(button("Back to ESCParty")).toBeDisabled();
+    expect(screen.getByText("Setting up the room…")).toBeInTheDocument();
+    finish();
+    expect(await screen.findByText("at /lobby")).toBeInTheDocument();
   });
 
   it("lets a player back into a game this device was in, as themselves (#65)", async () => {
@@ -155,6 +195,13 @@ describe("MultiplayerLobby", () => {
     await user.click(button("Join the game"));
     expect(screen.getByText(/You were in this game as Loreen/)).toBeInTheDocument();
     expect(joinRoom).not.toHaveBeenCalled();
+    expect(button("Rejoin as Loreen")).toHaveFocus();
+
+    // Enter in the field waits for the choice instead of asking again.
+    await user.type(screen.getByLabelText("Game code"), "{Enter}");
+    expect(joinRoom).not.toHaveBeenCalled();
+    // Another tab changing the stored game doesn't change who rejoins.
+    localStorage.setItem("playerId", "p-other");
 
     await user.click(button("Rejoin as Loreen"));
     expect(confirm).not.toHaveBeenCalled();
