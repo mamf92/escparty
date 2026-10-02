@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
+import { act, fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import MultiplayerLobby from "./MultiplayerLobby";
 import { createRoom, getRoom, joinRoom, JoinRejected, setRoomDifficulty } from "../utils/roomsFirestore";
@@ -220,6 +221,68 @@ describe("MultiplayerLobby", () => {
     expect(screen.getByText(/You were in this game as Dana International 🏳️‍🌈/)).toBeInTheDocument();
     await user.click(button("Rejoin as Dana International"));
     expect(joinRoom).toHaveBeenCalledWith("ABBA", "p-dana", "Dana International 🏳️‍🌈");
+  });
+
+  it("drops every part of an emoji from the rejoin button", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-x");
+    localStorage.setItem("playerName", "Sam 👋🏽 Ryder 1️⃣ 🏴󠁧󠁢󠁥󠁮󠁧󠁿");
+    renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    expect(button("Rejoin as Sam Ryder 1")).toBeInTheDocument();
+  });
+
+  it("takes a pasted code with a separator in it", async () => {
+    const user = userEvent.setup();
+    renderLobby();
+    await user.click(button(/^Join a game/));
+    await user.click(screen.getByLabelText("Game code"));
+    await user.paste(" ab-ba ");
+    expect(screen.getByLabelText("Game code")).toHaveValue("ABBA");
+  });
+
+  it("makes one room however fast the host button is tapped", async () => {
+    const user = userEvent.setup();
+    renderLobby();
+    await user.click(button(/^Host a game/));
+    const play = button(/^Host and play/);
+    act(() => {
+      fireEvent.click(play);
+      fireEvent.click(play);
+    });
+    expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+    expect(createRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the stored game when the page is left while a room is made", async () => {
+    const user = userEvent.setup();
+    let finish = () => {};
+    vi.mocked(createRoom).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    localStorage.setItem("gameCode", "WXYZ");
+    const { unmount } = renderLobby();
+    await user.click(button(/^Host a game/));
+    await user.click(button(/^Host and play/));
+    unmount();
+    await act(async () => finish());
+    expect(localStorage.getItem("gameCode")).toBe("WXYZ");
+  });
+
+  it("remembers who joined when the page is left mid-join", async () => {
+    const user = userEvent.setup();
+    let finish = (_: boolean) => {};
+    vi.mocked(joinRoom).mockImplementationOnce(() => new Promise<boolean>(resolve => { finish = resolve; }));
+    const { unmount } = renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    await vi.waitFor(() => expect(joinRoom).toHaveBeenCalled());
+    const [, id, name] = vi.mocked(joinRoom).mock.calls[0];
+    unmount();
+    await act(async () => finish(true));
+    expect(localStorage.getItem("gameCode")).toBe("ABBA");
+    expect(localStorage.getItem("playerId")).toBe(id);
+    expect(localStorage.getItem("playerName")).toBe(name);
   });
 
   it("joins the same game as someone new when that's not you", async () => {

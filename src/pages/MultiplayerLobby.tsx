@@ -69,7 +69,10 @@ type StoredPlayer = { id: string; name: string };
 // A player's name without its emoji ("Loreen 🇸🇪" → "Loreen"), for a
 // button label: the design system keeps emoji out of buttons (§8).
 const plainName = (name: string): string =>
-  name.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\u{FE0F}\u{200D}]/gu, "").trim() || name;
+  name
+    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\u{E0020}-\u{E007F}]|\u{FE0F}|\u{200D}|\u{20E3}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim() || name;
 
 /**
  * The way into a multiplayer quiz: host a game (playing along, or only
@@ -92,6 +95,9 @@ const MultiplayerLobby = () => {
   // A create or join still running when the page is left must not pull
   // the user into the lobby afterwards.
   const left = useRef(false);
+  // A create or join in flight: two taps in one render would both still
+  // see loading as false, and make two rooms or two players.
+  const busy = useRef(false);
   useEffect(() => {
     left.current = false;
     return () => { left.current = true; };
@@ -134,6 +140,8 @@ const MultiplayerLobby = () => {
 
   // Create the room, with the host playing along or only observing.
   const createGame = async (hostIsObserver: boolean) => {
+    if (busy.current) return;
+    busy.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -152,6 +160,10 @@ const MultiplayerLobby = () => {
           console.error("Couldn't preselect the quiz:", error));
       }
 
+      // Left while the room was being made: it stays empty and unused, and
+      // the game this device was in stays the stored one (#65).
+      if (left.current) return;
+
       // Save user info in local storage
       localStorage.setItem("playerId", hostId);
       localStorage.setItem("playerName", hostName);
@@ -160,13 +172,13 @@ const MultiplayerLobby = () => {
       // Whether the host only observes lives on the room (hostIsObserver),
       // which every page reads; a localStorage copy would outlive this game.
 
-      if (left.current) return;
       forgetPickedQuiz();
       navigate("/lobby");
     } catch (error) {
       console.error("Error creating game:", error);
       if (!left.current) setError("We couldn't set up the room. Check your connection and try again.");
     } finally {
+      busy.current = false;
       if (!left.current) setLoading(false);
     }
   };
@@ -197,6 +209,8 @@ const MultiplayerLobby = () => {
       }
     }
 
+    if (busy.current) return;
+    busy.current = true;
     setLoading(true);
     try {
       const before = rejoin === true ? rejoinAs : null;
@@ -206,16 +220,16 @@ const MultiplayerLobby = () => {
       // Join the room in Firestore
       const joined = await joinRoom(code, playerId, randomName);
 
-      if (left.current) return;
       if (joined) {
-        // Save user info in local storage
+        // Saved even if the page was left meanwhile: the player is in the
+        // room now, and this device can only rejoin as them with it (#65).
         localStorage.setItem("playerId", playerId);
         localStorage.setItem("playerName", randomName);
         localStorage.setItem("gameCode", code);
 
-        // Navigate to lobby
-        navigate("/lobby");
+        if (!left.current) navigate("/lobby");
       } else {
+        if (left.current) return;
         const note = await refusedNote(code);
         if (!left.current) setError(note);
       }
@@ -223,6 +237,7 @@ const MultiplayerLobby = () => {
       console.error("Error joining game:", error);
       if (!left.current) setError(joinErrorNote(error));
     } finally {
+      busy.current = false;
       if (!left.current) setLoading(false);
     }
   };
@@ -310,7 +325,7 @@ const MultiplayerLobby = () => {
                     type="text"
                     value={joinCode}
                     onChange={(e) => {
-                      setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""));
+                      setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
                       setRejoinAs(null);
                       setError(null);
                     }}
@@ -321,7 +336,6 @@ const MultiplayerLobby = () => {
                     autoFocus
                     autoCapitalize="characters"
                     autoComplete="off"
-                    maxLength={4}
                   />
                 </label>
                 {rejoinAs ? (
