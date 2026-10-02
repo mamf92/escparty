@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { Control, Ground, Pane, Row } from "../design";
 import {
   createRoom,
   generateRoomCode,
@@ -127,35 +128,35 @@ const QuizResults = () => {
         subtitle={best !== null && best > gameData.score ? `Your best is still ${best}.` : undefined}
         footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
       >
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <div className="lycra is-block is-static is-chosen">
+        <Ground>
+          <Pane>
+            <Row elevation="high">
               <span className="calm-label">You scored</span>
               <span>{gameData.score} points</span>
-            </div>
-          </div>
-        </div>
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <button type="button" className="lycra" onClick={() => leave("/quizzes")}>Play another quiz</button>
-            <button type="button" className="lycra" onClick={() => leave("/scoreboard")}>See the scoreboard</button>
-          </div>
-        </div>
+            </Row>
+          </Pane>
+        </Ground>
+        <Ground>
+          <Pane>
+            <Control onClick={() => leave("/quizzes")}>Play another quiz</Control>
+            <Control onClick={() => leave("/scoreboard")}>See the scoreboard</Control>
+          </Pane>
+        </Ground>
         {scoreHistory.length > 0 && (
           <>
-            <CalmNote>Your past scores</CalmNote>
-            <div className="calm-ground">
-              <ol className="lycra-pane" aria-label="Your past scores">
+            <h2 className="esc-note" id="results-past-scores">Your past scores</h2>
+            <Ground>
+              <Pane as="ol" aria-labelledby="results-past-scores">
                 {scoreHistory.map((entry, index) => (
-                  <li key={index} className="lycra is-block is-static">
+                  <Row key={index} as="li">
                     <span className="calm-row">
                       <span>{new Date(entry.date).toLocaleDateString()}</span>
                       <span>{entry.score} points · {entry.total} {entry.total === 1 ? "question" : "questions"}</span>
                     </span>
-                  </li>
+                  </Row>
                 ))}
-              </ol>
-            </div>
+              </Pane>
+            </Ground>
           </>
         )}
       </CalmPage>
@@ -167,6 +168,15 @@ const QuizResults = () => {
   const shown = step === 0 ? 0 : steps[Math.min(step, steps.length) - 1];
   const revealed = placed.slice(placed.length - shown);
   const done = steps.length > 0 && step >= steps.length;
+  // What the last tap put on the board, said out loud: the list itself
+  // isn't a live region, so a screen reader hears each reveal here.
+  const before = step <= 1 ? 0 : steps[Math.min(step, steps.length) - 2];
+  const justRevealed = placed.slice(placed.length - shown, placed.length - before);
+  const revealLine = done
+    ? winnerLine(placed)
+    : step === 0
+      ? `${placed.length === 1 ? "1 player is" : `${placed.length} players are`} on the scoreboard. Start the reveal when the room is ready.`
+      : `On the board: ${justRevealed.map(({ player, place }) => `place ${place}, ${player.name}, ${player.score} points`).join("; ")}.`;
   const isHost = isRoomHost(room, gameData.playerId);
   // This player's name in this room (the host included, from the full
   // list), before this device's last-used name, which another tab may have
@@ -216,82 +226,81 @@ const QuizResults = () => {
 
   return (
     <CalmPage
-      title="And the results are…"
+      title="The results are in"
       subtitle={isObserver ? undefined : `You scored ${bestKnownScore(gameData.score, players, gameData.playerId)} points.`}
       footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
     >
-      {error && <CalmNote role="alert">{error}</CalmNote>}
+      {error && (
+        <>
+          <CalmNote role="alert">{error} Join or host another game to play on.</CalmNote>
+          <Ground>
+            <Pane>
+              <Control onClick={() => leave("/multiplayer")}>Join or host another game</Control>
+            </Pane>
+          </Ground>
+        </>
+      )}
       {placed.length === 0 && !error && <CalmNote role="status">Collecting the final scores…</CalmNote>}
 
       {revealed.length > 0 && (
-        <div className="calm-ground">
-          <ol className="lycra-pane" aria-label="Final standings">
+        <Ground>
+          <Pane as="ol" aria-label="Final standings">
             {revealed.map(({ player, place }) => {
               const podium = PODIUM_POINTS[place];
               const mine = player.id === gameData.playerId;
               return (
-                <li
-                  key={player.id}
-                  className={`lycra is-block is-static${place === 1 ? " is-chosen" : ""}`}
-                >
+                <Row key={player.id} as="li" elevation={place === 1 || mine ? "high" : "rest"}>
                   {podium && <span className="calm-label">{podium}</span>}
                   <span className="calm-row">
                     <span>{place}. {player.name}{mine ? " (you)" : ""}</span>
                     <span>{player.score}</span>
                   </span>
-                </li>
+                </Row>
               );
             })}
-          </ol>
-        </div>
+          </Pane>
+        </Ground>
       )}
 
-      {done ? (
-        <CalmNote role="status">{winnerLine(placed)}</CalmNote>
-      ) : (
-        placed.length > 0 && (
-          <div className="calm-ground">
-            <div className="lycra-pane calm-split">
-              <button type="button" className="lycra" onClick={() => setStep(step + 1)}>
-                {step === 0 ? "Start the reveal" : `Reveal ${nextRevealLabel(placed, shown)}`}
-              </button>
-              <button type="button" className="lycra" onClick={() => setStep(steps.length)}>
-                Show everything
-              </button>
-            </div>
-          </div>
-        )
+      {placed.length > 0 && <CalmNote role="status">{revealLine}</CalmNote>}
+      {!done && placed.length > 0 && (
+        <Ground>
+          <Pane layout="split">
+            <Control onClick={() => setStep(step + 1)}>
+              {step === 0 ? "Start the reveal" : `Reveal ${nextRevealLabel(placed, shown)}`}
+            </Control>
+            <Control onClick={() => setStep(steps.length)}>Show everything</Control>
+          </Pane>
+        </Ground>
       )}
 
       {room && isHost && !room.nextRoomCode && (
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={playAgain}>
-              Play again with everyone
-            </button>
-          </div>
-        </div>
+        <Ground>
+          <Pane>
+            <Control disabled={nextRound === "busy"} onClick={playAgain}>Play again with everyone</Control>
+          </Pane>
+        </Ground>
       )}
       {room?.nextRoomCode && (
         <>
           <CalmNote>{isHost ? "You've started another round." : "The host has started another round."}</CalmNote>
-          <div className="calm-ground">
-            <div className="lycra-pane">
-              <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={joinNext}>
+          <Ground>
+            <Pane>
+              <Control disabled={nextRound === "busy"} onClick={joinNext}>
                 {isHost ? "Back to the next round's lobby" : "Join the next round"}
-              </button>
-            </div>
-          </div>
+              </Control>
+            </Pane>
+          </Ground>
         </>
       )}
-      {nextRound !== "idle" && nextRound !== "busy" && <CalmNote role="status">{nextRound}</CalmNote>}
+      {nextRound !== "idle" && nextRound !== "busy" && <CalmNote role="alert">{nextRound}</CalmNote>}
 
-      {room && !isHost && !room.nextRoomCode && (
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <button type="button" className="lycra" onClick={() => leave("/multiplayer")}>Join or host another game</button>
-          </div>
-        </div>
+      {room && !isHost && !room.nextRoomCode && !error && (
+        <Ground>
+          <Pane>
+            <Control onClick={() => leave("/multiplayer")}>Join or host another game</Control>
+          </Pane>
+        </Ground>
       )}
     </CalmPage>
   );

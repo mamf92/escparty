@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { Control, Ground, Pane, Row } from "../design";
 import { listenToRoom, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
@@ -94,11 +95,20 @@ const Lobby = () => {
         navigate("/multiplayer");
     };
     const leave = <CalmLink type="button" onClick={leaveRoom}>Leave the waiting room</CalmLink>;
+    /** The way out of a waiting room that can't go on. */
+    const wayOut = (label: string, onClick: () => void) => (
+        <Ground>
+            <Pane>
+                <Control onClick={onClick}>{label}</Control>
+            </Pane>
+        </Ground>
+    );
 
     if (!identity) {
         return (
             <CalmPage title="The green room">
-                <CalmNote role="alert">Missing game data. Returning to multiplayer lobby.</CalmNote>
+                <CalmNote role="alert">This tab isn't in a game yet. Taking you to join or host one…</CalmNote>
+                {wayOut("Join or host a game", () => navigate("/multiplayer"))}
             </CalmPage>
         );
     }
@@ -111,8 +121,11 @@ const Lobby = () => {
     }
     if (room === null || error) {
         return (
-            <CalmPage title="The green room" footer={leave}>
-                <CalmNote role="alert">{error ?? "Game not found"}</CalmNote>
+            <CalmPage title="The green room">
+                <CalmNote role="alert">
+                    {error ?? "This game has closed, or the code is wrong. Join with another code, or host your own."}
+                </CalmNote>
+                {wayOut("Join or host a game", leaveRoom)}
             </CalmPage>
         );
     }
@@ -124,22 +137,19 @@ const Lobby = () => {
     // Taken out by the host: this tab isn't in the room any more.
     if (!me) {
         return (
-            <CalmPage title="The green room" footer={leave}>
+            <CalmPage title="The green room">
                 <CalmNote role="alert">The host took you out of this game. You can join again with the code.</CalmNote>
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <button type="button" className="lycra" onClick={() => navigate("/multiplayer")}>Join a game</button>
-                    </div>
-                </div>
+                {wayOut("Join a game", () => navigate("/multiplayer"))}
             </CalmPage>
         );
     }
 
     const ready = room.readyPlayers ?? [];
     const players = playingPlayers(room);
+    const guests = room.players.filter(p => p.id !== room.hostId);
     const gate = startGate(room);
     const amReady = ready.includes(playerId);
-    const chosen = isHost ? room.players.find(p => p.id === selected && p.id !== room.hostId) : undefined;
+    const chosen = isHost ? guests.find(p => p.id === selected) : undefined;
 
     /**
      * One write at a time; a failure leaves a note and the page usable,
@@ -167,8 +177,11 @@ const Lobby = () => {
     // written if the quiz couldn't be read, so the host can pick again; a
     // refused write is a dead end as before.
     const handleSelectQuiz = (quizKey: string) => run("set the quiz", () => setRoomQuiz(gameCode, quizKey), (err) => {
-        if (String(err).includes("Failed to set difficulty")) setError("Failed to set difficulty");
-        else setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+        if (String(err).includes("Failed to set difficulty")) {
+            setError("This room wouldn't take the quiz, so the show can't go on here. Host a new game to start again.");
+        } else {
+            setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+        }
     });
 
     const status = (id: string) => {
@@ -186,102 +199,99 @@ const Lobby = () => {
 
             {isHost && !room.difficulty && (
                 <>
-                    <CalmNote>Pick a quiz</CalmNote>
-                    <div className="calm-ground">
-                        <div className="lycra-pane">
+                    <h2 className="esc-note" id="lobby-pick-quiz">Pick a quiz</h2>
+                    <Ground>
+                        <Pane role="group" aria-labelledby="lobby-pick-quiz">
                             {myQuizzes.map(quiz => (
-                                <button key={quiz.id} type="button" className="lycra" disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
+                                <Control key={quiz.id} disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
                                     {quiz.title}
-                                </button>
+                                </Control>
                             ))}
                             {QUIZ_CHOICES.map(choice => (
-                                <button key={choice.key} type="button" className="lycra" disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
+                                <Control key={choice.key} disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
                                     {choice.title}
-                                </button>
+                                </Control>
                             ))}
-                        </div>
-                    </div>
+                        </Pane>
+                    </Ground>
                 </>
             )}
 
-            <CalmNote>{players.length === 1 ? "1 player" : `${players.length} players`}</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane" role="group" aria-label="Players">
-                    {players.map(player => {
-                        const row = (
+            {/* Polite: someone joining or leaving is news to whoever waits. */}
+            <h2 className="esc-note" aria-live="polite">{players.length === 1 ? "1 player" : `${players.length} players`}</h2>
+            <Ground>
+                <Pane as="ol" aria-label="Players">
+                    {players.map(player => (
+                        <Row key={player.id} as="li" elevation={player.id === playerId ? "high" : "rest"}>
                             <span className="calm-row">
                                 <span>{player.name}{player.id === playerId ? " (you)" : ""}</span>
                                 <span>{status(player.id)}</span>
                             </span>
-                        );
-                        return isHost && player.id !== room.hostId ? (
-                            <button
-                                key={player.id}
-                                type="button"
-                                className={`lycra is-block${selected === player.id ? " is-chosen" : ""}`}
-                                aria-pressed={selected === player.id}
-                                onClick={() => setSelected(selected === player.id ? null : player.id)}
-                            >
-                                {row}
-                            </button>
-                        ) : (
-                            <div key={player.id} className="lycra is-block is-static">{row}</div>
-                        );
-                    })}
-                </div>
-            </div>
+                        </Row>
+                    ))}
+                </Pane>
+            </Ground>
 
-            {chosen && (
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <button
-                            type="button"
-                            className="lycra"
-                            disabled={busy}
-                            onClick={() => run(`remove ${chosen.name}`, async () => {
-                                await removePlayerFromRoom(gameCode, chosen);
-                                setSelected(null);
-                            })}
-                        >
-                            Take {chosen.name} out of the game
-                        </button>
-                    </div>
-                </div>
+            {isHost && guests.length > 0 && (
+                <>
+                    <h2 className="esc-note" id="lobby-take-out">Joined by mistake? Pick who to take out</h2>
+                    <Ground>
+                        <Pane role="group" aria-labelledby="lobby-take-out">
+                            {guests.map(guest => (
+                                <Control
+                                    key={guest.id}
+                                    chosen={selected === guest.id}
+                                    onClick={() => setSelected(selected === guest.id ? null : guest.id)}
+                                >
+                                    {guest.name}
+                                </Control>
+                            ))}
+                            {chosen && (
+                                <Control
+                                    disabled={busy}
+                                    onClick={() => run(`remove ${chosen.name}`, async () => {
+                                        await removePlayerFromRoom(gameCode, chosen);
+                                        setSelected(null);
+                                    })}
+                                >
+                                    Take {chosen.name} out of the game
+                                </Control>
+                            )}
+                        </Pane>
+                    </Ground>
+                </>
             )}
 
             {!isHost && (
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <button
-                            type="button"
-                            className={`lycra${amReady ? " is-chosen" : ""}`}
-                            aria-pressed={amReady}
+                <Ground>
+                    <Pane>
+                        <Control
+                            chosen={amReady}
                             disabled={busy}
                             onClick={() => run("change whether you're ready", () => setPlayerReady(gameCode, playerId, !amReady))}
                         >
-                            {amReady ? "I'm ready (tap to undo)" : "I'm ready"}
-                        </button>
-                    </div>
-                </div>
+                            I'm ready
+                        </Control>
+                    </Pane>
+                </Ground>
             )}
-            {!isHost && <CalmNote role="status">{amReady ? "Waiting for the host to start." : "Tap when you're ready to play."}</CalmNote>}
+            {!isHost && (
+                <CalmNote role="status">
+                    {amReady ? "Waiting for the host to start. Tap again if you need a moment." : "Tap when you're ready to play."}
+                </CalmNote>
+            )}
 
             {isHost && room.difficulty && (
                 <>
                     <CalmNote role="status">{gate.message}</CalmNote>
                     {gate.canStart !== "no" && (
-                        <div className="calm-ground">
-                            <div className="lycra-pane">
-                                <button
-                                    type="button"
-                                    className={`lycra${gate.canStart === "yes" ? " is-chosen" : ""}`}
-                                    disabled={busy}
-                                    onClick={() => run("start the game", () => startGame(gameCode))}
-                                >
+                        <Ground>
+                            <Pane>
+                                <Control disabled={busy} onClick={() => run("start the game", () => startGame(gameCode))}>
                                     {gate.canStart === "yes" ? "Start the show" : "Start anyway"}
-                                </button>
-                            </div>
-                        </div>
+                                </Control>
+                            </Pane>
+                        </Ground>
                     )}
                 </>
             )}

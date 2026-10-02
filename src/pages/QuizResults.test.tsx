@@ -67,6 +67,11 @@ describe("QuizResults", () => {
     expect(screen.getByText("9 points")).toBeInTheDocument();
     expect(screen.getByText("Your best is still 12.")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Your past scores" })).toHaveTextContent("12 points · 15 questions");
+    expect(screen.getByRole("heading", { level: 2, name: "Your past scores" })).toBeInTheDocument();
+    // Your score stands proud as information, not as something picked.
+    const scored = screen.getByText("9 points").parentElement!;
+    expect(scored).toHaveClass("is-static", "is-high");
+    expect(scored).not.toHaveClass("is-chosen");
     await userEvent.setup().click(screen.getByRole("button", { name: "Play another quiz" }));
     expect(screen.getByText("at /quizzes")).toBeInTheDocument();
   });
@@ -87,14 +92,30 @@ describe("QuizResults", () => {
     expect(screen.getByText("You scored 850 points.")).toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
 
+    expect(screen.getByRole("status")).toHaveTextContent("5 players are on the scoreboard.");
+
     await user.click(screen.getByRole("button", { name: "Start the reveal" }));
     expect(standings()).toEqual(["4. Lordi400", "5. Jedward100"]);
+    // Each reveal is said out loud, not only drawn.
+    expect(screen.getByRole("status")).toHaveTextContent("On the board: place 4, Lordi, 400 points; place 5, Jedward, 100 points.");
     await user.click(screen.getByRole("button", { name: "Reveal 3rd place" }));
     expect(standings()[0]).toBe("Huit points3. Käärijä (you)700");
+    expect(screen.getByRole("status")).toHaveTextContent("On the board: place 3, Käärijä, 700 points.");
     await user.click(screen.getByRole("button", { name: "Reveal 2nd place" }));
     await user.click(screen.getByRole("button", { name: "Reveal the winner" }));
     expect(standings()[0]).toBe("Douze points1. Loreen1200");
     expect(screen.getByRole("status")).toHaveTextContent("Loreen wins with 1200 points!");
+    expect(screen.queryByRole("button", { name: "Show everything" })).not.toBeInTheDocument();
+  });
+
+  it("raises first place and your own row, and picks none of them", async () => {
+    renderResults({ score: 850, multiplayer: true, roomCode: "ABBA", playerId: "p4" });
+    act(() => mocks.onRoom(room()));
+    expect(screen.getByRole("heading", { level: 1, name: "The results are in" })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show everything" }));
+    const rows = within(screen.getByRole("list", { name: "Final standings" })).getAllByRole("listitem");
+    expect(rows.map(row => row.classList.contains("is-high"))).toEqual([true, false, true, false, false]);
+    expect(rows.some(row => row.classList.contains("is-chosen"))).toBe(false);
   });
 
   it("can skip straight to everything, and leaves on purpose", async () => {
@@ -115,6 +136,16 @@ describe("QuizResults", () => {
     renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
     act(() => mocks.onRoom(null));
     expect(screen.getByRole("alert")).toHaveTextContent("no longer exists");
+    expect(screen.getAllByRole("button", { name: "Join or host another game" })).toHaveLength(1);
+  });
+
+  it("offers a way out when the room goes after the scores came in", async () => {
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+    act(() => mocks.onRoom(room()));
+    act(() => mocks.onRoom(null));
+    expect(screen.getByRole("alert")).toHaveTextContent("no longer exists");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Join or host another game" }));
+    expect(screen.getByText("at /multiplayer")).toBeInTheDocument();
   });
 
   it("lets the host start another round with everyone", async () => {

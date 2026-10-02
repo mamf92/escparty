@@ -1,7 +1,7 @@
 import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
 import Lobby from "./Lobby";
 import type { Room } from "../utils/roomsFirestore";
 
@@ -53,7 +53,7 @@ const as = (playerId: string, name: string) => {
   localStorage.setItem("playerId", playerId);
   localStorage.setItem("playerName", name);
 };
-const players = () => Array.from(screen.getByRole("group", { name: "Players" }).querySelectorAll(".calm-row")).map(row => row.textContent);
+const players = () => Array.from(screen.getByRole("list", { name: "Players" }).querySelectorAll(".calm-row")).map(row => row.textContent);
 
 describe("Lobby", () => {
   beforeEach(() => {
@@ -70,7 +70,8 @@ describe("Lobby", () => {
     vi.useFakeTimers();
     try {
       renderLobby();
-      expect(screen.getByRole("alert")).toHaveTextContent("Missing game data");
+      expect(screen.getByRole("alert")).toHaveTextContent("This tab isn't in a game yet");
+      expect(screen.getByRole("button", { name: "Join or host a game" })).toBeInTheDocument();
       await act(async () => vi.advanceTimersByTime(2000));
       expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
     } finally {
@@ -89,11 +90,12 @@ describe("Lobby", () => {
     expect(screen.getByText("Quiz: the host is picking")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Start/ })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "I'm ready" }));
+    await user.click(screen.getByRole("button", { name: "I'm ready", pressed: false }));
     expect(mocks.setPlayerReady).toHaveBeenCalledWith("ABBA", "p2", true);
     act(() => mocks.onRoom(room({ readyPlayers: ["p2"] })));
-    expect(screen.getByText("Waiting for the host to start.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "I'm ready (tap to undo)" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for the host to start.");
+    // Ready holds the sink; the label stays put and aria-pressed says it.
+    await user.click(screen.getByRole("button", { name: "I'm ready", pressed: true }));
     expect(mocks.setPlayerReady).toHaveBeenLastCalledWith("ABBA", "p2", false);
   });
 
@@ -137,7 +139,10 @@ describe("Lobby", () => {
     await user.click(screen.getByRole("button", { name: "Classic: Easy" }));
     expect(screen.getByRole("alert")).toHaveTextContent("That quiz couldn't be loaded");
     await user.click(screen.getByRole("button", { name: "Classic: Easy" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Failed to set difficulty");
+    expect(screen.getByRole("alert")).toHaveTextContent("This room wouldn't take the quiz");
+    expect(screen.queryByText(/Failed to set difficulty/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Join or host a game" }));
+    expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
   });
 
   it("lets the host take a player out", async () => {
@@ -146,7 +151,10 @@ describe("Lobby", () => {
     mocks.removePlayerFromRoom.mockResolvedValue(undefined);
     renderLobby();
     act(() => mocks.onRoom(room({ difficulty: "easy" })));
-    await user.click(screen.getByRole("button", { name: "LordiGetting ready" }));
+    const takeOut = screen.getByRole("group", { name: /Pick who to take out/ });
+    expect(within(takeOut).getAllByRole("button").map(button => button.textContent)).toEqual(["Loreen", "Lordi"]);
+    await user.click(within(takeOut).getByRole("button", { name: "Lordi" }));
+    expect(within(takeOut).getByRole("button", { name: "Lordi" })).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByRole("button", { name: "Take Lordi out of the game" }));
     expect(mocks.removePlayerFromRoom).toHaveBeenCalledWith("ABBA", lordi);
     expect(screen.queryByRole("button", { name: /Take Lordi/ })).not.toBeInTheDocument();
@@ -209,6 +217,39 @@ describe("Lobby", () => {
     as("p2", "Loreen");
     renderLobby();
     act(() => mocks.onRoom(null));
-    expect(screen.getByRole("alert")).toHaveTextContent("Game not found");
+    expect(screen.getByRole("alert")).toHaveTextContent("This game has closed");
+    expect(screen.getByRole("button", { name: "Join or host a game" })).toBeInTheDocument();
+  });
+
+  it("raises your own row, never sinks the start, and labels its sections", () => {
+    as("host", "Martin");
+    renderLobby();
+    act(() => mocks.onRoom(room({ difficulty: "easy", readyPlayers: ["p2", "p3"] })));
+    const rows = within(screen.getByRole("list", { name: "Players" })).getAllByRole("listitem");
+    expect(rows.map(row => row.classList.contains("is-high"))).toEqual([true, false, false]);
+    expect(rows.some(row => row.classList.contains("is-chosen"))).toBe(false);
+    const start = screen.getByRole("button", { name: "Start the show" });
+    expect(start).not.toHaveClass("is-chosen");
+    expect(start).not.toHaveAttribute("aria-pressed");
+    expect(screen.getByRole("heading", { level: 2, name: "3 players" })).toHaveAttribute("aria-live", "polite");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("counts players as they come and go", () => {
+    as("p2", "Loreen");
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    expect(screen.getByRole("heading", { level: 2, name: "3 players" })).toBeInTheDocument();
+    act(() => mocks.onRoom(room({ players: [{ id: "host", name: "Martin", score: 0 }, loreen] })));
+    expect(screen.getByRole("heading", { level: 2, name: "2 players" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: /Pick who to take out/ })).not.toBeInTheDocument();
+  });
+
+  it("gives the host a heading for the quiz picks", () => {
+    as("host", "Martin");
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    expect(within(screen.getByRole("group", { name: "Pick a quiz" })).getByRole("button", { name: "Classic: Easy" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Pick a quiz" })).toBeInTheDocument();
   });
 });
