@@ -75,6 +75,18 @@ export class ScoreWriteRejected extends Error {
     }
 }
 
+/**
+ * The rules refused a room's quiz pick (it is one-shot, or the key isn't a
+ * quiz the rules know), as opposed to a failure that may go through on a
+ * retry, such as the network.
+ */
+export class QuizPickRefused extends Error {
+    constructor(message: string, options?: ErrorOptions) {
+        super(message, options);
+        this.name = "QuizPickRefused";
+    }
+}
+
 /** Why a room turned a join down; `joinRoom` answers `false` for "not-found" and "started". */
 export class JoinRejected extends Error {
     constructor(public readonly reason: "not-found" | "started" | "full", message: string, options?: ErrorOptions) {
@@ -258,7 +270,7 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
 /**
  * Set which quiz a room plays (its `difficulty`, a quiz key), and optionally
  * how often its mid-quiz break comes. One-shot: firestore.rules refuses a
- * second write.
+ * second write, which throws `QuizPickRefused`.
  */
 export const setRoomDifficulty = async (roomCode: string, difficulty: string, breakEvery?: number): Promise<void> => {
     console.log(`Setting difficulty for room ${roomCode} to ${difficulty}`);
@@ -273,7 +285,9 @@ export const setRoomDifficulty = async (roomCode: string, difficulty: string, br
         console.log(`Difficulty set to ${difficulty} for room ${roomCode}`);
     } catch (error) {
         console.error("Error setting room difficulty:", error);
-        throw new Error(`Failed to set difficulty: ${(error as Error).message}`, { cause: error });
+        const message = `Failed to set difficulty: ${(error as Error).message}`;
+        if ((error as { code?: unknown }).code === "permission-denied") throw new QuizPickRefused(message, { cause: error });
+        throw new Error(message, { cause: error });
     }
 };
 

@@ -70,20 +70,31 @@ export const nextRevealLabel = (placed: Placed[], shown: number): string => {
 };
 
 /**
+ * How many rows are showing after `step` taps of the reveal (0 before the
+ * first; taps past the last show everyone). The page draws this many rows
+ * and the announcement below speaks the same count, so they can't drift.
+ */
+export const revealedCount = (steps: readonly number[], step: number): number =>
+    step <= 0 || steps.length === 0 ? 0 : steps[Math.min(step, steps.length) - 1];
+
+/** Whether the reveal is over after `step` taps: everyone is showing. */
+export const revealDone = (steps: readonly number[], step: number): boolean =>
+    steps.length > 0 && step >= steps.length;
+
+/**
  * What the reveal says out loud after `step` taps (0 before the first):
  * how many are on the board, then the rows the last tap added, then the
  * winner line once everyone is showing. The standings list isn't a live
  * region, so a screen reader hears each reveal from this line instead.
+ * Pass the page's `steps` so both read the same reveal.
  */
-export const revealAnnouncement = (placed: Placed[], step: number): string => {
-    const steps = revealSteps(placed);
+export const revealAnnouncement = (placed: Placed[], step: number, steps: readonly number[] = revealSteps(placed)): string => {
     if (step === 0 || steps.length === 0) {
         return `${placed.length === 1 ? "1 player is" : `${placed.length} players are`} on the scoreboard. Start the reveal when the room is ready.`;
     }
-    const at = Math.min(step, steps.length);
-    if (at === steps.length) return winnerLine(placed) ?? "";
-    const shown = steps[at - 1];
-    const before = at === 1 ? 0 : steps[at - 2];
+    if (revealDone(steps, step)) return winnerLine(placed) ?? "";
+    const shown = revealedCount(steps, step);
+    const before = revealedCount(steps, step - 1);
     return `On the board: ${placed
         .slice(placed.length - shown, placed.length - before)
         .map(({ player, place }) => `place ${place}, ${player.name}, ${points(player.score)}`)

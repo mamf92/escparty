@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealAnnouncement, revealSteps, winnerLine } from "./finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealAnnouncement, revealDone, revealSteps, revealedCount, winnerLine } from "./finale";
 
 const p = (name: string, score: number) => ({ id: name.toLowerCase(), name, score });
 
@@ -56,5 +56,13 @@ describe("finale", () => {
         // Past the last step it stays on the winner.
         expect(revealAnnouncement(four, 9)).toBe("A wins with 9 points!");
         expect(revealAnnouncement(placePlayers([p("Solo", 3)]), 0)).toBe("1 player is on the scoreboard. Start the reveal when the room is ready.");
+    });
+
+    it("counts the rows showing after each tap, and when the reveal is over", () => {
+        const steps = [1, 3, 4];
+        expect([0, 1, 2, 3, 9].map(step => revealedCount(steps, step))).toEqual([0, 1, 3, 4, 4]);
+        expect(revealedCount([], 2)).toBe(0);
+        expect([2, 3, 9].map(step => revealDone(steps, step))).toEqual([false, true, true]);
+        expect(revealDone([], 0)).toBe(false);
     });
 });

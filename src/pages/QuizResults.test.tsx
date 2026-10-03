@@ -84,6 +84,17 @@ describe("QuizResults", () => {
     expect(screen.getByText("at /scoreboard")).toBeInTheDocument();
   });
 
+  it("skips broken past scores and shows a run missing its details", () => {
+    localStorage.setItem("quizScores", JSON.stringify([null, { score: "x" }, { score: 6 }]));
+    renderResults({ score: 3 });
+    expect(screen.getByText("Your best is still 6.")).toBeInTheDocument();
+    const past = screen.getByRole("list", { name: "Your past scores" });
+    expect(past.querySelectorAll("li")).toHaveLength(1);
+    expect(past).toHaveTextContent("Unknown date");
+    expect(past).toHaveTextContent("6 points");
+    expect(past).not.toHaveTextContent("undefined");
+  });
+
   it("reveals the standings from the bottom, podium one place at a time", async () => {
     const user = userEvent.setup();
     renderResults({ score: 850, multiplayer: true, roomCode: "ABBA", playerId: "p4" });

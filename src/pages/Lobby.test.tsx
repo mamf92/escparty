@@ -12,12 +12,14 @@ const mocks = vi.hoisted(() => ({
   removePlayerFromRoom: vi.fn(),
   setRoomQuiz: vi.fn(),
   onRoom: (_room: unknown) => {},
+  QuizPickRefused: class QuizPickRefused extends Error {},
 }));
 vi.mock("../utils/roomsFirestore", () => ({
   listenToRoom: mocks.listenToRoom,
   startGame: mocks.startGame,
   setPlayerReady: mocks.setPlayerReady,
   removePlayerFromRoom: mocks.removePlayerFromRoom,
+  QuizPickRefused: mocks.QuizPickRefused,
 }));
 vi.mock("../utils/quizCatalog", async (original) => ({
   ...(await original<typeof import("../utils/quizCatalog")>()),
@@ -132,7 +134,7 @@ describe("Lobby", () => {
   it("says when a quiz can't be loaded", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     as("host", "Martin");
-    mocks.setRoomQuiz.mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("Failed to set difficulty: denied", { cause: { code: "permission-denied" } }));
+    mocks.setRoomQuiz.mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new mocks.QuizPickRefused("Failed to set difficulty: denied"));
     renderLobby();
     act(() => mocks.onRoom(room()));
     const user = userEvent.setup();
@@ -148,7 +150,7 @@ describe("Lobby", () => {
   it("goes on when a refused pick finds the room already has a quiz", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     as("host", "Martin");
-    mocks.setRoomQuiz.mockRejectedValueOnce(new Error("Failed to set difficulty: denied", { cause: { code: "permission-denied" } }));
+    mocks.setRoomQuiz.mockRejectedValueOnce(new mocks.QuizPickRefused("Failed to set difficulty: denied"));
     renderLobby();
     act(() => mocks.onRoom(room()));
     await userEvent.setup().click(screen.getByRole("button", { name: "Classic: Easy" }));

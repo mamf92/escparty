@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane, Row } from "../design";
-import { listenToRoom, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
+import { listenToRoom, QuizPickRefused, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
 import { customQuizKey, listMyQuizzes } from "../utils/customQuizzes";
@@ -185,8 +185,7 @@ const Lobby = () => {
     // its snapshot shows a quiz after all; anything else (the quiz couldn't
     // be read, the network) wrote nothing, so the host can pick again.
     const handleSelectQuiz = (quizKey: string) => run("set the quiz", () => setRoomQuiz(gameCode, quizKey), (err) => {
-        const cause = err instanceof Error ? err.cause as { code?: unknown } | undefined : undefined;
-        if (cause?.code === "permission-denied") {
+        if (err instanceof QuizPickRefused) {
             setQuizRefused(true);
         } else {
             setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");

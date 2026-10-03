@@ -14,13 +14,12 @@ import {
 import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealAnnouncement, revealSteps } from "../utils/finale";
+import { readScoreHistory } from "../utils/scoreHistory";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealAnnouncement, revealDone, revealSteps, revealedCount } from "../utils/finale";
 
-interface ScoreEntry {
-  score: number;
-  total: number;
-  date: string;
-  difficulty?: string;
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "Unknown date" : date.toLocaleDateString();
 }
 
 /**
@@ -51,15 +50,9 @@ const QuizResults = () => {
     };
   });
 
-  const [scoreHistory] = useState<ScoreEntry[]>(() => {
-    if (gameData.multiplayer) return [];
-    try {
-      const stored: unknown = JSON.parse(localStorage.getItem("quizScores") || "[]");
-      return Array.isArray(stored) ? stored : [];
-    } catch {
-      return [];
-    }
-  });
+  // Read through the shared reader so a broken stored run is skipped here
+  // just as on the scoreboard, instead of crashing the page.
+  const [scoreHistory] = useState(() => (gameData.multiplayer ? [] : readScoreHistory()));
   const [room, setRoom] = useState<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(null);
@@ -154,8 +147,8 @@ const QuizResults = () => {
                 {scoreHistory.map((entry, index) => (
                   <Row key={index} as="li">
                     <span className="calm-row">
-                      <span>{new Date(entry.date).toLocaleDateString()}</span>
-                      <span>{entry.score} points · {entry.total} {entry.total === 1 ? "question" : "questions"}</span>
+                      <span>{formatDate(entry.date)}</span>
+                      <span>{entry.score} points{entry.total === undefined ? "" : ` · ${entry.total} ${entry.total === 1 ? "question" : "questions"}`}</span>
                     </span>
                   </Row>
                 ))}
@@ -169,15 +162,15 @@ const QuizResults = () => {
 
   const placed = placePlayers(players);
   const steps = revealSteps(placed);
-  const shown = step === 0 ? 0 : steps[Math.min(step, steps.length) - 1];
+  const shown = revealedCount(steps, step);
   const revealed = placed.slice(placed.length - shown);
-  const done = steps.length > 0 && step >= steps.length;
+  const done = revealDone(steps, step);
   // One status line for the whole reveal, mounted from the first render so
   // screen readers announce each change to it: collecting, then how many
   // are on the board, then what each tap added, then the winner.
   // With the room gone there is nothing left to collect, but scores the
   // page already holds can still be revealed and announced.
-  const statusLine = placed.length > 0 ? revealAnnouncement(placed, step) : error ? "" : "Collecting the final scores…";
+  const statusLine = placed.length > 0 ? revealAnnouncement(placed, step, steps) : error ? "" : "Collecting the final scores…";
   const isHost = isRoomHost(room, gameData.playerId);
   // This player's name in this room (the host included, from the full
   // list), before this device's last-used name, which another tab may have
