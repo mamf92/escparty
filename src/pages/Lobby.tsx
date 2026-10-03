@@ -37,9 +37,9 @@ const Lobby = () => {
     // A second tap in the same render can't see `busy` yet.
     const inFlight = useRef(false);
     const [pickError, setPickError] = useState<string | null>(null);
-    // The rules refused the quiz pick. A dead end only while the room still
-    // has no quiz: the refusal can also mean another tab already picked one.
-    const [quizRefused, setQuizRefused] = useState(false);
+    // The rules refused the last quiz pick; said only while the room still
+    // has no quiz (another tab may have picked one first).
+    const [pickRefused, setPickRefused] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
     const roomQuizTitle = useQuizTitle(room?.difficulty);
     // This device's saved quizzes, offered alongside the premade ones.
@@ -123,14 +123,13 @@ const Lobby = () => {
             </CalmPage>
         );
     }
-    const refusedForGood = quizRefused && !room?.difficulty;
-    if (room === null || refusedForGood) {
+    // Also what an offline first snapshot looks like (a cache-only miss);
+    // the room comes back by itself if the server then finds it.
+    if (room === null) {
         return (
             <CalmPage title="The green room" footer={leave}>
                 <CalmNote role="alert">
-                    {refusedForGood
-                        ? "This room wouldn't take the quiz, so the show can't go on here. Host a new game to start again."
-                        : "This game has closed, or the code is wrong. Join with another code, or host your own."}
+                    We can't find this game. It may have closed, the code may be wrong, or you may be offline. Join with another code, or host your own.
                 </CalmNote>
                 {wayOut("Join or host a game", leaveRoom)}
             </CalmPage>
@@ -180,13 +179,17 @@ const Lobby = () => {
         }
     };
 
-    // The room's `difficulty` names the quiz (quizCatalog.ts). The rules
-    // refusing the write (the pick is one-shot there) ends this room unless
-    // its snapshot shows a quiz after all; anything else (the quiz couldn't
-    // be read, the network) wrote nothing, so the host can pick again.
-    const handleSelectQuiz = (quizKey: string) => run("set the quiz", () => setRoomQuiz(gameCode, quizKey), (err) => {
+    // The room's `difficulty` names the quiz (quizCatalog.ts). A pick the
+    // rules refuse wrote nothing: either another tab already picked (the
+    // snapshot then shows that quiz and the picker goes) or the rules won't
+    // take this quiz (its key or break setting), so the host picks another.
+    // Anything else (the quiz couldn't be read, the network) can be retried.
+    const handleSelectQuiz = (quizKey: string) => run("set the quiz", async () => {
+        setPickRefused(false);
+        await setRoomQuiz(gameCode, quizKey);
+    }, (err) => {
         if (err instanceof QuizPickRefused) {
-            setQuizRefused(true);
+            setPickRefused(true);
         } else {
             setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
         }
@@ -272,22 +275,22 @@ const Lobby = () => {
             )}
 
             {!isHost && (
-                <Ground>
-                    <Pane>
-                        <Control
-                            chosen={amReady}
-                            disabled={busy}
-                            onClick={() => run("change whether you're ready", () => setPlayerReady(gameCode, playerId, !amReady))}
-                        >
-                            I'm ready
-                        </Control>
-                    </Pane>
-                </Ground>
-            )}
-            {!isHost && (
-                <CalmNote role="status">
-                    {amReady ? "Waiting for the host to start. Tap again if you need a moment." : "Tap when you're ready to play."}
-                </CalmNote>
+                <>
+                    <Ground>
+                        <Pane>
+                            <Control
+                                chosen={amReady}
+                                disabled={busy}
+                                onClick={() => run("change whether you're ready", () => setPlayerReady(gameCode, playerId, !amReady))}
+                            >
+                                I'm ready
+                            </Control>
+                        </Pane>
+                    </Ground>
+                    <CalmNote role="status">
+                        {amReady ? "Waiting for the host to start. Tap again if you need a moment." : "Tap when you're ready to play."}
+                    </CalmNote>
+                </>
             )}
 
             {isHost && room.difficulty && (
@@ -298,7 +301,7 @@ const Lobby = () => {
                             <Pane>
                                 {/* Everyone ready: the next step stands proudest (design-system.md section 6). */}
                                 <Control
-                                    className={gate.canStart === "yes" ? "is-high" : undefined}
+                                    elevation={gate.canStart === "yes" ? "high" : "rest"}
                                     disabled={busy}
                                     onClick={() => run("start the game", () => startGame(gameCode))}
                                 >
@@ -309,6 +312,7 @@ const Lobby = () => {
                     )}
                 </>
             )}
+            {pickRefused && !room.difficulty && <CalmNote role="alert">This room won't take that quiz. Pick another one.</CalmNote>}
             {pickError && <CalmNote role="alert">{pickError}</CalmNote>}
         </CalmPage>
     );

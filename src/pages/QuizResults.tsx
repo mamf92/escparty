@@ -14,13 +14,8 @@ import {
 import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
-import { readScoreHistory } from "../utils/scoreHistory";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealAnnouncement, revealDone, revealSteps, revealedCount } from "../utils/finale";
-
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "Unknown date" : date.toLocaleDateString();
-}
+import { formatRunDate, readScoreHistory } from "../utils/scoreHistory";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, revealAnnouncement, revealDone, revealSteps, revealedCount } from "../utils/finale";
 
 /**
  * The end of a quiz (#67). Solo: your score and your past ones. In a room:
@@ -128,14 +123,14 @@ const QuizResults = () => {
           <Pane>
             <Row elevation="high">
               <span className="calm-label">You scored</span>
-              <span>{gameData.score} points</span>
+              <span>{points(gameData.score)}</span>
             </Row>
           </Pane>
         </Ground>
         <Ground>
           <Pane>
             {/* The next step stands proudest (design-system.md section 6). */}
-            <Control className="is-high" onClick={() => leave("/quizzes")}>Play another quiz</Control>
+            <Control elevation="high" onClick={() => leave("/quizzes")}>Play another quiz</Control>
             <Control onClick={() => leave("/scoreboard")}>See the scoreboard</Control>
           </Pane>
         </Ground>
@@ -147,8 +142,8 @@ const QuizResults = () => {
                 {scoreHistory.map((entry, index) => (
                   <Row key={index} as="li">
                     <span className="calm-row">
-                      <span>{formatDate(entry.date)}</span>
-                      <span>{entry.score} points{entry.total === undefined ? "" : ` · ${entry.total} ${entry.total === 1 ? "question" : "questions"}`}</span>
+                      <span>{formatRunDate(entry.date)}</span>
+                      <span>{points(entry.score)}{entry.total === undefined ? "" : ` · ${entry.total} ${entry.total === 1 ? "question" : "questions"}`}</span>
                     </span>
                   </Row>
                 ))}
@@ -161,6 +156,9 @@ const QuizResults = () => {
   }
 
   const placed = placePlayers(players);
+  // Rank by elevation as the break's standings do: nobody stands proud for
+  // first when everyone is level, only your own row.
+  const leads = someoneLeads(placed);
   const steps = revealSteps(placed);
   const shown = revealedCount(steps, step);
   const revealed = placed.slice(placed.length - shown);
@@ -221,7 +219,7 @@ const QuizResults = () => {
   return (
     <CalmPage
       title="The results are in"
-      subtitle={isObserver ? undefined : `You scored ${bestKnownScore(gameData.score, players, gameData.playerId)} points.`}
+      subtitle={isObserver ? undefined : `You scored ${points(bestKnownScore(gameData.score, players, gameData.playerId))}.`}
       footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
     >
       {error && (
@@ -242,11 +240,11 @@ const QuizResults = () => {
               const podium = PODIUM_POINTS[place];
               const mine = player.id === gameData.playerId;
               return (
-                <Row key={player.id} as="li" elevation={place === 1 || mine ? "high" : "rest"}>
+                <Row key={player.id} as="li" elevation={(leads && place === 1) || mine ? "high" : "rest"}>
                   {podium && <span className="calm-label">{podium}</span>}
                   <span className="calm-row">
                     <span>{place}. {player.name}{mine ? " (you)" : ""}</span>
-                    <span>{player.score}</span>
+                    <span>{points(player.score)}</span>
                   </span>
                 </Row>
               );
@@ -255,7 +253,9 @@ const QuizResults = () => {
         </Ground>
       )}
 
-      <CalmNote role="status">{statusLine}</CalmNote>
+      {/* Empty only once the room has gone with nobody to show: the alert
+          above says so, and an empty note would just leave a gap. */}
+      {statusLine && <CalmNote role="status">{statusLine}</CalmNote>}
       {!done && placed.length > 0 && (
         <Ground>
           <Pane layout="split">

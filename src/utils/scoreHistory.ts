@@ -25,6 +25,14 @@ export function toScoreEntry(value: unknown): ScoreEntry | null {
     };
 }
 
+/** A run's date as both history screens show it ("16 May 2026"), or "Unknown date". */
+export function formatRunDate(iso: string): string {
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime())
+        ? "Unknown date"
+        : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 /**
  * The solo score history, in stored order. Every reader of `quizScores`
  * should come through here so they agree on which runs count: a broken

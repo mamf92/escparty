@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { readScoreHistory, toScoreEntry } from "./scoreHistory";
+import { formatRunDate, readScoreHistory, toScoreEntry } from "./scoreHistory";
 
 describe("toScoreEntry", () => {
     it("keeps a complete run as it is", () => {
@@ -20,6 +20,14 @@ describe("toScoreEntry", () => {
         for (const value of [null, 5, "run", [], { score: "lots" }, { score: NaN }, { total: 10 }]) {
             expect(toScoreEntry(value)).toBeNull();
         }
+    });
+});
+
+describe("formatRunDate", () => {
+    it("shows a stored date, or says it's unknown", () => {
+        expect(formatRunDate("2026-05-16T12:00:00Z")).toBe(new Date("2026-05-16T12:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }));
+        expect(formatRunDate("")).toBe("Unknown date");
+        expect(formatRunDate("not a date")).toBe("Unknown date");
     });
 });
 

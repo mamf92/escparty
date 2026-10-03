@@ -106,15 +106,15 @@ describe("QuizResults", () => {
     expect(screen.getByRole("status")).toHaveTextContent("5 players are on the scoreboard.");
 
     await user.click(screen.getByRole("button", { name: "Start the reveal" }));
-    expect(standings()).toEqual(["4. Lordi400", "5. Jedward100"]);
+    expect(standings()).toEqual(["4. Lordi400 points", "5. Jedward100 points"]);
     // Each reveal is said out loud, not only drawn.
     expect(screen.getByRole("status")).toHaveTextContent("On the board: place 4, Lordi, 400 points; place 5, Jedward, 100 points.");
     await user.click(screen.getByRole("button", { name: "Reveal 3rd place" }));
-    expect(standings()[0]).toBe("Huit points3. Käärijä (you)700");
+    expect(standings()[0]).toBe("Huit points3. Käärijä (you)700 points");
     expect(screen.getByRole("status")).toHaveTextContent("On the board: place 3, Käärijä, 700 points.");
     await user.click(screen.getByRole("button", { name: "Reveal 2nd place" }));
     await user.click(screen.getByRole("button", { name: "Reveal the winner" }));
-    expect(standings()[0]).toBe("Douze points1. Loreen1200");
+    expect(standings()[0]).toBe("Douze points1. Loreen1200 points");
     expect(screen.getByRole("status")).toHaveTextContent("Loreen wins with 1200 points!");
     expect(screen.queryByRole("button", { name: "Show everything" })).not.toBeInTheDocument();
   });
@@ -127,6 +127,29 @@ describe("QuizResults", () => {
     const rows = within(screen.getByRole("list", { name: "Final standings" })).getAllByRole("listitem");
     expect(rows.map(row => row.classList.contains("is-high"))).toEqual([true, false, true, false, false]);
     expect(rows.some(row => row.classList.contains("is-chosen"))).toBe(false);
+  });
+
+  it("raises only your own row when everyone is level, and says 1 point", async () => {
+    const level = [
+      { id: "host", name: "Martin", score: 1 },
+      { id: "p2", name: "Loreen", score: 1 },
+      { id: "p3", name: "Lordi", score: 1 },
+    ];
+    renderResults({ score: 1, multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+    act(() => mocks.onRoom(room({ players: level })));
+    expect(screen.getByText("You scored 1 point.")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Start the reveal" }));
+    const rows = within(screen.getByRole("list", { name: "Final standings" })).getAllByRole("listitem");
+    expect(rows.map(row => row.textContent)).toEqual(["Douze points1. Lordi1 point", "Douze points1. Loreen (you)1 point", "Douze points1. Martin1 point"]);
+    expect(rows.map(row => row.classList.contains("is-high"))).toEqual([false, true, false]);
+  });
+
+  it("leaves no empty status note once the room has gone with nobody to show", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    renderResults({ score: 0, multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+    act(() => mocks.onRoom(null));
+    expect(screen.getByRole("alert")).toHaveTextContent("The game room no longer exists.");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("can skip straight to everything, and leaves on purpose", async () => {

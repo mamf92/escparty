@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane, Row, useRovingTabs } from "../design";
 import { quizTitle } from "../utils/quizCatalog";
-import { readScoreHistory, type ScoreEntry } from "../utils/scoreHistory";
+import { formatRunDate, readScoreHistory, type ScoreEntry } from "../utils/scoreHistory";
 
 type SortKey = "date" | "difficulty" | "score";
 
@@ -80,13 +80,6 @@ function timeOf(entry: ScoreEntry): number {
     return Number.isNaN(time) ? -Infinity : time;
 }
 
-function formatDate(iso: string): string {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime())
-        ? "Unknown date"
-        : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
-
 const Scoreboard = () => {
     const navigate = useNavigate();
     const [scoreHistory] = useState(readScoreHistory);
@@ -144,7 +137,7 @@ const Scoreboard = () => {
                             </span>
                             <span className="calm-sub">
                                 {entry.total === undefined ? "" : `${entry.total} ${entry.total === 1 ? "question" : "questions"} · `}
-                                {formatDate(entry.date)}
+                                {formatRunDate(entry.date)}
                             </span>
                         </Row>
                     ))

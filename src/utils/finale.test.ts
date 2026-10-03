@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealAnnouncement, revealDone, revealSteps, revealedCount, winnerLine } from "./finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealAnnouncement, revealDone, revealSteps, revealedCount, someoneLeads, winnerLine } from "./finale";
 
 const p = (name: string, score: number) => ({ id: name.toLowerCase(), name, score });
 
@@ -64,5 +64,12 @@ describe("finale", () => {
         expect(revealedCount([], 2)).toBe(0);
         expect([2, 3, 9].map(step => revealDone(steps, step))).toEqual([false, true, true]);
         expect(revealDone([], 0)).toBe(false);
+    });
+
+    it("says whether anyone leads", () => {
+        expect(someoneLeads(placePlayers([p("Solo", 3)]))).toBe(true);
+        expect(someoneLeads(placePlayers([p("A", 3), p("B", 3)]))).toBe(false);
+        expect(someoneLeads(placePlayers([p("A", 5), p("B", 5), p("C", 1)]))).toBe(true);
+        expect(someoneLeads([])).toBe(false);
     });
 });

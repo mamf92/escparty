@@ -141,10 +141,13 @@ describe("Lobby", () => {
     await user.click(screen.getByRole("button", { name: "Classic: Easy" }));
     expect(screen.getByRole("alert")).toHaveTextContent("That quiz couldn't be loaded");
     await user.click(screen.getByRole("button", { name: "Classic: Easy" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("This room wouldn't take the quiz");
+    expect(screen.getByRole("alert")).toHaveTextContent("This room won't take that quiz. Pick another one.");
     expect(screen.queryByText(/Failed to set difficulty/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Join or host a game" }));
-    expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+    // A refused quiz wrote nothing: the host can still pick another.
+    mocks.setRoomQuiz.mockResolvedValueOnce(undefined);
+    await user.click(screen.getByRole("button", { name: "Classic: Hard" }));
+    expect(mocks.setRoomQuiz).toHaveBeenLastCalledWith("ABBA", "hard");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("goes on when a refused pick finds the room already has a quiz", async () => {
@@ -154,10 +157,10 @@ describe("Lobby", () => {
     renderLobby();
     act(() => mocks.onRoom(room()));
     await userEvent.setup().click(screen.getByRole("button", { name: "Classic: Easy" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("This room wouldn't take the quiz");
+    expect(screen.getByRole("alert")).toHaveTextContent("This room won't take that quiz");
     // Another tab of this host picked first: the room has its quiz after all.
     act(() => mocks.onRoom(room({ difficulty: "easy" })));
-    expect(screen.queryByText(/wouldn't take the quiz/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/won't take that quiz/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Start/ })).toBeInTheDocument();
   });
 
@@ -254,8 +257,11 @@ describe("Lobby", () => {
     as("p2", "Loreen");
     renderLobby();
     act(() => mocks.onRoom(null));
-    expect(screen.getByRole("alert")).toHaveTextContent("This game has closed");
+    expect(screen.getByRole("alert")).toHaveTextContent("We can't find this game. It may have closed");
     expect(screen.getByRole("button", { name: "Join or host a game" })).toBeInTheDocument();
+    // An offline first snapshot looks the same; the room coming back heals it.
+    act(() => mocks.onRoom(room()));
+    expect(screen.queryByText(/can't find this game/)).not.toBeInTheDocument();
   });
 
   it("raises your own row, never sinks the start, and labels its sections", () => {

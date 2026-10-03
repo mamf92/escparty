@@ -154,7 +154,9 @@ case, verb first ("Host a party", "Lock in", "Next act"). States:
 | Disabled | Faded, a smaller lift | Same | `disabled` |
 
 Rows with a title and detail use `block`: title in the control size, detail
-in `.calm-sub`, laid out left to right with `.calm-row`.
+in `.calm-sub`, laid out left to right with `.calm-row`. The screen's next
+step takes `elevation="high"` (`.is-high`): it stands proudest at rest and
+still lightens on hover and presses in.
 
 **Row** (`<Row>`, `.lycra.is-block.is-static`). Information on the
 surface: a quieter lift than a control (`--esc-raise-sm`), and no pointer,

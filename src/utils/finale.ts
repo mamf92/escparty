@@ -24,6 +24,14 @@ export const placePlayers = (players: readonly Player[]): Placed[] => {
 };
 
 /**
+ * Whether anyone leads: a lone player does, and a field that's all level
+ * (two or more on one score) doesn't. Standings raise first place only
+ * when someone leads, so a tie for everyone doesn't raise every row.
+ */
+export const someoneLeads = (placed: readonly Placed[]): boolean =>
+    placed.length === 1 || placed.some(({ place }) => place > 1);
+
+/**
  * How many rows are showing after each tap of the reveal, counted from the
  * bottom. Everyone below the podium comes out together first (if there is
  * anyone), then third, second and first place one at a time. A tie comes
