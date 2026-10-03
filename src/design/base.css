@@ -55,6 +55,8 @@ body {
 .esc-note {
   margin: var(--esc-space-2) 0 0;
   font-size: var(--esc-text-sub);
+  /* A section heading set as a note reads as one, not as a bold h2. */
+  font-weight: inherit;
   line-height: 1.5;
   text-align: center;
   color: var(--esc-ink-muted);

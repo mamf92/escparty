@@ -116,7 +116,7 @@ const QuizResults = () => {
     return (
       <CalmPage
         title="Quiz complete"
-        subtitle={best !== null && best > gameData.score ? `Your best is still ${best}.` : undefined}
+        subtitle={best !== null && best > gameData.score ? `Your best is still ${points(best)}.` : undefined}
         footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
       >
         <Ground>
@@ -271,7 +271,8 @@ const QuizResults = () => {
       {room && isHost && !room.nextRoomCode && !error && (
         <Ground>
           <Pane>
-            <Control disabled={nextRound === "busy"} onClick={playAgain}>Play again with everyone</Control>
+            {/* Once everyone is showing, the next round is the next step (design-system.md section 6). */}
+            <Control elevation={done ? "high" : "rest"} disabled={nextRound === "busy"} onClick={playAgain}>Play again with everyone</Control>
           </Pane>
         </Ground>
       )}
@@ -280,7 +281,7 @@ const QuizResults = () => {
           <CalmNote>{isHost ? "You've started another round." : "The host has started another round."}</CalmNote>
           <Ground>
             <Pane>
-              <Control disabled={nextRound === "busy"} onClick={joinNext}>
+              <Control elevation={done ? "high" : "rest"} disabled={nextRound === "busy"} onClick={joinNext}>
                 {isHost ? "Back to the next round's lobby" : "Join the next round"}
               </Control>
             </Pane>

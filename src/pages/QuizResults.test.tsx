@@ -65,7 +65,7 @@ describe("QuizResults", () => {
     localStorage.setItem("quizScores", JSON.stringify([{ score: 12, total: 15, date: "2026-05-16T00:00:00Z" }]));
     renderResults({ score: 9, multiplayer: false });
     expect(screen.getByText("9 points")).toBeInTheDocument();
-    expect(screen.getByText("Your best is still 12.")).toBeInTheDocument();
+    expect(screen.getByText("Your best is still 12 points.")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Your past scores" })).toHaveTextContent("12 points · 15 questions");
     expect(screen.getByRole("heading", { level: 2, name: "Your past scores" })).toBeInTheDocument();
     // Your score stands proud as information, not as something picked.
@@ -87,7 +87,7 @@ describe("QuizResults", () => {
   it("skips broken past scores and shows a run missing its details", () => {
     localStorage.setItem("quizScores", JSON.stringify([null, { score: "x" }, { score: 6 }]));
     renderResults({ score: 3 });
-    expect(screen.getByText("Your best is still 6.")).toBeInTheDocument();
+    expect(screen.getByText("Your best is still 6 points.")).toBeInTheDocument();
     const past = screen.getByRole("list", { name: "Your past scores" });
     expect(past.querySelectorAll("li")).toHaveLength(1);
     expect(past).toHaveTextContent("Unknown date");
@@ -171,6 +171,15 @@ describe("QuizResults", () => {
     act(() => mocks.onRoom(null));
     expect(screen.getByRole("alert")).toHaveTextContent("no longer exists");
     expect(screen.getAllByRole("button", { name: "Join or host another game" })).toHaveLength(1);
+  });
+
+  it("raises the next round once everyone is showing", async () => {
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
+    act(() => mocks.onRoom(room()));
+    const playAgain = screen.getByRole("button", { name: "Play again with everyone" });
+    expect(playAgain).not.toHaveClass("is-high");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show everything" }));
+    expect(screen.getByRole("button", { name: "Play again with everyone" })).toHaveClass("is-high");
   });
 
   it("offers the host no next round once the room is gone", () => {

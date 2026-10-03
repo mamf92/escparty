@@ -159,11 +159,11 @@
 }
 
 /* A proud control (the screen's next step) still answers a point and a press. */
-.esc-app .lycra.is-high:not(.is-static):not(:disabled):hover {
+.esc-app .lycra.is-high:not(.is-static):not(:disabled):not([aria-disabled="true"]):hover {
   background: var(--esc-face-hover);
 }
 
-.esc-app .lycra.is-high:not(.is-static):not(:disabled):active {
+.esc-app .lycra.is-high:not(.is-static):not(:disabled):not([aria-disabled="true"]):active {
   background: var(--esc-face-pressed);
   box-shadow: var(--esc-inset);
 }

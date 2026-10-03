@@ -71,6 +71,13 @@ describe("Surface", () => {
     expect(screen.getByRole("button", { name: "Later" })).not.toHaveClass("is-high");
   });
 
+  it("keeps a chosen control pressed in even when asked to stand proud", () => {
+    render(<Control chosen elevation="high">Picked</Control>);
+    const picked = screen.getByRole("button", { name: "Picked" });
+    expect(picked).toHaveClass("is-chosen");
+    expect(picked).not.toHaveClass("is-high");
+  });
+
   it("a block control is a left-aligned row, type=button by default", async () => {
     const onClick = vi.fn();
     render(<Control block onClick={onClick}>Row</Control>);

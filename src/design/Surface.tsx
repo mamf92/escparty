@@ -40,7 +40,8 @@ type ControlProps = ComponentPropsWithRef<"button"> & {
   block?: boolean;
   /**
    * `high` stands proudest: the screen's next step (design-system.md
-   * section 6, "Success"). It still lifts on hover and presses in.
+   * section 6, "Success"). It still lifts on hover and presses in, and
+   * `chosen` wins over it: a chosen control stays pressed in.
    */
   elevation?: "high" | "rest";
 };
@@ -53,7 +54,7 @@ type ControlProps = ComponentPropsWithRef<"button"> & {
 export const Control = ({ chosen, block, elevation = "rest", className, type = "button", ...props }: ControlProps) => (
   <button
     type={type}
-    className={cx("lycra", block && "is-block", chosen && "is-chosen", elevation === "high" && "is-high", className)}
+    className={cx("lycra", block && "is-block", chosen && "is-chosen", !chosen && elevation === "high" && "is-high", className)}
     aria-pressed={chosen === undefined || props.role ? undefined : chosen}
     {...props}
   />
