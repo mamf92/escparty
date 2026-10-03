@@ -98,7 +98,7 @@ const PartyRoom = () => {
             </Ground>
             {error && <PartyError error={error} onRetry={retry} />}
 
-            <div className="party-tabpanel" {...tabs.panel}>
+            <div className="party-stack" {...tabs.panel}>
                 {tab === "rate" && (
                     <RateAct
                         party={party}

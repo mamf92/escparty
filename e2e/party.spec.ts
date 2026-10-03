@@ -42,7 +42,8 @@ test("a host and two guests rate a semi and get their awards", async ({ browser 
     await expect(john.getByText(/^(Loreen & John|John & Loreen) \(that's you!\)$/)).toBeVisible();
 
     // The last page is the closeness table: everyone called the qualifier.
-    const next = lordi.getByRole("button", { name: "Next award" });
+    // The last award's Next is named for the table it goes to.
+    const next = lordi.getByRole("button", { name: /^(Next award|Closest to the result)$/ });
     await lordi.getByRole("button", { name: "See the awards" }).click();
     await expect(lordi.getByText("The Jedward Twins")).toBeVisible();
     while (await next.isEnabled()) await next.click();

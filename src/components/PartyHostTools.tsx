@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from "react";
 import { CalmNote } from "./CalmPage";
 import { Control, Field, Ground, Pane } from "../design";
 import type { Act } from "../data/contests2027";
@@ -103,7 +103,7 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
  * answer first and focused, so a stray tap or Enter can't wipe anything.
  * Answering hands focus back to the button that asked.
  */
-const useConfirm = (fallbackRef?: RefObject<HTMLButtonElement | null>) => {
+const useConfirm = (busy: boolean, fallbackRef?: RefObject<HTMLButtonElement | null>) => {
     const [asking, setAsking] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const keepRef = useRef<HTMLButtonElement>(null);
@@ -112,9 +112,10 @@ const useConfirm = (fallbackRef?: RefObject<HTMLButtonElement | null>) => {
     // After a confirmed overwrite the button that asked may be about to go
     // (a cleared result has nothing to clear), so the fallback comes first.
     const confirmed = useRef(false);
-    // Runs after every render: the button to hand focus back to can be
-    // disabled while the confirmed write is in flight, or gone once it
-    // lands, so the hand-back waits until there's an enabled one to take it.
+    // The button to hand focus back to can be disabled while the confirmed
+    // write is in flight, or gone once it lands, so the hand-back waits for
+    // that write (busy) to end, and then gives up rather than wait for a
+    // later render to pull focus or scroll the page.
     useEffect(() => {
         if (asking && !wasAsking.current) keepRef.current?.focus();
         if (!asking && wasAsking.current) handBack.current = true;
@@ -127,11 +128,9 @@ const useConfirm = (fallbackRef?: RefObject<HTMLButtonElement | null>) => {
         }
         const order = confirmed.current ? [fallbackRef?.current, triggerRef.current] : [triggerRef.current, fallbackRef?.current];
         const target = order.find(button => button && !button.disabled);
-        if (target) {
-            target.focus();
-            handBack.current = false;
-        }
-    });
+        target?.focus();
+        if (target || !busy) handBack.current = false;
+    }, [asking, busy, fallbackRef]);
     const ask = () => {
         confirmed.current = false;
         setAsking(true);
@@ -172,7 +171,7 @@ const ConfirmStep = ({ question, keep, confirm, busy, keepRef, onKeep, onConfirm
 const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onSave: (results: PartyResults) => void }) => {
     // With "Clear" gone once the result is, focus carries on from who came 1st.
     const firstPickRef = useRef<HTMLButtonElement>(null);
-    const { asking: clearing, ask: askClear, answer: answerClear, setAsking: setClearing, triggerRef: clearRef, keepRef: keepResultRef } = useConfirm(firstPickRef);
+    const { asking: clearing, ask: askClear, answer: answerClear, setAsking: setClearing, triggerRef: clearRef, keepRef: keepResultRef } = useConfirm(busy, firstPickRef);
     // Only acts still in the show, in case the lineup changed under the result.
     const places = resultsFor(party.acts, party.results).places ?? {};
     const placed = party.acts.filter(act => places[act.id] !== undefined).sort((a, b) => places[a.id] - places[b.id]);
@@ -291,7 +290,7 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
 }) => {
     const actFieldId = useId();
     const [actId, setActId] = useState(party.acts[0].id);
-    const { asking: loading, ask: askLoad, answer: answerLoad, triggerRef: loadRef, keepRef: keepLineupRef } = useConfirm();
+    const { asking: loading, ask: askLoad, answer: answerLoad, triggerRef: loadRef, keepRef: keepLineupRef } = useConfirm(busy);
     // The picked act, or the first one if it left the lineup.
     const index = Math.max(party.acts.findIndex(act => act.id === actId), 0);
     const act = party.acts[index];
@@ -363,22 +362,28 @@ const ActDetails = ({ act, busy, onSave }: { act: Act; busy: boolean; onSave: (a
     const ids = useId();
     const [artist, setArtist] = useState(act.artist);
     const [song, setSong] = useState(act.song);
+    const save = (event: FormEvent) => {
+        event.preventDefault();
+        if (!busy) onSave(artist.trim() || act.artist, song.trim() || act.song);
+    };
     return (
-        <Ground>
-            <Pane>
-                <div>
-                    <label className="calm-label" htmlFor={`${ids}-artist`}>Artist</label>
-                    <Field id={`${ids}-artist`} value={artist} maxLength={80} onChange={event => setArtist(event.target.value)} />
-                </div>
-                <div>
-                    <label className="calm-label" htmlFor={`${ids}-song`}>Song</label>
-                    <Field id={`${ids}-song`} value={song} maxLength={80} onChange={event => setSong(event.target.value)} />
-                </div>
-                <Control disabled={busy} onClick={() => onSave(artist.trim() || act.artist, song.trim() || act.song)}>
-                    Save {act.country}
-                </Control>
-            </Pane>
-        </Ground>
+        <form onSubmit={save} noValidate>
+            <Ground>
+                <Pane>
+                    <div>
+                        <label className="calm-label" htmlFor={`${ids}-artist`}>Artist</label>
+                        <Field id={`${ids}-artist`} value={artist} maxLength={80} onChange={event => setArtist(event.target.value)} />
+                    </div>
+                    <div>
+                        <label className="calm-label" htmlFor={`${ids}-song`}>Song</label>
+                        <Field id={`${ids}-song`} value={song} maxLength={80} onChange={event => setSong(event.target.value)} />
+                    </div>
+                    <Control type="submit" disabled={busy}>
+                        Save {act.country}
+                    </Control>
+                </Pane>
+            </Ground>
+        </form>
     );
 };
 

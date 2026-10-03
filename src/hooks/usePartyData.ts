@@ -41,11 +41,16 @@ export const usePartyData = (code: string | undefined): PartyData => {
         };
         let unsubscribeParty = () => {};
         let unsubscribeBallots = () => {};
+        // Each listener's own failure, so the log names the one that failed.
         try {
             unsubscribeParty = listenToParty(code, next => setParty({ code, value: next }), failed("party"));
-            unsubscribeBallots = listenToBallots(code, next => setBallots({ code, value: next }), failed("ballots"));
         } catch (err) {
             failed("party")(err as Error);
+        }
+        try {
+            unsubscribeBallots = listenToBallots(code, next => setBallots({ code, value: next }), failed("ballots"));
+        } catch (err) {
+            failed("ballots")(err as Error);
         }
         return () => {
             unsubscribeParty();

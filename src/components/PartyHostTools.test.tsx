@@ -116,6 +116,14 @@ describe("PartyHostTools", () => {
         expect(screen.getByRole("status")).toHaveTextContent("Saved Ireland.");
     });
 
+    it("saves an act's artist and song with Enter", async () => {
+        const user = userEvent.setup();
+        renderTools(makeParty());
+        await user.clear(screen.getByLabelText("Song"));
+        await user.type(screen.getByLabelText("Song"), "Euphoria{Enter}");
+        expect(mocks.updatePartyActs).toHaveBeenLastCalledWith("ABBA", [{ ...fixtureActs[0], song: "Euphoria" }, ...fixtureActs.slice(1)]);
+    });
+
     it("refills the fields from a newer lineup instead of saving old ones over it", async () => {
         const user = userEvent.setup();
         const { rerender } = renderTools(makeParty());

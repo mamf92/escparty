@@ -10,6 +10,7 @@ import {
     PARTY_BONUSES,
     RATING_TEMPLATES,
     SCALE_CHOICES,
+    categoryLabelProblem,
     categoryProblems,
     type RatingCategory,
     type RatingTemplate,
@@ -53,14 +54,8 @@ const PartySetup = () => {
     const sheetProblems = templateId === CUSTOM ? categoryProblems(custom) : [];
     const nameMissing = tried && !name.trim();
     const sheetProblemShown = tried && sheetProblems.length > 0;
-    // Which category names the problem is about: blank ones and repeats.
-    const labelCounts = new Map<string, number>();
-    for (const category of custom) {
-        const label = category.label.trim().toLowerCase();
-        if (label) labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
-    }
-    const labelInvalid = (label: string) =>
-        sheetProblemShown && (!label.trim() || label.trim().length > CATEGORY_LIMITS.maxLabel || (labelCounts.get(label.trim().toLowerCase()) ?? 0) > 1);
+    // Which category names the problem is about: blank, too long or repeated.
+    const labelInvalid = (category: RatingCategory) => sheetProblemShown && categoryLabelProblem(category, custom) !== null;
 
     const setCategory = (index: number, change: Partial<RatingCategory>) =>
         setCustom(custom.map((category, i) => (i === index ? { ...category, ...change } : category)));
@@ -165,8 +160,8 @@ const PartySetup = () => {
                                         value={category.label}
                                         maxLength={CATEGORY_LIMITS.maxLabel}
                                         placeholder={index === 0 ? "Hair height" : "Costume changes"}
-                                        aria-invalid={labelInvalid(category.label)}
-                                        aria-describedby={labelInvalid(category.label) ? `${ids}-sheet-problem` : undefined}
+                                        aria-invalid={labelInvalid(category)}
+                                        aria-describedby={labelInvalid(category) ? `${ids}-sheet-problem` : undefined}
                                         onChange={event => setCategory(index, { label: event.target.value })}
                                     />
                                     <label className="calm-label party-label-gap" htmlFor={`${ids}-${category.id}-scale`}>

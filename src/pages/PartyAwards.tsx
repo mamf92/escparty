@@ -25,8 +25,9 @@ const PartyAwards = () => {
     const back = <CalmLink onClick={() => navigate(code ? `/party/${code}` : "/party")}>Back to the party</CalmLink>;
 
     if (party === null) {
+        // No party to go back to: back to the start instead.
         return (
-            <CalmPage title="The awards" footer={back}>
+            <CalmPage title="The awards" footer={<CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>}>
                 <PartyNotFound code={code} />
             </CalmPage>
         );
@@ -72,55 +73,60 @@ const PartyAwards = () => {
                 </Ground>
             )}
 
-            {award && (() => {
-                const { who, mine } = awardWinners(award.guestIds, names, party.showNames, identity?.guestId);
-                return (
-                    <Ground>
-                        <Pane>
-                            {/* Your own award stands proud, and says so in words too. */}
-                            <Row elevation={mine ? "high" : "rest"}>
-                                <span className="calm-label">{award.for}</span>
-                                <span>{award.title}</span>
-                                <span>{who}{mine && party.showNames ? " (that's you!)" : ""}</span>
-                                <span className="calm-sub">{award.detail}</span>
-                                <span className="calm-sub">{award.story}</span>
-                            </Row>
-                        </Pane>
-                    </Ground>
-                );
-            })()}
+            {/* Paging moves no focus, so what the page now shows is read out. */}
+            <div className="party-stack" aria-live="polite">
+                {award && (() => {
+                    const { who, mine } = awardWinners(award.guestIds, names, party.showNames, identity?.guestId);
+                    return (
+                        <Ground>
+                            <Pane>
+                                {/* Your own award stands proud, and says so in words too. */}
+                                <Row elevation={mine ? "high" : "rest"}>
+                                    <span className="calm-label">{award.for}</span>
+                                    <span>{award.title}</span>
+                                    <span>{who}{mine && party.showNames ? " (that's you!)" : ""}</span>
+                                    <span className="calm-sub">{award.detail}</span>
+                                    <span className="calm-sub">{award.story}</span>
+                                </Row>
+                            </Pane>
+                        </Ground>
+                    );
+                })()}
 
-            {!award && leaderboard.length > 0 && (
-                <>
-                    <h2 className="esc-note">Closest to the real result</h2>
-                    <Ground>
-                        <Pane as="ol" aria-label="Closest to the real result">
-                            {leaderboard.map((row, place) => {
-                                const mine = row.guestId === identity?.guestId;
-                                if (!party.showNames && !mine) return null;
-                                return (
-                                    <Row as="li" key={row.guestId} elevation={mine && party.showNames ? "high" : "rest"}>
-                                        <span className="calm-row">
-                                            <span>{ordinal(place + 1)} {party.showNames ? row.name : "You"}</span>
-                                            <span>{row.prediction.points}</span>
-                                        </span>
-                                        {mine && party.showNames && <span className="calm-sub">That's you</span>}
-                                    </Row>
-                                );
-                            })}
-                        </Pane>
-                    </Ground>
-                    {!party.showNames && <CalmNote>Out of {leaderboard.length} guests. Everyone else's place is theirs to share.</CalmNote>}
-                </>
-            )}
+                {!award && leaderboard.length > 0 && (
+                    <>
+                        <h2 className="esc-note">Closest to the real result</h2>
+                        <Ground>
+                            <Pane as="ol" aria-label="Closest to the real result">
+                                {leaderboard.map((row, place) => {
+                                    const mine = row.guestId === identity?.guestId;
+                                    if (!party.showNames && !mine) return null;
+                                    return (
+                                        <Row as="li" key={row.guestId} elevation={mine && party.showNames ? "high" : "rest"}>
+                                            <span className="calm-row">
+                                                <span>{ordinal(place + 1)} {party.showNames ? row.name : "You"}</span>
+                                                <span>{row.prediction.points}</span>
+                                            </span>
+                                            {mine && party.showNames && <span className="calm-sub">That's you</span>}
+                                        </Row>
+                                    );
+                                })}
+                            </Pane>
+                        </Ground>
+                        {!party.showNames && <CalmNote>Out of {leaderboard.length} guests. Everyone else's place is theirs to share.</CalmNote>}
+                    </>
+                )}
+            </div>
 
             {pages > 1 && (
                 <>
-                    <CalmNote aria-live="polite">{page + 1} of {pages}</CalmNote>
+                    <CalmNote>{page + 1} of {pages}</CalmNote>
                     <Ground>
                         <Pane layout="split">
                             <Control disabled={page === 0} onClick={() => setIndex(page - 1)}>Previous award</Control>
-                            <Control disabled={page === pages - 1} onClick={() => setIndex(page + 1)}>Next award</Control>
+                            <Control disabled={page === pages - 1} onClick={() => setIndex(page + 1)}>
+                                {leaderboard.length > 0 && page + 1 === awards.length ? "Closest to the result" : "Next award"}
+                            </Control>
                         </Pane>
                     </Ground>
                 </>

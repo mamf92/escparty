@@ -26,8 +26,9 @@
   margin-top: var(--esc-space-3);
 }
 
-/* The room's tab panel stacks its sections like the page around it does. */
-.party-tabpanel {
+/* The room's tab panel and the awards' live region stack their sections
+   like the page around them does. */
+.party-stack {
   display: flex;
   flex-direction: column;
   align-items: stretch;

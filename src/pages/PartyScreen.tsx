@@ -47,8 +47,9 @@ const PartyScreen = () => {
         );
     }
     if (party === null) {
+        // No party to go back to: back to the start instead.
         return (
-            <CalmPage title="Scoreboard party" className="calm-screen" footer={back}>
+            <CalmPage title="Scoreboard party" className="calm-screen" footer={<CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>}>
                 <PartyNotFound code={code} />
             </CalmPage>
         );

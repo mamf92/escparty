@@ -44,6 +44,9 @@ describe("PartyAwards", () => {
         const { unmount: unmountMissing } = renderAwards();
         expect(screen.getByRole("alert")).toHaveTextContent("no party with the code ABBA");
         expect(screen.getByRole("button", { name: "Try another code" })).toBeInTheDocument();
+        // No party to go back to: the footer goes to the start, not the same missing code.
+        expect(screen.queryByRole("button", { name: "Back to the party" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Back to the scoreboard party" })).toBeInTheDocument();
         unmountMissing();
         mocks.data = { party: undefined, ballots: undefined, error: "The party couldn't be reached.", retry: vi.fn() };
         renderAwards();
@@ -82,6 +85,8 @@ describe("PartyAwards", () => {
         renderAwards();
         expect(card()).toHaveTextContent("The Jedward Twins");
         expect(card()).toHaveTextContent("Jedward & Lordi (that's you!)");
+        // Paging moves no focus, so the award itself is read out.
+        expect(card().closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
         // Your own award stands proud: raised, not marked as a choice.
         expect(card()).toHaveClass("is-high");
         expect(card()).not.toHaveClass("is-chosen");
@@ -109,14 +114,19 @@ describe("PartyAwards", () => {
         mocks.data = { party: makeParty({ revealed: true, results }), ballots, error: null, retry: vi.fn() };
         const { unmount } = renderAwards();
         const pages = Number(screen.getByText(/^1 of \d+$/).textContent!.split(" of ")[1]);
-        for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
+        for (let page = 1; page < pages - 1; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
+        // The last award's Next is named for where it goes, and it's read out.
+        await user.click(screen.getByRole("button", { name: "Closest to the result" }));
+        expect(screen.getByRole("list", { name: "Closest to the real result" }).closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
+        expect(screen.getByRole("button", { name: "Next award" })).toBeDisabled();
         const board = screen.getByRole("list", { name: "Closest to the real result" });
         expect(within(board).getAllByRole("listitem")[0]).toHaveTextContent("1st Jedward48");
         unmount();
 
         mocks.data = { party: makeParty({ revealed: true, showNames: false, results }), ballots, error: null, retry: vi.fn() };
         renderAwards();
-        for (let page = 1; page < pages; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
+        for (let page = 1; page < pages - 1; page++) await user.click(screen.getByRole("button", { name: "Next award" }));
+        await user.click(screen.getByRole("button", { name: "Closest to the result" }));
         const anonymous = screen.getByRole("list", { name: "Closest to the real result" });
         expect(within(anonymous).getAllByRole("listitem").map(item => item.textContent)).toEqual(["1st You48"]);
         expect(screen.getByText(/Out of 3 guests/)).toBeInTheDocument();

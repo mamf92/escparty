@@ -89,15 +89,16 @@ describe("PartyScreen", () => {
         renderScreen();
         expect(screen.getByRole("alert")).toHaveTextContent("no party with the code ABBA");
         expect(screen.getByRole("button", { name: "Try another code" })).toBeInTheDocument();
-        await userEvent.setup().click(screen.getByRole("button", { name: "Back to my phone view" }));
-        expect(screen.getByText("at /party/ABBA")).toBeInTheDocument();
+        // No party to go back to, so the way back is to the start.
+        await userEvent.setup().click(screen.getByRole("button", { name: "Back to the scoreboard party" }));
+        expect(screen.getByText("at /party")).toBeInTheDocument();
         expect(console.error).toHaveBeenCalled();
     });
 
     it("goes to the party home without a code", async () => {
         mocks.data = { party: null, ballots: undefined, error: null, retry: vi.fn() };
         renderScreen("/screen");
-        await userEvent.setup().click(screen.getByRole("button", { name: "Back to my phone view" }));
+        await userEvent.setup().click(screen.getByRole("button", { name: "Back to the scoreboard party" }));
         expect(screen.getByText("at /party")).toBeInTheDocument();
         expect(mocks.toDataURL).not.toHaveBeenCalled();
     });

@@ -82,4 +82,17 @@ describe("usePartyData", () => {
         const { result } = renderHook(() => usePartyData("ABBA"));
         expect(result.current.error).toMatch(/couldn't be reached/);
     });
+
+    it("blames the ratings listener, not the party's, when that one can't start", () => {
+        mocks.listenToBallots.mockImplementation(() => {
+            throw new Error("Firebase not initialized");
+        });
+        const { result, unmount } = renderHook(() => usePartyData("ABBA"));
+        expect(result.current.error).toMatch(/couldn't be reached/);
+        expect(console.error).toHaveBeenCalledWith("Couldn't follow the party's ratings:", expect.any(Error));
+        expect(console.error).not.toHaveBeenCalledWith("Couldn't follow the party's details:", expect.anything());
+        // The party listener started, so it's still stopped on unmount.
+        unmount();
+        expect(mocks.stopParty).toHaveBeenCalled();
+    });
 });

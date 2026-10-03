@@ -86,17 +86,31 @@ export interface Ballot {
     bonuses: Bonuses;
 }
 
+/**
+ * What's wrong with one category's name among the sheet's, if anything:
+ * blank, too long, or the same as another's (ignoring case). The setup
+ * screen marks the fields it's about; categoryProblems words it.
+ */
+export const categoryLabelProblem = (
+    category: RatingCategory,
+    categories: RatingCategory[],
+): "blank" | "long" | "repeat" | null => {
+    const label = category.label.trim().toLowerCase();
+    if (!label) return "blank";
+    if (label.length > CATEGORY_LIMITS.maxLabel) return "long";
+    if (categories.filter(other => other.label.trim().toLowerCase() === label).length > 1) return "repeat";
+    return null;
+};
+
 /** What's wrong with a set of custom categories, as sentences. */
 export const categoryProblems = (categories: RatingCategory[]): string[] => {
     const problems: string[] = [];
     if (categories.length < CATEGORY_LIMITS.min) problems.push("Add at least one category.");
     if (categories.length > CATEGORY_LIMITS.max) problems.push(`Use at most ${CATEGORY_LIMITS.max} categories.`);
-    if (categories.some(category => !category.label.trim())) problems.push("Name every category.");
-    if (categories.some(category => category.label.trim().length > CATEGORY_LIMITS.maxLabel)) {
-        problems.push(`Keep category names under ${CATEGORY_LIMITS.maxLabel} characters.`);
-    }
-    const labels = categories.map(category => category.label.trim().toLowerCase()).filter(Boolean);
-    if (new Set(labels).size < labels.length) problems.push("Two categories have the same name.");
+    const labelProblems = categories.map(category => categoryLabelProblem(category, categories));
+    if (labelProblems.includes("blank")) problems.push("Name every category.");
+    if (labelProblems.includes("long")) problems.push(`Keep category names under ${CATEGORY_LIMITS.maxLabel} characters.`);
+    if (labelProblems.includes("repeat")) problems.push("Two categories have the same name.");
     if (categories.some(category => !(SCALE_CHOICES as readonly number[]).includes(category.max))) {
         problems.push("Pick a scale for every category.");
     }
