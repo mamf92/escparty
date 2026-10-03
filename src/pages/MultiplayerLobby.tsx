@@ -66,6 +66,10 @@ const refusedNote = async (code: string): Promise<string> => {
 
 type StoredPlayer = { id: string; name: string };
 
+const HOST_NAME = "The host";
+// A stored name as it reads mid-sentence ("Rejoin as the host").
+const asNamed = (name: string): string => name === HOST_NAME ? "the host" : name;
+
 // A player's name without its emoji ("Loreen 🇸🇪" → "Loreen"), for a
 // button label: the design system keeps emoji out of buttons (§8).
 const plainName = (name: string): string =>
@@ -98,6 +102,9 @@ const MultiplayerLobby = () => {
   // A create or join in flight: two taps in one render would both still
   // see loading as false, and make two rooms or two players.
   const busy = useRef(false);
+  // Which create or join is current: going back to host or join mid-way
+  // starts afresh, and the one left behind must not take the user anywhere.
+  const attempt = useRef(0);
   useEffect(() => {
     left.current = false;
     return () => { left.current = true; };
@@ -131,6 +138,9 @@ const MultiplayerLobby = () => {
   };
 
   const goTo = (next: Step) => {
+    attempt.current += 1;
+    busy.current = false;
+    setLoading(false);
     setStep(next);
     setError(null);
     setAttempted(false);
@@ -142,12 +152,14 @@ const MultiplayerLobby = () => {
   const createGame = async (hostIsObserver: boolean) => {
     if (busy.current) return;
     busy.current = true;
+    const mine = ++attempt.current;
+    const stale = () => left.current || attempt.current !== mine;
     setLoading(true);
     setError(null);
     try {
       // Generate a unique ID for the host
       const hostId = uuidv4();
-      const hostName = "The host";
+      const hostName = HOST_NAME;
 
       // Generate a room code
       const newGameCode = generateRoomCode();
@@ -162,7 +174,7 @@ const MultiplayerLobby = () => {
 
       // Left while the room was being made: it stays empty and unused, and
       // the game this device was in stays the stored one (#65).
-      if (left.current) return;
+      if (stale()) return;
 
       // Save user info in local storage
       localStorage.setItem("playerId", hostId);
@@ -176,10 +188,12 @@ const MultiplayerLobby = () => {
       navigate("/lobby");
     } catch (error) {
       console.error("Error creating game:", error);
-      if (!left.current) setError("We couldn't set up the room. Check your connection and try again.");
+      if (!stale()) setError("We couldn't set up the room. Check your connection and try again.");
     } finally {
-      busy.current = false;
-      if (!left.current) setLoading(false);
+      if (!stale()) {
+        busy.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -211,6 +225,8 @@ const MultiplayerLobby = () => {
 
     if (busy.current) return;
     busy.current = true;
+    const mine = ++attempt.current;
+    const stale = () => left.current || attempt.current !== mine;
     setLoading(true);
     try {
       const before = rejoin === true ? rejoinAs : null;
@@ -227,18 +243,22 @@ const MultiplayerLobby = () => {
         localStorage.setItem("playerName", randomName);
         localStorage.setItem("gameCode", code);
 
-        if (!left.current) navigate("/lobby");
+        if (stale()) return;
+        forgetPickedQuiz();
+        navigate("/lobby");
       } else {
-        if (left.current) return;
+        if (stale()) return;
         const note = await refusedNote(code);
-        if (!left.current) setError(note);
+        if (!stale()) setError(note);
       }
     } catch (error) {
       console.error("Error joining game:", error);
-      if (!left.current) setError(joinErrorNote(error));
+      if (!stale()) setError(joinErrorNote(error));
     } finally {
-      busy.current = false;
-      if (!left.current) setLoading(false);
+      if (!stale()) {
+        busy.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -254,10 +274,12 @@ const MultiplayerLobby = () => {
     pressed.current = event.currentTarget;
   };
 
-  const backHome = <CalmLink onClick={() => navigate("/")} disabled={loading}>Back to ESCParty</CalmLink>;
+  // Always open, even mid-way: a write on a bad connection can wait for
+  // ever, and leaving or going back drops what is still running.
+  const backHome = <CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>;
   const footer = step === "choose" ? backHome : (
     <>
-      <CalmLink onClick={() => goTo("choose")} disabled={loading}>Back to host or join</CalmLink>
+      <CalmLink onClick={() => goTo("choose")}>Back to host or join</CalmLink>
       {backHome}
     </>
   );
@@ -271,7 +293,7 @@ const MultiplayerLobby = () => {
         : "Play the quiz together: one of you hosts, everyone else joins with the code."}
       footer={footer}
     >
-      {quizKey && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
+      {quizKey && step !== "join" && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
 
       {step === "choose" && (
         <Ground>
@@ -282,11 +304,9 @@ const MultiplayerLobby = () => {
             </Control>
             <Control
               block
-              onClick={() => {
-                // Joining someone else's room: the quiz picked for hosting doesn't apply.
-                forgetPickedQuiz();
-                setStep("join");
-              }}
+              // Joining someone else's room: the quiz picked for hosting is
+              // set aside, and dropped once the join goes through.
+              onClick={() => setStep("join")}
             >
               <span>Join a game</span>
               <span className="calm-sub">Got a code from the host? Jump in</span>
@@ -309,8 +329,11 @@ const MultiplayerLobby = () => {
               </Control>
             </Pane>
           </Ground>
-          {loading && <CalmNote role="status">Setting up the room…</CalmNote>}
           {error && <CalmNote role="alert">{error}</CalmNote>}
+          {/* Mounted before it fills, so screen readers announce what fills it. */}
+          <div role="status">
+            {loading && <CalmNote>Setting up the room…</CalmNote>}
+          </div>
         </>
       )}
 
@@ -341,7 +364,7 @@ const MultiplayerLobby = () => {
                 {rejoinAs ? (
                   <>
                     <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
-                    <Control ref={rejoinButton} disabled={loading} onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(rejoinAs.name)}</Control>
+                    <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
                   </>
                 ) : (
                   <Control type="submit" disabled={loading} onClick={remember}>Join the game</Control>
@@ -350,13 +373,17 @@ const MultiplayerLobby = () => {
             </Ground>
           </form>
           {showCodeHelp && <CalmNote id="join-code-help" role="alert">A game code is four letters, like ABBA.</CalmNote>}
-          {rejoinAs && !loading && (
-            <CalmNote role="status">
-              You were in this game as {rejoinAs.name}. Rejoin as them, or join as someone new if someone else is playing on this device.
-            </CalmNote>
-          )}
-          {loading && <CalmNote role="status">Joining the game…</CalmNote>}
           {error && <CalmNote role="alert">{error}</CalmNote>}
+          {/* Mounted before it fills, so screen readers announce what fills
+              it; the rejoin note also describes the button focus lands on. */}
+          <div role="status">
+            {rejoinAs && !loading && (
+              <CalmNote id="rejoin-help">
+                You were in this game as {asNamed(rejoinAs.name)}. Rejoin as them, or join as someone new if someone else is playing on this device.
+              </CalmNote>
+            )}
+            {loading && <CalmNote>Joining the game…</CalmNote>}
+          </div>
         </>
       )}
     </CalmPage>

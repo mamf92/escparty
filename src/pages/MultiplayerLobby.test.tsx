@@ -172,17 +172,56 @@ describe("MultiplayerLobby", () => {
     expect(screen.getByLabelText("Game code")).toHaveValue("ABBA");
   });
 
-  it("keeps the way out closed while the room is being set up", async () => {
+  it("announces the room being set up and moves on when it is", async () => {
+    const user = userEvent.setup();
+    let finish = () => {};
+    vi.mocked(createRoom).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    renderLobby();
+    await user.click(button(/^Host a game/));
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await user.click(button(/^Host and play/));
+    expect(screen.getByRole("status")).toHaveTextContent("Setting up the room…");
+    finish();
+    expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+  });
+
+  it("keeps the way out open while a room is set up, and going back drops it", async () => {
     const user = userEvent.setup();
     let finish = () => {};
     vi.mocked(createRoom).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
     renderLobby();
     await user.click(button(/^Host a game/));
     await user.click(button(/^Host and play/));
-    expect(button("Back to ESCParty")).toBeDisabled();
-    expect(screen.getByText("Setting up the room…")).toBeInTheDocument();
-    finish();
+    expect(button("Back to ESCParty")).toBeEnabled();
+    await user.click(button("Back to host or join"));
+    await act(async () => finish());
+    expect(screen.queryByText("at /lobby")).not.toBeInTheDocument();
+    expect(localStorage.getItem("gameCode")).toBeNull();
+
+    // A fresh try goes through.
+    await user.click(button(/^Host a game/));
+    await user.click(button(/^Host and play/));
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+    expect(createRoom).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the picked quiz when Join a game was a slip", async () => {
+    const user = userEvent.setup();
+    renderLobby({ quizKey: "t-nordic-nights" });
+    await user.click(button(/^Join a game/));
+    await user.click(button("Back to host or join"));
+    expect(screen.getByText("Hosting: Nordic Nights")).toBeInTheDocument();
+  });
+
+  it("offers a host back in as the host", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-host");
+    localStorage.setItem("playerName", "The host");
+    renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    expect(button("Rejoin as the host")).toHaveAccessibleDescription(/You were in this game as the host\./);
   });
 
   it("lets a player back into a game this device was in, as themselves (#65)", async () => {
