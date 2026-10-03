@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { listenToRoom, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
+import { Control, Ground, Pane, Row } from "../design";
+import { listenToRoom, QuizPickRefused, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
 import { customQuizKey, listMyQuizzes } from "../utils/customQuizzes";
 import { useQuizTitle } from "../hooks/useQuizTitle";
-import { startGate } from "../utils/lobbyGate";
+import { roomGuests, startGate } from "../utils/lobbyGate";
 
 interface Identity {
     gameCode: string;
@@ -32,11 +33,13 @@ const Lobby = () => {
     const navigate = useNavigate();
     const [identity] = useState(readIdentity);
     const [room, setRoom] = useState<Room | null | undefined>(undefined);
-    const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     // A second tap in the same render can't see `busy` yet.
     const inFlight = useRef(false);
     const [pickError, setPickError] = useState<string | null>(null);
+    // The rules refused the last quiz pick; said only while the room still
+    // has no quiz (another tab may have picked one first).
+    const [pickRefused, setPickRefused] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
     const roomQuizTitle = useQuizTitle(room?.difficulty);
     // This device's saved quizzes, offered alongside the premade ones.
@@ -94,11 +97,22 @@ const Lobby = () => {
         navigate("/multiplayer");
     };
     const leave = <CalmLink type="button" onClick={leaveRoom}>Leave the waiting room</CalmLink>;
+    /** The footer's way back from a waiting room this tab isn't in. */
+    const backToMultiplayer = <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Back to join or host</CalmLink>;
+    /** The way out of a waiting room that can't go on. */
+    const wayOut = (label: string, onClick: () => void) => (
+        <Ground>
+            <Pane>
+                <Control onClick={onClick}>{label}</Control>
+            </Pane>
+        </Ground>
+    );
 
     if (!identity) {
         return (
-            <CalmPage title="The green room">
-                <CalmNote role="alert">Missing game data. Returning to multiplayer lobby.</CalmNote>
+            <CalmPage title="The green room" footer={backToMultiplayer}>
+                <CalmNote role="alert">This tab isn't in a game yet. Taking you to join or host one…</CalmNote>
+                {wayOut("Join or host a game", () => navigate("/multiplayer"))}
             </CalmPage>
         );
     }
@@ -109,10 +123,15 @@ const Lobby = () => {
             </CalmPage>
         );
     }
-    if (room === null || error) {
+    // Also what an offline first snapshot looks like (a cache-only miss);
+    // the room comes back by itself if the server then finds it.
+    if (room === null) {
         return (
             <CalmPage title="The green room" footer={leave}>
-                <CalmNote role="alert">{error ?? "Game not found"}</CalmNote>
+                <CalmNote role="alert">
+                    We can't find this game. It may have closed, the code may be wrong, or you may be offline. Join with another code, or host your own.
+                </CalmNote>
+                {wayOut("Join or host a game", leaveRoom)}
             </CalmPage>
         );
     }
@@ -124,22 +143,19 @@ const Lobby = () => {
     // Taken out by the host: this tab isn't in the room any more.
     if (!me) {
         return (
-            <CalmPage title="The green room" footer={leave}>
+            <CalmPage title="The green room" footer={backToMultiplayer}>
                 <CalmNote role="alert">The host took you out of this game. You can join again with the code.</CalmNote>
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <button type="button" className="lycra" onClick={() => navigate("/multiplayer")}>Join a game</button>
-                    </div>
-                </div>
+                {wayOut("Join a game", () => navigate("/multiplayer"))}
             </CalmPage>
         );
     }
 
     const ready = room.readyPlayers ?? [];
     const players = playingPlayers(room);
+    const guests = roomGuests(room);
     const gate = startGate(room);
     const amReady = ready.includes(playerId);
-    const chosen = isHost ? room.players.find(p => p.id === selected && p.id !== room.hostId) : undefined;
+    const chosen = isHost ? guests.find(p => p.id === selected) : undefined;
 
     /**
      * One write at a time; a failure leaves a note and the page usable,
@@ -163,12 +179,20 @@ const Lobby = () => {
         }
     };
 
-    // The room's `difficulty` names the quiz (quizCatalog.ts). Nothing was
-    // written if the quiz couldn't be read, so the host can pick again; a
-    // refused write is a dead end as before.
-    const handleSelectQuiz = (quizKey: string) => run("set the quiz", () => setRoomQuiz(gameCode, quizKey), (err) => {
-        if (String(err).includes("Failed to set difficulty")) setError("Failed to set difficulty");
-        else setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+    // The room's `difficulty` names the quiz (quizCatalog.ts). A pick the
+    // rules refuse wrote nothing: either another tab already picked (the
+    // snapshot then shows that quiz and the picker goes) or the rules won't
+    // take this quiz (its key or break setting), so the host picks another.
+    // Anything else (the quiz couldn't be read, the network) can be retried.
+    const handleSelectQuiz = (quizKey: string) => run("set the quiz", async () => {
+        setPickRefused(false);
+        await setRoomQuiz(gameCode, quizKey);
+    }, (err) => {
+        if (err instanceof QuizPickRefused) {
+            setPickRefused(true);
+        } else {
+            setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+        }
     });
 
     const status = (id: string) => {
@@ -186,105 +210,109 @@ const Lobby = () => {
 
             {isHost && !room.difficulty && (
                 <>
-                    <CalmNote>Pick a quiz</CalmNote>
-                    <div className="calm-ground">
-                        <div className="lycra-pane">
+                    <h2 className="esc-note" id="lobby-pick-quiz">Pick a quiz</h2>
+                    <Ground>
+                        <Pane role="group" aria-labelledby="lobby-pick-quiz">
                             {myQuizzes.map(quiz => (
-                                <button key={quiz.id} type="button" className="lycra" disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
+                                <Control key={quiz.id} disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
                                     {quiz.title}
-                                </button>
+                                </Control>
                             ))}
                             {QUIZ_CHOICES.map(choice => (
-                                <button key={choice.key} type="button" className="lycra" disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
+                                <Control key={choice.key} disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
                                     {choice.title}
-                                </button>
+                                </Control>
                             ))}
-                        </div>
-                    </div>
+                        </Pane>
+                    </Ground>
                 </>
             )}
 
-            <CalmNote>{players.length === 1 ? "1 player" : `${players.length} players`}</CalmNote>
-            <div className="calm-ground">
-                <div className="lycra-pane" role="group" aria-label="Players">
-                    {players.map(player => {
-                        const row = (
+            {/* Polite: someone joining or leaving is news to whoever waits. */}
+            <h2 className="esc-note" aria-live="polite">{players.length === 1 ? "1 player" : `${players.length} players`}</h2>
+            <Ground>
+                <Pane as="ol" aria-label="Players">
+                    {players.map(player => (
+                        <Row key={player.id} as="li" elevation={player.id === playerId ? "high" : "rest"}>
                             <span className="calm-row">
                                 <span>{player.name}{player.id === playerId ? " (you)" : ""}</span>
                                 <span>{status(player.id)}</span>
                             </span>
-                        );
-                        return isHost && player.id !== room.hostId ? (
-                            <button
-                                key={player.id}
-                                type="button"
-                                className={`lycra is-block${selected === player.id ? " is-chosen" : ""}`}
-                                aria-pressed={selected === player.id}
-                                onClick={() => setSelected(selected === player.id ? null : player.id)}
-                            >
-                                {row}
-                            </button>
-                        ) : (
-                            <div key={player.id} className="lycra is-block is-static">{row}</div>
-                        );
-                    })}
-                </div>
-            </div>
+                        </Row>
+                    ))}
+                </Pane>
+            </Ground>
 
-            {chosen && (
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <button
-                            type="button"
-                            className="lycra"
-                            disabled={busy}
-                            onClick={() => run(`remove ${chosen.name}`, async () => {
-                                await removePlayerFromRoom(gameCode, chosen);
-                                setSelected(null);
-                            })}
-                        >
-                            Take {chosen.name} out of the game
-                        </button>
-                    </div>
-                </div>
+            {isHost && guests.length > 0 && (
+                <>
+                    <h2 className="esc-note" id="lobby-take-out">Joined by mistake? Pick who to take out</h2>
+                    <Ground>
+                        <Pane role="group" aria-labelledby="lobby-take-out">
+                            {guests.map(guest => (
+                                <Control
+                                    key={guest.id}
+                                    chosen={selected === guest.id}
+                                    disabled={busy}
+                                    onClick={() => setSelected(selected === guest.id ? null : guest.id)}
+                                >
+                                    {guest.name}
+                                </Control>
+                            ))}
+                            {chosen && (
+                                <Control
+                                    disabled={busy}
+                                    onClick={() => run(`remove ${chosen.name}`, async () => {
+                                        await removePlayerFromRoom(gameCode, chosen);
+                                        setSelected(current => current === chosen.id ? null : current);
+                                    })}
+                                >
+                                    Take {chosen.name} out of the game
+                                </Control>
+                            )}
+                        </Pane>
+                    </Ground>
+                </>
             )}
 
             {!isHost && (
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <button
-                            type="button"
-                            className={`lycra${amReady ? " is-chosen" : ""}`}
-                            aria-pressed={amReady}
-                            disabled={busy}
-                            onClick={() => run("change whether you're ready", () => setPlayerReady(gameCode, playerId, !amReady))}
-                        >
-                            {amReady ? "I'm ready (tap to undo)" : "I'm ready"}
-                        </button>
-                    </div>
-                </div>
+                <>
+                    <Ground>
+                        <Pane>
+                            <Control
+                                chosen={amReady}
+                                disabled={busy}
+                                onClick={() => run("change whether you're ready", () => setPlayerReady(gameCode, playerId, !amReady))}
+                            >
+                                I'm ready
+                            </Control>
+                        </Pane>
+                    </Ground>
+                    <CalmNote role="status">
+                        {amReady ? "Waiting for the host to start. Tap again if you need a moment." : "Tap when you're ready to play."}
+                    </CalmNote>
+                </>
             )}
-            {!isHost && <CalmNote role="status">{amReady ? "Waiting for the host to start." : "Tap when you're ready to play."}</CalmNote>}
 
             {isHost && room.difficulty && (
                 <>
                     <CalmNote role="status">{gate.message}</CalmNote>
                     {gate.canStart !== "no" && (
-                        <div className="calm-ground">
-                            <div className="lycra-pane">
-                                <button
-                                    type="button"
-                                    className={`lycra${gate.canStart === "yes" ? " is-chosen" : ""}`}
+                        <Ground>
+                            <Pane>
+                                {/* Everyone ready: the next step stands proudest (design-system.md section 6). */}
+                                <Control
+                                    elevation={gate.canStart === "yes" ? "high" : "rest"}
                                     disabled={busy}
                                     onClick={() => run("start the game", () => startGame(gameCode))}
                                 >
                                     {gate.canStart === "yes" ? "Start the show" : "Start anyway"}
-                                </button>
-                            </div>
-                        </div>
+                                </Control>
+                            </Pane>
+                        </Ground>
                     )}
                 </>
             )}
+            {pickRefused && !room.difficulty && <CalmNote role="alert">This room won't take that quiz. Pick another one.</CalmNote>}
             {pickError && <CalmNote role="alert">{pickError}</CalmNote>}
         </CalmPage>
     );

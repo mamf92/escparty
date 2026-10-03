@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealSteps, winnerLine } from "./finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealAnnouncement, revealDone, revealSteps, revealedCount, someoneLeads, winnerLine } from "./finale";
 
 const p = (name: string, score: number) => ({ id: name.toLowerCase(), name, score });
 
@@ -31,6 +31,7 @@ describe("finale", () => {
     it("names the podium and the winner", () => {
         expect(PODIUM_POINTS[1]).toBe("Douze points");
         expect(winnerLine(placePlayers([p("Loreen", 12), p("Lordi", 3)]))).toBe("Loreen wins with 12 points!");
+        expect(winnerLine(placePlayers([p("Lordi", 1), p("Loreen", 0)]))).toBe("Lordi wins with 1 point!");
         expect(winnerLine(placePlayers([p("Loreen", 12), p("Abba", 12)]))).toBe("A tie at the top: Abba and Loreen, 12 points each!");
         expect(winnerLine([])).toBeNull();
     });
@@ -43,5 +44,32 @@ describe("finale", () => {
         const tiedSecond = placePlayers([p("A", 9), p("B", 5), p("C", 5)]);
         expect(nextRevealLabel(tiedSecond, 0)).toBe("2nd place (a tie)");
         expect(nextRevealLabel(tiedSecond, 3)).toBe("the rest");
+    });
+
+    it("says out loud what each tap put on the board", () => {
+        const four = placePlayers([p("A", 9), p("B", 5), p("C", 5), p("D", 1)]);
+        expect(revealAnnouncement(four, 0)).toBe("4 players are on the scoreboard. Start the reveal when the room is ready.");
+        expect(revealAnnouncement(four, 1)).toBe("On the board: place 4, D, 1 point.");
+        // A tie comes out, and is said, together.
+        expect(revealAnnouncement(four, 2)).toBe("On the board: place 2, B, 5 points; place 2, C, 5 points.");
+        expect(revealAnnouncement(four, 3)).toBe("A wins with 9 points!");
+        // Past the last step it stays on the winner.
+        expect(revealAnnouncement(four, 9)).toBe("A wins with 9 points!");
+        expect(revealAnnouncement(placePlayers([p("Solo", 3)]), 0)).toBe("1 player is on the scoreboard. Start the reveal when the room is ready.");
+    });
+
+    it("counts the rows showing after each tap, and when the reveal is over", () => {
+        const steps = [1, 3, 4];
+        expect([0, 1, 2, 3, 9].map(step => revealedCount(steps, step))).toEqual([0, 1, 3, 4, 4]);
+        expect(revealedCount([], 2)).toBe(0);
+        expect([2, 3, 9].map(step => revealDone(steps, step))).toEqual([false, true, true]);
+        expect(revealDone([], 0)).toBe(false);
+    });
+
+    it("says whether anyone leads", () => {
+        expect(someoneLeads(placePlayers([p("Solo", 3)]))).toBe(true);
+        expect(someoneLeads(placePlayers([p("A", 3), p("B", 3)]))).toBe(false);
+        expect(someoneLeads(placePlayers([p("A", 5), p("B", 5), p("C", 1)]))).toBe(true);
+        expect(someoneLeads([])).toBe(false);
     });
 });

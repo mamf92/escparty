@@ -6,8 +6,9 @@ import { answerOptions, hostParty, joinParty, rateActs } from "./helpers";
  * Theme compliance for the scoreboard party screens (#90), Home (#169),
  * the single-player entry (#170), the scoreboard break and the host's view
  * (#173), multiplayer create and join (#172), the solo scoreboard (#174),
- * the quiz library and builder (#177) and the quiz screen (#171),
- * judged against the rules in docs/design/design-system.md as the browser actually renders
+ * the green room and the results (#176), the quiz library and builder
+ * (#177) and the quiz screen (#171), judged against the rules in
+ * docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
  *   - no frames: nothing on the surface draws a border, and the ground and
@@ -174,6 +175,43 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await judge(guest, "party-big-screen");
 
     await Promise.all([host, guest].map(page => page.context().close()));
+});
+
+test("the green room and the results follow the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    // The host's green room, before and after picking a quiz.
+    await page.goto("/#/multiplayer");
+    await page.getByRole("button", { name: /^Host a game/ }).click();
+    await page.getByRole("button", { name: /^Host and play/ }).click();
+    await expect(page.getByRole("heading", { name: "The green room" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Players" }).getByRole("listitem")).toHaveCount(1);
+    await judge(page, "lobby-pick-quiz");
+    await page.getByRole("button", { name: "Nul Points" }).click();
+    await expect(page.getByRole("button", { name: "Start anyway" })).toBeVisible();
+    await judge(page, "lobby-host");
+    const { code, playerId } = await page.evaluate(() => ({ code: localStorage.getItem("gameCode"), playerId: localStorage.getItem("playerId") }));
+
+    // The same room's standings (one player on nought), fully revealed.
+    await page.evaluate(game => sessionStorage.setItem("multiplayerGame", JSON.stringify(game)), { multiplayer: true, roomCode: code, playerId });
+    await page.goto("/#/results");
+    await expect(page.getByRole("heading", { name: "The results are in" })).toBeVisible();
+    await page.getByRole("button", { name: "Show everything" }).click();
+    await expect(page.getByRole("list", { name: "Final standings" }).getByRole("listitem")).toHaveCount(1);
+    await judge(page, "results-standings");
+
+    // A solo finish with a past score.
+    await page.evaluate(() => {
+        sessionStorage.clear();
+        localStorage.setItem("quizScores", JSON.stringify([{ score: 7, total: 10, date: "2026-05-16T00:00:00Z" }]));
+    });
+    await page.goto("/#/");
+    await page.goto("/#/results");
+    await expect(page.getByRole("heading", { name: "Quiz complete" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Your past scores" })).toBeVisible();
+    await judge(page, "results-solo");
+
+    await page.context().close();
 });
 
 test("the quiz library and builder follow the surface rules", async ({ browser }) => {

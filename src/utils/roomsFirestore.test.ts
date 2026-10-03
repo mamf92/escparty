@@ -13,6 +13,7 @@ import {
     resumeAfterMidQuiz,
     setContinueReady,
     setRoomDifficulty,
+    QuizPickRefused,
     startGame,
     updatePlayerScore,
     ScoreWriteRejected,
@@ -748,6 +749,13 @@ describe("the single-field room writes", () => {
         await resetPlayersAtMidQuiz("ABCD");
 
         expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), { playersAtMidQuiz: [] });
+    });
+
+    it("setRoomDifficulty names a refusal by the rules apart from other failures", async () => {
+        mocks.updateDoc.mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }));
+        await expect(setRoomDifficulty("ABCD", "easy")).rejects.toBeInstanceOf(QuizPickRefused);
+        mocks.updateDoc.mockRejectedValueOnce(Object.assign(new Error("offline"), { code: "unavailable" }));
+        await expect(setRoomDifficulty("ABCD", "easy")).rejects.not.toBeInstanceOf(QuizPickRefused);
     });
 
     it("wraps each write's failure with its own context", async () => {

@@ -52,5 +52,5 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
     // The last question is the one written here.
     await expect(page.getByRole("heading", { level: 2 })).toHaveText("Who sang 'Lipstick' for Ireland in 2011?", { timeout: 30_000 });
     await answer("Jedward");
-    await expect(page.getByRole("heading", { name: "And the results are…" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: "The results are in" })).toBeVisible({ timeout: 60_000 });
 });

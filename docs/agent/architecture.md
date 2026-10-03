@@ -104,8 +104,11 @@ plan that also removes the ad hoc storage it would duplicate.
   Firestore `quizzes/`, and this device's "my quizzes" list in
   localStorage. See "Saved quizzes" in `firestore-data-model.md`.
 
-- `finale.ts` — the quiz finale (#67): final places with ties, and the
-  order the results page reveals them in.
+- `finale.ts` — the quiz finale (#67): final places with ties, the order
+  the results page reveals them in (`revealSteps`, `revealedCount`,
+  `revealDone`), what each tap says out loud (`revealAnnouncement`),
+  whether anyone leads (`someoneLeads`, shared with `Standings`) and a
+  score in words (`points`, "1 point").
 
 - `lobbyGate.ts` — when the lobby's host may start (#65): everyone ready,
   "Start anyway" before that, never an observer host with nobody to play.
@@ -138,9 +141,9 @@ plan that also removes the ad hoc storage it would duplicate.
 - `scoreHistory.ts` — `readScoreHistory()`, the solo score history
   (`localStorage` `quizScores`) read forgivingly: a run needs only a
   numeric score (missing details come back unknown), broken entries are
-  skipped and unreadable storage is an empty history (#174). The solo
-  scoreboard reads it; the results page still parses `quizScores` itself
-  until #176 moves it over.
+  skipped and unreadable storage is an empty history (#174), plus
+  `formatRunDate()` ("16 May 2026" or "Unknown date"). The solo scoreboard
+  and the results page both read the history through it (#176).
 - `quizTiming.ts` — multiplayer question timing (#62): the 10s + 5s slot,
   `phaseAfterQuestion` (next question, mid-quiz break after every 5th, or
   results), `questionClock` (where a question is, given its

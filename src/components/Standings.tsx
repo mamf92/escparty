@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Ground, Pane, Row } from "../design";
 import type { Player } from "../utils/roomsFirestore";
-import { placePlayers, points } from "../utils/finale";
+import { placePlayers, points, someoneLeads } from "../utils/finale";
 
 /**
  * The room's standings as a list on the surface (docs/design/design-system.md,
@@ -31,8 +31,7 @@ export const Standings = ({ players, label, meId, detail, empty, live = false }:
   live?: boolean;
 }) => {
   const ranked = placePlayers(players);
-  // A lone player leads too; only a field that's all level has no leader.
-  const someoneLeads = ranked.length === 1 || ranked.some(({ place }) => place > 1);
+  const leads = someoneLeads(ranked);
   return (
     <Ground>
       <Pane as="ol" aria-label={label} aria-live={live ? "polite" : undefined}>
@@ -42,7 +41,7 @@ export const Standings = ({ players, label, meId, detail, empty, live = false }:
           const mine = !!meId && player.id === meId;
           const extra = detail?.(player);
           return (
-            <Row key={player.id} as="li" elevation={(someoneLeads && place === 1) || mine ? "high" : "rest"}>
+            <Row key={player.id} as="li" elevation={(leads && place === 1) || mine ? "high" : "rest"}>
               <span className="calm-row">
                 <span>{place}. {player.name}{mine ? " (you)" : ""}</span>
                 <span>{points(player.score)}</span>

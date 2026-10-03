@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { Control, Ground, Pane, Row } from "../design";
 import {
   createRoom,
   generateRoomCode,
@@ -13,14 +14,8 @@ import {
 import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, revealSteps, winnerLine } from "../utils/finale";
-
-interface ScoreEntry {
-  score: number;
-  total: number;
-  date: string;
-  difficulty?: string;
-}
+import { formatRunDate, readScoreHistory } from "../utils/scoreHistory";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, revealAnnouncement, revealDone, revealSteps, revealedCount } from "../utils/finale";
 
 /**
  * The end of a quiz (#67). Solo: your score and your past ones. In a room:
@@ -50,15 +45,9 @@ const QuizResults = () => {
     };
   });
 
-  const [scoreHistory] = useState<ScoreEntry[]>(() => {
-    if (gameData.multiplayer) return [];
-    try {
-      const stored: unknown = JSON.parse(localStorage.getItem("quizScores") || "[]");
-      return Array.isArray(stored) ? stored : [];
-    } catch {
-      return [];
-    }
-  });
+  // Read through the shared reader so a broken stored run is skipped here
+  // just as on the scoreboard, instead of crashing the page.
+  const [scoreHistory] = useState(() => (gameData.multiplayer ? [] : readScoreHistory()));
   const [room, setRoom] = useState<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>(gameData.players);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +84,9 @@ const QuizResults = () => {
     // the host's next round arrives on this room too.
     return listenToRoom(gameData.roomCode, (next) => {
       if (next) {
+        // A room that comes back (a cache-only miss, then the server) is
+        // playable again: drop the "gone" notice and its way out.
+        setError(null);
         setRoom(next);
         setPlayers(playingPlayers(next));
         setIsObserver(isObserverHost(next, gameData.playerId));
@@ -124,38 +116,39 @@ const QuizResults = () => {
     return (
       <CalmPage
         title="Quiz complete"
-        subtitle={best !== null && best > gameData.score ? `Your best is still ${best}.` : undefined}
+        subtitle={best !== null && best > gameData.score ? `Your best is still ${points(best)}.` : undefined}
         footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
       >
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <div className="lycra is-block is-static is-chosen">
+        <Ground>
+          <Pane>
+            <Row elevation="high">
               <span className="calm-label">You scored</span>
-              <span>{gameData.score} points</span>
-            </div>
-          </div>
-        </div>
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <button type="button" className="lycra" onClick={() => leave("/quizzes")}>Play another quiz</button>
-            <button type="button" className="lycra" onClick={() => leave("/scoreboard")}>See the scoreboard</button>
-          </div>
-        </div>
+              <span>{points(gameData.score)}</span>
+            </Row>
+          </Pane>
+        </Ground>
+        <Ground>
+          <Pane>
+            {/* The next step stands proudest (design-system.md section 6). */}
+            <Control elevation="high" onClick={() => leave("/quizzes")}>Play another quiz</Control>
+            <Control onClick={() => leave("/scoreboard")}>See the scoreboard</Control>
+          </Pane>
+        </Ground>
         {scoreHistory.length > 0 && (
           <>
-            <CalmNote>Your past scores</CalmNote>
-            <div className="calm-ground">
-              <ol className="lycra-pane" aria-label="Your past scores">
+            <h2 className="esc-note" id="results-past-scores">Your past scores</h2>
+            <Ground>
+              <Pane as="ol" aria-labelledby="results-past-scores">
                 {scoreHistory.map((entry, index) => (
-                  <li key={index} className="lycra is-block is-static">
+                  <Row key={index} as="li">
                     <span className="calm-row">
-                      <span>{new Date(entry.date).toLocaleDateString()}</span>
-                      <span>{entry.score} points · {entry.total} {entry.total === 1 ? "question" : "questions"}</span>
+                      <span>{formatRunDate(entry.date)}</span>
+                      <span>{points(entry.score)}{entry.total === undefined ? "" : ` · ${entry.total} ${entry.total === 1 ? "question" : "questions"}`}</span>
                     </span>
-                  </li>
+                  </Row>
                 ))}
-              </ol>
-            </div>
+              </Pane>
+            </Ground>
           </>
         )}
       </CalmPage>
@@ -163,10 +156,19 @@ const QuizResults = () => {
   }
 
   const placed = placePlayers(players);
+  // Rank by elevation as the break's standings do: nobody stands proud for
+  // first when everyone is level, only your own row.
+  const leads = someoneLeads(placed);
   const steps = revealSteps(placed);
-  const shown = step === 0 ? 0 : steps[Math.min(step, steps.length) - 1];
+  const shown = revealedCount(steps, step);
   const revealed = placed.slice(placed.length - shown);
-  const done = steps.length > 0 && step >= steps.length;
+  const done = revealDone(steps, step);
+  // One status line for the whole reveal, mounted from the first render so
+  // screen readers announce each change to it: collecting, then how many
+  // are on the board, then what each tap added, then the winner.
+  // With the room gone there is nothing left to collect, but scores the
+  // page already holds can still be revealed and announced.
+  const statusLine = placed.length > 0 ? revealAnnouncement(placed, step, steps) : error ? "" : "Collecting the final scores…";
   const isHost = isRoomHost(room, gameData.playerId);
   // This player's name in this room (the host included, from the full
   // list), before this device's last-used name, which another tab may have
@@ -216,82 +218,84 @@ const QuizResults = () => {
 
   return (
     <CalmPage
-      title="And the results are…"
-      subtitle={isObserver ? undefined : `You scored ${bestKnownScore(gameData.score, players, gameData.playerId)} points.`}
+      title="The results are in"
+      subtitle={isObserver ? undefined : `You scored ${points(bestKnownScore(gameData.score, players, gameData.playerId))}.`}
       footer={<CalmLink type="button" onClick={() => leave("/")}>Back to ESCParty</CalmLink>}
     >
-      {error && <CalmNote role="alert">{error}</CalmNote>}
-      {placed.length === 0 && !error && <CalmNote role="status">Collecting the final scores…</CalmNote>}
+      {error && (
+        <>
+          <CalmNote role="alert">{error} Join or host another game to play on.</CalmNote>
+          <Ground>
+            <Pane>
+              <Control onClick={() => leave("/multiplayer")}>Join or host another game</Control>
+            </Pane>
+          </Ground>
+        </>
+      )}
 
       {revealed.length > 0 && (
-        <div className="calm-ground">
-          <ol className="lycra-pane" aria-label="Final standings">
+        <Ground>
+          <Pane as="ol" aria-label="Final standings">
             {revealed.map(({ player, place }) => {
               const podium = PODIUM_POINTS[place];
               const mine = player.id === gameData.playerId;
               return (
-                <li
-                  key={player.id}
-                  className={`lycra is-block is-static${place === 1 ? " is-chosen" : ""}`}
-                >
+                <Row key={player.id} as="li" elevation={(leads && place === 1) || mine ? "high" : "rest"}>
                   {podium && <span className="calm-label">{podium}</span>}
                   <span className="calm-row">
                     <span>{place}. {player.name}{mine ? " (you)" : ""}</span>
-                    <span>{player.score}</span>
+                    <span>{points(player.score)}</span>
                   </span>
-                </li>
+                </Row>
               );
             })}
-          </ol>
-        </div>
+          </Pane>
+        </Ground>
       )}
 
-      {done ? (
-        <CalmNote role="status">{winnerLine(placed)}</CalmNote>
-      ) : (
-        placed.length > 0 && (
-          <div className="calm-ground">
-            <div className="lycra-pane calm-split">
-              <button type="button" className="lycra" onClick={() => setStep(step + 1)}>
-                {step === 0 ? "Start the reveal" : `Reveal ${nextRevealLabel(placed, shown)}`}
-              </button>
-              <button type="button" className="lycra" onClick={() => setStep(steps.length)}>
-                Show everything
-              </button>
-            </div>
-          </div>
-        )
+      {/* Empty only once the room has gone with nobody to show: the alert
+          above says so, and an empty note would just leave a gap. */}
+      {statusLine && <CalmNote role="status">{statusLine}</CalmNote>}
+      {!done && placed.length > 0 && (
+        <Ground>
+          <Pane layout="split">
+            <Control onClick={() => setStep(step + 1)}>
+              {step === 0 ? "Start the reveal" : `Reveal ${nextRevealLabel(placed, shown)}`}
+            </Control>
+            <Control onClick={() => setStep(steps.length)}>Show everything</Control>
+          </Pane>
+        </Ground>
       )}
 
-      {room && isHost && !room.nextRoomCode && (
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={playAgain}>
-              Play again with everyone
-            </button>
-          </div>
-        </div>
+      {/* A room that's gone can't take a next round: the way out above is all. */}
+      {room && isHost && !room.nextRoomCode && !error && (
+        <Ground>
+          <Pane>
+            {/* Once everyone is showing, the next round is the next step (design-system.md section 6). */}
+            <Control elevation={done ? "high" : "rest"} disabled={nextRound === "busy"} onClick={playAgain}>Play again with everyone</Control>
+          </Pane>
+        </Ground>
       )}
-      {room?.nextRoomCode && (
+      {room?.nextRoomCode && !error && (
         <>
           <CalmNote>{isHost ? "You've started another round." : "The host has started another round."}</CalmNote>
-          <div className="calm-ground">
-            <div className="lycra-pane">
-              <button type="button" className="lycra" disabled={nextRound === "busy"} onClick={joinNext}>
+          <Ground>
+            <Pane>
+              <Control elevation={done ? "high" : "rest"} disabled={nextRound === "busy"} onClick={joinNext}>
                 {isHost ? "Back to the next round's lobby" : "Join the next round"}
-              </button>
-            </div>
-          </div>
+              </Control>
+            </Pane>
+          </Ground>
         </>
       )}
-      {nextRound !== "idle" && nextRound !== "busy" && <CalmNote role="status">{nextRound}</CalmNote>}
+      {nextRound !== "idle" && nextRound !== "busy" && <CalmNote role="alert">{nextRound}</CalmNote>}
 
-      {room && !isHost && !room.nextRoomCode && (
-        <div className="calm-ground">
-          <div className="lycra-pane">
-            <button type="button" className="lycra" onClick={() => leave("/multiplayer")}>Join or host another game</button>
-          </div>
-        </div>
+      {room && !isHost && !room.nextRoomCode && !error && (
+        <Ground>
+          <Pane>
+            <Control onClick={() => leave("/multiplayer")}>Join or host another game</Control>
+          </Pane>
+        </Ground>
       )}
     </CalmPage>
   );
