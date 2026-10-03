@@ -209,8 +209,8 @@ minute or two; there is one worker and no retries (a flaky spec is a bug).
   guests see the Jedward Twins go to the two who rated alike (#91).
 - `theme.spec.ts` — every scoreboard party screen and each migrated screen
   (the scoreboard break and the host's view, #173; single-player entry,
-  #170) measured against the design system's surface rules (#90), and the
-  Sparkle mode switch. See
+  #170; the solo scoreboard, #174) measured against the design system's
+  surface rules (#90), and the Sparkle mode switch. See
   "Checking a live page" in `theming.md`.
 
 On a failure CI uploads the HTML report and traces as the `playwright-report`

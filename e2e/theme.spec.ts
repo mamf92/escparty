@@ -3,7 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
- * Theme compliance for the scoreboard party screens (#90), judged against
+ * Theme compliance for the scoreboard party screens (#90) and each screen
+ * moved onto the design system since (one test() per issue), judged against
  * the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
@@ -206,6 +207,28 @@ test("the green room and the results follow the surface rules", async ({ browser
     await expect(page.getByRole("heading", { name: "Quiz complete" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Your past scores" })).toBeVisible();
     await judge(page, "results-solo");
+
+    await page.context().close();
+});
+
+test("the solo scoreboard follows the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("quizScores", JSON.stringify([
+        { score: 900, total: 10, difficulty: "easy", date: "2026-05-10T00:00:00Z" },
+        { score: 1300, total: 10, difficulty: "hard", date: "2026-05-01T00:00:00Z" },
+        { score: 400, total: 10, difficulty: "medium", date: "2026-05-16T00:00:00Z" },
+    ])));
+    await page.goto("/#/scoreboard");
+    await expect(page.getByText("3 runs. Your best stands highest.")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Score" })).toHaveAttribute("aria-selected", "true");
+    await judge(page, "solo-scoreboard");
+
+    // The best run stands proud in both themes; Sparkle gilds the same lift.
+    const best = page.getByRole("list", { name: "Your runs" }).getByRole("listitem").first();
+    await expect(best).toHaveClass(/is-high/);
+    await page.getByRole("switch", { name: "Sparkle mode" }).click();
+    await expect(best).toHaveCSS("box-shadow", /rgba\(255, 201, 60, 0\.4\) 0px 0px 26px/);
 
     await page.context().close();
 });
