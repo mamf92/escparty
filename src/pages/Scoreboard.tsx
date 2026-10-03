@@ -1,15 +1,9 @@
 import { useMemo, useState } from "react";
-import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
-import "./scoreboard-calm.css";
+import { CalmLink, CalmPage } from "../components/CalmPage";
+import { Control, Ground, Pane, Row, useRovingTabs } from "../design";
 import { quizTitle } from "../utils/quizCatalog";
-
-interface ScoreEntry {
-    score: number;
-    total: number;
-    difficulty: string;
-    date: string;
-}
+import { readScoreHistory, type ScoreEntry } from "../utils/scoreHistory";
 
 type SortKey = "date" | "difficulty" | "score";
 
@@ -29,8 +23,11 @@ type Level = "high" | "rest" | "low";
 const SORTS: { key: SortKey; label: string }[] = [
     { key: "score", label: "Score" },
     { key: "date", label: "Date" },
-    { key: "difficulty", label: "Difficulty" },
+    // "Quiz", not "Difficulty": it orders by the quiz each row names (the
+    // classics easiest first), and a ten-letter label overran its tab at 320px.
+    { key: "difficulty", label: "Quiz" },
 ];
+const SORT_KEYS = SORTS.map(sort => sort.key);
 
 /** Rank by the points each row shows, so the ladder matches its numbers. */
 function pointsOf(entry: ScoreEntry): number {
@@ -70,19 +67,17 @@ function levelsFor(entries: ScoreEntry[]): Map<ScoreEntry, Level> {
     return levels;
 }
 
-function rowClass(level: Level): string {
-    const out = ["lycra", "is-block", "is-static", "is-rank"];
-    // `is-high` is the proud lift (src/design/surface.css).
-    if (level === "high") out.push("is-high");
-    if (level === "low") out.push("is-low");
-    return out.join(" ");
-}
-
 /** Classic quizzes easiest first, then every other quiz by its title. */
 const CLASSIC_ORDER = ["easy", "medium", "hard"];
 function difficultyRank(entry: ScoreEntry): number {
     const rank = CLASSIC_ORDER.indexOf(entry.difficulty);
     return rank === -1 ? CLASSIC_ORDER.length : rank;
+}
+
+/** Newest first; a run with an unreadable date sorts last. */
+function timeOf(entry: ScoreEntry): number {
+    const time = new Date(entry.date).getTime();
+    return Number.isNaN(time) ? -Infinity : time;
 }
 
 function formatDate(iso: string): string {
@@ -94,183 +89,97 @@ function formatDate(iso: string): string {
 
 const Scoreboard = () => {
     const navigate = useNavigate();
-    const [scoreHistory] = useState<ScoreEntry[]>(() => {
-        try {
-            const stored = JSON.parse(localStorage.getItem("quizScores") || "[]");
-            return Array.isArray(stored) ? stored : [];
-        } catch {
-            return [];
-        }
-    });
+    const [scoreHistory] = useState(readScoreHistory);
     const [sortKey, setSortKey] = useState<SortKey>("score");
 
     // Levels are computed from the unsorted history, so re-sorting moves rows
     // without changing how high any of them sits.
     const levels = useMemo(() => levelsFor(scoreHistory), [scoreHistory]);
 
+    // Each run once with its stored place (a stable row key, so a re-sort
+    // moves rows) and its quiz's title, which can mean a storage read.
+    const rows = useMemo(() => scoreHistory.map((entry, index) => ({
+        entry,
+        index,
+        // A run saved without its quiz was still played; it's only unknown.
+        title: entry.difficulty ? quizTitle(entry.difficulty) : "Unknown quiz",
+    })), [scoreHistory]);
+
     const sortedScores = useMemo(() => {
-        const rows = [...scoreHistory];
+        const sorted = [...rows];
         if (sortKey === "date") {
-            return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            return sorted.sort((a, b) => timeOf(b.entry) - timeOf(a.entry) || 0);
         }
         if (sortKey === "difficulty") {
-            return rows.sort((a, b) => difficultyRank(a) - difficultyRank(b) || quizTitle(a.difficulty).localeCompare(quizTitle(b.difficulty)));
+            return sorted.sort((a, b) => difficultyRank(a.entry) - difficultyRank(b.entry) || a.title.localeCompare(b.title));
         }
-        return rows.sort((a, b) => pointsOf(b) - pointsOf(a));
-    }, [scoreHistory, sortKey]);
+        return sorted.sort((a, b) => pointsOf(b.entry) - pointsOf(a.entry));
+    }, [rows, sortKey]);
 
-    return (
-        <Page className="calm-page scoreboard-calm">
-            <Header>
-                <Title>Scoreboard</Title>
-                <Subtitle>
-                    {scoreHistory.length === 0
-                        ? "No runs recorded yet."
-                        : `${scoreHistory.length} ${scoreHistory.length === 1 ? "run" : "runs"}. Your best stands highest.`}
-                </Subtitle>
-            </Header>
+    const tabs = useRovingTabs(SORT_KEYS, sortKey, setSortKey);
 
-            {scoreHistory.length > 1 && (
-                <Toolbar>
-                    <SortTabs role="tablist" aria-label="Sort scores by">
-                        {SORTS.map(({ key, label }) => (
-                            <Tab
-                                key={key}
-                                type="button"
-                                role="tab"
-                                aria-selected={sortKey === key}
-                                $active={sortKey === key}
-                                onClick={() => setSortKey(key)}
-                            >
-                                {label}
-                            </Tab>
-                        ))}
-                    </SortTabs>
-                </Toolbar>
-            )}
+    // One run has nothing to sort, so the tabs only appear from two runs up.
+    const sortable = scoreHistory.length > 1;
 
-            <div className="calm-ground">
-                <ol className="lycra-pane">
-                    {sortedScores.length === 0 ? (
-                        <li className="lycra is-block is-static is-rank">
-                            <span className="rank-line">
-                                <span>No runs yet</span>
+    const runs = (
+        <Ground {...(sortable ? tabs.panel : {})}>
+            <Pane as="ol" aria-label="Your runs">
+                {sortedScores.length === 0 ? (
+                    <Row as="li">
+                        <span className="calm-row">
+                            <span>No runs yet</span>
+                        </span>
+                        <span className="calm-sub">Play a quiz and your scores land here.</span>
+                    </Row>
+                ) : (
+                    sortedScores.map(({ entry, index, title }) => (
+                        <Row
+                            as="li"
+                            key={index}
+                            elevation={levels.get(entry) ?? "rest"}
+                        >
+                            <span className="calm-row">
+                                <span>{entry.score} points</span>
+                                <span className="calm-sub">{title}</span>
                             </span>
                             <span className="calm-sub">
-                                Play a quiz and your scores land here.
+                                {entry.total === undefined ? "" : `${entry.total} ${entry.total === 1 ? "question" : "questions"} · `}
+                                {formatDate(entry.date)}
                             </span>
-                        </li>
-                    ) : (
-                        sortedScores.map((entry, index) => (
-                            <li
-                                key={`${entry.date}-${index}`}
-                                className={rowClass(levels.get(entry) ?? "rest")}
-                            >
-                                <span className="rank-line">
-                                    <span>
-                                        {entry.score} points
-                                    </span>
-                                    <span className="calm-sub">{quizTitle(entry.difficulty)}</span>
-                                </span>
-                                <span className="calm-sub">
-                                    {entry.total} {entry.total === 1 ? "question" : "questions"} · {formatDate(entry.date)}
-                                </span>
-                            </li>
-                        ))
-                    )}
-                </ol>
-            </div>
+                        </Row>
+                    ))
+                )}
+            </Pane>
+        </Ground>
+    );
 
-            <Footer>
-                <BackButton type="button" onClick={() => navigate("/")}>
-                    Back to ESCParty
-                </BackButton>
-            </Footer>
-        </Page>
+    return (
+        <CalmPage
+            title="Scoreboard"
+            subtitle={
+                scoreHistory.length === 0
+                    ? "No runs recorded yet."
+                    : `${scoreHistory.length} ${scoreHistory.length === 1 ? "run" : "runs"}. Your best stands highest.`
+            }
+            footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
+        >
+            {sortable && (
+                <Ground>
+                    <Pane layout="split" role="tablist" aria-label="Sort scores by">
+                        {SORTS.map(({ key, label }) => (
+                            // The hook decides which tab is chosen, so its look and its
+                            // aria-selected can't disagree; Control leaves aria-pressed
+                            // off any control given a role.
+                            <Control key={key} {...tabs.tab(key)}>
+                                {label}
+                            </Control>
+                        ))}
+                    </Pane>
+                </Ground>
+            )}
+            {runs}
+        </CalmPage>
     );
 };
 
 export default Scoreboard;
-
-/*
-  Page chrome. Everything below sits OUTSIDE the surface on purpose.
-
-  The fabric-ui demo draws the same line: the screen tabs and the back link are
-  ordinary styled-components, and only the content itself is .lycra. Keeping
-  navigation out of the pane is also what lets the score rows stay direct
-  siblings — the fabric tension rule keys off `.lycra:active + .lycra`, and a
-  wrapper element around any control kills it silently.
-*/
-
-const Page = styled.div`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    width: 100%;
-    padding: 0.5rem 0 1.5rem;
-`;
-
-const Header = styled.header`
-    text-align: center;
-`;
-
-const Title = styled.h1`
-    font-family: ${({ theme }) => theme.fonts.heading};
-    font-size: 1.5rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: ${({ theme }) => theme.colors.pinkLavender};
-    margin: 0;
-`;
-
-const Subtitle = styled.p`
-    margin-top: 0.5rem;
-    font-family: ${({ theme }) => theme.fonts.body};
-    font-size: 0.85rem;
-    line-height: 1.5;
-    color: ${({ theme }) => theme.colors.magnolia};
-    opacity: 0.75;
-`;
-
-const Toolbar = styled.div`
-    display: flex;
-    justify-content: center;
-`;
-
-const SortTabs = styled.div`
-    display: flex;
-    gap: 0.25rem;
-    padding: 0.25rem;
-    border-radius: 999px;
-    background: rgba(213, 184, 230, 0.12);
-`;
-
-const Tab = styled.button<{ $active: boolean }>`
-    font-family: ${({ theme }) => theme.fonts.body};
-    font-size: 0.75rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 0.35rem 0.85rem;
-    border: none;
-    border-radius: 999px;
-    cursor: pointer;
-    background: ${({ $active, theme }) => ($active ? theme.colors.amethyst : "transparent")};
-    color: ${({ $active, theme }) => ($active ? theme.colors.nightblue : theme.colors.pinkLavender)};
-`;
-
-const Footer = styled.footer`
-    display: flex;
-    justify-content: center;
-`;
-
-const BackButton = styled.button`
-    font-family: ${({ theme }) => theme.fonts.body};
-    font-size: 0.85rem;
-    background: none;
-    border: none;
-    padding: 0.25rem;
-    cursor: pointer;
-    text-decoration: underline;
-    color: ${({ theme }) => theme.colors.pinkLavender};
-`;

@@ -30,6 +30,10 @@ Mostly not small reusable pieces, despite the folder name:
   itself is `src/design/surface.css`. See
   `docs/design/design-system.md`.
 
+- `Standings.tsx` — the room's standings as information rows (places shared
+  on a tie, as `placePlayers` in `src/utils/finale.ts`; the leader and your
+  own row raised), shared by the mid-quiz break and the host's view.
+
 - `PartyHostTools.tsx` — the host's tab in a scoreboard party: share the
   link, enter the real result, edit the running order, open the awards.
 
@@ -128,6 +132,12 @@ plan that also removes the ad hoc storage it would duplicate.
   rendering the component, plus `bestKnownScore` (a multiplayer player's
   local score or the room's, whichever is higher, #63). Pure functions, no
   React, no Firestore.
+- `scoreHistory.ts` — `readScoreHistory()`, the solo score history
+  (`localStorage` `quizScores`) read forgivingly: a run needs only a
+  numeric score (missing details come back unknown), broken entries are
+  skipped and unreadable storage is an empty history (#174). The solo
+  scoreboard reads it; the results page still parses `quizScores` itself
+  until #176 moves it over.
 - `quizTiming.ts` — multiplayer question timing (#62): the 10s + 5s slot,
   `phaseAfterQuestion` (next question, mid-quiz break after every 5th, or
   results), `questionClock` (where a question is, given its
@@ -193,7 +203,8 @@ the theme switch and the forced-colours / more-contrast rules;
 `DesignThemeProvider`/`useDesignTheme` hold the active theme,
 `ThemeSwitch` is the app bar's Sparkle mode switch, `Sparkles` the
 decorative glitter layer, and `Surface.tsx` the `Ground`/`Pane`/`Control`/
-`Row`/`Field` primitives screens are built from.
+`Row`/`Field` primitives screens are built from; `useRovingTabs` wires a
+tablist of `Control`s and its tab panel.
 
 ## `src/styles/theme.ts`
 

@@ -65,14 +65,14 @@ test("host and a throttled guest see the same questions through a break", async 
     }
 
     // Both reach the break; only the host can continue.
-    await expect(host.getByText("Mid-Quiz Scoreboard")).toBeVisible({ timeout: 30_000 });
-    await expect(guest.getByText("Mid-Quiz Scoreboard")).toBeVisible({ timeout: 30_000 });
-    await expect(guest.getByText("Waiting for the host to continue...")).toBeVisible();
-    await host.getByRole("button", { name: "Continue Quiz" }).click();
+    await expect(host.getByRole("heading", { name: "Scoreboard break" })).toBeVisible({ timeout: 30_000 });
+    await expect(guest.getByRole("heading", { name: "Scoreboard break" })).toBeVisible({ timeout: 30_000 });
+    await expect(guest.getByText("Waiting for the host to continue…")).toBeVisible();
+    await host.getByRole("button", { name: "Continue the quiz" }).click();
 
-    // Both come back on question 5, and move on to question 6 together. (The
-    // break's title is an h2 too, so wait until it's gone before reading.)
-    await expect(host.getByText("Mid-Quiz Scoreboard")).toBeHidden({ timeout: 30_000 });
+    // Both come back on question 5, and move on to question 6 together. (Wait
+    // until the break is gone, so the question read is the quiz's.)
+    await expect(host.getByRole("heading", { name: "Scoreboard break" })).toBeHidden({ timeout: 30_000 });
     await expect(host.getByRole("button", { name: "Lock in my answer" })).toBeVisible();
     await expect(question(guest)).toHaveText((await question(host).textContent())!);
     const fifth = await question(host).textContent();
