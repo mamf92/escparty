@@ -199,7 +199,8 @@ only the sizes scale up, together.
 - The app bar carries the brand and the Sparkle mode switch, and is not a
   home link: several screens are mid-game and need their own way out.
   Every screen has one explicit way back in its footer, named for where it
-  goes ("Back to the quiz library", not "Back").
+  goes ("Back to the quiz library", not "Back"). The one exception is Home
+  (`/`), the root: there is nowhere further back to go.
 - Leaving a game in progress (a quiz, a lobby, a party) asks first or says
   what happens ("Leave the waiting room"). Never strand someone mid-game
   with a bare home button.

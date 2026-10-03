@@ -3,7 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
- * Theme compliance for the scoreboard party screens (#90), judged against
+ * Theme compliance for the scoreboard party screens (#90), Home (#169),
+ * the scoreboard break and the host's view (#173), the solo scoreboard (#174) and
+ * the single-player entry (#170), judged against
  * the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
@@ -171,6 +173,25 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await judge(guest, "party-big-screen");
 
     await Promise.all([host, guest].map(page => page.context().close()));
+});
+
+test("the home screen follows the surface rules, and re-skins in Sparkle", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Browse the quiz library" })).toBeVisible();
+    await judge(page, "home");
+
+    // Home re-skins with the switch like every other screen: no photo, no own colours.
+    await page.getByRole("switch", { name: "Sparkle mode" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
+    // judge() holds Calm's flat-face rules, so Sparkle is checked here: every
+    // one of the five controls wears the sequin sheet.
+    const controls = page.locator(".calm-ground button.lycra");
+    await expect(controls).toHaveCount(5);
+    for (const control of await controls.all()) {
+        await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
+    }
+    await page.context().close();
 });
 
 test("the solo scoreboard follows the surface rules", async ({ browser }) => {
