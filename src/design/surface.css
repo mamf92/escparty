@@ -36,7 +36,9 @@
   position: relative;
   isolation: auto;
   display: grid;
-  gap: var(--esc-space-4);
+  /* The gap, named so a field's label and note can be pulled up past it. */
+  --esc-pane-gap: var(--esc-space-4);
+  gap: var(--esc-pane-gap);
   margin: 0;
   /*
     Room for the shadows. With the page's own gutter this is about 28px,
@@ -243,6 +245,24 @@
   opacity: 1;
 }
 
+/*
+  A label and a field's note are siblings of the field in the pane, so the
+  pane's gap would hold them as far from their field as from the next one.
+  Pull each up to the field it belongs to; the gap stays between fields.
+*/
+.esc-app .lycra-pane > .calm-label {
+  margin-bottom: calc(var(--esc-space-2) - var(--esc-pane-gap));
+}
+
+.esc-app .lycra-pane > p.calm-sub {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.esc-app .lycra-pane > .lycra-field + p.calm-sub {
+  margin-top: calc(var(--esc-space-2) - var(--esc-pane-gap));
+}
+
 /* A title and its value at the two ends of one line. */
 .esc-app .calm-row,
 .esc-app .rank-line {
@@ -257,13 +277,13 @@
 .esc-app .lycra-pane.calm-split {
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   grid-auto-flow: column;
-  gap: var(--esc-space-3);
+  --esc-pane-gap: var(--esc-space-3);
 }
 
 /* A rating scale: the numbers 1..max as a grid of small round keys. */
 .esc-app .lycra-pane.calm-scale {
   grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
-  gap: var(--esc-space-3);
+  --esc-pane-gap: var(--esc-space-3);
 }
 
 .esc-app .calm-scale .lycra {

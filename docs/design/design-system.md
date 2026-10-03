@@ -169,7 +169,8 @@ same way a control does.
 
 **Field** (`<Field>`, `.lycra-field`). A well pressed into the background.
 Always has a visible `.calm-label` above it (placeholders are examples,
-never labels). Textareas and selects take the same class.
+never labels). Textareas and selects are Fields too: `<Field as="textarea">`,
+`<Field as="select">`.
 
 **Pane layouts.** `layout="stack"` (default, one surface per row),
 `"split"` (two or three moves side by side, e.g. Previous / Next) and

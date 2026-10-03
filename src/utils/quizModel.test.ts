@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
     BREAK_CHOICES,
     DEFAULT_BREAK_EVERY,
+    badOptions,
     isBreakAfter,
     isPlayableQuestion,
+    questionFieldProblems,
     questionProblems,
+    quizFieldProblems,
     quizProblems,
     seededShuffle,
     toBreakEvery,
@@ -41,6 +44,33 @@ describe("questionProblems", () => {
     it("limits lengths", () => {
         expect(questionProblems({ ...good, question: "x".repeat(201) })).toContain("Keep the question under 200 characters.");
         expect(questionProblems({ ...good, options: ["ABBA", "y".repeat(81)] })).toContain("Keep each answer under 80 characters.");
+    });
+});
+
+describe("questionFieldProblems", () => {
+    it("tags each problem with the field it's about", () => {
+        const problems = questionFieldProblems({ question: "", options: ["ABBA", "abba", ""], correctAnswer: "Lulu" });
+        expect(problems).toEqual([
+            { field: "question", message: "Write the question." },
+            { field: "answers", message: "Fill in every answer, or remove the empty one." },
+            { field: "answers", message: "Two answers are the same." },
+            { field: "correct", message: "Mark which answer is correct." },
+        ]);
+    });
+});
+
+describe("badOptions", () => {
+    it("marks the empty, too long and repeated answers, and agrees with the problems", () => {
+        const options = ["ABBA", " abba", "", "y".repeat(81), "Lulu"];
+        expect(badOptions(options)).toEqual([true, true, true, true, false]);
+        expect(badOptions(good.options)).toEqual([false, false]);
+    });
+});
+
+describe("quizFieldProblems", () => {
+    it("tags name, question and break problems", () => {
+        expect(quizFieldProblems({ title: "", questions: [], breakEvery: 7 as never }).map(problem => problem.field))
+            .toEqual(["name", "questions", "break"]);
     });
 });
 

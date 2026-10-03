@@ -7,7 +7,7 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
  *     <Pane>            one sheet; controls are direct children (.lycra-pane)
  *       <Control />     a raised control, always a <button> (.lycra)
  *       <Row />         a raised row of information, not a control (.lycra.is-static)
- *       <Field />       a sunken field (.lycra-field)
+ *       <Field />       a sunken field: input, select or textarea (.lycra-field)
  *
  * These render the classes and nothing else: no wrapper elements, so
  * controls stay direct siblings and the neighbour tug keeps working.
@@ -83,6 +83,12 @@ export const Row = ({ as: Tag = "div", elevation = "rest", className, ...props }
   />
 );
 
-export const Field = ({ className, ...props }: ComponentPropsWithRef<"input">) => (
-  <input className={cx("lycra-field", className)} {...props} />
+type FieldProps =
+  | ({ as?: "input" } & ComponentPropsWithRef<"input">)
+  | ({ as: "select" } & ComponentPropsWithRef<"select">)
+  | ({ as: "textarea" } & ComponentPropsWithRef<"textarea">);
+
+/** A sunken field: an <input> by default, or `as="select"` / `as="textarea"`. */
+export const Field = ({ as: Tag = "input", className, ...props }: FieldProps) => (
+  <Tag className={cx("lycra-field", className)} {...(props as object)} />
 );

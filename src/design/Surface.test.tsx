@@ -92,4 +92,17 @@ describe("Surface", () => {
     render(<Field aria-label="Your name" />);
     expect(screen.getByRole("textbox", { name: "Your name" })).toHaveClass("lycra-field");
   });
+
+  it("a field can be a select or a textarea, with the same class", () => {
+    render(
+      <>
+        <Field as="select" aria-label="Category"><option>All</option></Field>
+        <Field as="textarea" aria-label="Question" />
+      </>,
+    );
+    expect(screen.getByRole("combobox", { name: "Category" })).toHaveClass("lycra-field");
+    const question = screen.getByRole("textbox", { name: "Question" });
+    expect(question.tagName).toBe("TEXTAREA");
+    expect(question).toHaveClass("lycra-field");
+  });
 });
