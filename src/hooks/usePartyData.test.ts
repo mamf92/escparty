@@ -16,13 +16,11 @@ describe("usePartyData", () => {
 
     it("follows the party and its ballots, and stops on unmount", () => {
         const { result, unmount } = renderHook(() => usePartyData("ABBA"));
-        expect(result.current).toEqual({ party: undefined, ballots: undefined, error: null });
-        const [code, onParty, onPartyError] = mocks.listenToParty.mock.calls[0];
+        expect(result.current).toMatchObject({ party: undefined, ballots: undefined, error: null });
+        const [code, onParty] = mocks.listenToParty.mock.calls[0];
         const [, onBallots] = mocks.listenToBallots.mock.calls[0];
         expect(code).toBe("ABBA");
 
-        act(() => onPartyError(new Error("offline")));
-        expect(result.current.error).toMatch(/couldn't be reached/);
         act(() => {
             onParty(makeParty());
             onBallots([makeBallot("g", "Jedward", [12])]);
@@ -44,7 +42,7 @@ describe("usePartyData", () => {
         });
         rerender({ code: "LORD" });
         expect(mocks.stopParty).toHaveBeenCalled();
-        expect(result.current).toEqual({ party: undefined, ballots: undefined, error: null });
+        expect(result.current).toMatchObject({ party: undefined, ballots: undefined, error: null });
         expect(mocks.listenToParty.mock.calls[1][0]).toBe("LORD");
     });
 
@@ -54,11 +52,47 @@ describe("usePartyData", () => {
         expect(mocks.listenToParty).not.toHaveBeenCalled();
     });
 
+    it("keeps saying the ratings stopped when the party updates, until a retry", () => {
+        const { result } = renderHook(() => usePartyData("ABBA"));
+        const [, onParty] = mocks.listenToParty.mock.calls[0];
+        const [, onBallots, onBallotsError] = mocks.listenToBallots.mock.calls[0];
+        act(() => {
+            onParty(makeParty());
+            onBallots([makeBallot("g", "Jedward", [12])]);
+            onBallotsError(new Error("permission-denied"));
+        });
+        act(() => onParty(makeParty({ revealed: true })));
+        expect(result.current.error).toMatch(/couldn't be reached/);
+
+        // A retry attaches both listeners afresh and keeps what's on screen.
+        act(() => result.current.retry());
+        expect(mocks.stopParty).toHaveBeenCalled();
+        expect(mocks.stopBallots).toHaveBeenCalled();
+        expect(mocks.listenToParty).toHaveBeenCalledTimes(2);
+        expect(mocks.listenToBallots).toHaveBeenCalledTimes(2);
+        expect(result.current.error).toBeNull();
+        expect(result.current.party?.revealed).toBe(true);
+        expect(result.current.ballots).toHaveLength(1);
+    });
+
     it("reports a listener that can't start", () => {
         mocks.listenToParty.mockImplementation(() => {
             throw new Error("Firebase not initialized");
         });
         const { result } = renderHook(() => usePartyData("ABBA"));
         expect(result.current.error).toMatch(/couldn't be reached/);
+    });
+
+    it("blames the ratings listener, not the party's, when that one can't start", () => {
+        mocks.listenToBallots.mockImplementation(() => {
+            throw new Error("Firebase not initialized");
+        });
+        const { result, unmount } = renderHook(() => usePartyData("ABBA"));
+        expect(result.current.error).toMatch(/couldn't be reached/);
+        expect(console.error).toHaveBeenCalledWith("Couldn't follow the party's ratings:", expect.any(Error));
+        expect(console.error).not.toHaveBeenCalledWith("Couldn't follow the party's details:", expect.anything());
+        // The party listener started, so it's still stopped on unmount.
+        unmount();
+        expect(mocks.stopParty).toHaveBeenCalled();
     });
 });

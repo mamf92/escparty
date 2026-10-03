@@ -5,6 +5,7 @@ import {
     RATING_TEMPLATES,
     actScore,
     ballotScores,
+    categoryLabelProblem,
     categoryProblems,
     isValidRating,
     partyAwards,
@@ -62,6 +63,17 @@ describe("templates", () => {
             "Two categories have the same name.",
             "Pick a scale for every category.",
         ]);
+    });
+
+    it("say what's wrong with one category's name", () => {
+        const sheet: RatingCategory[] = [
+            { id: "1", label: " ", max: 10 },
+            { id: "2", label: "Hair", max: 10 },
+            { id: "3", label: " hair ", max: 5 },
+            { id: "4", label: "x".repeat(31), max: 5 },
+            { id: "5", label: "Wind", max: 5 },
+        ];
+        expect(sheet.map(category => categoryLabelProblem(category, sheet))).toEqual(["blank", "repeat", "repeat", "long", null]);
     });
 
     it("know a valid rating", () => {
