@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { Control, Field, Ground, Pane, Row } from "../design";
 import { customQuizKey, saveCustomQuiz } from "../utils/customQuizzes";
 import { loadQuizForEditing } from "../utils/quizCatalog";
+import { focusSoon } from "../utils/focusSoon";
+import { radioGroupKeys, radioTabIndex } from "../utils/radioGroupKeys";
 import type { QuizDifficulty } from "../utils/QuizDataProvider";
 import {
     BREAK_CHOICES,
@@ -11,9 +14,10 @@ import {
     DIFFICULTY_LABELS,
     QUESTION_LIMITS,
     QUIZ_LIMITS,
+    badOptions,
     isBreakAfter,
-    questionProblems,
-    quizProblems,
+    questionFieldProblems,
+    quizFieldProblems,
     type AnyQuestion,
     type BankQuestion,
     type BreakEvery,
@@ -42,6 +46,10 @@ const sourceLabel = (question: AnyQuestion) =>
 let customCounter = 0;
 const newCustomId = () => `mine-${Date.now().toString(36)}-${(customCounter++).toString(36)}`;
 
+/** The messages of the problems about one field. */
+const messagesFor = <Field extends string>(problems: { field: Field; message: string }[], field: Field) =>
+    problems.filter(problem => problem.field === field).map(problem => problem.message);
+
 /**
  * Build a quiz (#73-#76): name it, pick questions from the bank, write your
  * own, put them in order, choose when the scoreboard break comes, and save
@@ -49,26 +57,35 @@ const newCustomId = () => `mine-${Date.now().toString(36)}-${(customCounter++).t
  * or from a saved quiz to edit (`/quizzes/edit/:quizId`), which saves as a
  * new quiz in its place.
  *
- * Three views on the Calm surface: the quiz being assembled, the bank
- * picker, and the question editor. Each list is a pane of controls, picked
- * then acted on, the same as the quiz library.
+ * Three views on the design system's surface (#177): the quiz being
+ * assembled, the bank picker, and the question editor. Each list is a pane
+ * of controls, picked then acted on, the same as the quiz library. Fields
+ * sit in the pane under their labels, and what's wrong with one is said
+ * beside it.
  */
 const QuizBuilder = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { quizId } = useParams<{ quizId?: string }>();
     const fromKey = quizId ? customQuizKey(quizId) : (location.state as { fromKey?: string } | null)?.fromKey;
+    const ids = useId();
+    const fieldId = (name: string) => `${ids}-${name}`;
 
     const [title, setTitle] = useState("");
     const [breakEvery, setBreakEvery] = useState<BreakEvery>(DEFAULT_BREAK_EVERY);
     const [questions, setQuestions] = useState<AnyQuestion[]>([]);
     const [selected, setSelected] = useState<number | null>(null);
+    // Taking a question out asks first.
+    const [confirmingRemove, setConfirmingRemove] = useState(false);
     const [mode, setMode] = useState<Mode>("assemble");
     const [draft, setDraft] = useState<Draft>(emptyDraft);
     const [draftTried, setDraftTried] = useState(false);
+    // The alert summing up a failed "Add to the quiz", as it stood then.
+    const [draftSummary, setDraftSummary] = useState<string | null>(null);
     const [saveTried, setSaveTried] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [notice, setNotice] = useState<string | null>(null);
+    const [loadNotice, setLoadNotice] = useState<string | null>(null);
+    const [saveFailed, setSaveFailed] = useState(false);
     const [loadingFrom, setLoadingFrom] = useState(!!fromKey);
     // Only a quiz that actually loaded is replaced in "my quizzes" on save.
     const [editingLoaded, setEditingLoaded] = useState(false);
@@ -77,6 +94,17 @@ const QuizBuilder = () => {
     const [bank, setBank] = useState<BankQuestion[] | null>(null);
     const [category, setCategory] = useState<QuestionCategory | "all">("all");
     const [difficulty, setDifficulty] = useState<QuizDifficulty | "all">("all");
+
+    const nameRef = useRef<HTMLInputElement>(null);
+    const questionRef = useRef<HTMLTextAreaElement>(null);
+    const listRef = useRef<HTMLDivElement>(null);
+    const moveUpRef = useRef<HTMLButtonElement>(null);
+    const moveDownRef = useRef<HTMLButtonElement>(null);
+    const askRemoveRef = useRef<HTMLButtonElement>(null);
+    const keepRef = useRef<HTMLButtonElement>(null);
+    const editRef = useRef<HTMLButtonElement>(null);
+    const answersRef = useRef<HTMLDivElement>(null);
+    const correctRef = useRef<HTMLDivElement>(null);
 
     // Start from a premade or saved quiz.
     useEffect(() => {
@@ -90,7 +118,7 @@ const QuizBuilder = () => {
                 setQuestions(start.questions);
                 setEditingLoaded(!!quizId);
             })
-            .catch(() => current && setNotice("That quiz couldn't be loaded, so you're starting from scratch."))
+            .catch(() => current && setLoadNotice("That quiz couldn't be loaded, so you're starting from scratch."))
             .finally(() => current && setLoadingFrom(false));
         return () => {
             current = false;
@@ -110,19 +138,50 @@ const QuizBuilder = () => {
 
     const inQuiz = useMemo(() => new Set(questions.map(question => question.id)), [questions]);
     const full = questions.length >= QUIZ_LIMITS.maxQuestions;
-    const problems = quizProblems({ title, questions, breakEvery });
+    // Each problem is said beside the field it's about
+    // (docs/design/design-system.md, "Forms").
+    const quizFieldIssues = quizFieldProblems({ title, questions, breakEvery });
+    const nameProblems = saveTried ? messagesFor(quizFieldIssues, "name") : [];
+    const quizWideProblems = saveTried
+        ? quizFieldIssues.filter(problem => problem.field !== "name").map(problem => problem.message)
+        : [];
+
+    const select = (index: number | null) => {
+        setSelected(index);
+        setConfirmingRemove(false);
+    };
 
     const move = (from: number, to: number) => {
         if (to < 0 || to >= questions.length) return;
         const next = [...questions];
         [next[from], next[to]] = [next[to], next[from]];
         setQuestions(next);
-        setSelected(to);
+        select(to);
+        // At an end the move just made is disabled, so keep focus on the
+        // move that's still possible instead of dropping it.
+        if (to === 0) focusSoon(() => moveDownRef.current);
+        else if (to === questions.length - 1) focusSoon(() => moveUpRef.current);
+    };
+
+    const askToRemove = () => {
+        setConfirmingRemove(true);
+        focusSoon(() => keepRef.current);
+    };
+
+    const keep = () => {
+        setConfirmingRemove(false);
+        focusSoon(() => askRemoveRef.current);
     };
 
     const remove = (index: number) => {
+        const left = questions.length - 1;
         setQuestions(questions.filter((_, i) => i !== index));
-        setSelected(null);
+        select(null);
+        // Back to the list's tab stop (nothing is picked now, so the first
+        // question), or to adding one when the list is gone.
+        focusSoon(() => left > 0
+            ? listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')
+            : document.getElementById(fieldId("add-from-bank")));
     };
 
     const toggleBankQuestion = (question: BankQuestion) => {
@@ -131,7 +190,7 @@ const QuizBuilder = () => {
         } else if (!full) {
             setQuestions([...questions, question]);
         }
-        setSelected(null);
+        select(null);
     };
 
     const openEditor = (index: number | null) => {
@@ -143,11 +202,47 @@ const QuizBuilder = () => {
                 index,
                 question: question.question,
                 options: [...question.options],
-                correct: question.options.indexOf(question.correctAnswer),
+                // An answer that isn't one of the options marks none.
+                correct: question.options.includes(question.correctAnswer)
+                    ? question.options.indexOf(question.correctAnswer)
+                    : null,
             });
         }
         setDraftTried(false);
+        setDraftSummary(null);
+        setConfirmingRemove(false);
         setMode("write");
+        focusSoon(() => questionRef.current);
+    };
+
+    // Each view replaces the page, so focus goes where the view was opened
+    // from instead of falling back to the top of the document.
+    const openBank = () => {
+        setMode("bank");
+        focusSoon(() => document.getElementById(fieldId("category")));
+    };
+
+    const backFromBank = () => {
+        setMode("assemble");
+        focusSoon(() => document.getElementById(fieldId("add-from-bank")));
+    };
+
+    /** Back from the editor: to the question it edited, or to writing another. */
+    const backFromEditor = (index: number | null) => {
+        select(index);
+        setMode("assemble");
+        focusSoon(() => {
+            if (index !== null) return editRef.current;
+            // A full quiz can't take another, so its write button is off.
+            const write = document.getElementById(fieldId("write")) as HTMLButtonElement | null;
+            return write && !write.disabled ? write : document.getElementById(fieldId("add-from-bank"));
+        });
+    };
+
+    // Any edit retires the summary; the notes beside the fields stay current.
+    const editDraft = (next: Draft) => {
+        setDraft(next);
+        setDraftSummary(null);
     };
 
     const draftQuestion = {
@@ -155,11 +250,31 @@ const QuizBuilder = () => {
         options: draft.options,
         correctAnswer: draft.correct === null ? "" : draft.options[draft.correct] ?? "",
     };
-    const draftProblems = questionProblems(draftQuestion);
+    const draftIssues = questionFieldProblems(draftQuestion);
+    const shownDraftIssues = draftTried ? draftIssues : [];
+    const questionTextProblems = messagesFor(shownDraftIssues, "question");
+    const correctProblems = messagesFor(shownDraftIssues, "correct");
+    const answerProblems = messagesFor(shownDraftIssues, "answers");
+    const answersInvalid = answerProblems.length > 0 ? badOptions(draft.options) : draft.options.map(() => false);
 
     const saveDraft = () => {
         setDraftTried(true);
-        if (draftProblems.length > 0) return;
+        if (draftIssues.length > 0) {
+            // Said once, as it stood on submit; the notes beside the fields
+            // follow the edits from here without interrupting.
+            setDraftSummary(draftIssues.length > 1
+                ? `${draftIssues.length} things to fix before this question can go in: ${draftIssues.map(problem => problem.message).join(" ")}`
+                : null);
+            // Take them to the first thing to fix once its note is on the
+            // page, so the note is read with it.
+            const first = draftIssues[0].field;
+            const firstBadAnswer = badOptions(draft.options).indexOf(true);
+            if (first === "question") focusSoon(() => questionRef.current);
+            else if (first === "answers" && firstBadAnswer >= 0) {
+                focusSoon(() => answersRef.current?.querySelectorAll<HTMLElement>("input")[firstBadAnswer]);
+            } else if (first === "correct") focusSoon(() => correctRef.current?.querySelector<HTMLElement>('[role="radio"]'));
+            return;
+        }
         const trimmed = {
             question: draftQuestion.question.trim(),
             options: draftQuestion.options.map(option => option.trim()),
@@ -179,23 +294,37 @@ const QuizBuilder = () => {
                 return { id: question.source === "custom" ? question.id : newCustomId(), source: "custom", ...trimmed };
             }));
         }
-        setSelected(null);
-        setMode("assemble");
+        backFromEditor(draft.index);
     };
 
     const setOption = (index: number, value: string) =>
-        setDraft({ ...draft, options: draft.options.map((option, i) => (i === index ? value : option)) });
+        editDraft({ ...draft, options: draft.options.map((option, i) => (i === index ? value : option)) });
+
+    const addOption = () => {
+        const added = draft.options.length;
+        editDraft({ ...draft, options: [...draft.options, ""] });
+        // Straight into the new answer, ready to type.
+        focusSoon(() => document.getElementById(fieldId(`answer-${added}`)));
+    };
 
     const removeLastOption = () => {
         const last = draft.options.length - 1;
-        setDraft({ ...draft, options: draft.options.slice(0, last), correct: draft.correct === last ? null : draft.correct });
+        editDraft({ ...draft, options: draft.options.slice(0, last), correct: draft.correct === last ? null : draft.correct });
+        // At the fewest answers this move goes away; keep focus nearby.
+        if (last <= QUESTION_LIMITS.minOptions) focusSoon(() => document.getElementById(fieldId("add-answer")));
     };
 
     const saveQuiz = async () => {
         setSaveTried(true);
-        if (problems.length > 0 || saving) return;
+        // A notice about how the builder started has had its say by now.
+        setLoadNotice(null);
+        if (quizFieldIssues.length > 0) {
+            if (quizFieldIssues.some(problem => problem.field === "name")) focusSoon(() => nameRef.current);
+            return;
+        }
+        if (saving) return;
         setSaving(true);
-        setNotice(null);
+        setSaveFailed(false);
         try {
             const id = await saveCustomQuiz({ title, breakEvery, questions }, editingLoaded ? quizId : undefined);
             // The library lists it from this device's storage; the state
@@ -205,7 +334,7 @@ const QuizBuilder = () => {
             });
         } catch (error) {
             console.error("Couldn't save the quiz:", error);
-            setNotice("The quiz couldn't be saved. Check your connection and try again.");
+            setSaveFailed(true);
             setSaving(false);
         }
     };
@@ -218,62 +347,73 @@ const QuizBuilder = () => {
             <CalmPage
                 title="Question bank"
                 subtitle={`${questions.length} ${questions.length === 1 ? "question" : "questions"} in your quiz. Tap to add or take out.`}
-                footer={<CalmLink type="button" onClick={() => setMode("assemble")}>Back to your quiz</CalmLink>}
+                footer={<CalmLink onClick={backFromBank}>Back to your quiz</CalmLink>}
             >
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <label>
-                            <span className="calm-label">Category</span>
-                            <select className="lycra-field" value={category} onChange={event => setCategory(event.target.value as QuestionCategory | "all")}>
-                                <option value="all">All categories</option>
-                                {Object.entries(CATEGORY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                            </select>
-                        </label>
-                        <label>
-                            <span className="calm-label">Difficulty</span>
-                            <select className="lycra-field" value={difficulty} onChange={event => setDifficulty(event.target.value as QuizDifficulty | "all")}>
-                                <option value="all">Any difficulty</option>
-                                {Object.entries(DIFFICULTY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                            </select>
-                        </label>
-                    </div>
-                </div>
+                <Ground>
+                    <Pane>
+                        <label className="calm-label" htmlFor={fieldId("category")}>Category</label>
+                        <Field
+                            as="select"
+                            id={fieldId("category")}
+                            value={category}
+                            onChange={event => setCategory(event.target.value as QuestionCategory | "all")}
+                        >
+                            <option value="all">All categories</option>
+                            {Object.entries(CATEGORY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                        </Field>
+                        <label className="calm-label" htmlFor={fieldId("difficulty")}>Difficulty</label>
+                        <Field
+                            as="select"
+                            id={fieldId("difficulty")}
+                            value={difficulty}
+                            onChange={event => setDifficulty(event.target.value as QuizDifficulty | "all")}
+                        >
+                            <option value="all">Any difficulty</option>
+                            {Object.entries(DIFFICULTY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                        </Field>
+                    </Pane>
+                </Ground>
                 {bankFailed ? (
                     <>
-                        <CalmNote role="alert">The question bank couldn't be loaded.</CalmNote>
-                        <div className="calm-ground">
-                            <div className="lycra-pane">
-                                <button type="button" className="lycra" onClick={() => setBankFailed(false)}>Try again</button>
-                            </div>
-                        </div>
+                        <CalmNote role="alert">The question bank couldn't be loaded. Check your connection and try again.</CalmNote>
+                        <Ground>
+                            <Pane>
+                                <Control onClick={() => setBankFailed(false)}>Try again</Control>
+                            </Pane>
+                        </Ground>
                     </>
                 ) : !bank ? (
-                    <CalmNote>Loading the bank…</CalmNote>
+                    <CalmNote role="status">Loading the bank…</CalmNote>
+                ) : shown.length === 0 ? (
+                    <Ground>
+                        <Pane>
+                            <Row>No questions match that category and difficulty. Try all categories or any difficulty.</Row>
+                        </Pane>
+                    </Ground>
                 ) : (
-                    <div className="calm-ground">
-                        <div className="lycra-pane" role="group" aria-label="Bank questions">
+                    <Ground>
+                        <Pane role="group" aria-label="Bank questions">
                             {shown.map(question => (
-                                <button
+                                <Control
                                     key={question.id}
-                                    type="button"
-                                    aria-pressed={inQuiz.has(question.id)}
+                                    block
+                                    chosen={inQuiz.has(question.id)}
                                     disabled={full && !inQuiz.has(question.id)}
-                                    className={`lycra is-block${inQuiz.has(question.id) ? " is-chosen" : ""}`}
                                     onClick={() => toggleBankQuestion(question)}
                                 >
                                     <span>{question.question}</span>
                                     <span className="calm-sub">{DIFFICULTY_LABELS[question.difficulty]} · {question.correctAnswer}</span>
-                                </button>
+                                </Control>
                             ))}
-                        </div>
-                    </div>
+                        </Pane>
+                    </Ground>
                 )}
                 {full && <CalmNote>That's the most a quiz can hold ({QUIZ_LIMITS.maxQuestions}).</CalmNote>}
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <button type="button" className="lycra" onClick={() => setMode("assemble")}>Done</button>
-                    </div>
-                </div>
+                <Ground>
+                    <Pane>
+                        <Control onClick={backFromBank}>Use these questions</Control>
+                    </Pane>
+                </Ground>
             </CalmPage>
         );
     }
@@ -283,68 +423,83 @@ const QuizBuilder = () => {
             <CalmPage
                 title={draft.index === null ? "Write a question" : "Edit question"}
                 subtitle="Two to six answers, and tap the one that's right."
-                footer={<CalmLink type="button" onClick={() => setMode("assemble")}>Back to your quiz</CalmLink>}
+                footer={<CalmLink onClick={() => backFromEditor(draft.index)}>Back to your quiz</CalmLink>}
             >
-                <div className="calm-ground">
-                    <div className="lycra-pane">
-                        <label>
-                            <span className="calm-label">Question</span>
-                            <textarea
-                                className="lycra-field"
-                                value={draft.question}
-                                maxLength={QUESTION_LIMITS.maxQuestionLength}
-                                placeholder="Which act sang in wolf masks?"
-                                onChange={event => setDraft({ ...draft, question: event.target.value })}
-                            />
-                        </label>
-                        {draft.options.map((option, index) => (
-                            <label key={index}>
-                                <span className="calm-label">Answer {index + 1}</span>
-                                <input
-                                    className="lycra-field"
-                                    value={option}
-                                    maxLength={QUESTION_LIMITS.maxOptionLength}
-                                    onChange={event => setOption(index, event.target.value)}
-                                />
-                            </label>
-                        ))}
-                    </div>
-                </div>
+                <Ground>
+                    <Pane ref={answersRef}>
+                        <label className="calm-label" htmlFor={fieldId("question")}>Question</label>
+                        <Field
+                            as="textarea"
+                            ref={questionRef}
+                            id={fieldId("question")}
+                            value={draft.question}
+                            maxLength={QUESTION_LIMITS.maxQuestionLength}
+                            placeholder="Which act sang in wolf masks?"
+                            aria-invalid={questionTextProblems.length > 0 || undefined}
+                            aria-describedby={questionTextProblems.length > 0 ? fieldId("question-note") : undefined}
+                            onChange={event => editDraft({ ...draft, question: event.target.value })}
+                        />
+                        {questionTextProblems.length > 0 && (
+                            <p className="calm-sub" id={fieldId("question-note")}>{questionTextProblems.join(" ")}</p>
+                        )}
+                        {draft.options.flatMap((option, index) => [
+                            <label key={`label-${index}`} className="calm-label" htmlFor={fieldId(`answer-${index}`)}>
+                                Answer {index + 1}
+                            </label>,
+                            <Field
+                                key={`field-${index}`}
+                                id={fieldId(`answer-${index}`)}
+                                value={option}
+                                maxLength={QUESTION_LIMITS.maxOptionLength}
+                                aria-invalid={answersInvalid[index] || undefined}
+                                aria-describedby={answersInvalid[index] ? fieldId("answers-note") : undefined}
+                                onChange={event => setOption(index, event.target.value)}
+                            />,
+                        ])}
+                        {answerProblems.length > 0 && (
+                            <p className="calm-sub" id={fieldId("answers-note")}>{answerProblems.join(" ")}</p>
+                        )}
+                    </Pane>
+                </Ground>
                 <CalmNote>Which answer is correct?</CalmNote>
-                <div className="calm-ground">
-                    <div className="lycra-pane" role="radiogroup" aria-label="Correct answer">
+                <Ground>
+                    <Pane
+                        ref={correctRef}
+                        role="radiogroup"
+                        aria-label="Correct answer"
+                        aria-describedby={correctProblems.length > 0 ? fieldId("correct-note") : undefined}
+                    >
                         {draft.options.map((option, index) => (
-                            <button
+                            <Control
                                 key={index}
-                                type="button"
+                                block
                                 role="radio"
                                 aria-checked={draft.correct === index}
-                                className={`lycra is-block${draft.correct === index ? " is-chosen" : ""}`}
-                                onClick={() => setDraft({ ...draft, correct: index })}
+                                tabIndex={radioTabIndex(index, draft.correct)}
+                                chosen={draft.correct === index}
+                                onClick={() => editDraft({ ...draft, correct: index })}
+                                onKeyDown={event => radioGroupKeys(event, index, draft.options.length, next => editDraft({ ...draft, correct: next }))}
                             >
                                 {option.trim() || `Answer ${index + 1}`}
-                            </button>
+                            </Control>
                         ))}
-                    </div>
-                </div>
-                {draftTried && draftProblems.length > 0 && (
-                    <CalmNote role="alert">{draftProblems.join(" ")}</CalmNote>
-                )}
-                <div className="calm-ground">
-                    <div className="lycra-pane">
+                    </Pane>
+                </Ground>
+                {correctProblems.length > 0 && <CalmNote id={fieldId("correct-note")}>{correctProblems.join(" ")}</CalmNote>}
+                {draftSummary && <CalmNote role="alert">{draftSummary}</CalmNote>}
+                <Ground>
+                    <Pane>
                         {draft.options.length < QUESTION_LIMITS.maxOptions && (
-                            <button type="button" className="lycra" onClick={() => setDraft({ ...draft, options: [...draft.options, ""] })}>
-                                Add another answer
-                            </button>
+                            <Control id={fieldId("add-answer")} onClick={addOption}>Add another answer</Control>
                         )}
                         {draft.options.length > QUESTION_LIMITS.minOptions && (
-                            <button type="button" className="lycra" onClick={removeLastOption}>Remove the last answer</button>
+                            <Control onClick={removeLastOption}>Remove the last answer</Control>
                         )}
-                        <button type="button" className="lycra" onClick={saveDraft}>
+                        <Control onClick={saveDraft}>
                             {draft.index === null ? "Add to the quiz" : "Keep these changes"}
-                        </button>
-                    </div>
-                </div>
+                        </Control>
+                    </Pane>
+                </Ground>
             </CalmPage>
         );
     }
@@ -354,86 +509,102 @@ const QuizBuilder = () => {
         <CalmPage
             title={quizId ? "Edit quiz" : "Build a quiz"}
             subtitle="Mix questions from the bank with your own, then save it to host or play."
-            footer={<CalmLink type="button" onClick={() => navigate("/quizzes")}>Back to the quiz library</CalmLink>}
+            footer={<CalmLink onClick={() => navigate("/quizzes")}>Back to the quiz library</CalmLink>}
         >
-            {notice && <CalmNote role="status">{notice}</CalmNote>}
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <label>
-                        <span className="calm-label">Name</span>
-                        <input
-                            className="lycra-field"
-                            value={title}
-                            maxLength={QUIZ_LIMITS.maxTitleLength}
-                            placeholder="Jedward's Revenge"
-                            onChange={event => setTitle(event.target.value)}
-                        />
-                    </label>
-                    <label>
-                        <span className="calm-label">Scoreboard break</span>
-                        <select
-                            className="lycra-field"
-                            value={breakEvery}
-                            onChange={event => setBreakEvery(Number(event.target.value) as BreakEvery)}
-                        >
-                            {BREAK_CHOICES.map(choice => <option key={choice} value={choice}>{breakLabel(choice)}</option>)}
-                        </select>
-                    </label>
-                </div>
-            </div>
+            {loadNotice && <CalmNote role="status">{loadNotice}</CalmNote>}
+            <Ground>
+                <Pane>
+                    <label className="calm-label" htmlFor={fieldId("name")}>Name</label>
+                    <Field
+                        ref={nameRef}
+                        id={fieldId("name")}
+                        value={title}
+                        maxLength={QUIZ_LIMITS.maxTitleLength}
+                        placeholder="Jedward's Revenge"
+                        aria-invalid={nameProblems.length > 0 || undefined}
+                        aria-describedby={nameProblems.length > 0 ? fieldId("name-note") : undefined}
+                        onChange={event => setTitle(event.target.value)}
+                    />
+                    {nameProblems.length > 0 && <p className="calm-sub" id={fieldId("name-note")}>{nameProblems.join(" ")}</p>}
+                    <label className="calm-label" htmlFor={fieldId("break")}>Scoreboard break</label>
+                    <Field
+                        as="select"
+                        id={fieldId("break")}
+                        value={breakEvery}
+                        onChange={event => setBreakEvery(Number(event.target.value) as BreakEvery)}
+                    >
+                        {BREAK_CHOICES.map(choice => <option key={choice} value={choice}>{breakLabel(choice)}</option>)}
+                    </Field>
+                </Pane>
+            </Ground>
 
             {loadingFrom ? (
-                <CalmNote>Loading the quiz…</CalmNote>
+                <CalmNote role="status">Loading the quiz…</CalmNote>
             ) : questions.length === 0 ? (
-                <CalmNote>No questions yet. Add some from the bank or write your own.</CalmNote>
+                <Ground>
+                    <Pane>
+                        <Row>No questions yet. Add some from the bank or write your own.</Row>
+                    </Pane>
+                </Ground>
             ) : (
-                <div className="calm-ground">
-                    <div className="lycra-pane" role="radiogroup" aria-label="Questions in this quiz">
+                <Ground>
+                    <Pane ref={listRef} role="radiogroup" aria-label="Questions in this quiz">
                         {questions.map((question, index) => (
-                            <button
+                            <Control
                                 key={question.id}
-                                type="button"
+                                block
                                 role="radio"
                                 aria-checked={selected === index}
-                                className={`lycra is-block${selected === index ? " is-chosen" : ""}`}
-                                onClick={() => setSelected(selected === index ? null : index)}
+                                tabIndex={radioTabIndex(index, selected)}
+                                chosen={selected === index}
+                                onClick={() => select(index)}
+                                onKeyDown={event => radioGroupKeys(event, index, questions.length, select)}
                             >
                                 <span>{index + 1}. {question.question}</span>
                                 <span className="calm-sub">
                                     {sourceLabel(question)}
                                     {isBreakAfter(index, questions.length, breakEvery) ? " · Scoreboard after this one" : ""}
                                 </span>
-                            </button>
+                            </Control>
                         ))}
-                    </div>
-                </div>
+                    </Pane>
+                </Ground>
             )}
 
             {picked && selected !== null && (
-                <div className="calm-ground">
-                    <div className="lycra-pane" aria-label={`Question ${selected + 1}`}>
-                        {selected > 0 && (
-                            <button type="button" className="lycra" onClick={() => move(selected, selected - 1)}>Move up</button>
+                <Ground>
+                    <Pane role="group" aria-label={`Question ${selected + 1}`}>
+                        <Control ref={moveUpRef} disabled={selected === 0} onClick={() => move(selected, selected - 1)}>Move up</Control>
+                        <Control ref={moveDownRef} disabled={selected === questions.length - 1} onClick={() => move(selected, selected + 1)}>Move down</Control>
+                        <Control ref={editRef} onClick={() => openEditor(selected)}>Edit this question</Control>
+                        {confirmingRemove ? (
+                            <>
+                                <p className="calm-sub" id={fieldId("remove-note")}>
+                                    Take question {selected + 1} out of this quiz?
+                                </p>
+                                <Control aria-describedby={fieldId("remove-note")} onClick={() => remove(selected)}>Yes, remove it</Control>
+                                <Control ref={keepRef} onClick={keep}>Keep it</Control>
+                            </>
+                        ) : (
+                            <Control ref={askRemoveRef} onClick={askToRemove}>Remove this question</Control>
                         )}
-                        {selected < questions.length - 1 && (
-                            <button type="button" className="lycra" onClick={() => move(selected, selected + 1)}>Move down</button>
-                        )}
-                        <button type="button" className="lycra" onClick={() => openEditor(selected)}>Edit</button>
-                        <button type="button" className="lycra" onClick={() => remove(selected)}>Take out</button>
-                    </div>
-                </div>
+                    </Pane>
+                </Ground>
             )}
 
-            {saveTried && problems.length > 0 && <CalmNote role="alert">{problems.join(" ")}</CalmNote>}
-            <div className="calm-ground">
-                <div className="lycra-pane">
-                    <button type="button" className="lycra" onClick={() => setMode("bank")}>Add from the bank</button>
-                    <button type="button" className="lycra" disabled={full} onClick={() => openEditor(null)}>Write a question</button>
-                    <button type="button" className="lycra" disabled={saving || loadingFrom} onClick={saveQuiz}>
+            {quizWideProblems.length > 0 && <CalmNote role="alert">{quizWideProblems.join(" ")}</CalmNote>}
+            {saveFailed && (
+                <CalmNote role="alert">The quiz couldn't be saved. Check your connection and try again.</CalmNote>
+            )}
+            <Ground>
+                <Pane>
+                    <Control id={fieldId("add-from-bank")} onClick={openBank}>Add from the bank</Control>
+                    <Control id={fieldId("write")} disabled={full} onClick={() => openEditor(null)}>Write a question</Control>
+                    <Control disabled={saving || loadingFrom} onClick={saveQuiz}>
                         {saving ? "Saving…" : "Save quiz"}
-                    </button>
-                </div>
-            </div>
+                    </Control>
+                </Pane>
+            </Ground>
         </CalmPage>
     );
 };

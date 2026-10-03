@@ -143,6 +143,12 @@ plan that also removes the ad hoc storage it would duplicate.
   `MidQuizScoreboard.tsx` and
   `advanceQuestion` in `roomsFirestore.ts`; `firestore.rules` hardcodes the
   same 15s slot.
+- `radioGroupKeys.ts` — arrow, Home and End keys plus the roving tab stop
+  for a radio group built from buttons (#177), used by the quiz library
+  and the quiz builder's lists.
+- `focusSoon.ts` — focus an element a frame later, once React has put it
+  (and the note describing it) on the page; used by the quiz library and
+  builder (#177).
 - `pathUtils.ts` — environment detection (`isDevelopmentEnvironment`,
   `isProductionPreview`) plus the base-path helper `getAssetPath`.
   `firebase.ts` uses both detection functions (but no base-path helper);
