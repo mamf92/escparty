@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import PartyHostTools from "../components/PartyHostTools";
 import { PartyError, PartyNotFound } from "../components/PartyStates";
-import { Control, Field, Ground, Pane, Row } from "../design";
+import { Control, Field, Ground, Pane, Row, useRovingTabs } from "../design";
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
 import { usePartyData } from "../hooks/usePartyData";
 import type { Party } from "../utils/partyFirestore";
@@ -20,8 +20,13 @@ import {
 import { randomPartyName } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
+import "./party-calm.css";
 
 type Tab = "rate" | "ranking" | "room" | "host";
+
+const GUEST_TABS: readonly Tab[] = ["rate", "ranking", "room"];
+const HOST_TABS: readonly Tab[] = [...GUEST_TABS, "host"];
+const TAB_LABELS: Record<Tab, string> = { rate: "Rate", ranking: "My ranking", room: "The room", host: "Host" };
 
 const SAVE_NOTES: Record<SaveState, string> = {
     saved: "Your ratings are saved.",
@@ -41,6 +46,11 @@ const PartyRoom = () => {
     const [identity, setIdentity] = useState<PartyIdentity | null>(() => (code ? readPartyIdentity(code) : null));
     const own = useOwnBallot(code, identity, ballots);
     const [tab, setTab] = useState<Tab>("rate");
+    // Before the early returns, as hooks must be; the host's tab only once
+    // the party and who you are are known.
+    const isHost = !!party && !!identity && identity.guestId === party.hostId;
+    const tabKeys = isHost ? HOST_TABS : GUEST_TABS;
+    const tabs = useRovingTabs(tabKeys, tab, setTab);
 
     const back = <CalmLink onClick={() => navigate("/party")}>Leave the party</CalmLink>;
 
@@ -62,13 +72,11 @@ const PartyRoom = () => {
         return <JoinParty party={party} onJoin={next => { savePartyIdentity(party.code, next); setIdentity(next); }} footer={back} />;
     }
 
-    const isHost = identity.guestId === party.hostId;
     const updateIdentity = (change: Partial<PartyIdentity>) => {
         const next = { ...identity, ...change };
         savePartyIdentity(party.code, next);
         setIdentity(next);
     };
-    const tabs: [Tab, string][] = [["rate", "Rate"], ["ranking", "My ranking"], ["room", "The room"], ...(isHost ? [["host", "Host"] as [Tab, string]] : [])];
 
     return (
         <CalmPage
@@ -83,47 +91,41 @@ const PartyRoom = () => {
         >
             <Ground>
                 <Pane layout="split" role="tablist" aria-label="Party">
-                    {tabs.map(([id, label]) => (
-                        <Control
-                            key={id}
-                            role="tab"
-                            aria-selected={tab === id}
-                            chosen={tab === id}
-                            onClick={() => setTab(id)}
-                        >
-                            {label}
-                        </Control>
+                    {tabKeys.map(key => (
+                        <Control key={key} {...tabs.tab(key)}>{TAB_LABELS[key]}</Control>
                     ))}
                 </Pane>
             </Ground>
             {error && <PartyError error={error} onRetry={retry} />}
 
-            {tab === "rate" && (
-                <RateAct
-                    party={party}
-                    ballot={own.ballot}
-                    actIndex={Math.max(party.acts.findIndex(entry => entry.id === identity.actId), 0)}
-                    onMove={index => updateIdentity({ actId: party.acts[index].id })}
-                    onRate={own.rate}
-                    onBonus={own.toggleBonus}
-                />
-            )}
-            {tab === "ranking" && <MyRanking party={party} ballot={{ guestId: identity.guestId, name: identity.name, ...own.ballot }} />}
-            {tab === "room" && (ballots === undefined
-                ? !error && <CalmNote role="status">Counting the ratings…</CalmNote>
-                : <TheRoom party={party} ballots={ballots} me={identity.guestId} />)}
-            {tab === "host" && isHost && <PartyHostTools party={party} ballots={ballots ?? []} />}
+            <div className="party-tabpanel" {...tabs.panel}>
+                {tab === "rate" && (
+                    <RateAct
+                        party={party}
+                        ballot={own.ballot}
+                        actIndex={Math.max(party.acts.findIndex(entry => entry.id === identity.actId), 0)}
+                        onMove={index => updateIdentity({ actId: party.acts[index].id })}
+                        onRate={own.rate}
+                        onBonus={own.toggleBonus}
+                    />
+                )}
+                {tab === "ranking" && <MyRanking party={party} ballot={{ guestId: identity.guestId, name: identity.name, ...own.ballot }} />}
+                {tab === "room" && (ballots === undefined
+                    ? !error && <CalmNote role="status">Counting the ratings…</CalmNote>
+                    : <TheRoom party={party} ballots={ballots} me={identity.guestId} />)}
+                {tab === "host" && isHost && <PartyHostTools party={party} ballots={ballots ?? []} />}
 
-            {tab !== "host" && (party.revealed || isHost) && (
-                <Ground>
-                    <Pane>
-                        <Control onClick={() => navigate(`/party/${party.code}/awards`)}>
-                            {party.revealed ? "See the awards" : "Preview the awards"}
-                        </Control>
-                    </Pane>
-                </Ground>
-            )}
-            {tab === "rate" && <CalmNote role="status">{SAVE_NOTES[own.state]}</CalmNote>}
+                {tab !== "host" && (party.revealed || isHost) && (
+                    <Ground>
+                        <Pane>
+                            <Control onClick={() => navigate(`/party/${party.code}/awards`)}>
+                                {party.revealed ? "See the awards" : "Preview the awards"}
+                            </Control>
+                        </Pane>
+                    </Ground>
+                )}
+                {tab === "rate" && <CalmNote role="status">{SAVE_NOTES[own.state]}</CalmNote>}
+            </div>
         </CalmPage>
     );
 };

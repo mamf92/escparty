@@ -25,3 +25,11 @@
 .party-label-gap {
   margin-top: var(--esc-space-3);
 }
+
+/* The room's tab panel stacks its sections like the page around it does. */
+.party-tabpanel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--esc-space-4);
+}

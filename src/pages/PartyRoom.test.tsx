@@ -110,6 +110,26 @@ describe("PartyRoom", () => {
         expect(screen.getByRole("radiogroup", { name: "Points for Finland" })).toBeInTheDocument();
     });
 
+    it("moves between the tabs with the arrow keys, one tab stop for the tablist", async () => {
+        const user = userEvent.setup();
+        savePartyIdentity("ABBA", guest);
+        renderRoom();
+        const rate = screen.getByRole("tab", { name: "Rate" });
+        expect(rate).toHaveAttribute("tabindex", "0");
+        expect(screen.getByRole("tab", { name: "The room" })).toHaveAttribute("tabindex", "-1");
+        expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", rate.id);
+
+        rate.focus();
+        await user.keyboard("{ArrowRight}");
+        const ranking = screen.getByRole("tab", { name: "My ranking" });
+        expect(ranking).toHaveFocus();
+        expect(ranking).toHaveAttribute("aria-selected", "true");
+        expect(ranking).toHaveClass("is-chosen");
+        expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", ranking.id);
+        await user.keyboard("{ArrowLeft}{ArrowLeft}");
+        expect(screen.getByRole("tab", { name: "The room" })).toHaveFocus();
+    });
+
     it("stays on the same act when the host reorders the lineup", () => {
         savePartyIdentity("ABBA", { ...guest, actId: "fi" });
         const { unmount } = renderRoom();
