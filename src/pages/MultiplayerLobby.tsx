@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import styled from "styled-components";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, generateRoomCode, getRoom } from "../utils/roomsFirestore";
+import { createRoom, joinRoom, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
 import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
+import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { Control, Field, Ground, Pane } from "../design";
 
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
@@ -36,16 +37,91 @@ const getUniquePlayerName = async (roomCode: string, namesList: string[]): Promi
   return availableNames[Math.floor(Math.random() * availableNames.length)];
 };
 
+type Step = "choose" | "host" | "join";
+
+const NOT_FOUND_NOTE = "No game has that code. Check the four letters with the host and try again.";
+const STARTED_NOTE = "That game has already started. Ask the host to start a new one.";
+
+// What went wrong joining, as a note that says what to do next (#172).
+// joinRoom answers "no such game" and "already started" with false (see
+// refusedNote), and throws only for a full room (a JoinRejected as the
+// cause) or a failure.
+const joinErrorNote = (error: unknown): string => {
+  const cause = (error as { cause?: unknown } | null)?.cause;
+  if (cause instanceof JoinRejected && cause.reason === "full") return "This game is full. Ask the host to start a new one.";
+  const message = (error as { message?: string } | null)?.message ?? "";
+  if (message.includes("Security rules")) return "The room didn't let you in. Try again, or check the code with the host.";
+  return "We couldn't join the game. Check your connection and try again.";
+};
+
+// Why joinRoom said no: one more read tells a wrong code from a started game.
+const refusedNote = async (code: string): Promise<string> => {
+  try {
+    const room = await getRoom(code);
+    return room ? STARTED_NOTE : NOT_FOUND_NOTE;
+  } catch {
+    return "That game can't be joined: it may have started, or the code may be wrong. Check it with the host.";
+  }
+};
+
+type StoredPlayer = { id: string; name: string };
+
+const HOST_NAME = "The host";
+// A stored name as it reads mid-sentence ("Rejoin as the host").
+const asNamed = (name: string): string => name === HOST_NAME ? "the host" : name;
+
+// A player's name without its emoji ("Loreen 🇸🇪" → "Loreen"), for a
+// button label: the design system keeps emoji out of buttons (§8).
+const plainName = (name: string): string =>
+  name
+    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\u{E0020}-\u{E007F}]|\u{FE0F}|\u{200D}|\u{20E3}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim() || name;
+
+/**
+ * The way into a multiplayer quiz: host a game (playing along, or only
+ * running it) or join one with its four-letter code. Errors and the offer
+ * to rejoin as yourself are notes and controls on the page (#172).
+ */
 const MultiplayerLobby = () => {
-  const [_gameCode, setGameCode] = useState<string | null>(null); // Renamed to _gameCode as it's not used directly
+  const [step, setStep] = useState<Step>("choose");
   const [joinCode, setJoinCode] = useState("");
   // Four letters, A to Z; the field upper-cases what is typed.
   const codeInvalid = !/^[A-Z]{4}$/.test(joinCode);
   const [loading, setLoading] = useState(false);
-  const [showJoinForm, setShowJoinForm] = useState(false); // Added missing state variable
-  const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [attempted, setAttempted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Set when this device was already in the game with the typed code: the
+  // player it was, offered back before joining (#65). Kept as offered, so
+  // another tab changing the stored game can't swap who rejoins.
+  const [rejoinAs, setRejoinAs] = useState<StoredPlayer | null>(null);
   const navigate = useNavigate();
+  // A create or join still running when the page is left must not pull
+  // the user into the lobby afterwards.
+  const left = useRef(false);
+  // A create or join in flight: two taps in one render would both still
+  // see loading as false, and make two rooms or two players.
+  const busy = useRef(false);
+  // Which create or join is current: going back to host or join mid-way
+  // starts afresh, and the one left behind must not take the user anywhere.
+  const attempt = useRef(0);
+  useEffect(() => {
+    left.current = false;
+    return () => { left.current = true; };
+  }, []);
+  // Keyboard focus: back to the control that was pressed once it is
+  // enabled again, and onto the rejoin choice when it replaces the submit.
+  const pressed = useRef<HTMLButtonElement | null>(null);
+  const rejoinButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (loading) return;
+    const target = pressed.current;
+    pressed.current = null;
+    if (target?.isConnected && document.activeElement === document.body) target.focus();
+  }, [loading]);
+  useEffect(() => {
+    if (rejoinAs) rejoinButton.current?.focus();
+  }, [rejoinAs]);
   // A quiz picked in the library before coming here (#72): the new room
   // starts with it chosen, and the host can start straight away.
   const location = useLocation();
@@ -61,13 +137,29 @@ const MultiplayerLobby = () => {
     if (location.state) navigate(location.pathname, { replace: true, state: null });
   };
 
-  // Function to create game with host as observer
+  const goTo = (next: Step) => {
+    attempt.current += 1;
+    busy.current = false;
+    setLoading(false);
+    setStep(next);
+    setError(null);
+    setAttempted(false);
+    setRejoinAs(null);
+    setJoinCode("");
+  };
+
+  // Create the room, with the host playing along or only observing.
   const createGame = async (hostIsObserver: boolean) => {
+    if (busy.current) return;
+    busy.current = true;
+    const mine = ++attempt.current;
+    const stale = () => left.current || attempt.current !== mine;
     setLoading(true);
+    setError(null);
     try {
       // Generate a unique ID for the host
       const hostId = uuidv4();
-      const hostName = "👑 HOST 👑";
+      const hostName = HOST_NAME;
 
       // Generate a room code
       const newGameCode = generateRoomCode();
@@ -80,6 +172,10 @@ const MultiplayerLobby = () => {
           console.error("Couldn't preselect the quiz:", error));
       }
 
+      // Left while the room was being made: it stays empty and unused, and
+      // the game this device was in stays the stored one (#65).
+      if (stale()) return;
+
       // Save user info in local storage
       localStorage.setItem("playerId", hostId);
       localStorage.setItem("playerName", hostName);
@@ -88,325 +184,210 @@ const MultiplayerLobby = () => {
       // Whether the host only observes lives on the room (hostIsObserver),
       // which every page reads; a localStorage copy would outlive this game.
 
-      // Update state and navigate
-      setGameCode(newGameCode);
       forgetPickedQuiz();
       navigate("/lobby");
     } catch (error) {
       console.error("Error creating game:", error);
-      alert("Failed to create game. Please try again.");
+      if (!stale()) setError("We couldn't set up the room. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (!stale()) {
+        busy.current = false;
+        setLoading(false);
+      }
     }
   };
 
-  // Function to handle showing create game options
-  const handleShowCreateOptions = () => {
-    setShowCreateOptions(true);
-  };
-
-  // Function to join an existing game
-  const joinGame = async () => {
+  // Join with the typed code. `rejoin` answers the rejoin offer; it is
+  // undefined until that offer has been made.
+  const joinGame = async (rejoin?: boolean) => {
     setAttempted(true);
+    setError(null);
 
     if (codeInvalid) {
       return;
     }
 
-    setLoading(true);
-    try {
-      // Back into a game this device was already in (a closed tab, a
-      // restarted browser, #65): the same player ID and name, so the room
-      // lets them in again even after the start and their score carries on.
-      // Asked first, since every tab on this device shares that identity and
-      // someone else may be joining from it. Otherwise a new ID and a free
-      // Eurovision winner's name.
-      const code = joinCode.toUpperCase();
+    // Back into a game this device was already in (a closed tab, a
+    // restarted browser, #65): the same player ID and name, so the room
+    // lets them in again even after the start and their score carries on.
+    // Asked first, since every tab on this device shares that identity and
+    // someone else may be joining from it. Otherwise a new ID and a free
+    // Eurovision winner's name.
+    const code = joinCode;
+    if (rejoin === undefined) {
       const storedId = localStorage.getItem("playerId");
       const storedName = localStorage.getItem("playerName");
-      const rejoin = localStorage.getItem("gameCode") === code && !!storedId && !!storedName &&
-        window.confirm(`You were in this game as ${storedName}. Rejoin as ${storedName}? (Cancel joins as someone new.)`);
-      const playerId = rejoin ? storedId : uuidv4();
-      const randomName = rejoin ? storedName : await getUniquePlayerName(code, ESC_WINNERS);
+      if (localStorage.getItem("gameCode") === code && storedId && storedName) {
+        setRejoinAs({ id: storedId, name: storedName });
+        return;
+      }
+    }
+
+    if (busy.current) return;
+    busy.current = true;
+    const mine = ++attempt.current;
+    const stale = () => left.current || attempt.current !== mine;
+    setLoading(true);
+    try {
+      const before = rejoin === true ? rejoinAs : null;
+      const playerId = before ? before.id : uuidv4();
+      const randomName = before ? before.name : await getUniquePlayerName(code, ESC_WINNERS);
 
       // Join the room in Firestore
       const joined = await joinRoom(code, playerId, randomName);
 
       if (joined) {
-        // Save user info in local storage
+        // Saved even if the page was left meanwhile: the player is in the
+        // room now, and this device can only rejoin as them with it (#65).
         localStorage.setItem("playerId", playerId);
         localStorage.setItem("playerName", randomName);
         localStorage.setItem("gameCode", code);
 
-        // Navigate to lobby
+        if (stale()) return;
+        forgetPickedQuiz();
         navigate("/lobby");
       } else {
-        alert("Game not found or already started!");
+        if (stale()) return;
+        const note = await refusedNote(code);
+        if (!stale()) setError(note);
       }
     } catch (error) {
-      const err = error as { message: string };
       console.error("Error joining game:", error);
-      
-      // Specific error messages
-      if (err.message.includes('Security rules')) {
-        alert("Unable to join game due to security restrictions. Please try again.");
-      } else if (err.message.includes('not found')) {
-        alert("Game not found! Please check the code and try again.");
-      } else if (err.message.includes('already started')) {
-        alert("This game has already started!");
-      } else if (err.message.includes('room is full')) {
-        alert("This game is full. Ask the host to start a new one.");
-      } else {
-        alert("Failed to join game. Please try again.");
-      }
+      if (!stale()) setError(joinErrorNote(error));
     } finally {
-      setLoading(false);
+      if (!stale()) {
+        busy.current = false;
+        setLoading(false);
+      }
     }
   };
 
-  const handleShowJoinForm = () => {
-    // Joining someone else's room: the quiz picked for hosting doesn't apply.
-    forgetPickedQuiz();
-    setShowJoinForm(true);
+  const submitJoin = (event: FormEvent) => {
+    event.preventDefault();
+    // While the rejoin choice is up, Enter waits for one of its two buttons.
+    if (rejoinAs || loading) return;
+    void joinGame();
   };
 
-  // Added function to go back to options
-  const handleBackToOptions = () => {
-    setShowJoinForm(false);
-    setJoinCode("");
+  // Remember the pressed control, so focus can go back to it after loading.
+  const remember = (event: MouseEvent<HTMLButtonElement>) => {
+    pressed.current = event.currentTarget;
   };
+
+  // Always open, even mid-way: a write on a bad connection can wait for
+  // ever, and leaving or going back drops what is still running.
+  const backHome = <CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>;
+  const footer = step === "choose" ? backHome : (
+    <>
+      <CalmLink onClick={() => goTo("choose")}>Back to host or join</CalmLink>
+      {backHome}
+    </>
+  );
+  const showCodeHelp = attempted && codeInvalid;
 
   return (
-    <Container>
-      <Title>Multiplayer Quiz</Title>
-      {quizKey && <HostingNote>Hosting: {pickedTitle}</HostingNote>}
-      {!showJoinForm && !showCreateOptions ? (
-        <OptionsContainer>
-          <OptionCard onClick={loading ? undefined : handleShowCreateOptions} disabled={loading}>
-            <OptionTitle>Create game</OptionTitle>
-            <OptionDescription>Host your own game and invite friends!</OptionDescription>
-            {loading && <LoadingText>Creating...</LoadingText>}
-          </OptionCard>
+    <CalmPage
+      title="Multiplayer quiz"
+      subtitle={step === "join"
+        ? "Type the four-letter code from the host's screen."
+        : "Play the quiz together: one of you hosts, everyone else joins with the code."}
+      footer={footer}
+    >
+      {quizKey && step !== "join" && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
 
-          <OrDivider>OR</OrDivider>
-
-          <OptionCard onClick={loading ? undefined : handleShowJoinForm} disabled={loading}>
-            <OptionTitle>Join game</OptionTitle>
-            <OptionDescription>Enter a game code to join an existing game.</OptionDescription>
-          </OptionCard>
-        </OptionsContainer>
-      ) : showCreateOptions ? (
-        <OptionsContainer>
-          <OptionCard onClick={loading ? undefined : () => createGame(false)} disabled={loading}>
-            <OptionTitle>Host & Play</OptionTitle>
-            <OptionDescription>Host the game and participate in the quiz</OptionDescription>
-            {loading && <LoadingText>Creating...</LoadingText>}
-          </OptionCard>
-
-          <OrDivider>OR</OrDivider>
-
-          <OptionCard onClick={loading ? undefined : () => createGame(true)} disabled={loading}>
-            <OptionTitle>Host Only</OptionTitle>
-            <OptionDescription>Host the game and observe the players' progress</OptionDescription>
-            {loading && <LoadingText>Creating...</LoadingText>}
-          </OptionCard>
-
-          <Button onClick={() => setShowCreateOptions(false)} disabled={loading} $secondary style={{ marginTop: '1rem' }}>
-            Back
-          </Button>
-        </OptionsContainer>
-      ) : (
-        <JoinContainer>
-          <JoinTitle>Enter Game Code</JoinTitle>
-          <Input
-            type="text"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            placeholder="code"
-            disabled={loading}
-            $isInvalid={attempted && codeInvalid}
-            aria-invalid={attempted && codeInvalid}
-            aria-describedby={attempted && codeInvalid ? "join-code-help" : undefined}
-            autoFocus
-            autoCapitalize="characters"
-            maxLength={4}
-          />
-          {attempted && codeInvalid && <InputHelperText id="join-code-help">Please enter 4 letters.</InputHelperText>}
-          <ButtonGroup>
-            <Button onClick={handleBackToOptions} disabled={loading} $secondary>
-              Back
-            </Button>
-            <Button onClick={joinGame} disabled={loading}>
-              {loading ? "Joining..." : "Join Game"}
-            </Button>
-          </ButtonGroup>
-        </JoinContainer>
+      {step === "choose" && (
+        <Ground>
+          <Pane>
+            <Control block onClick={() => setStep("host")}>
+              <span>Host a game</span>
+              <span className="calm-sub">Get a code and invite your party</span>
+            </Control>
+            <Control
+              block
+              // Joining someone else's room: the quiz picked for hosting is
+              // set aside, and dropped once the join goes through.
+              onClick={() => setStep("join")}
+            >
+              <span>Join a game</span>
+              <span className="calm-sub">Got a code from the host? Jump in</span>
+            </Control>
+          </Pane>
+        </Ground>
       )}
-    </Container>
+
+      {step === "host" && (
+        <>
+          <Ground>
+            <Pane role="group" aria-label="How you'll host">
+              <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(false); }}>
+                <span>Host and play</span>
+                <span className="calm-sub">Run the game and answer along with everyone</span>
+              </Control>
+              <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(true); }}>
+                <span>Host only</span>
+                <span className="calm-sub">Run the game and follow everyone's progress</span>
+              </Control>
+            </Pane>
+          </Ground>
+          {error && <CalmNote role="alert">{error}</CalmNote>}
+          {/* Mounted before it fills, so screen readers announce what fills it. */}
+          <div role="status">
+            {loading && <CalmNote>Setting up the room…</CalmNote>}
+          </div>
+        </>
+      )}
+
+      {step === "join" && (
+        <>
+          <form onSubmit={submitJoin} noValidate>
+            <Ground>
+              <Pane>
+                <label>
+                  <span className="calm-label">Game code</span>
+                  <Field
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => {
+                      setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
+                      setRejoinAs(null);
+                      setError(null);
+                    }}
+                    placeholder="ABBA"
+                    disabled={loading}
+                    aria-invalid={showCodeHelp}
+                    aria-describedby={showCodeHelp ? "join-code-help" : undefined}
+                    autoFocus
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                  />
+                </label>
+                {rejoinAs ? (
+                  <>
+                    <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
+                    <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
+                  </>
+                ) : (
+                  <Control type="submit" disabled={loading} onClick={remember}>Join the game</Control>
+                )}
+              </Pane>
+            </Ground>
+          </form>
+          {showCodeHelp && <CalmNote id="join-code-help" role="alert">A game code is four letters, like ABBA.</CalmNote>}
+          {error && <CalmNote role="alert">{error}</CalmNote>}
+          {/* Mounted before it fills, so screen readers announce what fills
+              it; the rejoin note also describes the button focus lands on. */}
+          <div role="status">
+            {rejoinAs && !loading && (
+              <CalmNote id="rejoin-help">
+                You were in this game as {asNamed(rejoinAs.name)}. Rejoin as them, or join as someone new if someone else is playing on this device.
+              </CalmNote>
+            )}
+            {loading && <CalmNote>Joining the game…</CalmNote>}
+          </div>
+        </>
+      )}
+    </CalmPage>
   );
 };
 
 export default MultiplayerLobby;
-
-// Styled Components
-const HostingNote = styled.p`
-  margin: -0.5rem 0 1rem;
-  color: ${({ theme }) => theme.colors.pinkLavender};
-`;
-
-interface OptionCardProps {
-  disabled?: boolean;
-}
-interface ButtonProps {
-  $secondary?: boolean;
-}
-
-interface InputProps {
-  $isInvalid?: boolean;
-}
-
-const Container = styled.div`
-  text-align: center;
-  max-width: 31.25rem; /* 500px - standardized width */
-  margin: auto;
-  padding: 1.25rem; /* 20px */
-`;
-
-const Title = styled.h2`
-  font-family: ${({ theme }) => theme.fonts.heading};
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 2rem;
-  margin-bottom: 1.25rem; /* 20px */
-`;
-
-const OptionsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.9375rem; /* 15px */
-`;
-
-const OptionCard = styled.div<OptionCardProps>`
-  padding: 1.25rem; /* 20px */
-  background: ${({ theme }) => theme.colors.purple};
-  border: 0.125rem solid ${({ theme }) => theme.colors.purple}; /* 2px */
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
-  opacity: ${props => props.disabled ? 0.7 : 1};
-  transition: all 0.2s ease;
-  position: relative;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.darkpurple};
-    border-color: ${({ theme }) => theme.colors.darkpurple};
-  }
-`;
-
-const OptionTitle = styled.h3`
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem; /* 8px */
-`;
-
-const OptionDescription = styled.p`
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 1rem;
-`;
-
-const LoadingText = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  font-weight: bold;
-`;
-
-const OrDivider = styled.div`
-  display: flex;
-  align-items: center;
-  margin: 0.3125rem 0; /* 5px */
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 0.9rem;
-  
-  &::before, &::after {
-    content: '';
-    flex: 1;
-    height: 0.0625rem; /* 1px */
-    background: ${({ theme }) => theme.colors.deepblue};
-    margin: 0 0.625rem; /* 10px */
-  }
-`;
-
-const JoinContainer = styled.div`
-  margin-top: 1.25rem; /* 20px */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const JoinTitle = styled.h3`
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 1.4rem;
-  margin-bottom: 0.9375rem; /* 15px */
-`;
-
-const Input = styled.input<InputProps>`
-  padding: 0.75rem; /* 12px */
-  margin: 0.625rem 0; /* 10px */
-  width: 90%;
-  border: 0.1875rem solid ${({ $isInvalid, theme }) => $isInvalid ? theme.colors.accentorange : theme.colors.purple}; /* 3px */
-  background: ${({ theme }) => theme.colors.white};
-  color: ${({ theme }) => theme.colors.black};
-  font-size: 1rem;
-  border-radius: 0; 
-  -webkit-appearance: none; 
-  -moz-appearance: none; 
-  appearance: none; 
-  text-transform: uppercase;
-  
-  &:focus {
-    outline: none;
-    border-width: 0.125rem; /* 2px */
-  }
-`;
-
-const InputHelperText = styled.div`
-  color: ${({ theme }) => theme.colors.accentorange};
-  font-size: 0.9rem;
-  align-self: flex-start;
-  margin-left: 5%;
-  margin-top: 0.3125rem; /* 5px */
-`;
-
-const ButtonGroup = styled.div`
-  display: flex;
-  gap: 0.625rem; /* 10px */
-  margin-top: 0.625rem; /* 10px */
-  width: 90%;
-  justify-content: space-between;
-`;
-
-const Button = styled.button<ButtonProps>`
-    padding: 0.75rem 1.25rem; /* 12px 20px */
-    background: ${({ $secondary, theme }) => $secondary ? theme.colors.darkpurple : theme.colors.purple};
-    color: ${({ theme }) => theme.colors.white};
-    font-size: 1rem;
-    font-weight: bold;
-    border: none;
-    cursor: pointer;
-    flex: ${props => props.$secondary ? '0.4' : '0.6'};
-    transition: all 0.2s ease;
-
-    &:hover {
-      background: ${({ $secondary, theme }) => $secondary ? theme.colors.purple : theme.colors.darkpurple};
-    }
-    
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
-  `;

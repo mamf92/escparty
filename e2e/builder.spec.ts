@@ -30,8 +30,8 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
 
     // Host it: the saved quiz is offered in the green room.
     await page.goto("/#/multiplayer");
-    await page.getByText("Create game").click();
-    await page.getByText("Host & Play").click();
+    await page.getByRole("button", { name: /^Host a game/ }).click();
+    await page.getByRole("button", { name: /^Host and play/ }).click();
     await expect(page.getByRole("heading", { name: "The green room" })).toBeVisible();
     await page.getByRole("button", { name: "Jedward's Revenge" }).click();
     await expect(page.getByText("Quiz: Jedward's Revenge")).toBeVisible();
