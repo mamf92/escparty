@@ -29,9 +29,17 @@ describe("PartyHome", () => {
         renderHome();
         await user.click(screen.getByRole("button", { name: "Join to rate" }));
         expect(screen.getByRole("alert")).toHaveTextContent("four letters");
+        expect(screen.getByLabelText("Party code")).toHaveAccessibleDescription("A party code is four letters, like ABBA.");
+        expect(screen.getByLabelText("Party code")).toHaveAttribute("aria-invalid", "true");
         await user.type(screen.getByLabelText("Party code"), "ab-ba");
         expect(screen.getByLabelText("Party code")).toHaveValue("ABBA");
         await user.click(screen.getByRole("button", { name: "Join to rate" }));
+        expect(screen.getByText("at /party/ABBA")).toBeInTheDocument();
+    });
+
+    it("joins with Enter in the code field", async () => {
+        renderHome();
+        await userEvent.setup().type(screen.getByLabelText("Party code"), "abba{Enter}");
         expect(screen.getByText("at /party/ABBA")).toBeInTheDocument();
     });
 

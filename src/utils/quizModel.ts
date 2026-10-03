@@ -73,56 +73,102 @@ export interface QuizDefinition {
     breakEvery: BreakEvery;
 }
 
+/** Which part of the question editor a problem is about. */
+export type QuestionField = "question" | "answers" | "correct";
+
+/** Which part of the quiz form a problem is about. */
+export type QuizField = "name" | "questions" | "break";
+
+export interface Problem<Field extends string> {
+    field: Field;
+    message: string;
+}
+
+/** Why each answer can't stand: empty, too long, or a repeat of another. */
+const optionFaults = (options: string[]) => {
+    const trimmed = options.map(option => option.trim());
+    return trimmed.map((option, index) => ({
+        empty: !option,
+        tooLong: option.length > QUESTION_LIMITS.maxOptionLength,
+        repeated: !!option && trimmed.some((other, i) => i !== index && other.toLowerCase() === option.toLowerCase()),
+    }));
+};
+
+/** Which answers are wrong (empty, too long or a repeat), by position. */
+export const badOptions = (options: string[]): boolean[] =>
+    optionFaults(options).map(fault => fault.empty || fault.tooLong || fault.repeated);
+
 /**
- * What's wrong with a question, as sentences a host can act on. Empty when
- * it's playable: a question, 2-6 distinct non-empty answers, and exactly
- * one of them marked correct.
+ * What's wrong with a question, each problem tagged with the field it's
+ * about, so an editor can say it beside that field. Empty when it's
+ * playable: a question, 2-6 distinct non-empty answers, and exactly one of
+ * them marked correct.
  */
-export const questionProblems = (question: Pick<QuizQuestion, "question" | "options" | "correctAnswer">): string[] => {
-    const problems: string[] = [];
+export const questionFieldProblems = (
+    question: Pick<QuizQuestion, "question" | "options" | "correctAnswer">,
+): Problem<QuestionField>[] => {
+    const problems: Problem<QuestionField>[] = [];
+    const add = (field: QuestionField, message: string) => problems.push({ field, message });
     const text = question.question.trim();
     const options = question.options.map(option => option.trim());
+    const faults = optionFaults(question.options);
 
-    if (!text) problems.push("Write the question.");
+    if (!text) add("question", "Write the question.");
     if (text.length > QUESTION_LIMITS.maxQuestionLength) {
-        problems.push(`Keep the question under ${QUESTION_LIMITS.maxQuestionLength} characters.`);
+        add("question", `Keep the question under ${QUESTION_LIMITS.maxQuestionLength} characters.`);
     }
     if (options.length < QUESTION_LIMITS.minOptions) {
-        problems.push(`Give at least ${QUESTION_LIMITS.minOptions} answers.`);
+        add("answers", `Give at least ${QUESTION_LIMITS.minOptions} answers.`);
     }
     if (options.length > QUESTION_LIMITS.maxOptions) {
-        problems.push(`Give at most ${QUESTION_LIMITS.maxOptions} answers.`);
+        add("answers", `Give at most ${QUESTION_LIMITS.maxOptions} answers.`);
     }
-    if (options.some(option => !option)) problems.push("Fill in every answer, or remove the empty one.");
-    if (options.some(option => option.length > QUESTION_LIMITS.maxOptionLength)) {
-        problems.push(`Keep each answer under ${QUESTION_LIMITS.maxOptionLength} characters.`);
+    if (faults.some(fault => fault.empty)) add("answers", "Fill in every answer, or remove the empty one.");
+    if (faults.some(fault => fault.tooLong)) {
+        add("answers", `Keep each answer under ${QUESTION_LIMITS.maxOptionLength} characters.`);
     }
-    const distinct = new Set(options.filter(Boolean).map(option => option.toLowerCase()));
-    if (distinct.size < options.filter(Boolean).length) problems.push("Two answers are the same.");
-    if (!options.includes(question.correctAnswer.trim())) problems.push("Mark which answer is correct.");
+    if (faults.some(fault => fault.repeated)) add("answers", "Two answers are the same.");
+    if (!options.includes(question.correctAnswer.trim())) add("correct", "Mark which answer is correct.");
 
     return problems;
 };
+
+/**
+ * What's wrong with a question, as sentences a host can act on. Empty when
+ * it's playable.
+ */
+export const questionProblems = (question: Pick<QuizQuestion, "question" | "options" | "correctAnswer">): string[] =>
+    questionFieldProblems(question).map(problem => problem.message);
 
 export const isPlayableQuestion = (question: Pick<QuizQuestion, "question" | "options" | "correctAnswer">) =>
     questionProblems(question).length === 0;
 
-/** What's wrong with a quiz as a whole (its questions are checked separately). */
-export const quizProblems = (quiz: Pick<QuizDefinition, "title" | "questions" | "breakEvery">): string[] => {
-    const problems: string[] = [];
-    if (!quiz.title.trim()) problems.push("Give the quiz a name.");
+/**
+ * What's wrong with a quiz as a whole (its questions are checked
+ * separately), each problem tagged with the field it's about.
+ */
+export const quizFieldProblems = (
+    quiz: Pick<QuizDefinition, "title" | "questions" | "breakEvery">,
+): Problem<QuizField>[] => {
+    const problems: Problem<QuizField>[] = [];
+    const add = (field: QuizField, message: string) => problems.push({ field, message });
+    if (!quiz.title.trim()) add("name", "Give the quiz a name.");
     if (quiz.title.trim().length > QUIZ_LIMITS.maxTitleLength) {
-        problems.push(`Keep the name under ${QUIZ_LIMITS.maxTitleLength} characters.`);
+        add("name", `Keep the name under ${QUIZ_LIMITS.maxTitleLength} characters.`);
     }
-    if (quiz.questions.length < QUIZ_LIMITS.minQuestions) problems.push("Add at least one question.");
+    if (quiz.questions.length < QUIZ_LIMITS.minQuestions) add("questions", "Add at least one question.");
     if (quiz.questions.length > QUIZ_LIMITS.maxQuestions) {
-        problems.push(`A quiz can have at most ${QUIZ_LIMITS.maxQuestions} questions.`);
+        add("questions", `A quiz can have at most ${QUIZ_LIMITS.maxQuestions} questions.`);
     }
-    if (!(BREAK_CHOICES as readonly number[]).includes(quiz.breakEvery)) problems.push("Pick when the scoreboard shows.");
+    if (!(BREAK_CHOICES as readonly number[]).includes(quiz.breakEvery)) add("break", "Pick when the scoreboard shows.");
     const broken = quiz.questions.filter(question => !isPlayableQuestion(question)).length;
-    if (broken > 0) problems.push(`${broken} ${broken === 1 ? "question needs" : "questions need"} fixing.`);
+    if (broken > 0) add("questions", `${broken} ${broken === 1 ? "question needs" : "questions need"} fixing.`);
     return problems;
 };
+
+/** What's wrong with a quiz as a whole, as sentences. */
+export const quizProblems = (quiz: Pick<QuizDefinition, "title" | "questions" | "breakEvery">): string[] =>
+    quizFieldProblems(quiz).map(problem => problem.message);
 
 /**
  * The question as the quiz screen plays it: trimmed, with the source
