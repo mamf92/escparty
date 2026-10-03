@@ -9,6 +9,7 @@ import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../u
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { ScoreEntry, readScoreHistory } from "../utils/scoreHistory";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { Control, Ground, Pane } from "../design";
 import { CalmNote, CalmPage } from "./CalmPage";
@@ -518,14 +519,13 @@ const Quiz = () => {
       savedRunRef.current = true;
       const difficultyLevel = difficulty ?? "easy";
 
-      const previousScores = JSON.parse(localStorage.getItem("quizScores") || "[]");
-      const newScore = {
+      const newScore: ScoreEntry = {
         score,
         total: questions.length,
         difficulty: difficultyLevel,
         date: new Date().toISOString()
       };
-      localStorage.setItem("quizScores", JSON.stringify([...previousScores, newScore]));
+      localStorage.setItem("quizScores", JSON.stringify([...readScoreHistory(), newScore]));
 
       navigate("/results", {
         state: {

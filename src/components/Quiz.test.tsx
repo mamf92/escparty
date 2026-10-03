@@ -278,11 +278,17 @@ describe("Quiz multiplayer score writes (#131)", () => {
 });
 
 describe("Quiz solo clock (#160)", () => {
-  it("times out an unanswered question, shows feedback, then saves the run once", async () => {
+  // Unreadable history (hand-edited or from an old build) must not stop the
+  // run being saved: it's read through readScoreHistory, which skips it.
+  it.each([
+    ["an empty history", null],
+    ["an unreadable history", "{not json"],
+  ])("times out an unanswered question, shows feedback, then saves the run once, from %s", async (_, stored) => {
     // Only the clock and intervals: React schedules its own work on setTimeout.
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     try {
-      localStorage.removeItem("quizScores");
+      if (stored === null) localStorage.removeItem("quizScores");
+      else localStorage.setItem("quizScores", stored);
       renderWithProviders(
         <Routes>
           <Route path="/quiz/:difficulty" element={<Quiz />} />
