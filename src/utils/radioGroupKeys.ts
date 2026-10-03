@@ -42,6 +42,9 @@ export const radioGroupKeys = (
     group?.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
 };
 
-/** The roving tab stop: the picked radio, or the first when none is picked. */
+/**
+ * The roving tab stop: the picked radio, or the first when none is picked
+ * (or the pick isn't a radio of the group, such as -1).
+ */
 export const radioTabIndex = (index: number, picked: number | null) =>
-    index === (picked ?? 0) ? 0 : -1;
+    index === (picked !== null && picked >= 0 ? picked : 0) ? 0 : -1;

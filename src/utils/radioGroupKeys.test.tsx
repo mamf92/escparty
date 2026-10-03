@@ -65,4 +65,8 @@ describe("radioTabIndex", () => {
   it("falls back to the first radio when none is picked", () => {
     expect([0, 1, 2].map(index => radioTabIndex(index, null))).toEqual([0, -1, -1]);
   });
+
+  it("falls back to the first radio when the pick isn't one of them", () => {
+    expect([0, 1, 2].map(index => radioTabIndex(index, -1))).toEqual([0, -1, -1]);
+  });
 });

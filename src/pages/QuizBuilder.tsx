@@ -80,6 +80,8 @@ const QuizBuilder = () => {
     const [mode, setMode] = useState<Mode>("assemble");
     const [draft, setDraft] = useState<Draft>(emptyDraft);
     const [draftTried, setDraftTried] = useState(false);
+    // The alert summing up a failed "Add to the quiz", as it stood then.
+    const [draftSummary, setDraftSummary] = useState<string | null>(null);
     const [saveTried, setSaveTried] = useState(false);
     const [saving, setSaving] = useState(false);
     const [loadNotice, setLoadNotice] = useState<string | null>(null);
@@ -100,6 +102,7 @@ const QuizBuilder = () => {
     const moveDownRef = useRef<HTMLButtonElement>(null);
     const askRemoveRef = useRef<HTMLButtonElement>(null);
     const keepRef = useRef<HTMLButtonElement>(null);
+    const editRef = useRef<HTMLButtonElement>(null);
     const answersRef = useRef<HTMLDivElement>(null);
     const correctRef = useRef<HTMLDivElement>(null);
 
@@ -138,7 +141,6 @@ const QuizBuilder = () => {
     // Each problem is said beside the field it's about
     // (docs/design/design-system.md, "Forms").
     const quizFieldIssues = quizFieldProblems({ title, questions, breakEvery });
-    const problems = quizFieldIssues.map(problem => problem.message);
     const nameProblems = saveTried ? messagesFor(quizFieldIssues, "name") : [];
     const quizWideProblems = saveTried
         ? quizFieldIssues.filter(problem => problem.field !== "name").map(problem => problem.message)
@@ -200,12 +202,47 @@ const QuizBuilder = () => {
                 index,
                 question: question.question,
                 options: [...question.options],
-                correct: question.options.indexOf(question.correctAnswer),
+                // An answer that isn't one of the options marks none.
+                correct: question.options.includes(question.correctAnswer)
+                    ? question.options.indexOf(question.correctAnswer)
+                    : null,
             });
         }
         setDraftTried(false);
+        setDraftSummary(null);
         setConfirmingRemove(false);
         setMode("write");
+        focusSoon(() => questionRef.current);
+    };
+
+    // Each view replaces the page, so focus goes where the view was opened
+    // from instead of falling back to the top of the document.
+    const openBank = () => {
+        setMode("bank");
+        focusSoon(() => document.getElementById(fieldId("category")));
+    };
+
+    const backFromBank = () => {
+        setMode("assemble");
+        focusSoon(() => document.getElementById(fieldId("add-from-bank")));
+    };
+
+    /** Back from the editor: to the question it edited, or to writing another. */
+    const backFromEditor = (index: number | null) => {
+        select(index);
+        setMode("assemble");
+        focusSoon(() => {
+            if (index !== null) return editRef.current;
+            // A full quiz can't take another, so its write button is off.
+            const write = document.getElementById(fieldId("write")) as HTMLButtonElement | null;
+            return write && !write.disabled ? write : document.getElementById(fieldId("add-from-bank"));
+        });
+    };
+
+    // Any edit retires the summary; the notes beside the fields stay current.
+    const editDraft = (next: Draft) => {
+        setDraft(next);
+        setDraftSummary(null);
     };
 
     const draftQuestion = {
@@ -214,9 +251,7 @@ const QuizBuilder = () => {
         correctAnswer: draft.correct === null ? "" : draft.options[draft.correct] ?? "",
     };
     const draftIssues = questionFieldProblems(draftQuestion);
-    const draftProblems = draftIssues.map(problem => problem.message);
     const shownDraftIssues = draftTried ? draftIssues : [];
-    const shownDraftProblems = shownDraftIssues.map(problem => problem.message);
     const questionTextProblems = messagesFor(shownDraftIssues, "question");
     const correctProblems = messagesFor(shownDraftIssues, "correct");
     const answerProblems = messagesFor(shownDraftIssues, "answers");
@@ -224,15 +259,20 @@ const QuizBuilder = () => {
 
     const saveDraft = () => {
         setDraftTried(true);
-        if (draftProblems.length > 0) {
+        if (draftIssues.length > 0) {
+            // Said once, as it stood on submit; the notes beside the fields
+            // follow the edits from here without interrupting.
+            setDraftSummary(draftIssues.length > 1
+                ? `${draftIssues.length} things to fix before this question can go in: ${draftIssues.map(problem => problem.message).join(" ")}`
+                : null);
             // Take them to the first thing to fix once its note is on the
             // page, so the note is read with it.
+            const first = draftIssues[0].field;
             const firstBadAnswer = badOptions(draft.options).indexOf(true);
-            const about = (field: string) => draftIssues.some(problem => problem.field === field);
-            if (about("question")) focusSoon(() => questionRef.current);
-            else if (about("answers") && firstBadAnswer >= 0) {
+            if (first === "question") focusSoon(() => questionRef.current);
+            else if (first === "answers" && firstBadAnswer >= 0) {
                 focusSoon(() => answersRef.current?.querySelectorAll<HTMLElement>("input")[firstBadAnswer]);
-            } else if (about("correct")) focusSoon(() => correctRef.current?.querySelector<HTMLElement>('[role="radio"]'));
+            } else if (first === "correct") focusSoon(() => correctRef.current?.querySelector<HTMLElement>('[role="radio"]'));
             return;
         }
         const trimmed = {
@@ -254,30 +294,31 @@ const QuizBuilder = () => {
                 return { id: question.source === "custom" ? question.id : newCustomId(), source: "custom", ...trimmed };
             }));
         }
-        select(null);
-        setMode("assemble");
+        backFromEditor(draft.index);
     };
 
     const setOption = (index: number, value: string) =>
-        setDraft({ ...draft, options: draft.options.map((option, i) => (i === index ? value : option)) });
+        editDraft({ ...draft, options: draft.options.map((option, i) => (i === index ? value : option)) });
 
     const addOption = () => {
         const added = draft.options.length;
-        setDraft({ ...draft, options: [...draft.options, ""] });
+        editDraft({ ...draft, options: [...draft.options, ""] });
         // Straight into the new answer, ready to type.
         focusSoon(() => document.getElementById(fieldId(`answer-${added}`)));
     };
 
     const removeLastOption = () => {
         const last = draft.options.length - 1;
-        setDraft({ ...draft, options: draft.options.slice(0, last), correct: draft.correct === last ? null : draft.correct });
+        editDraft({ ...draft, options: draft.options.slice(0, last), correct: draft.correct === last ? null : draft.correct });
         // At the fewest answers this move goes away; keep focus nearby.
         if (last <= QUESTION_LIMITS.minOptions) focusSoon(() => document.getElementById(fieldId("add-answer")));
     };
 
     const saveQuiz = async () => {
         setSaveTried(true);
-        if (problems.length > 0) {
+        // A notice about how the builder started has had its say by now.
+        setLoadNotice(null);
+        if (quizFieldIssues.length > 0) {
             if (quizFieldIssues.some(problem => problem.field === "name")) focusSoon(() => nameRef.current);
             return;
         }
@@ -306,7 +347,7 @@ const QuizBuilder = () => {
             <CalmPage
                 title="Question bank"
                 subtitle={`${questions.length} ${questions.length === 1 ? "question" : "questions"} in your quiz. Tap to add or take out.`}
-                footer={<CalmLink onClick={() => setMode("assemble")}>Back to your quiz</CalmLink>}
+                footer={<CalmLink onClick={backFromBank}>Back to your quiz</CalmLink>}
             >
                 <Ground>
                     <Pane>
@@ -370,7 +411,7 @@ const QuizBuilder = () => {
                 {full && <CalmNote>That's the most a quiz can hold ({QUIZ_LIMITS.maxQuestions}).</CalmNote>}
                 <Ground>
                     <Pane>
-                        <Control onClick={() => setMode("assemble")}>Use these questions</Control>
+                        <Control onClick={backFromBank}>Use these questions</Control>
                     </Pane>
                 </Ground>
             </CalmPage>
@@ -382,7 +423,7 @@ const QuizBuilder = () => {
             <CalmPage
                 title={draft.index === null ? "Write a question" : "Edit question"}
                 subtitle="Two to six answers, and tap the one that's right."
-                footer={<CalmLink onClick={() => setMode("assemble")}>Back to your quiz</CalmLink>}
+                footer={<CalmLink onClick={() => backFromEditor(draft.index)}>Back to your quiz</CalmLink>}
             >
                 <Ground>
                     <Pane ref={answersRef}>
@@ -396,7 +437,7 @@ const QuizBuilder = () => {
                             placeholder="Which act sang in wolf masks?"
                             aria-invalid={questionTextProblems.length > 0 || undefined}
                             aria-describedby={questionTextProblems.length > 0 ? fieldId("question-note") : undefined}
-                            onChange={event => setDraft({ ...draft, question: event.target.value })}
+                            onChange={event => editDraft({ ...draft, question: event.target.value })}
                         />
                         {questionTextProblems.length > 0 && (
                             <p className="calm-sub" id={fieldId("question-note")}>{questionTextProblems.join(" ")}</p>
@@ -435,10 +476,9 @@ const QuizBuilder = () => {
                                 role="radio"
                                 aria-checked={draft.correct === index}
                                 tabIndex={radioTabIndex(index, draft.correct)}
-                                aria-describedby={correctProblems.length > 0 ? fieldId("correct-note") : undefined}
                                 chosen={draft.correct === index}
-                                onClick={() => setDraft({ ...draft, correct: index })}
-                                onKeyDown={event => radioGroupKeys(event, index, draft.options.length, next => setDraft({ ...draft, correct: next }))}
+                                onClick={() => editDraft({ ...draft, correct: index })}
+                                onKeyDown={event => radioGroupKeys(event, index, draft.options.length, next => editDraft({ ...draft, correct: next }))}
                             >
                                 {option.trim() || `Answer ${index + 1}`}
                             </Control>
@@ -446,11 +486,7 @@ const QuizBuilder = () => {
                     </Pane>
                 </Ground>
                 {correctProblems.length > 0 && <CalmNote id={fieldId("correct-note")}>{correctProblems.join(" ")}</CalmNote>}
-                {shownDraftProblems.length > 1 && (
-                    <CalmNote role="alert">
-                        {shownDraftProblems.length} things to fix before this question can go in: {shownDraftProblems.join(" ")}
-                    </CalmNote>
-                )}
+                {draftSummary && <CalmNote role="alert">{draftSummary}</CalmNote>}
                 <Ground>
                     <Pane>
                         {draft.options.length < QUESTION_LIMITS.maxOptions && (
@@ -521,7 +557,7 @@ const QuizBuilder = () => {
                                 aria-checked={selected === index}
                                 tabIndex={radioTabIndex(index, selected)}
                                 chosen={selected === index}
-                                onClick={() => select(selected === index ? null : index)}
+                                onClick={() => select(index)}
                                 onKeyDown={event => radioGroupKeys(event, index, questions.length, select)}
                             >
                                 <span>{index + 1}. {question.question}</span>
@@ -540,7 +576,7 @@ const QuizBuilder = () => {
                     <Pane role="group" aria-label={`Question ${selected + 1}`}>
                         <Control ref={moveUpRef} disabled={selected === 0} onClick={() => move(selected, selected - 1)}>Move up</Control>
                         <Control ref={moveDownRef} disabled={selected === questions.length - 1} onClick={() => move(selected, selected + 1)}>Move down</Control>
-                        <Control onClick={() => openEditor(selected)}>Edit this question</Control>
+                        <Control ref={editRef} onClick={() => openEditor(selected)}>Edit this question</Control>
                         {confirmingRemove ? (
                             <>
                                 <p className="calm-sub" id={fieldId("remove-note")}>
@@ -562,8 +598,8 @@ const QuizBuilder = () => {
             )}
             <Ground>
                 <Pane>
-                    <Control id={fieldId("add-from-bank")} onClick={() => setMode("bank")}>Add from the bank</Control>
-                    <Control disabled={full} onClick={() => openEditor(null)}>Write a question</Control>
+                    <Control id={fieldId("add-from-bank")} onClick={openBank}>Add from the bank</Control>
+                    <Control id={fieldId("write")} disabled={full} onClick={() => openEditor(null)}>Write a question</Control>
                     <Control disabled={saving || loadingFrom} onClick={saveQuiz}>
                         {saving ? "Saving…" : "Save quiz"}
                     </Control>

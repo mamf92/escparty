@@ -35,6 +35,8 @@ const questionList = () => screen.getByRole("radiogroup", { name: "Questions in 
 
 const writeQuestion = async (user: ReturnType<typeof userEvent.setup>, text: string, answers: string[], correct: string) => {
   await user.click(screen.getByRole("button", { name: "Write a question" }));
+  // The editor takes focus to its first field.
+  await vi.waitFor(() => expect(screen.getByLabelText("Question")).toHaveFocus());
   await user.type(screen.getByLabelText("Question"), text);
   for (const [index, answer] of answers.entries()) {
     if (index >= 2) await user.click(screen.getByRole("button", { name: "Add another answer" }));
@@ -42,6 +44,9 @@ const writeQuestion = async (user: ReturnType<typeof userEvent.setup>, text: str
   }
   await user.click(screen.getByRole("radio", { name: correct }));
   await user.click(screen.getByRole("button", { name: "Add to the quiz" }));
+  // Back in the quiz, focus is ready to write another (or, when the quiz
+  // is full, to add from the bank).
+  await vi.waitFor(() => expect(document.activeElement).toHaveAccessibleName(/Write a question|Add from the bank/));
 };
 
 describe("QuizBuilder", () => {
@@ -98,6 +103,8 @@ describe("QuizBuilder", () => {
     expect(melodi).toHaveAttribute("aria-pressed", "false");
     await user.click(melodi);
     await user.click(screen.getByRole("button", { name: "Use these questions" }));
+    // Back where the bank was opened from.
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: "Add from the bank" })).toHaveFocus());
 
     await writeQuestion(user, "Who sang 'Lipstick'?", ["Bros", "Jedward", "Zig and Zag"], "Jedward");
 
@@ -126,6 +133,7 @@ describe("QuizBuilder", () => {
     const user = userEvent.setup();
     renderBuilder();
     await user.click(screen.getByRole("button", { name: "Write a question" }));
+    await vi.waitFor(() => expect(screen.getByLabelText("Question")).toHaveFocus());
     await user.type(screen.getByLabelText("Answer 1"), "Same");
     await user.type(screen.getByLabelText("Answer 2"), "same");
     await user.click(screen.getByRole("button", { name: "Add to the quiz" }));
@@ -138,10 +146,15 @@ describe("QuizBuilder", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "3 things to fix before this question can go in: Write the question. Two answers are the same. Mark which answer is correct.",
     );
-    expect(screen.getByRole("radio", { name: "Same" })).toHaveAccessibleDescription("Mark which answer is correct.");
+    // The correct-answer note is the group's, so it's read once.
+    expect(screen.getByRole("radio", { name: "Same" })).not.toHaveAccessibleDescription();
     expect(screen.getByLabelText("Answer 1")).toHaveAccessibleDescription("Two answers are the same.");
     expect(screen.getByLabelText("Answer 2")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("radiogroup", { name: "Correct answer" })).toHaveAccessibleDescription("Mark which answer is correct.");
+    // The alert was said once; editing retires it while the notes stay.
+    await user.type(screen.getByLabelText("Question"), "Who?");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Answer 1")).toHaveAccessibleDescription("Two answers are the same.");
 
     // Up to six answers, and back down to two.
     for (let i = 0; i < 4; i++) await user.click(screen.getByRole("button", { name: "Add another answer" }));
@@ -178,6 +191,14 @@ describe("QuizBuilder", () => {
     await user.type(screen.getByLabelText("Question"), "Second, edited?");
     await user.click(screen.getByRole("button", { name: "Keep these changes" }));
     expect(within(questionList()).getAllByRole("radio")[0]).toHaveTextContent("1. Second, edited?");
+    // Back on the question it edited, picked, with focus where it left.
+    expect(within(questionList()).getAllByRole("radio")[0]).toHaveAttribute("aria-checked", "true");
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: "Edit this question" })).toHaveFocus());
+    // Space or a click on the picked question keeps it picked.
+    within(questionList()).getAllByRole("radio")[0].focus();
+    await user.keyboard(" ");
+    expect(within(questionList()).getAllByRole("radio")[0]).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("group", { name: "Question 1" })).toBeInTheDocument();
 
     await user.click(within(questionList()).getByRole("radio", { name: /First\?/ }));
     // Taking a question out asks first, and keeping it changes nothing.
@@ -270,6 +291,9 @@ describe("QuizBuilder", () => {
     renderBuilder(`/quizzes/edit/${ID}`);
     expect(await screen.findByText(/That quiz couldn.t be loaded/)).toHaveAttribute("role", "status");
     expect(screen.getByText(/No questions yet/)).toBeInTheDocument();
+    // The notice has had its say once they try to save.
+    await user.click(screen.getByRole("button", { name: "Save quiz" }));
+    expect(screen.queryByText(/That quiz couldn.t be loaded/)).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Name"), "Fresh");
     await writeQuestion(user, "Q?", ["A", "B"], "A");
