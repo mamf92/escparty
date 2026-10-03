@@ -48,6 +48,10 @@
   --esc-backdrop: #1d1630;
   --esc-frame: #141018;
   --esc-bezel: #0d0a10;
+  /* The desktop phone frame's home bar, under the screen. */
+  --esc-home-bar: #333333;
+  /* The shadow the desktop phone frame casts on the backdrop. */
+  --esc-frame-glow: rgba(0, 0, 0, 0.5);
   /* The Sparkle mode switch when on: a gold coin, in either theme. */
   --esc-switch-on: radial-gradient(circle at 35% 30%, #fff3c4, #ffc93c 55%, #b07a12);
   --esc-on-switch: #2a1600;

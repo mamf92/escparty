@@ -63,11 +63,11 @@ game), and `pathUtils.ts`
 One design language, two themes, rules in `docs/design/design-system.md`
 (read it before building or restyling any screen) and code in
 `src/design/` (tokens, the theme switch, `Ground`/`Pane`/`Control`/`Row`/`Field`).
-New and migrated screens render through `CalmPage` on those primitives
-and never write their own colours, fonts or buttons. The older screens still on
-styled-components and `theme.colors` (the quiz)
-are being moved over under epic #166; don't copy
-their pattern.
+Every screen renders through `CalmPage` on those primitives and never
+writes its own colours, fonts or buttons (epic #166 moved them all over);
+styled-components is for layout only. `src/test/designGuard.test.ts` fails
+`npm test` on a hex or `rgb()`/`hsl()` colour or `theme.colors` outside
+`src/design/` (and the `/fabric-ui` demo, which keeps its own palette).
 
 The language is modern soft neumorphism: one background, and frameless
 surfaces of the same colour raised out of it or pressed into it.

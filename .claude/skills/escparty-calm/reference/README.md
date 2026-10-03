@@ -18,6 +18,6 @@ The reference images are evidence. The style itself lives in:
 - `src/fabric-ui/lycra-surface.css` — vendored byte for byte from the file the project owner supplied, including its own comments, so it stays diffable against its source. **Never edit it.**
 - `src/fabric-ui/calm.css` — the demo-side companion. Every deviation from the vendored stylesheet lives here.
 - `src/fabric-ui/CalmSurface.tsx` — the renderer.
-- `src/styles/theme.ts` — the token set the colours derive from.
+- `src/fabric-ui/palette.ts` — the demo's colours (until #179, `src/styles/theme.ts`; same values).
 
 If any of those change, re-capture and re-run the reconstruct-and-diff step rather than editing `dna.json` by hand.

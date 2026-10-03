@@ -27,6 +27,11 @@ All of it is scoped to `.esc-app`, so `/fabric-ui` is untouched, and is
 imported once, from `main.tsx`, via `src/design/design-system.css`. Never
 import a surface stylesheet from a page.
 
+Those tokens are the app's only palette: the styled-components theme and
+its named colours are gone (#179), and `src/test/designGuard.test.ts`
+fails `npm test` on a hex or `rgb()`/`hsl()` colour, or `theme.colors`,
+outside `src/design/`.
+
 ## The two themes
 
 - **Calm** — the default and accessible landing experience. One flat
@@ -42,8 +47,9 @@ import a surface stylesheet from a page.
 `src/fabric-ui/` is a standalone proof of concept on `/fabric-ui` with two
 renderers (a CSS one, `CalmSurface.tsx`, and a WebGL sequin membrane) that
 read the same `OverlayItem[]` content model. It keeps the earlier lycra
-surface (`lycra-surface.css`, `calm.css`, imported by `CalmSurface.tsx`)
-and the skills that describe it (`.claude/skills/escparty-calm/`,
+surface (`lycra-surface.css`, `calm.css`, imported by `CalmSurface.tsx`),
+its own palette (`palette.ts`, the colours the app used before the design
+system), and the skills that describe it (`.claude/skills/escparty-calm/`,
 `.claude/skills/escparty-sparkle/`). Those rules apply to the demo only;
 live pages follow `docs/design/design-system.md`, and the app's
 `.esc-app`-scoped surface outranks the demo's stylesheets after a visit to

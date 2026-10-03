@@ -90,7 +90,7 @@ hex value, a font name, a shadow or a pixel size of their own.
 | `--esc-target-min` | 52px: a control's and a field's minimum height |
 | `--esc-bg` / `--esc-surface` | The background, and the colour every surface is made of (the same in Calm) |
 | `--esc-screen` | What the phone screen and big screen paint: the background, plus Sparkle's stage |
-| `--esc-backdrop`, `--esc-frame` | Behind the phone, and the phone's body |
+| `--esc-backdrop`, `--esc-frame`, `--esc-bezel`, `--esc-home-bar`, `--esc-frame-glow` | Behind the phone, the phone's body, its bezel, its home bar and the shadow it casts |
 | `--esc-raise-sm`, `--esc-raise`, `--esc-raise-lg` | Soft lifts: an information row, a control, the proud row |
 | `--esc-inset`, `--esc-inset-sm` | Pressed in: chosen and fields, and the bottom of a ladder |
 | `--esc-face`, `--esc-face-hover`, `--esc-face-pressed` | A surface's face at rest, hovered, pressed or chosen |
@@ -101,9 +101,11 @@ hex value, a font name, a shadow or a pixel size of their own.
 | `--esc-correct`, `--esc-wrong` | The check and cross glyphs, nothing else |
 | `--esc-press` | The one transition: 120ms ease-out |
 
-`src/styles/theme.ts` (styled-components' theme) is legacy: its fonts point
-at the tokens, and its named colours only remain until every screen is
-migrated (see the design system epic). Don't use `theme.colors` in new code.
+There is no other palette: the styled-components theme (`theme.colors`)
+was retired in #179, and `src/test/designGuard.test.ts` fails `npm test` on
+a hex or `rgb()`/`hsl()` colour, or `theme.colors`, outside `src/design/`
+(comments aside; write issue references as "(#179)"). A colour a screen
+needs and no token gives is a new token here, not a literal in the page.
 
 ## 4. Page anatomy
 

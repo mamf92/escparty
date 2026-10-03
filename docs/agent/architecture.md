@@ -60,8 +60,10 @@ It's a parallel module with its own README (`src/fabric-ui/README.md`) and
 its own demo route (`/fabric-ui`), lazy-loaded so `three`/`@react-three/fiber`/
 `leva` never land in the main bundle. As of this writing it is a standalone
 proof-of-concept demo, not yet confirmed wired into the live app pages —
-check current usage before assuming it renders the real quiz flow. Design
-details belong in `.claude/skills/escparty-sparkle/`, not here.
+check current usage before assuming it renders the real quiz flow. Its
+colours are its own (`palette.ts`, the app's pre-design-system colours), so
+it is exempt from the design guard. Design details belong in
+`.claude/skills/escparty-sparkle/`, not here.
 
 ## `src/store/useGameStore.ts`
 
@@ -218,19 +220,17 @@ decorative glitter layer, and `Surface.tsx` the `Ground`/`Pane`/`Control`/
 `Row`/`Field` primitives screens are built from; `useRovingTabs` wires a
 tablist of `Control`s and its tab panel.
 
-## `src/styles/theme.ts`
-
-Legacy styled-components theme: its fonts point at the design tokens, and
-its named colours remain only for screens not yet moved onto
-`src/design/`. Don't use `theme.colors` in new code.
-
 ## `src/test/`
 
 Test harness only — no app code imports it. `setup.ts` is Vitest's per-file
 setup (jest-dom matchers, Testing Library cleanup) and `test-utils.tsx`
 exports `renderWithProviders`, which wraps a component in the same
-`ThemeProvider` + `DesignThemeProvider` + router that `App.tsx` mounts screens under. Tests
-themselves live next to the code they cover, not here. See
+`DesignThemeProvider` + router that `App.tsx` mounts screens under.
+`testFiles.test.ts` checks every page, component and hook has a test, and
+`designGuard.test.ts` that no hex or `rgb()`/`hsl()` colour or
+`theme.colors` appears outside `src/design/` and `src/fabric-ui/`; both walk
+the tree through `repoTree.ts`. Tests themselves live next to the code
+they cover, not here. See
 `docs/agent/testing.md`.
 
 ## Data files

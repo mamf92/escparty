@@ -68,7 +68,7 @@ const PhoneFrame = styled.div`
   max-height: 812px;
   background-color: var(--esc-frame);
   border-radius: 40px;
-  box-shadow: 0 0 0 10px var(--esc-bezel), 0 0 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 10px var(--esc-bezel), 0 0 30px var(--esc-frame-glow);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -147,7 +147,7 @@ const PhoneButton = styled.div`
   position: absolute;
   width: 40px;
   height: 5px;
-  background-color: #333;
+  background-color: var(--esc-home-bar);
   border-radius: 3px;
   bottom: 10px;
 

@@ -1,6 +1,6 @@
-import { readdirSync } from "node:fs";
 import { posix } from "node:path";
 import { describe, expect, it } from "vitest";
+import { walk } from "./repoTree";
 
 /**
  * Every page, component and hook ships with a test file (#140, Epic #53).
@@ -24,10 +24,6 @@ const UNTESTED = new Set([
   "src/store/useGameStore.ts",
 ]);
 
-// The repo root, from this file's own location rather than the working
-// directory. Paths are kept POSIX-style whatever the OS, so they match
-// UNTESTED.
-const root = posix.join(__dirname.replace(/\\/g, "/"), "..", "..");
 const isTest = (name: string) => /\.(test|spec)\.tsx?$/.test(name);
 const EVERY_MODULE = ["src/pages/", "src/components/", "src/hooks/"];
 const needsTest = (file: string) => {
@@ -35,11 +31,6 @@ const needsTest = (file: string) => {
   if (isTest(name) || name.endsWith(".d.ts") || !/\.tsx?$/.test(name)) return false;
   return EVERY_MODULE.some((folder) => file.startsWith(folder)) || /\.tsx$/.test(name) || /^use[A-Z]/.test(name);
 };
-
-const walk = (folder: string): string[] =>
-  readdirSync(posix.join(root, folder), { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? walk(posix.join(folder, entry.name)) : [posix.join(folder, entry.name)],
-  );
 
 const allFiles = CHECKED_FOLDERS.flatMap(walk);
 const files = new Set(allFiles);
