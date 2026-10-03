@@ -28,7 +28,7 @@ export const QuestionPane = ({ question, options, picked, correctAnswer, settled
   <>
     <h2 className="esc-heading" ref={headingRef} tabIndex={-1}>{question}</h2>
     <Ground>
-      <Pane role="group" aria-label="Answers" className="quiz-answers">
+      <Pane role="group" aria-label="Answers">
         {options.map(option => {
           const isPicked = picked === option;
           const marker = !settled ? undefined

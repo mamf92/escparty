@@ -26,7 +26,7 @@ describe("QuestionPane", () => {
     const heading = screen.getByRole("heading", { level: 2, name: "Which country won in 1974?" });
     const group = screen.getByRole("group", { name: "Answers" });
     expect(heading.nextElementSibling).toHaveClass("calm-ground");
-    expect(group).toHaveClass("lycra-pane", "quiz-answers");
+    expect(group).toHaveClass("lycra-pane");
     // Controls are direct children of their pane.
     for (const button of screen.getAllByRole("button")) expect(button.parentElement).toBe(group);
     expect(container.querySelector(".calm-marker")).toBeNull();

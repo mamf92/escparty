@@ -183,20 +183,27 @@ describe("Quiz unavailable (#171)", () => {
       useEffect(() => { visits.push(key); }, [key]);
       return <p>menu</p>;
     };
-    const user = userEvent.setup();
-    renderWithProviders(
-      <Routes>
-        <Route path="/quiz/:difficulty" element={<Quiz />} />
-        <Route path="/multiplayer" element={<Menu />} />
-      </Routes>,
-      { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: true, roomCode: "ABCD", playerId: "p1" } }] },
-    );
+    // Fake timeouts that still pass in real time, so the 2s redirect can be
+    // stepped past instead of waited out.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderWithProviders(
+        <Routes>
+          <Route path="/quiz/:difficulty" element={<Quiz />} />
+          <Route path="/multiplayer" element={<Menu />} />
+        </Routes>,
+        { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: true, roomCode: "ABCD", playerId: "p1" } }] },
+      );
 
-    await user.click(await screen.findByRole("button", { name: "Back to the game menu" }));
-    expect(await screen.findByText("menu")).toBeInTheDocument();
-    // Past the 2s the closed-room message waits before taking the player back itself.
-    await new Promise(resolve => setTimeout(resolve, 2300));
-    expect(visits).toHaveLength(1);
+      await user.click(await screen.findByRole("button", { name: "Back to the game menu" }));
+      expect(await screen.findByText("menu")).toBeInTheDocument();
+      // Past the 2s the closed-room message waits before taking the player back itself.
+      await vi.advanceTimersByTimeAsync(2300);
+      expect(visits).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -257,6 +264,47 @@ describe("Quiz multiplayer score writes (#131)", () => {
     // The verdict doesn't promise the points the alert says didn't count.
     expect(screen.getByRole("status")).toHaveTextContent("That's right, but the points didn't reach the room.");
     expect(screen.queryByText(/Douze points/)).not.toBeInTheDocument();
+  });
+
+  it("keeps a refused answer's verdict to its own question", async () => {
+    vi.mocked(loadQuizData).mockResolvedValueOnce([
+      ...QUESTIONS,
+      { id: 2, question: "Which country won in 1988?", options: ["Switzerland", "UK"], correctAnswer: "Switzerland" },
+    ]);
+    let send: (room: Room) => void = () => { };
+    const room: Room = {
+      id: "ABCD",
+      hostId: "host",
+      started: true,
+      difficulty: "easy",
+      createdAt: null as unknown as Room["createdAt"],
+      players: [{ id: "host", name: "Loreen", score: 0 }],
+      phase: "question",
+      currentQuestionIndex: 0,
+      phaseStartedAt: { toMillis: () => Date.now() } as unknown as Room["phaseStartedAt"],
+    };
+    mocks.listenToRoom.mockImplementation((_code: string, callback: (room: Room) => void) => {
+      send = callback;
+      callback(room);
+      return () => { };
+    });
+    mocks.updatePlayerScore
+      .mockRejectedValueOnce(new ScoreWriteRejected("unknown-player", "Failed to update score: no player ghost"))
+      // The next write is still in flight when the verdict shows.
+      .mockReturnValueOnce(new Promise(() => { }));
+
+    await answerCorrectly();
+    expect(await screen.findByText("That's right, but the points didn't reach the room.")).toBeInTheDocument();
+
+    // The next question's verdict isn't the last one's refusal.
+    const startedAt = Date.now();
+    send({ ...room, currentQuestionIndex: 1, phaseStartedAt: { toMillis: () => startedAt } as unknown as Room["phaseStartedAt"] });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Switzerland" }));
+    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
+    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/^Douze points! That's right/)).toBeInTheDocument();
+    expect(screen.queryByText(/didn't reach the room/)).not.toBeInTheDocument();
   });
 
   it("adds the answer's points to the room's score when the room already holds more", async () => {

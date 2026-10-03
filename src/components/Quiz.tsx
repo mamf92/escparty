@@ -51,6 +51,9 @@ const Quiz = () => {
   const [outcome, setOutcome] = useState<QuizOutcome | null>(null);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
   const [scoreSyncError, setScoreSyncError] = useState<string | null>(null); // A multiplayer score write that failed for good
+  // The question whose points the room refused or never got, so its verdict
+  // (and only its verdict) doesn't promise them.
+  const [pointsLostAt, setPointsLostAt] = useState<number | null>(null);
 
   const navigate = useNavigate();
   const { difficulty } = useParams<{ difficulty: string }>();
@@ -194,7 +197,7 @@ const Quiz = () => {
         console.log("✅ Fetched Quiz Data:", quizData);
         if (!quizData || !Array.isArray(quizData)) {
           console.error("❌ Quiz data is not in expected format:", quizData);
-          setError(LOAD_FAILED);
+          setError(multiplayerData?.multiplayer ? LOAD_FAILED_ROOM : LOAD_FAILED);
           setLoading(false);
           return;
         }
@@ -203,7 +206,7 @@ const Quiz = () => {
         // bank would be on different questions from everyone else, and its
         // shorter quiz could end the game for the whole room. Stop here.
         if (multiplayerData?.multiplayer && loaded.classic && isFallbackQuizData(quizData)) {
-          setError("Couldn't load this quiz's questions. Check your connection and reload the page to rejoin.");
+          setError(LOAD_FAILED_ROOM);
           setLoading(false);
           return;
         }
@@ -225,7 +228,8 @@ const Quiz = () => {
       .catch((error) => {
         console.error("❌ Error loading quiz data:", error);
         // A deleted custom quiz isn't a connection problem: retrying won't help.
-        setError(error instanceof QuizNotSavedError ? NOT_FOUND : LOAD_FAILED);
+        setError(error instanceof QuizNotSavedError ? NOT_FOUND
+          : multiplayerData?.multiplayer ? LOAD_FAILED_ROOM : LOAD_FAILED);
         setLoading(false);
       });
 
@@ -619,17 +623,22 @@ const Quiz = () => {
               }
               if (error.reason === "finished") {
                 setScoreSyncError("The game had already finished, so that answer didn't count.");
+                setPointsLostAt(answeredQuestion);
                 break;
               }
               // Retrying can't fix a room that doesn't know this player, or
               // is gone: say so once instead of failing quietly (#131).
               if (error.reason !== "lower-score") {
                 setScoreSyncError("Your score isn't being saved to this room. Ask the host to start a new game.");
+                setPointsLostAt(answeredQuestion);
                 break;
               }
             }
             if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            else setScoreSyncError("Your score couldn't reach the room. Check your connection.");
+            else {
+              setScoreSyncError("Your score couldn't reach the room. Check your connection.");
+              setPointsLostAt(answeredQuestion);
+            }
           }
         }
       }
@@ -661,7 +670,9 @@ const Quiz = () => {
     if (!isSubmitted) return;
     const focused = document.activeElement;
     if (!focused || focused === document.body || (focused as HTMLButtonElement).disabled) {
-      questionHeadingRef.current?.focus();
+      // Without scrolling: on touch Safari a tapped button never takes focus,
+      // so this runs on every question there, and the page shouldn't jump.
+      questionHeadingRef.current?.focus({ preventScroll: true });
     }
   }, [isSubmitted, currentQuestionIndex]);
 
@@ -681,7 +692,7 @@ const Quiz = () => {
   if (error || legacyRoom) {
     return (
       <CalmPage title="Quiz unavailable">
-        <CalmNote role="alert">{error === LOAD_FAILED && isMultiplayer ? LOAD_FAILED_ROOM : error ?? LEGACY_ROOM_MESSAGE}</CalmNote>
+        <CalmNote role="alert">{error ?? LEGACY_ROOM_MESSAGE}</CalmNote>
         <Ground>
           <Pane>
             {isMultiplayer
@@ -706,7 +717,7 @@ const Quiz = () => {
         correctAnswer={currentQuestion.correctAnswer}
         points={currentQuestionPoints}
         outcome={outcome}
-        counted={!scoreSyncError}
+        counted={pointsLostAt !== currentQuestionIndex}
       />
       {scoreSyncError && <CalmNote role="alert">{scoreSyncError}</CalmNote>}
       <QuestionPane

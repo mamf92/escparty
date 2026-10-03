@@ -8,9 +8,15 @@
   width: 100%;
 }
 
-/* The clock and the verdict share one slot in the page's column. */
+/*
+  The clock and the verdict share one slot in the page's column, tall enough
+  for a two-line verdict (a note's margin and two of its lines), so the
+  question below doesn't move when the one-line clock gives way to it.
+*/
 .quiz-status {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: calc(var(--esc-space-2) + 2 * 1.5 * var(--esc-text-sub));
 }

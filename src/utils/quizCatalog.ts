@@ -58,7 +58,7 @@ export const fetchQuizTitle = async (key: string | undefined | null): Promise<st
 };
 
 /** Why loading a custom quiz that was deleted (or emptied) fails. */
-export const QUIZ_NOT_SAVED = "This quiz isn't saved any more.";
+const QUIZ_NOT_SAVED = "This quiz isn't saved any more.";
 
 /**
  * A custom quiz that was deleted or emptied: retrying won't bring it back,
