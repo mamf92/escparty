@@ -6,7 +6,7 @@ import { answerOptions } from "./helpers";
 // the device.
 test("a solo quiz from the home screen to the scoreboard", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Quiz library" }).click();
+    await page.getByRole("button", { name: "Browse the quiz library" }).click();
     await page.getByRole("radio", { name: /Quick Fire/ }).click();
     await page.getByRole("button", { name: "Play Quick Fire solo" }).click();
 
