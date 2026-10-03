@@ -82,7 +82,7 @@
     color var(--esc-press);
 }
 
-.esc-app .lycra:hover {
+.esc-app .lycra:hover:where(:not(:disabled)) {
   background: var(--esc-face-hover);
 }
 
@@ -113,8 +113,9 @@
   transform: none;
 }
 
-.esc-app .lycra:disabled:not(.is-chosen):not(.is-selected),
-.esc-app .lycra[aria-disabled="true"]:not(.is-chosen):not(.is-selected) {
+/* Unavailable, so dimmed; a settled answer (is-marked) is not, see below. */
+.esc-app .lycra:disabled:not(.is-chosen):not(.is-selected):not(.is-marked),
+.esc-app .lycra[aria-disabled="true"]:not(.is-chosen):not(.is-selected):not(.is-marked) {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
@@ -171,7 +172,8 @@
 }
 
 /* A settled answer is the most important thing on screen, not a dimmed one. */
-.esc-app .lycra.is-marked:disabled {
+.esc-app .lycra.is-marked:disabled,
+.esc-app .lycra.is-marked[aria-disabled="true"] {
   opacity: 1;
   cursor: default;
 }
@@ -293,6 +295,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.esc-app .calm-marker.is-correct {
+  color: var(--esc-correct);
+}
+
+.esc-app .calm-marker.is-wrong {
+  color: var(--esc-wrong);
+}
+
+/* A marked control keeps its label clear of the glyph at its end, and centred. */
+.esc-app .lycra.is-marked {
+  padding-inline: calc(var(--esc-space-4) + 20px + var(--esc-space-3));
 }
 
 /* The big screen: the same surface for a TV across the room. */
