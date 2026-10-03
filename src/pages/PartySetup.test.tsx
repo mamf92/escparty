@@ -52,7 +52,12 @@ describe("PartySetup", () => {
         await user.click(screen.getByRole("radio", { name: /Semi-final 2/ }));
         await user.click(screen.getByRole("radio", { name: /Make our own/ }));
         await user.click(screen.getByRole("button", { name: "Start the party" }));
+        // Told beside Start, where the tap was, and the name field isn't blamed for it.
         expect(screen.getByRole("alert")).toHaveTextContent("Name every category.");
+        expect(screen.getByRole("alert").nextElementSibling).toBe(screen.getByRole("button", { name: "Start the party" }));
+        expect(screen.getByLabelText("Category 1")).toHaveAttribute("aria-invalid", "true");
+        expect(screen.getByLabelText("Category 1")).toHaveAccessibleDescription("Name every category.");
+        expect(screen.getByLabelText("Your name at the party")).toHaveAttribute("aria-invalid", "false");
 
         await user.type(screen.getByLabelText("Category 1"), "Hair height");
         await user.selectOptions(screen.getByLabelText("Scale for category 1"), "5");
@@ -60,9 +65,11 @@ describe("PartySetup", () => {
         await user.type(screen.getByLabelText("Category 2"), "Key changes");
         await user.click(screen.getByRole("button", { name: "Add a category" }));
         await user.click(screen.getByRole("button", { name: "Remove the last one" }));
-        await user.click(screen.getByRole("button", { name: /Party bonuses on/ }));
-        await user.click(screen.getByRole("button", { name: /Name names/ }));
-        expect(screen.getByRole("button", { name: /Keep the awards anonymous/ })).toHaveAttribute("aria-pressed", "false");
+        expect(screen.getByRole("button", { name: /^Party bonuses/ })).toHaveAttribute("aria-pressed", "true");
+        await user.click(screen.getByRole("button", { name: /^Party bonuses/ }));
+        await user.click(screen.getByRole("button", { name: /^Name names in the awards/ }));
+        // The switch keeps its name; only whether it's pressed changes.
+        expect(screen.getByRole("button", { name: /^Name names in the awards/ })).toHaveAttribute("aria-pressed", "false");
         await user.click(screen.getByRole("button", { name: "Start the party" }));
 
         const party = mocks.createParty.mock.calls[0][0];
@@ -77,6 +84,9 @@ describe("PartySetup", () => {
         await user.clear(screen.getByLabelText("Your name at the party"));
         await user.click(screen.getByRole("button", { name: "Start the party" }));
         expect(screen.getByRole("alert")).toHaveTextContent("Give yourself a name.");
+        // Beside the field, and read out with it.
+        expect(screen.getByLabelText("Your name at the party")).toHaveAccessibleDescription("Give yourself a name.");
+        expect(screen.getByLabelText("Your name at the party")).toHaveAttribute("aria-invalid", "true");
         expect(mocks.createParty).not.toHaveBeenCalled();
     });
 
@@ -86,7 +96,7 @@ describe("PartySetup", () => {
         renderSetup();
         await user.click(screen.getByRole("radio", { name: /Douze Points/ }));
         await user.click(screen.getByRole("button", { name: "Start the party" }));
-        expect(screen.getByRole("status")).toHaveTextContent("couldn't be created");
+        expect(screen.getByRole("alert")).toHaveTextContent("couldn't be created");
         mocks.fetchContest.mockResolvedValueOnce(undefined);
         await user.click(screen.getByRole("button", { name: "Start the party" }));
         expect(mocks.createParty).toHaveBeenCalledTimes(1);
@@ -94,9 +104,16 @@ describe("PartySetup", () => {
         expect(screen.getByText("at /party/ABBA")).toBeInTheDocument();
     });
 
-    it("goes back", async () => {
+    it("starts the party with Enter in the name field", async () => {
+        const user = userEvent.setup();
         renderSetup();
-        await userEvent.setup().click(screen.getByRole("button", { name: "Back" }));
+        await user.type(screen.getByLabelText("Your name at the party"), "{Enter}");
+        expect(screen.getByText("at /party/ABBA")).toBeInTheDocument();
+    });
+
+    it("goes back to the scoreboard party", async () => {
+        renderSetup();
+        await userEvent.setup().click(screen.getByRole("button", { name: "Back to the scoreboard party" }));
         expect(screen.getByText("at /party")).toBeInTheDocument();
     });
 });

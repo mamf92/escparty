@@ -25,7 +25,9 @@ Each guest's place in the running order is kept by act id, so a host
 reordering the lineup doesn't move them to another country.
 
 Live data comes from `usePartyData` (two `onSnapshot` listeners: the party
-and its ballots). The guest's own ratings go through `useOwnBallot`: kept in
+and its ballots). A listener that errors stays stopped, so the screens show
+the error with "Try again", which calls the hook's `retry` to attach both
+again while keeping what's on screen. The guest's own ratings go through `useOwnBallot`: kept in
 localStorage on every tap, saved to Firestore 400ms later, retried every 5s
 while that fails, and merged once with the server's copy when it arrives
 (`mergeBallots`, this device wins per rating). Leaving the page sends a
