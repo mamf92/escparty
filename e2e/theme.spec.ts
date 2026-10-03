@@ -3,9 +3,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { hostParty, joinParty, rateActs } from "./helpers";
 
 /*
- * Theme compliance for the scoreboard party screens (#90) and the quiz
- * library and builder (#177), judged against
- * the rules in docs/design/design-system.md as the browser actually renders
+ * Theme compliance for the scoreboard party screens (#90), the quiz
+ * library and builder (#177), the solo scoreboard (#174), the scoreboard
+ * break and the host's view (#173) and the single-player entry (#170), judged
+ * against the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
  *   - no frames: nothing on the surface draws a border, and the ground and
@@ -201,6 +202,28 @@ test("the quiz library and builder follow the surface rules", async ({ browser }
     await expect(page.getByText("Write the question.", { exact: true })).toBeVisible();
     await expect(page.getByRole("alert")).toContainText("things to fix");
     await judge(page, "quiz-builder-write");
+
+    await page.context().close();
+});
+
+test("the solo scoreboard follows the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("quizScores", JSON.stringify([
+        { score: 900, total: 10, difficulty: "easy", date: "2026-05-10T00:00:00Z" },
+        { score: 1300, total: 10, difficulty: "hard", date: "2026-05-01T00:00:00Z" },
+        { score: 400, total: 10, difficulty: "medium", date: "2026-05-16T00:00:00Z" },
+    ])));
+    await page.goto("/#/scoreboard");
+    await expect(page.getByText("3 runs. Your best stands highest.")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Score" })).toHaveAttribute("aria-selected", "true");
+    await judge(page, "solo-scoreboard");
+
+    // The best run stands proud in both themes; Sparkle gilds the same lift.
+    const best = page.getByRole("list", { name: "Your runs" }).getByRole("listitem").first();
+    await expect(best).toHaveClass(/is-high/);
+    await page.getByRole("switch", { name: "Sparkle mode" }).click();
+    await expect(best).toHaveCSS("box-shadow", /rgba\(255, 201, 60, 0\.4\) 0px 0px 26px/);
 
     await page.context().close();
 });
