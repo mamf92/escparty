@@ -37,7 +37,7 @@ That component was picked because it exercises the full state range, and because
 
 Content is real.
 Questions load through the app's own `loadQuizData('easy')` from `src/utils/QuizDataProvider.ts`, so the demo shows the same Eurovision questions the app does.
-Colours derive from `src/styles/theme.ts` rather than being invented.
+Colours come from `palette.ts`, the demo's own copy of the colours the app used before the design system (#179), rather than being invented.
 
 ## Running it
 

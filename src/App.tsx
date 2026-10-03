@@ -1,7 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { HashRouter as Router, Outlet, Route, Routes } from "react-router-dom";
-import styled, { ThemeProvider } from "styled-components";
-import { theme } from "./styles/theme";
+import styled from "styled-components";
 import Home from "./pages/Home";
 import SelectDifficulty from "./pages/SelectDifficulty";
 import Quiz from "./components/Quiz";
@@ -85,8 +84,7 @@ const FabricLoading = styled.div`
 
 const App = () => {
   return (
-    <ThemeProvider theme={theme}>
-      <DesignThemeProvider>
+    <DesignThemeProvider>
       <Router>
         <Routes>
           <Route
@@ -119,8 +117,7 @@ const App = () => {
           </Route>
         </Routes>
       </Router>
-      </DesignThemeProvider>
-    </ThemeProvider>
+    </DesignThemeProvider>
   );
 };
 

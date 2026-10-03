@@ -147,7 +147,7 @@ const PhoneButton = styled.div`
   position: absolute;
   width: 40px;
   height: 5px;
-  background-color: #333;
+  background-color: var(--esc-home-bar);
   border-radius: 3px;
   bottom: 10px;
 

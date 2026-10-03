@@ -22,6 +22,7 @@ import {
 import type { OptionState } from './types';
 import { useFabricControls } from './useFabricControls';
 import { useParallax } from './useParallax';
+import { fonts, palette } from './palette';
 
 const colorScratch = new THREE.Color();
 
@@ -364,9 +365,9 @@ const Page = styled.div`
   align-items: center;
   gap: 1rem;
   padding: 1.5rem 1rem 2.5rem;
-  background: ${({ theme }) => theme.colors.nightblue};
-  color: ${({ theme }) => theme.colors.magnolia};
-  font-family: ${({ theme }) => theme.fonts.body};
+  background: ${palette.nightblue};
+  color: ${palette.magnolia};
+  font-family: ${fonts.body};
 `;
 
 const Header = styled.header`
@@ -375,11 +376,11 @@ const Header = styled.header`
 `;
 
 const Title = styled.h1`
-  font-family: ${({ theme }) => theme.fonts.heading};
+  font-family: ${fonts.heading};
   font-size: 1.5rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.pinkLavender};
+  color: ${palette.pinkLavender};
 `;
 
 const Subtitle = styled.p`
@@ -406,7 +407,7 @@ const ScreenTabs = styled.div`
 `;
 
 const Tab = styled.button<{ $active: boolean }>`
-  font-family: ${({ theme }) => theme.fonts.body};
+  font-family: ${fonts.body};
   font-size: 0.75rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -414,21 +415,21 @@ const Tab = styled.button<{ $active: boolean }>`
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  background: ${({ $active, theme }) => ($active ? theme.colors.amethyst : 'transparent')};
-  color: ${({ $active, theme }) => ($active ? theme.colors.nightblue : theme.colors.pinkLavender)};
+  background: ${({ $active }) => ($active ? palette.amethyst : 'transparent')};
+  color: ${({ $active }) => ($active ? palette.nightblue : palette.pinkLavender)};
 `;
 
 const SparkleToggle = styled.button<{ $on: boolean }>`
-  font-family: ${({ theme }) => theme.fonts.heading};
+  font-family: ${fonts.heading};
   font-size: 0.75rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 0.45rem 1rem;
   border-radius: 999px;
   cursor: pointer;
-  border: 0.0625rem solid ${({ theme }) => theme.colors.accentorange}; /* 1px */
-  background: ${({ $on, theme }) => ($on ? theme.colors.accentorange : 'transparent')};
-  color: ${({ $on, theme }) => ($on ? theme.colors.nightblue : theme.colors.accentorange)};
+  border: 0.0625rem solid ${palette.accentorange}; /* 1px */
+  background: ${({ $on }) => ($on ? palette.accentorange : 'transparent')};
+  color: ${({ $on }) => ($on ? palette.nightblue : palette.accentorange)};
 `;
 
 const Stage = styled.div`
@@ -467,13 +468,13 @@ const plateau = css`
   padding: 0 0.9rem;
   transform-origin: 0 0;
   will-change: transform;
-  color: ${({ theme }) => theme.colors.white};
+  color: ${palette.white};
   text-shadow: 0 0.0625rem 0.1875rem rgba(7, 9, 38, 0.65); /* 1px 3px */
 `;
 
 const PlateauLabel = styled.div<{ $lead: boolean }>`
   ${plateau}
-  font-family: ${({ theme, $lead }) => ($lead ? theme.fonts.heading : theme.fonts.body)};
+  font-family: ${({ $lead }) => ($lead ? fonts.heading : fonts.body)};
   font-size: ${({ $lead }) => ($lead ? '0.95rem' : '0.85rem')};
   font-weight: 700;
   line-height: 1.25;
@@ -485,7 +486,7 @@ const PlateauButton = styled.button`
   background: transparent;
   border: none;
   cursor: pointer;
-  font-family: ${({ theme }) => theme.fonts.body};
+  font-family: ${fonts.body};
   font-size: 0.85rem;
   font-weight: 700;
   line-height: 1.2;
@@ -495,14 +496,14 @@ const PlateauButton = styled.button`
   }
 
   &:focus-visible {
-    outline: 0.1875rem solid ${({ theme }) => theme.colors.accentmint}; /* 3px */
+    outline: 0.1875rem solid ${palette.accentmint}; /* 3px */
     outline-offset: 0.25rem;
     border-radius: 0.5rem;
   }
 `;
 
 const Sub = styled.span`
-  font-family: ${({ theme }) => theme.fonts.body};
+  font-family: ${fonts.body};
   font-size: 0.7rem;
   font-weight: 400;
   opacity: 0.8;
@@ -516,18 +517,18 @@ const Footer = styled.footer`
 `;
 
 const MotionButton = styled.button`
-  font-family: ${({ theme }) => theme.fonts.body};
+  font-family: ${fonts.body};
   font-size: 0.75rem;
   letter-spacing: 0.04em;
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
-  border: 0.0625rem solid ${({ theme }) => theme.colors.amethyst}; /* 1px */
+  border: 0.0625rem solid ${palette.amethyst}; /* 1px */
   background: transparent;
-  color: ${({ theme }) => theme.colors.pinkLavender};
+  color: ${palette.pinkLavender};
   cursor: pointer;
 `;
 
 const BackLink = styled(Link)`
   font-size: 0.8rem;
-  color: ${({ theme }) => theme.colors.pinkLavender};
+  color: ${palette.pinkLavender};
 `;

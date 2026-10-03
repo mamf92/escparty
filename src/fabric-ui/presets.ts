@@ -1,4 +1,4 @@
-import { theme } from '../styles/theme';
+import { palette } from './palette';
 import type { MaterialPreset } from './types';
 
 export type PresetName = 'spandex' | 'felt' | 'sequin' | 'carbon';
@@ -6,8 +6,8 @@ export type PresetName = 'spandex' | 'felt' | 'sequin' | 'carbon';
 export const PRESET_NAMES: PresetName[] = ['spandex', 'felt', 'sequin', 'carbon'];
 
 /**
- * All four take their colours from the app's existing token set rather than
- * inventing a palette, so the concept can sit next to the current quiz screen.
+ * All four take their colours from the demo's palette (./palette), the
+ * colours the app's quiz screen used when the concept was built.
  *
  * `sheenIntensity` is the field worth reading first. Fibres standing off a
  * surface scatter light back at grazing angles, which is why cloth carries a
@@ -20,7 +20,7 @@ export const PRESETS: Record<PresetName, MaterialPreset> = {
      * response.
      */
     spandex: {
-        baseColor: theme.colors.amethyst, // #A56DC6
+        baseColor: palette.amethyst, // #A56DC6
         surface: 'woven',
         weaveScale: 60,
         weaveIntensity: 0.08,
@@ -32,7 +32,7 @@ export const PRESETS: Record<PresetName, MaterialPreset> = {
         specPower: 30,
         specIntensity: 0.18,
         specAniso: 0,
-        specColor: theme.colors.magnolia, // #EEE8F0
+        specColor: palette.magnolia, // #EEE8F0
         diffuseWrap: 0.5,
         ambient: 0.2,
         keyIntensity: 0.62,
@@ -42,7 +42,7 @@ export const PRESETS: Record<PresetName, MaterialPreset> = {
         ridgeFrequency: 4,
         sheenIntensity: 0.55,
         sheenPower: 2.6,
-        sheenColor: theme.colors.pinkLavender, // #D5B8E6
+        sheenColor: palette.pinkLavender, // #D5B8E6
         sequinTilt: 0,
         sequinDome: 0,
     },
@@ -65,7 +65,7 @@ export const PRESETS: Record<PresetName, MaterialPreset> = {
         specPower: 6,
         specIntensity: 0.03,
         specAniso: 0,
-        specColor: theme.colors.magnolia,
+        specColor: palette.magnolia,
         diffuseWrap: 0.75,
         ambient: 0.26,
         keyIntensity: 0.6,
@@ -86,7 +86,7 @@ export const PRESETS: Record<PresetName, MaterialPreset> = {
      * the sheet or the camera moves.
      */
     sequin: {
-        baseColor: theme.colors.brightpurple, // #C04BF2
+        baseColor: palette.brightpurple, // #C04BF2
         surface: 'sequin',
         weaveScale: 32.5,
         weaveIntensity: 0.8,
@@ -108,7 +108,7 @@ export const PRESETS: Record<PresetName, MaterialPreset> = {
         ridgeFrequency: 6,
         sheenIntensity: 0,
         sheenPower: 3.2,
-        sheenColor: theme.colors.accentorange, // #FF9F1D
+        sheenColor: palette.accentorange, // #FF9F1D
         sequinTilt: 1.7,
         sequinDome: 0.5,
     },
@@ -166,10 +166,10 @@ export const SURFACE_INDEX: Record<MaterialPreset['surface'], number> = {
  * held. Correctness is called out by a separate glyph in the left gutter, so
  * the two signals never compete.
  *
- * correctGreen was already defined in the theme and unused by the app, which
+ * correctGreen was in the app's old theme and unused by the app, which
  * uses the much darker accentgreen. It is the cleaner of the two here.
  */
 export const MARKER_COLOR = {
-    correct: theme.colors.correctGreen, // #28a745
+    correct: palette.correctGreen, // #28a745
     wrong: "#ff7b86", // --esc-wrong in src/design/tokens.css: 3:1 on the dark ground
 } as const;

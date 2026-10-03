@@ -1,24 +1,19 @@
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter, type InitialEntry } from "react-router-dom";
-import { ThemeProvider } from "styled-components";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
-import { theme } from "../styles/theme";
 import { DesignThemeProvider } from "../design/DesignThemeProvider";
 
 /**
  * The providers every screen in this app is mounted under in `App.tsx`:
- * styled-components' `ThemeProvider` (so `theme.colors.*` in a styled block
- * resolves instead of throwing), the design system's `DesignThemeProvider`
- * (Calm or Sparkle) and a router (so `useNavigate`/`<Link>` work).
+ * the design system's `DesignThemeProvider` (Calm or Sparkle) and a router
+ * (so `useNavigate`/`<Link>` work).
  *
  * `MemoryRouter` stands in for the app's `HashRouter` — routes are still
  * `#/...` in the browser, but in a test the history lives in memory, so a
  * test can start on any route without touching `window.location`.
  */
 const Providers = ({ children }: { children: ReactNode }) => (
-  <ThemeProvider theme={theme}>
-    <DesignThemeProvider>{children}</DesignThemeProvider>
-  </ThemeProvider>
+  <DesignThemeProvider>{children}</DesignThemeProvider>
 );
 
 export type RenderWithProvidersOptions = Omit<RenderOptions, "wrapper"> & {
