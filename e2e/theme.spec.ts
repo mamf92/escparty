@@ -4,8 +4,9 @@ import { answerOptions, hostParty, joinParty, rateActs } from "./helpers";
 
 /*
  * Theme compliance for the scoreboard party screens (#90), Home (#169),
- * the scoreboard break and the host's view (#173), the solo scoreboard (#174) and
- * the single-player entry (#170) and the quiz screen (#171), judged against
+ * the scoreboard break and the host's view (#173), the solo scoreboard (#174),
+ * the single-player entry (#170), multiplayer create and join (#172) and the
+ * quiz screen (#171), judged against
  * the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
@@ -293,6 +294,26 @@ test("the quiz screen follows the surface rules, open, chosen and settled", asyn
     await lockIn.click();
     await expect(page.locator(".calm-marker").first()).toBeVisible();
     await judge(page, "quiz-settled");
+
+    await page.context().close();
+});
+
+test("the multiplayer create and join screen follows the surface rules (#172)", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    await page.goto("/#/multiplayer");
+    await expect(page.getByRole("button", { name: /^Host a game/ })).toBeVisible();
+    await judge(page, "multiplayer-choose");
+
+    await page.getByRole("button", { name: /^Host a game/ }).click();
+    await expect(page.getByRole("button", { name: /^Host and play/ })).toBeVisible();
+    await judge(page, "multiplayer-host");
+
+    await page.getByRole("button", { name: "Back to host or join" }).click();
+    await page.getByRole("button", { name: /^Join a game/ }).click();
+    await page.getByRole("button", { name: "Join the game" }).click();
+    await expect(page.getByText("A game code is four letters, like ABBA.")).toBeVisible();
+    await judge(page, "multiplayer-join");
 
     await page.context().close();
 });
