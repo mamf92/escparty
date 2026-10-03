@@ -51,7 +51,7 @@ const verdict = ({ picked, correctAnswer, points, outcome, counted }: {
   outcome: QuizOutcome | null;
   counted: boolean;
 }) => {
-  if (outcome === "restored") return `This question closed for you before you came back. The answer was ${correctAnswer}.`;
+  if (outcome === "restored") return `This question was already settled when you came back. The answer was ${correctAnswer}.`;
   if (outcome === "answered") {
     if (picked === correctAnswer && !counted) return "That's right, but the points didn't reach the room.";
     return picked === correctAnswer

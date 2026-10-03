@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Link, Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import { loadQuizData, type QuizQuestion } from "../utils/QuizDataProvider";
 import { ScoreWriteRejected, type Room } from "../utils/roomsFirestore";
@@ -49,6 +49,34 @@ beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => { });
   vi.spyOn(console, "error").mockImplementation(() => { });
   sessionStorage.clear();
+});
+
+describe("Quiz loading", () => {
+  it("drops a quiz that finishes loading after the page moved on to another", async () => {
+    let finishFirst: (questions: QuizQuestion[]) => void = () => { };
+    vi.mocked(loadQuizData)
+      .mockReturnValueOnce(new Promise(resolve => { finishFirst = resolve; }))
+      .mockResolvedValueOnce(QUESTIONS);
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <Link to="/quiz/medium">Another quiz</Link>
+        <Routes>
+          <Route path="/quiz/:difficulty" element={<Quiz />} />
+        </Routes>
+      </>,
+      { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: false } }] },
+    );
+
+    await user.click(screen.getByRole("link", { name: "Another quiz" }));
+    expect(await screen.findByRole("heading", { name: "Which country won in 1974?" })).toBeInTheDocument();
+
+    // The first quiz arrives late: the page keeps the one it's on.
+    finishFirst([{ id: 9, question: "A stale question?", options: ["Yes", "No"], correctAnswer: "Yes" }]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(screen.queryByRole("heading", { name: "A stale question?" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Which country won in 1974?" })).toBeInTheDocument();
+  });
 });
 
 describe("Quiz answer selection (#22)", () => {
@@ -237,7 +265,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
     givenRoom();
     sessionStorage.setItem("answeredQuestion:ABCD", "0");
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
-    expect(await screen.findByText("This question closed for you before you came back. The answer was Sweden.")).toBeInTheDocument();
+    expect(await screen.findByText("This question was already settled when you came back. The answer was Sweden.")).toBeInTheDocument();
     expect(screen.queryByText(/You answered/)).not.toBeInTheDocument();
   });
 

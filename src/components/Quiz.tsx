@@ -187,12 +187,17 @@ const Quiz = () => {
 
     // Use Promise.race with a timeout to prevent infinite loading
     const quizLoaderPromise = loadQuiz(difficulty);
+    let loadTimer: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Quiz loading timed out after 10 seconds')), 10000);
+      loadTimer = setTimeout(() => reject(new Error('Quiz loading timed out after 10 seconds')), 10000);
     });
+    // A load this effect has since given up on (another quiz, or the page
+    // has gone) mustn't land on the page.
+    let cancelled = false;
 
     Promise.race([quizLoaderPromise, timeoutPromise])
       .then((loaded) => {
+        if (cancelled) return;
         const quizData = loaded.questions;
         console.log("✅ Fetched Quiz Data:", quizData);
         if (!quizData || !Array.isArray(quizData)) {
@@ -226,6 +231,7 @@ const Quiz = () => {
 
       })
       .catch((error) => {
+        if (cancelled) return;
         console.error("❌ Error loading quiz data:", error);
         // A deleted custom quiz isn't a connection problem: retrying won't help.
         setError(error instanceof QuizNotSavedError ? NOT_FOUND
@@ -235,6 +241,8 @@ const Quiz = () => {
 
     // Cleanup function
     return () => {
+      cancelled = true;
+      clearTimeout(loadTimer);
       // Clean up room listener if it was set
       unsubscribeRoom();
       // Don't send a page that has already gone (the player took the
