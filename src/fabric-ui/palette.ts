@@ -3,7 +3,8 @@
  * the design system (#166, retired in #179), kept here so the demo still
  * looks as it did. This module is a self-contained proof of concept; live
  * screens read colours from src/design/tokens.css instead, and nothing
- * outside src/fabric-ui should import this.
+ * outside src/fabric-ui may import this (src/test/designGuard.test.ts
+ * fails on an import from anywhere else).
  */
 export const palette = {
     magnolia: '#EEE8F0',

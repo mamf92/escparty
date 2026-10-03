@@ -181,9 +181,11 @@ open at the time of writing:
   `*.test.ts(x)`/`*.spec.ts(x)`, except the pre-existing debt it lists (#140, #59). The
   steward treats missing tests as blocking (#58).
 - **Colours come from tokens.** `src/test/designGuard.test.ts` fails
-  `npm test` on a hex colour literal or `theme.colors` in any `.ts`, `.tsx`
-  or `.css` file under `src/`, outside `src/design/` and the `/fabric-ui`
-  demo (#179). Add a token in `src/design/tokens.css` instead; its allow
+  `npm test` on a hex or `rgb()`/`hsl()` colour, `theme.colors`, or an
+  import of the demo's `palette.ts`, in the code (not the comments) of any
+  `.ts`, `.tsx` or `.css` file under `src/`, outside `src/design/` and the
+  `/fabric-ui` demo (#179). It tells an issue reference from an all-digit
+  colour by its parentheses, so write "(#179)", not a bare "#179". Add a token in `src/design/tokens.css` instead; its allow
   list is for a literal that genuinely can't move, with the reason.
 - **Pre-existing debt.** `Quiz.tsx` (~700 lines, the multiplayer branching
   logic) and `src/fabric-ui/` are the obvious first targets — tracked as #59.

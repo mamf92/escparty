@@ -227,8 +227,9 @@ setup (jest-dom matchers, Testing Library cleanup) and `test-utils.tsx`
 exports `renderWithProviders`, which wraps a component in the same
 `DesignThemeProvider` + router that `App.tsx` mounts screens under.
 `testFiles.test.ts` checks every page, component and hook has a test, and
-`designGuard.test.ts` that no hex colour or `theme.colors` appears outside
-`src/design/` and `src/fabric-ui/`. Tests themselves live next to the code
+`designGuard.test.ts` that no hex or `rgb()`/`hsl()` colour or
+`theme.colors` appears outside `src/design/` and `src/fabric-ui/`; both walk
+the tree through `repoTree.ts`. Tests themselves live next to the code
 they cover, not here. See
 `docs/agent/testing.md`.
 

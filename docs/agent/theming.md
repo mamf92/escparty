@@ -29,7 +29,8 @@ import a surface stylesheet from a page.
 
 Those tokens are the app's only palette: the styled-components theme and
 its named colours are gone (#179), and `src/test/designGuard.test.ts`
-fails `npm test` on a hex colour or `theme.colors` outside `src/design/`.
+fails `npm test` on a hex or `rgb()`/`hsl()` colour, or `theme.colors`,
+outside `src/design/`.
 
 ## The two themes
 
