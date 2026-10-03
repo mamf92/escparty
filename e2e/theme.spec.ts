@@ -5,8 +5,8 @@ import { hostParty, joinParty, rateActs } from "./helpers";
 /*
  * Theme compliance for the scoreboard party screens (#90), Home (#169),
  * the scoreboard break and the host's view (#173), the solo scoreboard (#174),
- * the green room and the results (#176) and the single-player entry (#170),
- * judged against
+ * the green room and the results (#176), the single-player entry (#170)
+ * and multiplayer create and join (#172), judged against
  * the rules in docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
@@ -181,8 +181,8 @@ test("the green room and the results follow the surface rules", async ({ browser
 
     // The host's green room, before and after picking a quiz.
     await page.goto("/#/multiplayer");
-    await page.getByText("Create game").click();
-    await page.getByText("Host & Play").click();
+    await page.getByRole("button", { name: /^Host a game/ }).click();
+    await page.getByRole("button", { name: /^Host and play/ }).click();
     await expect(page.getByRole("heading", { name: "The green room" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Players" }).getByRole("listitem")).toHaveCount(1);
     await judge(page, "lobby-pick-quiz");
@@ -308,6 +308,26 @@ test("Sparkle mode switches every screen, is remembered, and keeps still with re
     await expect(page.locator(".esc-sparkles > i").first()).toBeVisible();
     const running = await page.evaluate(() => document.getAnimations().length);
     expect(running).toBe(0);
+
+    await page.context().close();
+});
+
+test("the multiplayer create and join screen follows the surface rules (#172)", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    await page.goto("/#/multiplayer");
+    await expect(page.getByRole("button", { name: /^Host a game/ })).toBeVisible();
+    await judge(page, "multiplayer-choose");
+
+    await page.getByRole("button", { name: /^Host a game/ }).click();
+    await expect(page.getByRole("button", { name: /^Host and play/ })).toBeVisible();
+    await judge(page, "multiplayer-host");
+
+    await page.getByRole("button", { name: "Back to host or join" }).click();
+    await page.getByRole("button", { name: /^Join a game/ }).click();
+    await page.getByRole("button", { name: "Join the game" }).click();
+    await expect(page.getByText("A game code is four letters, like ABBA.")).toBeVisible();
+    await judge(page, "multiplayer-join");
 
     await page.context().close();
 });
