@@ -181,7 +181,7 @@ open at the time of writing:
   or hook (`use*.ts`) under `src/fabric-ui` or `src/store`, has no sibling
   `*.test.ts(x)`/`*.spec.ts(x)`, except the pre-existing debt it lists (#140, #59). The
   steward treats missing tests as blocking (#58).
-- **Pre-existing debt.** `Quiz.tsx` (~880 lines, the multiplayer branching
+- **Pre-existing debt.** `Quiz.tsx` (~700 lines, the multiplayer branching
   logic) and `src/fabric-ui/` are the obvious first targets — tracked as #59.
 
 Treat a PR checklist item about tests honestly: say what is and isn't

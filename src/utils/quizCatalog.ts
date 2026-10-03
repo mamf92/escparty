@@ -57,6 +57,20 @@ export const fetchQuizTitle = async (key: string | undefined | null): Promise<st
     return quizTitle(key);
 };
 
+/** Why loading a custom quiz that was deleted (or emptied) fails. */
+const QUIZ_NOT_SAVED = "This quiz isn't saved any more.";
+
+/**
+ * A custom quiz that was deleted or emptied: retrying won't bring it back,
+ * so callers can tell it from a failed connection by type, not by message.
+ */
+export class QuizNotSavedError extends Error {
+    constructor() {
+        super(QUIZ_NOT_SAVED);
+        this.name = "QuizNotSavedError";
+    }
+}
+
 export interface LoadedQuiz {
     questions: QuizQuestion[];
     breakEvery: BreakEvery;
@@ -71,7 +85,7 @@ export const loadQuiz = async (key: string): Promise<LoadedQuiz> => {
     }
     if (isCustomQuizKey(key)) {
         const quiz = await fetchCustomQuiz(customQuizId(key));
-        if (!quiz || quiz.questions.length === 0) throw new Error("This quiz isn't saved any more.");
+        if (!quiz || quiz.questions.length === 0) throw new QuizNotSavedError();
         return { questions: quiz.questions.map(toPlayable), breakEvery: quiz.breakEvery, classic: false };
     }
     const template = templateFor(key);
@@ -112,7 +126,7 @@ export const QUIZ_CHOICES: { key: string; title: string; tagline: string; questi
 export const quizBreakEvery = async (key: string): Promise<BreakEvery> => {
     if (isCustomQuizKey(key)) {
         const quiz = await fetchCustomQuiz(customQuizId(key));
-        if (!quiz || quiz.questions.length === 0) throw new Error("This quiz isn't saved any more.");
+        if (!quiz || quiz.questions.length === 0) throw new QuizNotSavedError();
         return quiz.breakEvery;
     }
     return templateFor(key)?.breakEvery ?? DEFAULT_BREAK_EVERY;
@@ -134,7 +148,7 @@ export const setRoomQuiz = async (roomCode: string, key: string): Promise<void> 
 export const loadQuizForEditing = async (key: string): Promise<{ title: string; breakEvery: BreakEvery; questions: AnyQuestion[] }> => {
     if (isCustomQuizKey(key)) {
         const quiz = await fetchCustomQuiz(customQuizId(key));
-        if (!quiz) throw new Error("This quiz isn't saved any more.");
+        if (!quiz) throw new QuizNotSavedError();
         return quiz;
     }
     const { BANK_QUESTIONS, bankQuestion } = await import("../data/questionBank");

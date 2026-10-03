@@ -1,8 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 
-/** The current question's answer buttons (everything but Submit and the home button). */
+/** The current question's answer buttons (not "Lock in my answer" or the way out). */
 export const answerOptions = (page: Page) =>
-    page.getByRole("heading", { level: 2 }).locator("xpath=following-sibling::div[1]").getByRole("button");
+    page.getByRole("group", { name: "Answers" }).getByRole("button");
 
 /** Host a scoreboard party for Semi-final 1 with the given sheet; returns its code. */
 export const hostParty = async (page: Page, name: string, sheet?: RegExp) => {

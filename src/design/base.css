@@ -62,6 +62,20 @@ body {
   color: var(--esc-ink-muted);
 }
 
+/*
+  A section heading that is the content itself (a quiz question), outside
+  the surface: full ink, the heading size, centred.
+*/
+.esc-heading {
+  margin: 0;
+  font-family: var(--esc-font-body);
+  font-size: var(--esc-text-heading);
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--esc-ink);
+}
+
 /* The quiet underlined link for "back" and secondary moves. */
 .esc-link {
   font-family: var(--esc-font-body);

@@ -43,9 +43,12 @@ Mostly not small reusable pieces, despite the folder name:
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui` and the big screen), with the app bar: the brand
   (not a link: mid-game screens own their exits) and the Sparkle mode switch.
-- `Quiz.tsx` — ~880 lines, the largest file in the app. Handles single-player
+- `Quiz.tsx` — ~700 lines, the largest file in the app. Handles single-player
   and multiplayer quiz flow, answer selection/scoring, and the multiplayer
-  progression timer. A change here is rarely "just a component change" —
+  progression timer. Its markup is in `src/components/quiz/`
+  (`QuestionPane`: the question and answer controls with their markers;
+  `QuizStatus`: the timer and the verdict in words; `LeaveQuiz`: the way
+  out, which asks first), which are presentation only. A change here is rarely "just a component change" —
   read `docs/agent/multiplayer-sync.md` first if the change touches
   multiplayer behavior.
 
