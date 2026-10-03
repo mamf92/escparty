@@ -60,7 +60,8 @@ on; Sparkle is the user's switch.
 `e2e/theme.spec.ts` renders each scoreboard party screen (home, setup,
 join, rate, my ranking, the room, host tools, awards, big screen) and
 each screen migrated since (the scoreboard break and the host's view, the
-single-player entry) with reduced motion on and measures it with `judge()`: no frames, controls made
+single-player entry, the solo scoreboard) with reduced motion on and
+measures it with `judge()`: no frames, controls made
 of the background and raised by a light and a dark shadow, chosen pressed
 in, at most four text sizes, nothing moving, and a small budget for green
 and red. The measurements are attached to the Playwright report. Add a
