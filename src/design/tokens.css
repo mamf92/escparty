@@ -47,10 +47,9 @@
   --esc-target-min: 52px;
 
   /*
-    The stage: dark pink, brightest under the ball. `--esc-stage-top` is
-    the brightest spot, the one contrast.test.ts holds stage text against.
+    The stage: dark pink, brightest under the ball (the gradient's first
+    stop, which contrast.test.ts holds stage text against).
   */
-  --esc-stage-top: #7a1356;
   --esc-bg: #3b0628;
   --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #7a1356 0%, #3b0628 72%);
   /*
@@ -62,8 +61,6 @@
   */
   --esc-ball-size: 96px;
   --esc-ball-hang: 56px;
-  /* Room the page header leaves for the ball, which hangs just above it. */
-  --esc-stage-clearance: calc(var(--esc-ball-size) + 0.5625rem);
 
   /* The desktop phone around the stage. */
   --esc-backdrop: #1a0612;

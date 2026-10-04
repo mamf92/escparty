@@ -41,6 +41,12 @@ const measureBall = (box: HTMLElement | null): BallBox => ({
 const MAX_STEP = 0.1;
 /** Frames a second while turning: enough for a slow ball. */
 const FPS = 30;
+/**
+ * The most pixels the sequin floor renders; CSS scales it up from there.
+ * It is a dimmed backdrop, so a big screen or a dense phone needs no more,
+ * and a TV stick keeps its frame rate.
+ */
+const MAX_SEQUIN_PIXELS = 900_000;
 
 const SEQUINS = `precision highp float;
 uniform float t; uniform vec2 m; uniform float s;
@@ -121,7 +127,8 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
     release: () => gl.getExtension("WEBGL_lose_context")?.loseContext(),
     draw: (time, lampX, lampY) => {
       if (gl.isContextLost()) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const area = canvas.clientWidth * canvas.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5, area ? Math.sqrt(MAX_SEQUIN_PIXELS / area) : 1);
       const w = Math.round(canvas.clientWidth * dpr);
       const h = Math.round(canvas.clientHeight * dpr);
       if (!w || !h) return;
@@ -145,7 +152,8 @@ const rgba = ([r, g, b]: readonly number[], a: number) => `rgba(${r}, ${g}, ${b}
 const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean, lampX: number, lampY: number, phase: number) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Soft spots and a small ball: 1.5x is as sharp as they look.
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   if (!width || !height) return;
@@ -204,9 +212,13 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
   ctx.restore();
 };
 
-const STILL = "(prefers-reduced-motion: reduce)";
+/*
+ * Still when the system asks for reduced motion, or in forced colours,
+ * where stage.css hides the stage and a turning ball would only burn frames.
+ */
+const STILL = "(prefers-reduced-motion: reduce), (forced-colors: active)";
 
-/** Whether the system asks for reduced motion, followed live. */
+/** Whether the stage should keep still, followed live. */
 const usePrefersStill = () => {
   const query = () => (typeof window.matchMedia === "function" ? window.matchMedia(STILL) : null);
   const [still, setStill] = useState(() => query()?.matches ?? false);
@@ -274,7 +286,7 @@ export const Stage = () => {
     };
 
     // In Sparkle the pointer (or a finger) is the lamp. The stage's box is
-    // measured on resize, not on every pointer move.
+    // measured when it resizes (the ResizeObserver below), not per move.
     let box = root.getBoundingClientRect();
     let ball = measureBall(ballRef.current);
     const measure = () => {
@@ -292,7 +304,6 @@ export const Stage = () => {
     draw(performance.now());
     if (!still) {
       window.addEventListener("pointermove", point, { passive: true });
-      window.addEventListener("resize", measure);
       frame = requestAnimationFrame(tick);
     }
     const resized = typeof ResizeObserver === "function"
@@ -306,7 +317,6 @@ export const Stage = () => {
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", point);
-      window.removeEventListener("resize", measure);
       resized?.disconnect();
       sequinCanvas?.removeEventListener("webglcontextlost", lost);
       sequins?.release();

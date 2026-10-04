@@ -26,9 +26,9 @@
 .esc-app {
   container-type: inline-size;
   /*
-    Declared again here, not only on :root: a custom property resolves its
-    var()s where it is declared, so on :root it would keep the fallback
-    ball size instead of the one this screen measures.
+    The room the page header leaves for the ball, which hangs just above
+    it. Declared here, not on :root: a custom property resolves its var()s
+    where it is declared, so on :root it would keep the fallback ball size.
   */
   --esc-stage-clearance: calc(var(--esc-ball-size) + 0.5625rem);
 }

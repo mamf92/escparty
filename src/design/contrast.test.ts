@@ -52,7 +52,7 @@ const tile = (() => {
 })();
 
 // The brightest spot of the stage's gradient in either theme.
-const stage = brightest([...stops(calm, "--esc-screen"), ...stops(glam, "--esc-screen"), rgb(token("--esc-stage-top"))]);
+const stage = brightest([...stops(calm, "--esc-screen"), ...stops(glam, "--esc-screen")]);
 /*
  * Over that gradient Stage.tsx paints the ball's spots of light and, in
  * Sparkle, sequin highlights, which can be anything up to white. So a tile
@@ -116,7 +116,9 @@ describe("design token contrast", () => {
     }
     expectText(token("--esc-on-accent"), token("--esc-accent"), "a chosen label");
     expectText(token("--esc-on-accent-muted"), token("--esc-accent"), "a chosen sub line");
-    // The focus ring stays visible on the stage around a white button or a pink one.
+    // The focus ring stays visible on the stage around a white button or a pink one,
+    // and against the dark rings that frame it over a spot of light.
     expectText(token("--esc-focus"), token("--esc-bg"), "focus on the stage", 3);
+    expectText(token("--esc-focus"), halo, "focus against its dark rings", 3);
   });
 });

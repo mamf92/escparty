@@ -171,7 +171,7 @@
 .esc-app .lycra.is-chosen:active,
 .esc-app .lycra.is-selected,
 .esc-app .lycra.is-selected:hover,
-.esc-app .lycra.is-pressed,
+.esc-app .lycra.is-selected:active,
 .esc-app .lycra.is-static.is-chosen,
 .esc-app .lycra.is-static.is-chosen:hover,
 .esc-app .lycra.is-static.is-chosen:active {
@@ -268,11 +268,11 @@
   backdrop-filter: none;
 }
 
-.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):hover {
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):not([aria-disabled="true"]):hover {
   background: var(--esc-blush-hover);
 }
 
-.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):active {
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):not([aria-disabled="true"]):active {
   box-shadow: var(--esc-inset);
 }
 
@@ -311,7 +311,7 @@
 }
 
 /* On a card, unavailable is a flat blush face with faded ink. */
-.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:disabled:not(.is-chosen):not(.is-selected):not(.is-marked) {
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:is(:disabled, [aria-disabled="true"]):not(.is-chosen):not(.is-selected):not(.is-marked) {
   --esc-ink: var(--esc-card-ink-muted);
   color: var(--esc-ink);
   background: var(--esc-blush);

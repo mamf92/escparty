@@ -20,6 +20,14 @@ body {
   text-shadow: var(--esc-stage-text-shadow);
 }
 
+/*
+  Browsers reset text-shadow on form controls, so the links and the
+  switch on the stage (buttons that aren't surfaces) take the outline back.
+*/
+.esc-app :is(button, a):not(.lycra) {
+  text-shadow: inherit;
+}
+
 /* The page title: chrome, outside the surface, in the display face. */
 .esc-title {
   margin: 0;
@@ -77,9 +85,28 @@ body {
 }
 
 /* One focus ring everywhere, in the theme's focus colour. */
+/*
+  Focus: a pale pink ring with a dark ring either side of it, so it holds
+  3:1 wherever a spot of light lands. A plain element draws the dark rings
+  with its box-shadow; a surface keeps its own shadow and draws the outer
+  dark ring with ::after.
+*/
 .esc-app :focus-visible {
   outline: 2px solid var(--esc-focus);
   outline-offset: 3px;
+}
+
+.esc-app :focus-visible:not(.lycra):not(.lycra-field) {
+  box-shadow: 0 0 0 7px var(--esc-halo);
+}
+
+.esc-app .lycra:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 2px solid var(--esc-halo);
+  border-radius: calc(var(--esc-radius-control) + 7px);
+  pointer-events: none;
 }
 
 /*
