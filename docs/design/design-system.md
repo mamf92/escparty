@@ -80,7 +80,7 @@ land. Never set a text colour on a page.
 | Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
 | Disco ball | Hangs still, in muted pinks; soft spots on the stage | White and light pink, turning slowly; brighter spots sweep the stage **left to right** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
-| Stage text | As is | Keeps a soft dark shadow, for the moving stage behind it |
+| Stage text | A tight dark halo, for the spots of light behind it | A wider halo, for the sequins too |
 | Materials, sizes, states, copy | Identical | Identical |
 | Motion | The press only | The ball turns and the sequins shimmer, **only** when the system allows motion; with reduced motion it is one still frame |
 
@@ -92,7 +92,7 @@ is the CSS gradient alone (`--esc-screen`). The ball turns at
 `SPIN` (negative, so its facets and spots travel left to right, slowly
 enough to read as reflections, not snow).
 
-What a theme may change: `--esc-screen`, `--esc-stage-text-shadow`, and
+What a theme may change: `--esc-screen`, `--esc-stage-text-shadow` (never dropping the halo), and
 what `<Stage />` draws. `contrast.test.ts` fails if Sparkle sets any other
 token.
 
@@ -121,12 +121,12 @@ hex value, a font name, a shadow or a pixel size of their own.
 | `--esc-space-1` … `--esc-space-8` | 4px steps: 4, 8, 12, 16, 20, 24, 32 |
 | `--esc-radius-control` / `--esc-radius-field` / `--esc-radius-card` | 18px / 16px / 28px |
 | `--esc-target-min` | 52px: a control's and a field's minimum height |
-| `--esc-bg`, `--esc-screen`, `--esc-stage-top`, `--esc-stage-clearance` | The stage colour, what the screen paints, its brightest spot, and the room the header leaves for the ball |
+| `--esc-bg`, `--esc-screen`, `--esc-stage-top`, `--esc-stage-clearance` | The stage colour, what the screen paints, its brightest spot, and the room the header leaves for the ball (it grows with the ball, which is 24% of the stage's width) |
 | `--esc-backdrop`, `--esc-frame`, `--esc-bezel`, `--esc-home-bar`, `--esc-frame-glow` | Behind the phone, its body, bezel, home bar and shadow |
 | `--esc-ink`, `--esc-ink-muted`, `--esc-title`, `--esc-link`, `--esc-focus` | Ink on the stage (scoped: a card swaps them) |
 | `--esc-stage-ink*`, `--esc-stage-correct`, `--esc-stage-wrong` | The same stage ink by name, for dark surfaces inside a light scope |
 | `--esc-card*` | The card, its ink, label, focus, markers and lift |
-| `--esc-blush*`, `--esc-light`, `--esc-shade`, `--esc-raise*`, `--esc-inset*`, `--esc-well` | Inside a card: blush controls and wells, and Pearl's soft depth |
+| `--esc-blush*`, `--esc-light`, `--esc-shade`, `--esc-raise-sm`, `--esc-inset`, `--esc-well` | Inside a card: blush controls and wells, and Pearl's soft depth |
 | `--esc-button*`, `--esc-on-button` | The white action button |
 | `--esc-primary*`, `--esc-on-primary` | The black next-step button |
 | `--esc-tile*` | The dark tile: rest, hover, sunk, edge, press, blur, and a proud row's lift |
@@ -134,7 +134,7 @@ hex value, a font name, a shadow or a pixel size of their own.
 | `--esc-disabled`, `--esc-on-disabled` | Unavailable |
 | `--esc-correct`, `--esc-wrong` | The check and cross glyphs, nothing else |
 | `--esc-switch-on`, `--esc-on-switch`, `--esc-switch-ring` | The Sparkle mode switch |
-| `--esc-stage-text-shadow` | Stage text's shadow (Sparkle only) |
+| `--esc-halo`, `--esc-stage-text-shadow` | The dark halo around text on the stage, which keeps it readable over a spot of light (wider in Sparkle) |
 | `--esc-press` | The one transition: 120ms ease-out |
 
 There is no other palette: the styled-components theme (`theme.colors`)
@@ -292,9 +292,11 @@ controls live in the host's own tab or pane, never mixed into a guest's.
 
 ## 8. Accessibility (both themes)
 
-- **Contrast:** text 4.5:1 against what it sits on (the brightest spot of
-  the stage, a tile over it, a card, a white or blush button, the black
-  button and a chosen pink one); markers and the focus ring 3:1.
+- **Contrast:** text 4.5:1 against what it sits on (the stage's gradient,
+  a tile frosted over a white spot of light, a card, a white or blush
+  button, the black button and a chosen pink one); markers and the focus
+  ring 3:1. Text straight on the stage can have a spot of light behind it,
+  so it always carries the dark halo, and the halo holds the 4.5:1.
   `src/design/contrast.test.ts` checks the tokens. Disabled controls are
   solid, so the stage never shows through behind their label.
 - **Colour is never alone:** chosen is pink plus pressed in plus
@@ -307,9 +309,10 @@ controls live in the host's own tab or pane, never mixed into a guest's.
   replacing it.
 - **Motion:** nothing moves position, ever: a press is a shadow change.
   `prefers-reduced-motion: reduce` stops the ball, the sequins and every
-  transition. Sparkle without motion is still Sparkle: one still frame.
+  transition, and the stage follows the setting live. Sparkle without motion is still Sparkle: one still frame.
 - **More contrast:** with `prefers-contrast: more` every control and field
-  gets a visible edge and notes turn full white.
+  gets an edge in its own ink (dark on white, white on a tile) and notes
+  turn full ink.
 - **Forced colours:** in Windows High Contrast every control and field gets
   a real border and the stage is removed.
 - **Semantics:** one `<h1>` per screen, real `<button>`s for actions and

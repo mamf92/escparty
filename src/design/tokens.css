@@ -52,10 +52,14 @@
   */
   --esc-stage-top: #7a1356;
   --esc-bg: #3b0628;
-  --esc-surface: #3b0628;
   --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #7a1356 0%, #3b0628 72%);
-  /* Room the page header leaves for the ball hanging over it. */
-  --esc-stage-clearance: 6.75rem;
+  /*
+    Room the page header leaves for the ball hanging over it. The ball is
+    24% of the stage's width, from 84px to 200px (ballSize in Stage.tsx),
+    so the room grows with it; `cqw` is the stage's width (stage.css makes
+    `.esc-app` the container).
+  */
+  --esc-stage-clearance: calc(clamp(84px, 24cqw, 200px) + 0.5625rem);
 
   /* The desktop phone around the stage. */
   --esc-backdrop: #1a0612;
@@ -68,7 +72,6 @@
   --esc-ink: #ffffff;
   --esc-ink-muted: #fce3f1;
   --esc-title: #ffffff;
-  --esc-title-fill: none;
   --esc-link: #ffc2e0;
   --esc-focus: #ffc2e0;
   /* Check and cross on a dark tile. A card swaps in darker ones. */
@@ -105,10 +108,7 @@
   --esc-light: #ffffff;
   --esc-shade: rgba(150, 60, 110, 0.32);
   --esc-raise-sm: -3px -3px 8px var(--esc-light), 4px 4px 10px var(--esc-shade);
-  --esc-raise: -5px -5px 12px var(--esc-light), 6px 7px 14px var(--esc-shade);
-  --esc-raise-lg: -6px -6px 14px var(--esc-light), 8px 10px 20px var(--esc-shade);
   --esc-inset: inset 4px 5px 10px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
-  --esc-inset-sm: inset 2px 3px 6px var(--esc-shade), inset -2px -2px 6px var(--esc-light);
   --esc-well: inset 3px 4px 9px var(--esc-shade), inset -3px -3px 8px var(--esc-light);
 
   /* A white button on the stage: an action. */
@@ -139,20 +139,18 @@
   --esc-disabled: #2e1424;
   --esc-on-disabled: #c9a9bb;
 
-  /* Kept for the few rules that still name them: a control's face. */
-  --esc-face: var(--esc-button);
-  --esc-face-hover: var(--esc-button-hover);
-  --esc-face-pressed: var(--esc-blush);
-
   /* The Sparkle mode switch when on. */
   --esc-switch-on: #e0177e;
-  --esc-on-switch: #ffffff;
+  --esc-on-switch: #e0177e;
   --esc-switch-ring: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
-  /* The edge every control and field gets with prefers-contrast: more. */
-  --esc-contrast-edge: rgba(255, 255, 255, 0.6);
 
-  /* Stage text over a moving background keeps a soft shadow (Sparkle). */
-  --esc-stage-text-shadow: none;
+  /*
+    Stage text sits over the ball's spots of light, so it keeps a tight dark
+    halo that holds its contrast wherever a spot lands (contrast.test.ts).
+    Sparkle widens it for the sequins.
+  */
+  --esc-halo: #1e0014;
+  --esc-stage-text-shadow: 0 0 2px var(--esc-halo), 0 0 4px var(--esc-halo);
 
   --esc-press: 120ms ease-out;
 
@@ -166,5 +164,5 @@
 */
 :root[data-theme="sparkle"] {
   --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #8e0f5f 0%, #3b0628 72%);
-  --esc-stage-text-shadow: 0 1px 8px rgba(30, 0, 20, 0.95), 0 0 2px rgba(30, 0, 20, 1);
+  --esc-stage-text-shadow: 0 0 2px var(--esc-halo), 0 0 4px var(--esc-halo), 0 1px 8px var(--esc-halo);
 }

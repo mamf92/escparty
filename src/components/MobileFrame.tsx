@@ -124,7 +124,7 @@ const Brand = styled.span`
   min-height: 44px;
   font-family: var(--esc-font-display);
   font-size: var(--esc-text-control);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: var(--esc-title-tracking);
   text-transform: uppercase;
   color: var(--esc-title);

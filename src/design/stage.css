@@ -22,9 +22,9 @@
   display: block;
 }
 
-/* The sequins stay a backdrop: dimmed, so stage text reads over them. */
-.esc-stage > .esc-stage-sequins {
-  filter: brightness(0.62);
+/* The screen is the container the ball (and the header's room for it) is sized by. */
+.esc-app {
+  container-type: inline-size;
 }
 
 /* The page header leaves room for the ball hanging over it. */
@@ -32,7 +32,7 @@
   padding-top: var(--esc-stage-clearance);
 }
 
-/* A TV's ball is bigger, so its header drops further. */
+/* A TV's header sits lower, under its own bar: give the largest ball room. */
 .esc-app .calm-page.calm-screen {
   --esc-stage-clearance: 13rem;
 }

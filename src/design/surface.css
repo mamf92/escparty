@@ -86,7 +86,7 @@
 
 /* The button: white on the stage, an action. */
 .esc-app .lycra {
-  --esc-ink: var(--esc-card-ink);
+  --esc-ink: var(--esc-on-button);
   --esc-ink-muted: var(--esc-card-ink-muted);
   --esc-correct: var(--esc-card-correct);
   --esc-wrong: var(--esc-card-wrong);

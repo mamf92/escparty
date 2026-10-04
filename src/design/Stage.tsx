@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BALL_GRID,
   CALM_BALL,
@@ -67,10 +67,15 @@ void main(){
     col*=mix(.6,1.,smoothstep(.04,.1,rr));
   }
   col=col/(1.+col*.4);
-  gl_FragColor=vec4(pow(col,vec3(.95)),1.);
+  // Dimmed to a backdrop, so stage text reads over the brightest sequin.
+  gl_FragColor=vec4(pow(col,vec3(.95))*.62,1.);
 }`;
 
-type Sequins = { draw: (time: number, lampX: number, lampY: number) => void };
+type Sequins = {
+  draw: (time: number, lampX: number, lampY: number) => void;
+  /** Hand the WebGL context back, so switching themes never piles them up. */
+  release: () => void;
+};
 
 /** The sequin floor, or null where WebGL isn't there. */
 const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
@@ -101,7 +106,9 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
   const [ur, ut, um, us] = [u("r"), u("t"), u("m"), u("s")];
 
   return {
+    release: () => gl.getExtension("WEBGL_lose_context")?.loseContext(),
     draw: (time, lampX, lampY) => {
+      if (gl.isContextLost()) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       const w = Math.round(canvas.clientWidth * dpr);
       const h = Math.round(canvas.clientHeight * dpr);
@@ -187,14 +194,27 @@ const paintLights = (canvas: HTMLCanvasElement, sparkle: boolean, lampX: number,
   ctx.restore();
 };
 
-const prefersStill = () =>
-  typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const STILL = "(prefers-reduced-motion: reduce)";
+
+/** Whether the system asks for reduced motion, followed live. */
+const usePrefersStill = () => {
+  const query = () => (typeof window.matchMedia === "function" ? window.matchMedia(STILL) : null);
+  const [still, setStill] = useState(() => query()?.matches ?? false);
+  useEffect(() => {
+    const media = query();
+    if (!media) return;
+    const changed = () => setStill(media.matches);
+    media.addEventListener?.("change", changed);
+    return () => media.removeEventListener?.("change", changed);
+  }, []);
+  return still;
+};
 
 export const Stage = () => {
   const { theme } = useDesignTheme();
   const sparkle = theme === "sparkle";
+  const reduced = usePrefersStill();
   const rootRef = useRef<HTMLDivElement>(null);
-  const sequinsRef = useRef<HTMLCanvasElement>(null);
   const lightsRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -202,8 +222,21 @@ export const Stage = () => {
     const lights = lightsRef.current;
     if (!root || !lights) return;
 
-    const still = !sparkle || prefersStill();
-    const sequins = sparkle && sequinsRef.current ? sequinFloor(sequinsRef.current) : null;
+    const still = !sparkle || reduced;
+    // A fresh canvas for every run: a released WebGL context can't be
+    // reused, and React may run this effect twice on one mount.
+    const sequinCanvas = sparkle ? document.createElement("canvas") : null;
+    if (sequinCanvas) {
+      sequinCanvas.className = "esc-stage-sequins";
+      root.insertBefore(sequinCanvas, lights);
+    }
+    let sequins = sequinCanvas ? sequinFloor(sequinCanvas) : null;
+    // A lost context (the GPU reset, too many tabs) leaves the CSS stage.
+    const lost = () => {
+      sequins = null;
+      if (sequinCanvas) sequinCanvas.style.display = "none";
+    };
+    sequinCanvas?.addEventListener("webglcontextlost", lost);
     let lamp: { x: number; y: number } = RESTING_LIGHT;
     let phase = 0.4;
     let last = performance.now();
@@ -224,9 +257,13 @@ export const Stage = () => {
       draw(now);
     };
 
-    // In Sparkle the pointer (or a finger) is the lamp.
+    // In Sparkle the pointer (or a finger) is the lamp. The stage's box is
+    // measured on resize, not on every pointer move.
+    let box = root.getBoundingClientRect();
+    const measure = () => {
+      box = root.getBoundingClientRect();
+    };
     const point = (event: PointerEvent) => {
-      const box = root.getBoundingClientRect();
       if (!box.width || !box.height) return;
       lamp = {
         x: Math.min(1, Math.max(-1, ((event.clientX - box.left) / box.width) * 2 - 1)),
@@ -237,21 +274,31 @@ export const Stage = () => {
     draw(performance.now());
     if (!still) {
       window.addEventListener("pointermove", point, { passive: true });
+      window.addEventListener("resize", measure);
       frame = requestAnimationFrame(tick);
     }
-    const resized = typeof ResizeObserver === "function" ? new ResizeObserver(() => draw(performance.now())) : null;
+    const resized = typeof ResizeObserver === "function"
+      ? new ResizeObserver(() => {
+          measure();
+          draw(performance.now());
+        })
+      : null;
     resized?.observe(root);
 
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", point);
+      window.removeEventListener("resize", measure);
       resized?.disconnect();
+      sequinCanvas?.removeEventListener("webglcontextlost", lost);
+      sequins?.release();
+      sequinCanvas?.remove();
     };
-  }, [sparkle]);
+  }, [sparkle, reduced]);
 
   return (
     <div ref={rootRef} className="esc-stage" aria-hidden="true">
-      {sparkle && <canvas ref={sequinsRef} className="esc-stage-sequins" />}
+      {/* In Sparkle the effect puts the sequin canvas here, before the lights. */}
       <canvas ref={lightsRef} className="esc-stage-lights" />
     </div>
   );

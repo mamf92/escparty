@@ -116,7 +116,8 @@ body {
 @media (prefers-contrast: more) {
   .esc-app .lycra,
   .esc-app .lycra-field {
-    outline: 1px solid var(--esc-contrast-edge);
+    /* In the control's own ink: dark on white and blush, white on a tile. */
+    outline: 1px solid currentColor;
     outline-offset: -1px;
   }
 
@@ -170,6 +171,7 @@ body {
   font-size: 10px;
   line-height: 1;
   color: transparent;
+  text-shadow: none;
   background: var(--esc-button);
   box-shadow: none;
   transition: transform var(--esc-press);

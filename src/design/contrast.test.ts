@@ -51,10 +51,16 @@ const tile = (() => {
   return { colour: [+m[1], +m[2], +m[3]] as Rgb, alpha: +m[4] };
 })();
 
-// The brightest spot of the stage in either theme: where text is hardest to read.
+// The brightest spot of the stage's gradient in either theme.
 const stage = brightest([...stops(calm, "--esc-screen"), ...stops(glam, "--esc-screen"), rgb(token("--esc-stage-top"))]);
-// A dark tile, frosted over that brightest spot.
-const darkTile = over(tile.colour, tile.alpha, stage);
+/*
+ * Over that gradient Stage.tsx paints the ball's spots of light and, in
+ * Sparkle, sequin highlights, which can be anything up to white. So a tile
+ * is checked frosted over white, and text straight on the stage leans on
+ * its dark halo (`--esc-stage-text-shadow`) wherever a spot lands.
+ */
+const darkTile = over(tile.colour, tile.alpha, [255, 255, 255]);
+const halo = token("--esc-halo");
 
 const expectText = (fg: Rgb | string, bg: Rgb | string, label: string, floor = 4.5) => {
   const a = typeof fg === "string" ? rgb(fg) : fg;
@@ -68,14 +74,23 @@ describe("design token contrast", () => {
     expect(names.sort()).toEqual(["--esc-screen", "--esc-stage-text-shadow"]);
   });
 
-  it("stage text holds 4.5:1 on the brightest spot of the stage, and on a dark tile", () => {
+  it("stage text holds 4.5:1 on the stage, in its halo over a spot of light, and on a tile over one", () => {
     for (const name of ["--esc-ink", "--esc-ink-muted", "--esc-stage-ink", "--esc-stage-ink-muted", "--esc-title", "--esc-link"]) {
       expectText(token(name), stage, `${name} on the stage`);
+      expectText(token(name), halo, `${name} in its halo`);
       expectText(token(name), darkTile, `${name} on a tile`);
     }
     for (const name of ["--esc-focus", "--esc-correct", "--esc-wrong", "--esc-stage-correct", "--esc-stage-wrong"]) {
       expectText(token(name), stage, `${name} on the stage`, 3);
       expectText(token(name), darkTile, `${name} on a tile`, 3);
+    }
+  });
+
+  it("stage text keeps its halo in both themes", () => {
+    for (const css of [calm, glam]) {
+      const start = css.indexOf("--esc-stage-text-shadow:");
+      const shadow = css.slice(start, css.indexOf(";", start));
+      expect(shadow).toMatch(/0 0 2px var\(--esc-halo\)/);
     }
   });
 
