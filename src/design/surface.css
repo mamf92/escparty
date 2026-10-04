@@ -75,6 +75,7 @@
   --esc-focus: var(--esc-card-focus);
   --esc-correct: var(--esc-card-correct);
   --esc-wrong: var(--esc-card-wrong);
+  --esc-label: var(--esc-card-label);
   --esc-pane-gap: var(--esc-space-4);
   padding: var(--esc-space-5);
   border-radius: var(--esc-radius-card);
@@ -136,11 +137,22 @@
   --esc-ink-muted: var(--esc-stage-ink-muted);
   --esc-correct: var(--esc-stage-correct);
   --esc-wrong: var(--esc-stage-wrong);
+  --esc-label: var(--esc-ink-muted);
   font-weight: 500;
   background: var(--esc-tile);
   box-shadow: var(--esc-tile-edge);
   -webkit-backdrop-filter: var(--esc-tile-blur);
   backdrop-filter: var(--esc-tile-blur);
+}
+
+/*
+  Rows of information can come in long ladders over a stage that repaints
+  every frame in Sparkle: they skip the frosting, which would re-blur each
+  row's backdrop on every frame. Their tile is dark enough without it.
+*/
+.esc-app .lycra.is-static {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):hover:where(:not(:disabled)) {
@@ -179,6 +191,7 @@
   --esc-ink-muted: var(--esc-on-accent-muted);
   --esc-correct: var(--esc-on-accent);
   --esc-wrong: var(--esc-on-accent);
+  --esc-label: var(--esc-on-accent-muted);
   transform: none;
   color: var(--esc-ink);
   background: var(--esc-accent);
@@ -201,6 +214,7 @@
   --esc-ink-muted: var(--esc-stage-ink-muted);
   --esc-correct: var(--esc-stage-correct);
   --esc-wrong: var(--esc-stage-wrong);
+  --esc-label: var(--esc-stage-ink-muted);
   font-family: var(--esc-font-display);
   font-weight: 400;
   letter-spacing: 0.03em;
@@ -270,14 +284,22 @@
   background: var(--esc-blush-hover);
 }
 
-.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):active,
-.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra.is-low {
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):active {
+  box-shadow: var(--esc-inset);
+}
+
+/* Sunk in a card (the bottom of a ladder, a wrong pick): blush, pressed in. */
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra.is-low:not(.is-chosen):not(.is-selected):not(.is-high) {
+  background: var(--esc-blush);
   box-shadow: var(--esc-inset);
 }
 
 .esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra.is-static.is-high {
   --esc-ink: var(--esc-on-primary);
   --esc-ink-muted: var(--esc-stage-ink-muted);
+  --esc-correct: var(--esc-stage-correct);
+  --esc-wrong: var(--esc-stage-wrong);
+  --esc-label: var(--esc-stage-ink-muted);
   background: var(--esc-primary);
   box-shadow: var(--esc-primary-lift);
 }
@@ -390,12 +412,8 @@
   margin-bottom: var(--esc-space-2);
   font-size: var(--esc-text-sub);
   font-weight: 700;
-  color: var(--esc-ink-muted);
+  color: var(--esc-label, var(--esc-ink-muted));
   opacity: 1;
-}
-
-.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .calm-label {
-  color: var(--esc-card-label);
 }
 
 /*

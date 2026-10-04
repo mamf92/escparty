@@ -88,14 +88,20 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
     gl.compileShader(s);
     return s;
   };
+  // Hand back a context the shader can't run on (no highp, say), so the
+  // caller falls back to the CSS stage without holding one open.
+  const fail = () => {
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return null;
+  };
   const program = gl.createProgram();
   const vertex = shader(gl.VERTEX_SHADER, "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}");
   const fragment = shader(gl.FRAGMENT_SHADER, SEQUINS);
-  if (!program || !vertex || !fragment) return null;
+  if (!program || !vertex || !fragment) return fail();
   gl.attachShader(program, vertex);
   gl.attachShader(program, fragment);
   gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return fail();
   gl.useProgram(program);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
@@ -231,6 +237,9 @@ export const Stage = () => {
       root.insertBefore(sequinCanvas, lights);
     }
     let sequins = sequinCanvas ? sequinFloor(sequinCanvas) : null;
+    // No sequins (no WebGL, or a shader the GPU can't run): the CSS stage
+    // shows through, never an opaque, empty canvas.
+    if (sequinCanvas && !sequins) sequinCanvas.style.display = "none";
     // A lost context (the GPU reset, too many tabs) leaves the CSS stage.
     const lost = () => {
       sequins = null;
@@ -250,7 +259,8 @@ export const Stage = () => {
 
     const tick = (now: number) => {
       frame = requestAnimationFrame(tick);
-      if (now - drawn < 1000 / FPS) return;
+      // A little slack, so a 60Hz display's every other frame always counts.
+      if (now - drawn < 1000 / FPS - 4) return;
       phase = (phase + SPIN * ((now - last) / 1000) + Math.PI * 2) % (Math.PI * 2);
       last = now;
       drawn = now;

@@ -42,4 +42,14 @@ describe("the disco ball", () => {
     expect(mean).toBeGreaterThan(0);
     expect(mean).toBeLessThan(0.05);
   });
+
+  it("comes round to the same pattern after a full turn, instead of reshuffling", () => {
+    const phase = 0.0005;
+    const turned = phase + Math.PI * 2;
+    expect(ballCells(SPARKLE_BALL, lamp, turned)).toEqual(ballCells(SPARKLE_BALL, lamp, phase));
+    const before = ballSpots(SPARKLE_BALL, lamp, phase, 0.1);
+    const after = ballSpots(SPARKLE_BALL, lamp, turned, 0.1);
+    expect(after.length).toBe(before.length);
+    after.forEach((spot, i) => expect(spot.x).toBeCloseTo(before[i].x, 6));
+  });
 });

@@ -55,8 +55,13 @@ export const SPARKLE_BALL: BallLook = {
 
 /** The facets per row and column the ball is painted at. */
 export const BALL_GRID = 24;
-/** A facet's angular size, in radians. */
-const FACET = 0.27;
+/**
+ * The facets around the ball's equator, and so a facet's angular size: a
+ * whole number of them fits a full turn, so the ball's pattern lines up
+ * again each time it comes round instead of reshuffling.
+ */
+const AROUND = 24;
+const FACET = (Math.PI * 2) / AROUND;
 /**
  * How fast the ball turns, in radians a second. Negative, so its front
  * moves left to right and the spots sweep the room the same way.
@@ -88,7 +93,8 @@ const facet = (latitude: number, longitude: number, phase: number) => {
   const o = (column + 0.5) * FACET - phase;
   return {
     normal: [Math.cos(a) * Math.sin(o), Math.sin(a), Math.cos(a) * Math.cos(o)] as Vec,
-    key: hash(row, column),
+    // The column counted around the ball, so a full turn is the same facet.
+    key: hash(row, ((column % AROUND) + AROUND) % AROUND),
   };
 };
 
