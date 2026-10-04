@@ -367,7 +367,7 @@ const MultiplayerLobby = () => {
                     <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
                   </>
                 ) : (
-                  <Control type="submit" disabled={loading} onClick={remember}>Join the game</Control>
+                  <Control type="submit" elevation="high" disabled={loading} onClick={remember}>Join the game</Control>
                 )}
               </Pane>
             </Ground>

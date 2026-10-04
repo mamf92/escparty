@@ -19,7 +19,7 @@ import PartyRoom from "./pages/PartyRoom";
 import PartyScreen from "./pages/PartyScreen";
 import PartyAwards from "./pages/PartyAwards";
 import MobileFrame from "./components/MobileFrame";
-import { DesignThemeProvider, Sparkles, ThemeSwitch } from "./design";
+import { DesignThemeProvider, Stage, ThemeSwitch } from "./design";
 
 // Lazy so that three, react-three-fiber and leva stay out of the app's main
 // bundle. Only the demo route pays for them.
@@ -38,7 +38,7 @@ const FramedLayout = () => (
 // switch, so the host can put the TV in Sparkle too.
 const TvLayout = ({ children }: { children: ReactNode }) => (
   <TvScreen className="esc-app">
-    <Sparkles />
+    <Stage />
     <TvScroll>
       <TvBar><ThemeSwitch /></TvBar>
       {children}
@@ -46,7 +46,7 @@ const TvLayout = ({ children }: { children: ReactNode }) => (
   </TvScreen>
 );
 
-// The stars stay put behind the content, which scrolls over them.
+// The stage stays put behind the content, which scrolls over it.
 const TvScreen = styled.div`
   position: fixed;
   inset: 0;

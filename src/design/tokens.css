@@ -2,31 +2,35 @@
   ESCParty design tokens — the one place a colour, font, size, radius or
   shadow is decided. Rules: docs/design/design-system.md.
 
-  The language is modern soft neumorphism: one background colour, and
-  every surface is made of that same colour, lifted out of it or pressed
-  into it by a pair of soft shadows (light from the top left, shade to the
-  bottom right). Nothing has a border or a frame.
+  The language is "Bobby Socks": white, black and pink sequins on a dark
+  pink stage, after Norway's 1985 winners. Every screen is the same stage
+  with a disco ball hanging over it; forms sit on white cards, choices are
+  dark tiles that turn hot pink when picked, actions are white buttons, and
+  the screen's next step is the one black button.
 
-  The two themes set the same variables to different values, and that is
-  the only way they differ:
+  The two themes share every token but the stage itself:
 
-    :root / [data-theme="calm"]   Calm, the accessible default
-    [data-theme="sparkle"]        Sparkle, the opt-in sequins-and-glitter skin
+    :root / [data-theme="calm"]   Calm: a still ball in muted pinks
+    [data-theme="sparkle"]        Sparkle: pink sequins and a turning ball
+
+  A card is a token scope: surface.css sets the card's own ink, label,
+  focus and marker colours on `.lycra-pane.is-card`, so everything inside
+  reads `--esc-ink` and gets the dark ink without knowing it is on a card.
 */
 
 :root,
 :root[data-theme="calm"] {
   /* Type. Two families, loaded in index.html. */
-  --esc-font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
-  --esc-font-body: "Open Sans", "Segoe UI", system-ui, sans-serif;
+  --esc-font-display: "Righteous", "Segoe UI", system-ui, sans-serif;
+  --esc-font-body: "DM Sans", "Segoe UI", system-ui, sans-serif;
 
-  --esc-text-display: 2rem;
-  --esc-text-title: 1.5rem;
-  --esc-text-heading: 1.0625rem;
+  --esc-text-display: 2.5rem;
+  --esc-text-title: 2.25rem;
+  --esc-text-heading: 1.25rem;
   --esc-text-control: 1rem;
-  --esc-text-body: 0.9375rem;
-  --esc-text-sub: 0.8125rem;
-  --esc-title-tracking: 0.04em;
+  --esc-text-body: 1rem;
+  --esc-text-sub: 0.875rem;
+  --esc-title-tracking: 0.01em;
 
   /* Space, on a 4px step. */
   --esc-space-1: 0.25rem;
@@ -37,115 +41,130 @@
   --esc-space-6: 1.5rem;
   --esc-space-8: 2rem;
 
-  --esc-radius-control: 16px;
-  --esc-radius-field: 14px;
-  --esc-radius-card: 24px;
+  --esc-radius-control: 18px;
+  --esc-radius-field: 16px;
+  --esc-radius-card: 28px;
   --esc-target-min: 52px;
 
-  /* Colour. One background; surfaces are the same colour. */
-  --esc-bg: #2a2142;
-  --esc-surface: #2a2142;
-  --esc-backdrop: #1d1630;
-  --esc-frame: #141018;
-  --esc-bezel: #0d0a10;
-  /* The desktop phone frame's home bar, under the screen. */
-  --esc-home-bar: #333333;
-  /* The shadow the desktop phone frame casts on the backdrop. */
-  --esc-frame-glow: rgba(0, 0, 0, 0.5);
-  /* The Sparkle mode switch when on: a gold coin, in either theme. */
-  --esc-switch-on: radial-gradient(circle at 35% 30%, #fff3c4, #ffc93c 55%, #b07a12);
-  --esc-on-switch: #2a1600;
-  --esc-ink: #f1ecf7;
-  --esc-ink-muted: #c3b8d6;
-  --esc-accent: #f2a7dc;
-  --esc-on-accent: #2a1230;
-  --esc-title: #f1ecf7;
-  --esc-title-fill: none;
-  --esc-link: #f2a7dc;
-  --esc-focus: #f2a7dc;
-  --esc-correct: #5ad48a;
-  --esc-wrong: #ff7b86;
-
-  /* The page behind the content: the same flat colour. */
-  --esc-screen: var(--esc-bg);
-
   /*
-    Elevation: a light and a dark shadow, offset the same distance in
-    opposite directions. Raised surfaces cast them outwards, pressed ones
-    hold them inside.
+    The stage: dark pink, brightest under the ball. `--esc-stage-top` is
+    the brightest spot, the one contrast.test.ts holds stage text against.
   */
-  --esc-light: rgba(255, 255, 255, 0.085);
-  --esc-shade: rgba(10, 5, 22, 0.6);
-  --esc-raise-sm: -3px -3px 8px var(--esc-light), 3px 3px 8px var(--esc-shade);
-  --esc-raise: -5px -5px 14px var(--esc-light), 5px 5px 14px var(--esc-shade);
-  --esc-raise-lg: -8px -8px 22px var(--esc-light), 9px 9px 24px var(--esc-shade);
-  --esc-inset: inset 5px 5px 12px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
-  --esc-inset-sm: inset 2px 2px 6px var(--esc-shade), inset -2px -2px 6px var(--esc-light);
-  /* A field's well: pressed in like chosen, but never with chosen's glow. */
-  --esc-well: inset 5px 5px 12px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
+  --esc-stage-top: #7a1356;
+  --esc-bg: #3b0628;
+  --esc-surface: #3b0628;
+  --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #7a1356 0%, #3b0628 72%);
+  /* Room the page header leaves for the ball hanging over it. */
+  --esc-stage-clearance: 6.75rem;
 
-  /* A surface's face: flat, the background colour. */
-  --esc-face: var(--esc-surface);
-  --esc-face-hover: #2e2548;
-  --esc-face-pressed: #272040;
+  /* The desktop phone around the stage. */
+  --esc-backdrop: #1a0612;
+  --esc-frame: #0b0408;
+  --esc-bezel: #000000;
+  --esc-home-bar: #333333;
+  --esc-frame-glow: rgba(0, 0, 0, 0.5);
+
+  /* Ink on the stage. */
+  --esc-ink: #ffffff;
+  --esc-ink-muted: #fce3f1;
+  --esc-title: #ffffff;
+  --esc-title-fill: none;
+  --esc-link: #ffc2e0;
+  --esc-focus: #ffc2e0;
+  /* Check and cross on a dark tile. A card swaps in darker ones. */
+  --esc-correct: #6be39a;
+  --esc-wrong: #ff8a95;
+  /*
+    The same stage ink under its own name, for the dark surfaces (a tile,
+    the black button) to set back after a card or a white button changed
+    --esc-ink around them.
+  */
+  --esc-stage-ink: #ffffff;
+  --esc-stage-ink-muted: #fce3f1;
+  --esc-stage-correct: #6be39a;
+  --esc-stage-wrong: #ff8a95;
+
+  /* The one accent: what is chosen, set in white. */
+  --esc-accent: #e0177e;
+  --esc-on-accent: #ffffff;
+  --esc-on-accent-muted: #ffffff;
+  --esc-accent-press: inset 0 3px 8px rgba(90, 0, 45, 0.45);
+
+  /* A white card, and its ink (applied as a scope by surface.css). */
+  --esc-card: #ffffff;
+  --esc-card-ink: #140810;
+  --esc-card-ink-muted: #6a3a58;
+  --esc-card-label: #a30a58;
+  --esc-card-focus: #c2106e;
+  --esc-card-correct: #0f6a36;
+  --esc-card-wrong: #b3122a;
+  --esc-card-lift: 0 24px 44px rgba(15, 0, 10, 0.5);
+  /* Inside a card: blush controls and wells, with Pearl's soft depth. */
+  --esc-blush: #f6e2ee;
+  --esc-blush-hover: #f1d3e4;
+  --esc-light: #ffffff;
+  --esc-shade: rgba(150, 60, 110, 0.32);
+  --esc-raise-sm: -3px -3px 8px var(--esc-light), 4px 4px 10px var(--esc-shade);
+  --esc-raise: -5px -5px 12px var(--esc-light), 6px 7px 14px var(--esc-shade);
+  --esc-raise-lg: -6px -6px 14px var(--esc-light), 8px 10px 20px var(--esc-shade);
+  --esc-inset: inset 4px 5px 10px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
+  --esc-inset-sm: inset 2px 3px 6px var(--esc-shade), inset -2px -2px 6px var(--esc-light);
+  --esc-well: inset 3px 4px 9px var(--esc-shade), inset -3px -3px 8px var(--esc-light);
+
+  /* A white button on the stage: an action. */
+  --esc-button: #ffffff;
+  --esc-button-hover: #fcedf5;
+  --esc-on-button: #140810;
+  --esc-button-lift: 0 8px 18px rgba(15, 0, 10, 0.4);
+  --esc-button-press: inset 0 3px 8px rgba(120, 30, 80, 0.3);
+
+  /* The black button: the screen's next step. */
+  --esc-primary: #140810;
+  --esc-primary-hover: #2a1420;
+  --esc-on-primary: #ffffff;
+  --esc-primary-lift: 0 14px 30px rgba(15, 0, 10, 0.55), inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+  --esc-primary-press: inset 0 4px 10px rgba(0, 0, 0, 0.8);
+
+  /* A dark tile on the stage: a choice, or a row of information. */
+  --esc-tile: rgba(40, 2, 26, 0.72);
+  --esc-tile-hover: rgba(64, 6, 42, 0.8);
+  --esc-tile-sunk: rgba(18, 0, 12, 0.82);
+  --esc-tile-edge: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --esc-tile-press: inset 0 3px 8px rgba(0, 0, 0, 0.5);
+  --esc-tile-blur: blur(10px);
+  /* A picked tile turns hot pink, and stands out. */
+  --esc-tile-chosen-lift: 0 10px 24px rgba(15, 0, 10, 0.5);
+
+  /* Unavailable: solid, so it never shows the stage through it. */
+  --esc-disabled: #2e1424;
+  --esc-on-disabled: #c9a9bb;
+
+  /* Kept for the few rules that still name them: a control's face. */
+  --esc-face: var(--esc-button);
+  --esc-face-hover: var(--esc-button-hover);
+  --esc-face-pressed: var(--esc-blush);
+
+  /* The Sparkle mode switch when on. */
+  --esc-switch-on: #e0177e;
+  --esc-on-switch: #ffffff;
+  --esc-switch-ring: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+  /* The edge every control and field gets with prefers-contrast: more. */
+  --esc-contrast-edge: rgba(255, 255, 255, 0.6);
+
+  /* Stage text over a moving background keeps a soft shadow (Sparkle). */
+  --esc-stage-text-shadow: none;
 
   --esc-press: 120ms ease-out;
 
   color-scheme: dark;
 }
 
+/*
+  Sparkle: the same cards, buttons and tiles. Only the stage changes: pink
+  sequins (Stage.tsx draws them in WebGL; this gradient is what shows
+  without it) and a turning disco ball, so stage text keeps a shadow.
+*/
 :root[data-theme="sparkle"] {
-  --esc-title-tracking: 0.1em;
-
-  --esc-bg: #240a33;
-  --esc-surface: #2c0d3e;
-  --esc-backdrop: #10040f;
-  --esc-frame: #1a0f1f;
-  --esc-ink: #fff7fb;
-  --esc-ink-muted: #ffeef8;
-  --esc-accent: #ffd86b;
-  --esc-on-accent: #2a1600;
-  --esc-title: #ffd86b;
-  --esc-title-fill: linear-gradient(100deg, #fff3c4 0%, #ffd86b 22%, #c9952b 45%, #fff3c4 58%, #ffc93c 78%, #fff3c4 100%);
-  --esc-link: #ffd86b;
-  --esc-focus: #ffd86b;
-  --esc-correct: #5ee69a;
-  --esc-wrong: #ff7b8a;
-
-  /* The stage: a flat plum floor under spotlights and a fine glitter. */
-  --esc-screen:
-    radial-gradient(circle at 50% 50%, rgba(255, 236, 170, 0.24) 0 0.8px, transparent 1.4px) 0 0 / 23px 23px,
-    radial-gradient(circle at 50% 50%, rgba(255, 140, 210, 0.26) 0 0.8px, transparent 1.4px) 11px 7px / 31px 31px,
-    radial-gradient(circle at 50% 50%, rgba(160, 240, 255, 0.3) 0 0.7px, transparent 1.3px) 5px 17px / 41px 41px,
-    radial-gradient(120% 40% at 50% -6%, rgba(255, 31, 143, 0.35) 0%, transparent 62%),
-    radial-gradient(70% 30% at 0% 55%, rgba(255, 201, 60, 0.12) 0%, transparent 65%),
-    radial-gradient(70% 30% at 100% 85%, rgba(45, 226, 230, 0.1) 0%, transparent 65%),
-    #240a33;
-
-  --esc-light: rgba(255, 150, 215, 0.12);
-  --esc-shade: rgba(6, 0, 10, 0.65);
-
-  /* The same lift, with stage light catching the sequins. */
-  --esc-raise: -5px -5px 14px var(--esc-light), 5px 5px 14px var(--esc-shade), 0 0 18px rgba(255, 31, 143, 0.28);
-  --esc-raise-lg: -8px -8px 22px var(--esc-light), 9px 9px 24px var(--esc-shade), 0 0 26px rgba(255, 201, 60, 0.4);
-  --esc-inset: inset 4px 4px 10px var(--esc-shade), inset -4px -4px 10px var(--esc-light), 0 0 14px rgba(255, 201, 60, 0.35);
-  --esc-well: inset 4px 4px 10px var(--esc-shade), inset -4px -4px 10px var(--esc-light);
-
-  /*
-    Sequins: two offset dot lattices over a magenta sheet. Kept dark enough
-    that the label holds 4.5:1 over the brightest sequin (contrast.test.ts).
-  */
-  --esc-face:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.3) 0 1.1px, transparent 1.6px) 0 0 / 7px 7px,
-    radial-gradient(circle at 50% 50%, rgba(255, 196, 236, 0.22) 0 1.1px, transparent 1.6px) 3.5px 3.5px / 7px 7px,
-    linear-gradient(135deg, #760c52 0%, #560944 52%, #6a0e5a 100%);
-  --esc-face-hover:
-    radial-gradient(circle at 50% 50%, rgba(255, 236, 170, 0.3) 0 1.1px, transparent 1.6px) 0 0 / 7px 7px,
-    radial-gradient(circle at 50% 50%, rgba(255, 196, 236, 0.24) 0 1.1px, transparent 1.6px) 3.5px 3.5px / 7px 7px,
-    linear-gradient(135deg, #7e0d58 0%, #5c0a48 52%, #721062 100%);
-  /* Pressed and chosen: the sequins flip to their dark gold side. */
-  --esc-face-pressed:
-    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.28) 0 1.1px, transparent 1.6px) 0 0 / 7px 7px,
-    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.16) 0 1.1px, transparent 1.6px) 3.5px 3.5px / 7px 7px,
-    linear-gradient(135deg, #3d2405 0%, #24140a 60%, #3a2008 100%);
+  --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #8e0f5f 0%, #3b0628 72%);
+  --esc-stage-text-shadow: 0 1px 8px rgba(30, 0, 20, 0.95), 0 0 2px rgba(30, 0, 20, 1);
 }

@@ -4,7 +4,7 @@ import { Control, Ground, Pane } from "../design";
 
 /*
  * The error states every scoreboard party screen shares (#178,
- * docs/design/design-system.md section 6): what happened in a note, then a
+ * docs/design/design-system.md, "States"): what happened in a note, then a
  * control for the way out.
  */
 

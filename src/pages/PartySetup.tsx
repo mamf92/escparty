@@ -231,7 +231,7 @@ const PartySetup = () => {
                         </div>
                         {/* Beside Start, where the tap was; the fields it's about point here. */}
                         {sheetProblemShown && <CalmNote id={`${ids}-sheet-problem`} role="alert">{sheetProblems.join(" ")}</CalmNote>}
-                        <Control type="submit" disabled={creating}>
+                        <Control type="submit" elevation="high" disabled={creating}>
                             {creating ? "Starting…" : "Start the party"}
                         </Control>
                     </Pane>

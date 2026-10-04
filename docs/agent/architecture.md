@@ -207,16 +207,17 @@ the local emulator only when `isDevelopmentEnvironment()` is true **and**
 ## `src/design/`
 
 The design system (rules: `docs/design/design-system.md`). `tokens.css`
-holds every colour, font, size, radius, face and shadow per theme
-(`data-theme` on `<html>`); `surface.css` draws the frameless neumorphic
-surface classes from them; `sparkle.css` is Sparkle's decoration (glint,
-stars);
+holds every colour, font, size, radius, material and shadow (Sparkle,
+via `data-theme` on `<html>`, only changes the stage); `surface.css` draws
+the surface classes as cards, buttons, tiles and the black next step;
+`stage.css` places the stage behind the page;
 `base.css` the page chrome classes (`esc-title`, `esc-note`, `esc-link`),
 the theme switch and the forced-colours / more-contrast rules;
 `design-system.css` imports them all once, from `main.tsx`.
 `DesignThemeProvider`/`useDesignTheme` hold the active theme,
-`ThemeSwitch` is the app bar's Sparkle mode switch, `Sparkles` the
-decorative glitter layer, and `Surface.tsx` the `Ground`/`Pane`/`Control`/
+`ThemeSwitch` is the app bar's Sparkle mode switch, `Stage` the
+decorative disco ball and Sparkle's sequin floor (canvas and WebGL, its
+maths in `stageLights.ts`), and `Surface.tsx` the `Ground`/`Pane`/`Control`/
 `Row`/`Field` primitives screens are built from; `useRovingTabs` wires a
 tablist of `Control`s and its tab panel.
 

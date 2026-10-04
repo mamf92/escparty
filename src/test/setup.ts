@@ -14,3 +14,8 @@ import { afterEach } from "vitest";
 afterEach(() => {
   cleanup();
 });
+
+// jsdom has no canvas: without this, every screen's <Stage /> would log
+// "Not implemented: HTMLCanvasElement.prototype.getContext". With no
+// context the stage is its CSS background alone, as in an old browser.
+HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement["getContext"];

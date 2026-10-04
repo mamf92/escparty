@@ -1,17 +1,27 @@
 /*
   The surface: every shape on a screen, in both themes
-  (docs/design/design-system.md, "Anatomy").
+  (docs/design/design-system.md, "Components").
 
-  Modern soft neumorphism. The screen is one colour, and every surface is
-  made of that same colour: a control is lifted out of it by a pair of soft
-  shadows (light to the top left, shade to the bottom right) and pressed
-  into it by the same pair turned inwards. There are no borders, no frames
-  and no cards around groups; space alone groups things.
+  Four materials on one dark pink stage:
+
+    card     a white card, for anything with a field (a form)
+    button   a white button on the stage: an action
+    tile     a dark tile on the stage: a choice, or a row of information
+    primary  the black button: the screen's next step
+
+  and one accent: a chosen tile or button turns hot pink, set in white.
+  Inside a card the same roles are made of blush, with Pearl's soft
+  raised-and-pressed depth. Nothing has a border.
 
   The class names are the ones the screens already use (calm-ground,
-  lycra-pane, lycra, lycra-field ...). They are kept so no page has to
-  change to take the new look; `Ground`, `Pane`, `Control`, `Row` and
-  `Field` in Surface.tsx write them for you.
+  lycra-pane, lycra, lycra-field ...); `Ground`, `Pane`, `Control`, `Row`
+  and `Field` in Surface.tsx write them for you.
+
+  Text colour is a token scope: each light surface (a card, a white button,
+  a proud row) sets `--esc-ink` and friends to the dark card ink, each dark
+  one (a tile, the black button, a chosen pink one) to white, and every
+  rule below reads `--esc-ink`. A note or a sub line inside any of them is
+  right without knowing where it is.
 
   Everything is scoped to `.esc-app` (the phone frame and the big screen).
   The /fabric-ui demo loads its own vendored lycra-surface.css and calm.css
@@ -19,7 +29,7 @@
   which keeps the app right after someone has visited the demo.
 */
 
-/* Ground and pane are layout only: no colour, no edge, no shadow. */
+/* Ground is layout only: the stage shows through. */
 .esc-app .calm-ground {
   position: relative;
   width: 100%;
@@ -32,20 +42,18 @@
   margin-top: var(--esc-space-4);
 }
 
+/* A pane is a stack on the stage, unless it is a card (below). */
 .esc-app .lycra-pane {
   position: relative;
   isolation: auto;
   display: grid;
   /* The gap, named so a field's label and note can be pulled up past it. */
-  --esc-pane-gap: var(--esc-space-4);
+  --esc-pane-gap: var(--esc-space-3);
   gap: var(--esc-pane-gap);
   margin: 0;
-  /*
-    Room for the shadows. With the page's own gutter this is about 28px,
-    which holds everything but the faintest tail of the proud lift.
-  */
-  padding: var(--esc-space-3) var(--esc-space-4);
+  padding: 0;
   list-style: none;
+  color: var(--esc-ink);
   background: none;
   border: 0;
   border-radius: 0;
@@ -54,8 +62,34 @@
   backdrop-filter: none;
 }
 
-/* The control: the background, raised. */
+/*
+  The card: white, lifted off the stage. Any pane holding a field is one
+  (a form), and `<Pane className="is-card">` makes one on purpose. It
+  carries the card ink.
+*/
+.esc-app .lycra-pane.is-card,
+.esc-app .lycra-pane:has(.lycra-field) {
+  --esc-ink: var(--esc-card-ink);
+  --esc-ink-muted: var(--esc-card-ink-muted);
+  --esc-link: var(--esc-card-label);
+  --esc-focus: var(--esc-card-focus);
+  --esc-correct: var(--esc-card-correct);
+  --esc-wrong: var(--esc-card-wrong);
+  --esc-pane-gap: var(--esc-space-4);
+  padding: var(--esc-space-5);
+  border-radius: var(--esc-radius-card);
+  color: var(--esc-ink);
+  text-shadow: none;
+  background: var(--esc-card);
+  box-shadow: var(--esc-card-lift);
+}
+
+/* The button: white on the stage, an action. */
 .esc-app .lycra {
+  --esc-ink: var(--esc-card-ink);
+  --esc-ink-muted: var(--esc-card-ink-muted);
+  --esc-correct: var(--esc-card-correct);
+  --esc-wrong: var(--esc-card-wrong);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -66,16 +100,19 @@
   padding: var(--esc-space-3) var(--esc-space-5);
   cursor: pointer;
   text-decoration: none;
+  text-shadow: none;
   font-family: var(--esc-font-body);
   font-size: var(--esc-text-control);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
   color: var(--esc-ink);
   border: 0;
   border-radius: var(--esc-radius-control);
-  background: var(--esc-face);
-  box-shadow: var(--esc-raise);
+  background: var(--esc-button);
+  box-shadow: var(--esc-button-lift);
   transform: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   transition:
     box-shadow var(--esc-press),
     background-color var(--esc-press),
@@ -83,50 +120,199 @@
 }
 
 .esc-app .lycra:hover:where(:not(:disabled)) {
-  background: var(--esc-face-hover);
+  background: var(--esc-button-hover);
 }
 
-/* Pressed and chosen: the same surface, pushed into the background. */
-.esc-app .lycra:active,
-.esc-app .lycra.is-pressed,
+.esc-app .lycra:active:where(:not(:disabled)) {
+  box-shadow: var(--esc-button-press);
+}
+
+/*
+  The tile: a choice (a toggle, a radio, a tab, an option) or a row of
+  information, dark and frosted on the stage, set in white.
+*/
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], .is-static) {
+  --esc-ink: var(--esc-stage-ink);
+  --esc-ink-muted: var(--esc-stage-ink-muted);
+  --esc-correct: var(--esc-stage-correct);
+  --esc-wrong: var(--esc-stage-wrong);
+  font-weight: 500;
+  background: var(--esc-tile);
+  box-shadow: var(--esc-tile-edge);
+  -webkit-backdrop-filter: var(--esc-tile-blur);
+  backdrop-filter: var(--esc-tile-blur);
+}
+
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):hover:where(:not(:disabled)) {
+  background: var(--esc-tile-hover);
+}
+
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):active:where(:not(:disabled)) {
+  box-shadow: var(--esc-tile-press);
+}
+
+/* Information, not a control: no pointer, no hover, no press. */
+.esc-app .lycra.is-static,
+.esc-app .lycra.is-static:hover,
+.esc-app .lycra.is-static:active {
+  cursor: default;
+  background: var(--esc-tile);
+  box-shadow: var(--esc-tile-edge);
+}
+
+/*
+  Chosen: hot pink, set in white, pressed in. The one accent, so a choice
+  never rests on colour or shadow alone (it is also aria-pressed,
+  aria-checked or aria-selected). Checks and crosses on it are white: the
+  glyph tells them apart.
+*/
 .esc-app .lycra.is-chosen,
 .esc-app .lycra.is-chosen:hover,
+.esc-app .lycra.is-chosen:active,
 .esc-app .lycra.is-selected,
-.esc-app .lycra.is-selected:active,
+.esc-app .lycra.is-selected:hover,
+.esc-app .lycra.is-pressed,
 .esc-app .lycra.is-static.is-chosen,
 .esc-app .lycra.is-static.is-chosen:hover,
 .esc-app .lycra.is-static.is-chosen:active {
+  --esc-ink: var(--esc-on-accent);
+  --esc-ink-muted: var(--esc-on-accent-muted);
+  --esc-correct: var(--esc-on-accent);
+  --esc-wrong: var(--esc-on-accent);
   transform: none;
-  background: var(--esc-face-pressed);
-  box-shadow: var(--esc-inset);
+  color: var(--esc-ink);
+  background: var(--esc-accent);
+  box-shadow: var(--esc-accent-press);
 }
 
-/* Chosen also takes the one accent, so it never rests on shadow alone. */
-.esc-app .lycra.is-chosen,
-.esc-app .lycra.is-selected {
-  color: var(--esc-accent);
-}
-
-/* Neighbours stay put: there is no fabric to tug any more. */
+/* Neighbours stay put. */
 .esc-app .lycra:active + .lycra,
 .esc-app .lycra:has(+ .lycra:active) {
   transform: none;
 }
 
-/* Unavailable, so dimmed; a settled answer (is-marked) is not, see below. */
-.esc-app .lycra:disabled:not(.is-chosen):not(.is-selected):not(.is-marked),
-.esc-app .lycra[aria-disabled="true"]:not(.is-chosen):not(.is-selected):not(.is-marked) {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-  background: var(--esc-face);
-  box-shadow: var(--esc-raise-sm);
+/*
+  The screen's next step: the black button. It still answers a point and
+  a press; a chosen control stays pink instead (Surface.tsx never marks a
+  chosen control high).
+*/
+.esc-app .lycra.is-high:not(.is-static) {
+  --esc-ink: var(--esc-on-primary);
+  --esc-ink-muted: var(--esc-stage-ink-muted);
+  --esc-correct: var(--esc-stage-correct);
+  --esc-wrong: var(--esc-stage-wrong);
+  font-family: var(--esc-font-display);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--esc-ink);
+  background: var(--esc-primary);
+  box-shadow: var(--esc-primary-lift);
 }
 
-/* A chosen control that is busy or locked stays pressed in, only dimmed. */
+.esc-app .lycra.is-high:not(.is-static):not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--esc-primary-hover);
+}
+
+.esc-app .lycra.is-high:not(.is-static):not(:disabled):not([aria-disabled="true"]):active {
+  box-shadow: var(--esc-primary-press);
+}
+
+/*
+  The proud row (first place, your own row, the right answer): white,
+  standing out of the dark tiles around it.
+*/
+.esc-app .lycra.is-static.is-high,
+.esc-app .lycra.is-static.is-high:hover,
+.esc-app .lycra.is-static.is-high:active,
+.esc-app .lycra.is-marked.is-high:disabled {
+  --esc-ink: var(--esc-card-ink);
+  --esc-ink-muted: var(--esc-card-ink-muted);
+  --esc-correct: var(--esc-card-correct);
+  --esc-wrong: var(--esc-card-wrong);
+  font-family: var(--esc-font-body);
+  font-weight: 700;
+  letter-spacing: normal;
+  color: var(--esc-ink);
+  background: var(--esc-button);
+  box-shadow: var(--esc-tile-chosen-lift);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The bottom of a ladder sits darker, pressed into the stage. */
+.esc-app .lycra.is-low,
+.esc-app .lycra.is-static.is-low,
+.esc-app .lycra.is-static.is-low:hover,
+.esc-app .lycra.is-static.is-low:active,
+.esc-app .lycra.is-marked.is-low:disabled {
+  background: var(--esc-tile-sunk);
+  box-shadow: var(--esc-tile-press);
+}
+
+/*
+  Inside a card the same roles are blush, with Pearl's soft depth: raised
+  at rest, pressed in when pressed. Chosen stays pink and the next step
+  stays black.
+*/
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high) {
+  --esc-ink: var(--esc-card-ink);
+  --esc-ink-muted: var(--esc-card-ink-muted);
+  --esc-correct: var(--esc-card-correct);
+  --esc-wrong: var(--esc-card-wrong);
+  color: var(--esc-ink);
+  background: var(--esc-blush);
+  box-shadow: var(--esc-raise-sm);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):hover {
+  background: var(--esc-blush-hover);
+}
+
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:not(.is-chosen):not(.is-selected):not(.is-high):not(.is-static):not(:disabled):active,
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra.is-low {
+  box-shadow: var(--esc-inset);
+}
+
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra.is-static.is-high {
+  --esc-ink: var(--esc-on-primary);
+  --esc-ink-muted: var(--esc-stage-ink-muted);
+  background: var(--esc-primary);
+  box-shadow: var(--esc-primary-lift);
+}
+
+/*
+  Unavailable: a solid, quiet face with muted text, never see-through, so
+  it reads the same over Sparkle's sequins. A settled answer (is-marked)
+  is not unavailable, see below.
+*/
+.esc-app .lycra:disabled:not(.is-chosen):not(.is-selected):not(.is-marked),
+.esc-app .lycra[aria-disabled="true"]:not(.is-chosen):not(.is-selected):not(.is-marked) {
+  --esc-ink: var(--esc-on-disabled);
+  --esc-ink-muted: var(--esc-on-disabled);
+  cursor: not-allowed;
+  transform: none;
+  color: var(--esc-ink);
+  background: var(--esc-disabled);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* On a card, unavailable is a flat blush face with faded ink. */
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .lycra:disabled:not(.is-chosen):not(.is-selected):not(.is-marked) {
+  --esc-ink: var(--esc-card-ink-muted);
+  color: var(--esc-ink);
+  background: var(--esc-blush);
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+/* A chosen control that is busy or locked stays pink, only dimmed. */
 .esc-app .lycra.is-chosen:disabled,
 .esc-app .lycra.is-chosen[aria-disabled="true"] {
-  opacity: 0.7;
+  opacity: 0.75;
   cursor: not-allowed;
 }
 
@@ -139,48 +325,6 @@
   text-align: left;
 }
 
-/*
-  Information, not a control: a quieter lift, and nothing happens when it
-  is pointed at or pressed.
-*/
-.esc-app .lycra.is-static,
-.esc-app .lycra.is-static:hover,
-.esc-app .lycra.is-static:active {
-  cursor: default;
-  background: var(--esc-face);
-  box-shadow: var(--esc-raise-sm);
-}
-
-/* The proud row (first place, your own row) stands further out. */
-.esc-app .lycra.is-high,
-.esc-app .lycra.is-static.is-high,
-.esc-app .lycra.is-static.is-high:hover,
-.esc-app .lycra.is-static.is-high:active,
-.esc-app .lycra.is-marked.is-high:disabled {
-  background: var(--esc-face);
-  box-shadow: var(--esc-raise-lg);
-}
-
-/* A proud control (the screen's next step) still answers a point and a press. */
-.esc-app .lycra.is-high:not(.is-static):not(:disabled):not([aria-disabled="true"]):hover {
-  background: var(--esc-face-hover);
-}
-
-.esc-app .lycra.is-high:not(.is-static):not(:disabled):not([aria-disabled="true"]):active {
-  background: var(--esc-face-pressed);
-  box-shadow: var(--esc-inset);
-}
-
-/* The bottom of a ladder sits in the background rather than on it. */
-.esc-app .lycra.is-low,
-.esc-app .lycra.is-static.is-low,
-.esc-app .lycra.is-static.is-low:hover,
-.esc-app .lycra.is-static.is-low:active,
-.esc-app .lycra.is-marked.is-low:disabled {
-  background: var(--esc-face-pressed);
-  box-shadow: var(--esc-inset-sm);
-}
-
 /* A settled answer is the most important thing on screen, not a dimmed one. */
 .esc-app .lycra.is-marked:disabled,
 .esc-app .lycra.is-marked[aria-disabled="true"] {
@@ -188,7 +332,7 @@
   cursor: default;
 }
 
-/* Fields are wells: pressed into the background, always. */
+/* Fields are blush wells pressed into the card. */
 .esc-app .lycra-field,
 .esc-app .lycra-well {
   box-sizing: border-box;
@@ -197,20 +341,22 @@
   padding: var(--esc-space-3) var(--esc-space-4);
   font-family: var(--esc-font-body);
   font-size: var(--esc-text-control);
-  color: var(--esc-ink);
+  font-weight: 500;
+  color: var(--esc-card-ink);
+  text-shadow: none;
   border: 0;
   border-radius: var(--esc-radius-field);
-  background: var(--esc-bg);
+  background: var(--esc-blush);
   box-shadow: var(--esc-well);
 }
 
 .esc-app .lycra-field::placeholder {
-  color: var(--esc-ink-muted);
-  opacity: 0.85;
+  color: var(--esc-card-ink-muted);
+  opacity: 1;
 }
 
 .esc-app .lycra-field:focus-visible {
-  outline: 2px solid var(--esc-focus);
+  outline: 2px solid var(--esc-card-focus);
   outline-offset: 3px;
   box-shadow: var(--esc-well);
 }
@@ -223,6 +369,11 @@
 
 .esc-app select.lycra-field {
   appearance: none;
+  padding-right: calc(var(--esc-space-4) * 2 + 12px);
+  background-image: linear-gradient(45deg, transparent 50%, var(--esc-card-ink) 50%), linear-gradient(135deg, var(--esc-card-ink) 50%, transparent 50%);
+  background-position: calc(100% - var(--esc-space-4) - 6px) 52%, calc(100% - var(--esc-space-4)) 52%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
 /* Detail text: the second type size, muted. */
@@ -233,18 +384,18 @@
   opacity: 1;
 }
 
-.esc-app .lycra.is-chosen .calm-sub {
-  color: inherit;
-}
-
-/* A field's caption. */
+/* A field's caption: on a card, in the card's deep pink. */
 .esc-app .calm-label {
   display: block;
   margin-bottom: var(--esc-space-2);
   font-size: var(--esc-text-sub);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--esc-ink-muted);
   opacity: 1;
+}
+
+.esc-app :is(.lycra-pane.is-card, .lycra-pane:has(.lycra-field)) .calm-label {
+  color: var(--esc-card-label);
 }
 
 /*
@@ -275,14 +426,14 @@
   width: 100%;
 }
 
-/* Two or three moves side by side (previous / next). */
+/* Two or three moves side by side (previous / next, tabs). */
 .esc-app .lycra-pane.calm-split {
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   grid-auto-flow: column;
   --esc-pane-gap: var(--esc-space-3);
 }
 
-/* A rating scale: the numbers 1..max as a grid of small round keys. */
+/* A rating scale: the numbers 1..max as a grid of small round tiles. */
 .esc-app .lycra-pane.calm-scale {
   grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
   --esc-pane-gap: var(--esc-space-3);

@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 /*
  * The design system's contrast floor (docs/design/design-system.md,
  * "Accessibility"), checked against the token values themselves so a colour
- * change can't quietly break it: body text 4.5:1, markers and focus 3:1.
+ * change can't quietly break it: text 4.5:1, markers and focus 3:1, on every
+ * material it can sit on (the stage, a dark tile, a white button or card, a
+ * blush control, the black button and a chosen pink one).
  */
 const here = __dirname.replace(/\\/g, "/");
 const tokens = readFileSync(posix.join(here, "tokens.css"), "utf8");
@@ -14,8 +16,11 @@ const block = (selector: string) => {
   const start = tokens.indexOf(selector);
   return tokens.slice(start, tokens.indexOf("}", start));
 };
-const token = (css: string, name: string) => {
-  const match = css.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, "i"));
+const calm = block(':root[data-theme="calm"]');
+const glam = block(':root[data-theme="sparkle"] {');
+
+const token = (name: string) => {
+  const match = calm.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, "i"));
   if (!match) throw new Error(`${name} isn't a plain hex colour`);
   return match[1];
 };
@@ -34,71 +39,65 @@ const ratio = (a: Rgb, b: Rgb) => {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 };
-
-const calm = block(':root[data-theme="calm"]');
-const glam = block(':root[data-theme="sparkle"] {');
-
-const declaration = (css: string, name: string) => {
+const brightest = (stops: Rgb[]) => stops.reduce((a, b) => (luminance(a) > luminance(b) ? a : b));
+const stops = (css: string, name: string) => {
   const start = css.indexOf(`${name}:`);
   if (start < 0) throw new Error(`${name} isn't declared`);
-  return css.slice(start, css.indexOf(";", start));
+  return [...css.slice(start, css.indexOf(";", start)).matchAll(/#[0-9a-f]{6}/gi)].map(m => rgb(m[0]));
 };
-const hexes = (decl: string) => [...decl.matchAll(/#[0-9a-f]{6}/gi)].map(m => rgb(m[0]));
-const rgbas = (decl: string) => [...decl.matchAll(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/g)]
-  .map(m => ({ colour: [+m[1], +m[2], +m[3]] as Rgb, alpha: +m[4] }));
-const brightest = (stops: Rgb[]) => stops.reduce((a, b) => (luminance(a) > luminance(b) ? a : b));
+const tile = (() => {
+  const m = calm.match(/--esc-tile:\s*rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
+  if (!m) throw new Error("--esc-tile isn't an rgba() colour");
+  return { colour: [+m[1], +m[2], +m[3]] as Rgb, alpha: +m[4] };
+})();
 
-/*
- * The brightest spot of a layered background: each solid stop, and each
- * translucent dot or pool laid over the brightest solid stop (the worst
- * case: a sequin or a spotlight may sit right where the base is lightest).
- */
-const peak = (themeBlock: string, name: string) => {
-  const decl = declaration(themeBlock, name);
-  const solid = hexes(decl);
-  const base = brightest(solid);
-  return brightest([...solid, ...rgbas(decl).map(({ colour, alpha }) => over(colour, alpha, base))]);
+// The brightest spot of the stage in either theme: where text is hardest to read.
+const stage = brightest([...stops(calm, "--esc-screen"), ...stops(glam, "--esc-screen"), rgb(token("--esc-stage-top"))]);
+// A dark tile, frosted over that brightest spot.
+const darkTile = over(tile.colour, tile.alpha, stage);
+
+const expectText = (fg: Rgb | string, bg: Rgb | string, label: string, floor = 4.5) => {
+  const a = typeof fg === "string" ? rgb(fg) : fg;
+  const b = typeof bg === "string" ? rgb(bg) : bg;
+  expect(ratio(a, b), label).toBeGreaterThanOrEqual(floor);
 };
-
-const TEXT = ["--esc-ink", "--esc-ink-muted"];
-const MARKS = ["--esc-correct", "--esc-wrong", "--esc-focus"];
 
 describe("design token contrast", () => {
-  it("Calm: every surface is the background colour, with no frame to read against", () => {
-    expect(token(calm, "--esc-bg")).toBe(token(calm, "--esc-surface"));
+  it("the two themes share every material but the stage", () => {
+    const names = [...glam.matchAll(/(--esc-[a-z0-9-]+):/g)].map(m => m[1]);
+    expect(names.sort()).toEqual(["--esc-screen", "--esc-stage-text-shadow"]);
   });
 
-  it("Calm: text holds 4.5:1 on the background and on every face", () => {
-    for (const face of ["--esc-bg", "--esc-face-hover", "--esc-face-pressed"]) {
-      for (const name of [...TEXT, "--esc-accent", "--esc-link", "--esc-title"]) {
-        expect(ratio(rgb(token(calm, name)), rgb(token(calm, face))), `${name} on ${face}`).toBeGreaterThanOrEqual(4.5);
+  it("stage text holds 4.5:1 on the brightest spot of the stage, and on a dark tile", () => {
+    for (const name of ["--esc-ink", "--esc-ink-muted", "--esc-stage-ink", "--esc-stage-ink-muted", "--esc-title", "--esc-link"]) {
+      expectText(token(name), stage, `${name} on the stage`);
+      expectText(token(name), darkTile, `${name} on a tile`);
+    }
+    for (const name of ["--esc-focus", "--esc-correct", "--esc-wrong", "--esc-stage-correct", "--esc-stage-wrong"]) {
+      expectText(token(name), stage, `${name} on the stage`, 3);
+      expectText(token(name), darkTile, `${name} on a tile`, 3);
+    }
+  });
+
+  it("card ink holds 4.5:1 on a white card, a white button and a blush control or well", () => {
+    for (const bg of ["--esc-card", "--esc-button", "--esc-button-hover", "--esc-blush", "--esc-blush-hover"]) {
+      for (const name of ["--esc-card-ink", "--esc-card-ink-muted", "--esc-card-label"]) {
+        expectText(token(name), token(bg), `${name} on ${bg}`);
+      }
+      for (const name of ["--esc-card-focus", "--esc-card-correct", "--esc-card-wrong"]) {
+        expectText(token(name), token(bg), `${name} on ${bg}`, 3);
       }
     }
+    expectText(token("--esc-on-button"), token("--esc-button"), "a button's label");
   });
 
-  it("Calm: markers and the focus ring hold 3:1 on the background", () => {
-    for (const name of MARKS) {
-      expect(ratio(rgb(token(calm, name)), rgb(token(calm, "--esc-bg"))), name).toBeGreaterThanOrEqual(3);
+  it("the black button and the chosen pink hold 4.5:1 for their white labels", () => {
+    for (const bg of ["--esc-primary", "--esc-primary-hover"]) {
+      expectText(token("--esc-on-primary"), token(bg), `on ${bg}`);
     }
-  });
-
-  it("Sparkle: text holds 4.5:1 on every sequin face, even over a sequin", () => {
-    for (const face of ["--esc-face", "--esc-face-hover", "--esc-face-pressed"]) {
-      for (const name of TEXT) {
-        expect(ratio(rgb(token(glam, name)), peak(glam, face)), `${name} on ${face}`).toBeGreaterThanOrEqual(4.5);
-      }
-    }
-    // A chosen key's label is gold on the gold side of its sequins.
-    expect(ratio(rgb(token(glam, "--esc-accent")), peak(glam, "--esc-face-pressed"))).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it("Sparkle: titles, links, markers and focus hold up on the brightest spot of the stage", () => {
-    const stage = peak(glam, "--esc-screen");
-    for (const name of [...TEXT, "--esc-title", "--esc-link"]) {
-      expect(ratio(rgb(token(glam, name)), stage), name).toBeGreaterThanOrEqual(4.5);
-    }
-    for (const name of MARKS) {
-      expect(ratio(rgb(token(glam, name)), stage), name).toBeGreaterThanOrEqual(3);
-    }
+    expectText(token("--esc-on-accent"), token("--esc-accent"), "a chosen label");
+    expectText(token("--esc-on-accent-muted"), token("--esc-accent"), "a chosen sub line");
+    // The focus ring stays visible on the stage around a white button or a pink one.
+    expectText(token("--esc-focus"), token("--esc-bg"), "focus on the stage", 3);
   });
 });

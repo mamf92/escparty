@@ -1,7 +1,7 @@
 export { DesignThemeProvider } from "./DesignThemeProvider";
 export { useDesignTheme } from "./useDesignTheme";
 export { ThemeSwitch } from "./ThemeSwitch";
-export { Sparkles } from "./Sparkles";
+export { Stage } from "./Stage";
 export { Ground, Pane, Control, Row, Field } from "./Surface";
 export { Marker } from "./Marker";
 export { cx } from "./cx";

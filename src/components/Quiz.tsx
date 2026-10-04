@@ -741,6 +741,7 @@ const Quiz = () => {
       <Ground>
         <Pane>
           <Control
+            elevation="high"
             onClick={() => submitAnswer(selectedAnswer ?? "")}
             disabled={!selectedAnswer || isSubmitted || showFeedback}
           >

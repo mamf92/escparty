@@ -16,6 +16,6 @@ describe("MobileFrame", () => {
     // The brand isn't a way out: mid-game screens own their exits.
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.getByText("Douze points").closest(".esc-app")).not.toBeNull();
-    expect(container.querySelector(".esc-sparkles")).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector(".esc-stage")).toHaveAttribute("aria-hidden", "true");
   });
 });

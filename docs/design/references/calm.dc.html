@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Build a quiz, Calm</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Righteous&amp;family=DM+Sans:opsz,wght@9..40,500;9..40,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#FFFFFF}a:hover{color:#FFC2E0}
+.bs *{box-sizing:border-box}
+.bs{--ink:#140810;--pink:#E0177E;--deep:#A30A58;--well:#F6E2EE;font-family:"DM Sans",system-ui,sans-serif;color:var(--ink);position:relative;background:radial-gradient(ellipse 520px 420px at 50% 120px,#7A1356,#3B0628 70%)}
+.bs .spots{position:absolute;inset:0;pointer-events:none}
+.bs .spot{position:absolute;border-radius:50%;filter:blur(2px)}
+.bs .wire{position:absolute;left:194px;top:0;width:2px;height:34px;background:#B89AAC}
+.bs .ball{position:absolute;left:99px;top:30px;width:192px;height:192px;display:grid;grid-template-columns:repeat(24,minmax(0,1fr));border-radius:50%;overflow:hidden}
+.bs .cell{box-shadow:inset 0 0 0 .5px rgba(30,0,20,.35)}
+.bs .lay{position:relative}
+.bs .bar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;color:#fff}
+.bs .brand{font-family:Righteous,sans-serif;font-size:18px;letter-spacing:.1em}
+.bs .switch{display:flex;align-items:center;gap:10px;font:inherit;font-weight:700;font-size:14px;background:none;border:0;color:inherit;min-height:44px;cursor:pointer;padding:0}
+.bs .track{width:48px;height:28px;border-radius:14px;position:relative;background:var(--ink);box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+.bs .knob{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:#fff}
+.bs main{padding:190px 20px 32px;display:flex;flex-direction:column;gap:20px}
+.bs h1{font-family:Righteous,sans-serif;font-weight:400;font-size:46px;line-height:1;margin:0;text-align:center;color:#fff}
+.bs .sub{margin:0;text-align:center;font-size:16px;line-height:1.45;color:#FCE3F1}
+.bs .pane{display:flex;flex-direction:column;gap:10px;padding:22px 20px;border-radius:28px;background:#FFFFFF;box-shadow:0 24px 44px rgba(15,0,10,.5)}
+.bs .lab{font-weight:700;font-size:14px;margin:4px 0 0;color:var(--deep)}
+.bs .field{font:inherit;font-size:16px;font-weight:500;border:0;outline:0;padding:15px 18px;border-radius:16px;width:100%;color:var(--ink);background:var(--well);box-shadow:inset 2px 3px 7px rgba(163,10,88,.16)}
+.bs .field:focus-visible{box-shadow:inset 2px 3px 7px rgba(163,10,88,.16),0 0 0 3px var(--pink)}
+.bs textarea.field{resize:none;line-height:1.35}
+.bs .sel{position:relative}
+.bs select.field{appearance:none;padding-right:48px}
+.bs .chev{position:absolute;right:18px;top:50%;margin-top:-9px;pointer-events:none}
+.bs .note{font-family:Righteous,sans-serif;font-weight:400;font-size:24px;margin:4px 4px 0;color:#fff;display:flex;align-items:center;gap:10px}
+.bs .count{font-family:"DM Sans",sans-serif;font-size:14px;font-weight:700;color:var(--ink);background:#fff;border-radius:999px;padding:3px 12px}
+.bs ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.bs .row{width:100%;display:flex;gap:14px;align-items:center;text-align:left;font:inherit;font-size:16px;font-weight:500;line-height:1.3;padding:14px 16px;border:0;border-radius:20px;cursor:pointer;color:#fff;background:rgba(40,2,26,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 rgba(255,255,255,.14);min-height:60px}
+.bs .row.on{color:var(--ink);background:#FFFFFF;box-shadow:0 10px 24px rgba(15,0,10,.5)}
+.bs .num{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-family:Righteous,sans-serif;font-size:15px;background:rgba(255,255,255,.14)}
+.bs .row.on .num{color:#fff;background:var(--pink)}
+.bs .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.bs .ctl{font:inherit;font-weight:700;font-size:16px;border:0;border-radius:18px;min-height:56px;padding:12px 14px;cursor:pointer;color:var(--ink);background:#FFFFFF;box-shadow:0 8px 18px rgba(15,0,10,.4)}
+.bs .pane .ctl{background:var(--well);box-shadow:none}
+.bs .ctl:active,.bs .row:active{transform:translateY(1px);filter:brightness(.94)}
+.bs .hero{font-family:Righteous,sans-serif;font-weight:400;font-size:22px;letter-spacing:.04em;min-height:68px;border-radius:24px;color:#fff;background:var(--ink);box-shadow:0 14px 30px rgba(15,0,10,.55),inset 0 0 0 2px rgba(255,255,255,.18)}
+.bs fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.bs legend{padding:0;margin-bottom:10px}
+.bs .ans{display:flex;gap:12px;align-items:center}
+.bs .radio{appearance:none;flex:none;width:30px;height:30px;border-radius:50%;margin:0;cursor:pointer;display:grid;place-items:center;background:var(--well);box-shadow:inset 2px 3px 6px rgba(163,10,88,.2)}
+.bs .radio::after{content:"";width:16px;height:16px;border-radius:50%;background:var(--pink);transform:scale(0);transition:transform .15s}
+.bs .radio:checked::after{transform:scale(1)}
+.bs .radio:focus-visible{outline:3px solid var(--pink);outline-offset:2px}
+.bs .ph{font-family:Righteous,sans-serif;font-weight:400;font-size:22px;margin:0;color:var(--ink)}
+.bs .back{text-align:center;font-weight:700;font-size:16px}
+</style>
+</helmet>
+<div class="bs" style="width: 390px; height: 1720px; overflow: hidden">
+<div class="spots" aria-hidden="true">
+<sc-for list="{{spots}}" as="sp" hint-placeholder-count="12">
+<span class="spot" style="left: {{sp.x}}px; top: {{sp.y}}px; width: {{sp.d}}px; height: {{sp.d}}px; background: {{sp.c}}; opacity: {{sp.o}}"></span>
+</sc-for>
+</div>
+<span class="wire" aria-hidden="true"></span>
+<div class="ball" aria-hidden="true">
+<sc-for list="{{cells}}" as="c" hint-placeholder-count="576">
+<span class="cell" style="background: {{c.bg}}"></span>
+</sc-for>
+</div>
+<div class="lay">
+<header class="bar">
+<span class="brand">ESCPARTY</span>
+<button class="switch" type="button" role="switch" aria-checked="false"><span class="track"><span class="knob"></span></span>Sparkle mode</button>
+</header>
+<main>
+<h1>Build a quiz</h1>
+<p class="sub">Mix questions from the bank with your own, then save it to host or play.</p>
+<section class="pane" aria-label="Quiz details">
+<label class="lab" for="bc-name">Name</label>
+<input class="field" id="bc-name" value="Jedward's Revenge">
+<label class="lab" for="bc-break">Scoreboard break</label>
+<div class="sel">
+<select class="field" id="bc-break"><option>After every 5 questions</option><option>After every 10 questions</option><option>Only at the end</option></select>
+<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A30A58" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</div>
+</section>
+<h2 class="note">Questions <span class="count">3</span></h2>
+<ol>
+<li><button class="row on" type="button" aria-pressed="true"><span class="num">1</span><span>Which country won in 1985 with “La det swinge”?</span></button></li>
+<li><button class="row" type="button" aria-pressed="false"><span class="num">2</span><span>Who sang “Euphoria” for Sweden in 2012?</span></button></li>
+<li><button class="row" type="button" aria-pressed="false"><span class="num">3</span><span>How many points is douze points?</span></button></li>
+</ol>
+<div class="two">
+<button class="ctl" type="button">Add from the bank</button>
+<button class="ctl" type="button">Write a question</button>
+</div>
+<section class="pane" aria-labelledby="bc-edit">
+<h2 class="ph" id="bc-edit">Edit question 1</h2>
+<label class="lab" for="bc-q">Question</label>
+<textarea class="field" id="bc-q" rows="2">Which country won in 1985 with “La det swinge”?</textarea>
+<fieldset>
+<legend class="lab">Answers, pick the right one</legend>
+<div class="ans"><input class="radio" type="radio" name="bc-right" checked aria-label="Answer 1 is right"><input class="field" value="Norway" aria-label="Answer 1"></div>
+<div class="ans"><input class="radio" type="radio" name="bc-right" aria-label="Answer 2 is right"><input class="field" value="Sweden" aria-label="Answer 2"></div>
+<div class="ans"><input class="radio" type="radio" name="bc-right" aria-label="Answer 3 is right"><input class="field" value="Ireland" aria-label="Answer 3"></div>
+<div class="ans"><input class="radio" type="radio" name="bc-right" aria-label="Answer 4 is right"><input class="field" value="Luxembourg" aria-label="Answer 4"></div>
+</fieldset>
+<div class="two" style="margin-top: 8px">
+<button class="ctl" type="button">Save question</button>
+<button class="ctl" type="button">Cancel</button>
+</div>
+</section>
+<button class="ctl hero" type="button">Save quiz</button>
+<a class="back" href="#">Back to the quiz library</a>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1720}}'>
+class Component extends DCLogic {
+  // Calm: the ball hangs still, lit once from the upper left, in muted pinks.
+  renderVals() {
+    const F = 0.27, N = 24, cy = 126, phase = 0.4;
+    const hash = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
+    const L = (() => { const v = [-0.5, 0.75, 1], l = Math.hypot(...v); return v.map((x) => x / l); })();
+    const tintOf = (k) => (k < 0.5 ? [196, 146, 170] : k < 0.85 ? [168, 104, 138] : [222, 190, 205]);
+    const facet = (la, lo) => {
+      const a = (Math.floor(la / F) + 0.5) * F, o = (Math.floor(lo / F) + 0.5) * F - phase;
+      return { n: [Math.cos(a) * Math.sin(o), Math.sin(a), Math.cos(a) * Math.cos(o)], k: hash(Math.floor(la / F), Math.floor(lo / F)) };
+    };
+    const cells = [];
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const x = ((i + 0.5) / N) * 2 - 1, y = 1 - ((j + 0.5) / N) * 2, r2 = x * x + y * y;
+      if (r2 > 1) { cells.push({ bg: 'transparent' }); continue; }
+      const z = Math.sqrt(1 - r2);
+      const f = facet(Math.asin(y), Math.atan2(x, z) + phase), n = f.n;
+      const d = Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]);
+      const R = [2 * n[2] * n[0], 2 * n[2] * n[1], 2 * n[2] * n[2] - 1];
+      const sp = Math.pow(Math.max(0, R[0] * L[0] + R[1] * L[1] + R[2] * L[2]), 40) * 0.45;
+      const t = tintOf(f.k), rim = 0.55 + 0.45 * z, jit = 0.9 + 0.2 * hash(f.k, 3.1);
+      const c = t.map((ch) => Math.min(255, Math.round(ch * (0.3 + 0.55 * d) * jit * rim + 235 * sp)));
+      cells.push({ bg: `rgb(${c[0]}, ${c[1]}, ${c[2]})` });
+    }
+    const spots = [];
+    for (let la = -1.35; la < 1.4; la += F) for (let lo = -1.5 + phase; lo < 1.5 + phase; lo += F) {
+      const f = facet(la, lo), n = f.n, nl = n[0] * L[0] + n[1] * L[1] + n[2] * L[2];
+      if (n[2] < 0.1 || nl < 0.35 || hash(f.k, 7.7) > 0.22) continue;
+      const sx = 195 + (-L[0] + 2 * nl * n[0]) * 560, sy = cy - (-L[1] + 2 * nl * n[1]) * 900;
+      if (sx < -10 || sx > 400 || sy < -10 || sy > 1730) continue;
+      const dd = 6 + Math.round(8 * hash(f.k, 2.2));
+      spots.push({ x: Math.round(sx - dd / 2), y: Math.round(sy - dd / 2), d: dd, c: 'rgb(230, 170, 200)', o: (0.18 + 0.2 * nl).toFixed(2) });
+    }
+    return { cells, spots: spots.slice(0, 24) };
+  }
+}
+</script>
+</body>
+</html>
