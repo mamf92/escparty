@@ -25,6 +25,28 @@
 /* The screen is the container the ball (and the header's room for it) is sized by. */
 .esc-app {
   container-type: inline-size;
+  /*
+    Declared again here, not only on :root: a custom property resolves its
+    var()s where it is declared, so on :root it would keep the fallback
+    ball size instead of the one this screen measures.
+  */
+  --esc-stage-clearance: calc(var(--esc-ball-size) + 0.5625rem);
+}
+
+@supports (width: 1cqw) {
+  .esc-app {
+    --esc-ball-size: clamp(84px, 24cqw, 200px);
+  }
+}
+
+/* An invisible box the ball's size and hang are measured from (Stage.tsx). */
+.esc-stage-ball {
+  position: absolute;
+  top: var(--esc-ball-hang);
+  left: 0;
+  width: var(--esc-ball-size);
+  height: 0;
+  visibility: hidden;
 }
 
 /* The page header leaves room for the ball hanging over it. */
@@ -32,7 +54,3 @@
   padding-top: var(--esc-stage-clearance);
 }
 
-/* A TV's header sits lower, under its own bar: give the largest ball room. */
-.esc-app .calm-page.calm-screen {
-  --esc-stage-clearance: 13rem;
-}

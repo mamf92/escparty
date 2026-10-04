@@ -67,8 +67,8 @@
   (a form), and `<Pane className="is-card">` makes one on purpose. It
   carries the card ink.
 */
-.esc-app .lycra-pane.is-card,
-.esc-app .lycra-pane:has(.lycra-field) {
+/* One :is() list, so a browser without :has() still gets .is-card. */
+.esc-app .lycra-pane:is(.is-card, :has(.lycra-field)) {
   --esc-ink: var(--esc-card-ink);
   --esc-ink-muted: var(--esc-card-ink-muted);
   --esc-link: var(--esc-card-label);
@@ -130,7 +130,7 @@
 
 /*
   The tile: a choice (a toggle, a radio, a tab, an option) or a row of
-  information, dark and frosted on the stage, set in white.
+  information, a dark tile on the stage, set in white.
 */
 .esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], .is-static) {
   --esc-ink: var(--esc-stage-ink);
@@ -141,18 +141,6 @@
   font-weight: 500;
   background: var(--esc-tile);
   box-shadow: var(--esc-tile-edge);
-  -webkit-backdrop-filter: var(--esc-tile-blur);
-  backdrop-filter: var(--esc-tile-blur);
-}
-
-/*
-  Rows of information can come in long ladders over a stage that repaints
-  every frame in Sparkle: they skip the frosting, which would re-blur each
-  row's backdrop on every frame. Their tile is dark enough without it.
-*/
-.esc-app .lycra.is-static {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 .esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):hover:where(:not(:disabled)) {

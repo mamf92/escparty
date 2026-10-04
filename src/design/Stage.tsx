@@ -26,18 +26,24 @@ import { useDesignTheme } from "./useDesignTheme";
  * is the CSS background alone (`--esc-screen`).
  */
 
-/** The ball's diameter for a stage this wide, in CSS pixels. */
-const ballSize = (width: number) => Math.round(Math.min(200, Math.max(84, width * 0.24)));
 /**
- * How far below the stage's top edge the ball hangs: under the app bar, so
- * it never crowds the brand or the Sparkle mode switch.
+ * The ball's diameter and how far below the stage's top edge it hangs,
+ * measured from `.esc-stage-ball`, which tokens.css and stage.css size
+ * (`--esc-ball-size`, `--esc-ball-hang`): the same values the page
+ * header leaves room for. 96px under 56px where it can't be measured.
  */
-const HANG = 56;
+type BallBox = { size: number; hang: number };
+const measureBall = (box: HTMLElement | null): BallBox => ({
+  size: box?.offsetWidth || 96,
+  hang: box?.offsetTop || 56,
+});
+/** The longest step the ball turns in one frame, so it never jumps after a hidden tab. */
+const MAX_STEP = 0.1;
 /** Frames a second while turning: enough for a slow ball. */
 const FPS = 30;
 
 const SEQUINS = `precision highp float;
-uniform vec2 r; uniform float t; uniform vec2 m; uniform float s;
+uniform float t; uniform vec2 m; uniform float s;
 float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main(){
   vec2 p=gl_FragCoord.xy/s;
@@ -67,7 +73,7 @@ void main(){
     col*=mix(.6,1.,smoothstep(.04,.1,rr));
   }
   col=col/(1.+col*.4);
-  // Dimmed to a backdrop, so stage text reads over the brightest sequin.
+  // Dimmed to a backdrop; stage text keeps its outline over a bright sequin.
   gl_FragColor=vec4(pow(col,vec3(.95))*.62,1.);
 }`;
 
@@ -109,7 +115,7 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
   gl.enableVertexAttribArray(a);
   gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
   const u = (name: string) => gl.getUniformLocation(program, name);
-  const [ur, ut, um, us] = [u("r"), u("t"), u("m"), u("s")];
+  const [ut, um, us] = [u("t"), u("m"), u("s")];
 
   return {
     release: () => gl.getExtension("WEBGL_lose_context")?.loseContext(),
@@ -124,7 +130,6 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
         canvas.height = h;
       }
       gl.viewport(0, 0, w, h);
-      gl.uniform2f(ur, w, h);
       gl.uniform1f(ut, time);
       // The lamp, from -1..1 across the stage, in the shader's pixels (y up).
       gl.uniform2f(um, ((lampX + 1) / 2) * w, (1 - (lampY + 1) / 2) * h);
@@ -137,7 +142,7 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
 const rgba = ([r, g, b]: readonly number[], a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
 
 /** Paint the ball and its spots on the lights canvas. */
-const paintLights = (canvas: HTMLCanvasElement, sparkle: boolean, lampX: number, lampY: number, phase: number) => {
+const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean, lampX: number, lampY: number, phase: number) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -153,9 +158,8 @@ const paintLights = (canvas: HTMLCanvasElement, sparkle: boolean, lampX: number,
 
   const look = sparkle ? SPARKLE_BALL : CALM_BALL;
   const lamp = lampDirection(lampX, lampY);
-  const size = ballSize(width);
+  const { size, hang: top } = ball;
   const left = (width - size) / 2;
-  const top = HANG;
   const centreY = top + size / 2;
 
   // The spots first, so the ball hangs in front of them.
@@ -222,6 +226,7 @@ export const Stage = () => {
   const reduced = usePrefersStill();
   const rootRef = useRef<HTMLDivElement>(null);
   const lightsRef = useRef<HTMLCanvasElement>(null);
+  const ballRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -254,14 +259,15 @@ export const Stage = () => {
 
     const draw = (now: number) => {
       sequins?.draw(still ? 0 : now / 1000, lamp.x, lamp.y);
-      paintLights(lights, sparkle, lamp.x, lamp.y, phase);
+      paintLights(lights, ball, sparkle, lamp.x, lamp.y, phase);
     };
 
     const tick = (now: number) => {
       frame = requestAnimationFrame(tick);
       // A little slack, so a 60Hz display's every other frame always counts.
       if (now - drawn < 1000 / FPS - 4) return;
-      phase = (phase + SPIN * ((now - last) / 1000) + Math.PI * 2) % (Math.PI * 2);
+      const step = Math.min((now - last) / 1000, MAX_STEP);
+      phase = (phase + SPIN * step + Math.PI * 2) % (Math.PI * 2);
       last = now;
       drawn = now;
       draw(now);
@@ -270,8 +276,10 @@ export const Stage = () => {
     // In Sparkle the pointer (or a finger) is the lamp. The stage's box is
     // measured on resize, not on every pointer move.
     let box = root.getBoundingClientRect();
+    let ball = measureBall(ballRef.current);
     const measure = () => {
       box = root.getBoundingClientRect();
+      ball = measureBall(ballRef.current);
     };
     const point = (event: PointerEvent) => {
       if (!box.width || !box.height) return;
@@ -310,6 +318,7 @@ export const Stage = () => {
     <div ref={rootRef} className="esc-stage" aria-hidden="true">
       {/* In Sparkle the effect puts the sequin canvas here, before the lights. */}
       <canvas ref={lightsRef} className="esc-stage-lights" />
+      <div ref={ballRef} className="esc-stage-ball" />
     </div>
   );
 };

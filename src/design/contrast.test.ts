@@ -86,11 +86,15 @@ describe("design token contrast", () => {
     }
   });
 
-  it("stage text keeps its halo in both themes", () => {
+  it("stage text keeps a solid outline in the halo colour in both themes", () => {
+    // Unblurred copies a pixel out on all four diagonals: every glyph edge
+    // meets the halo, so the ink-on-halo ratio above is the one a reader gets.
     for (const css of [calm, glam]) {
       const start = css.indexOf("--esc-stage-text-shadow:");
       const shadow = css.slice(start, css.indexOf(";", start));
-      expect(shadow).toMatch(/0 0 2px var\(--esc-halo\)/);
+      for (const [x, y] of [["-1px", "-1px"], ["1px", "-1px"], ["-1px", "1px"], ["1px", "1px"]]) {
+        expect(shadow).toContain(`${x} ${y} 0 var(--esc-halo)`);
+      }
     }
   });
 

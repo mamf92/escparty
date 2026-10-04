@@ -57,4 +57,21 @@ describe("Stage", () => {
     expect(still).not.toBeNull();
     expect(still).not.toBe(moving);
   });
+
+  it("only turns in Sparkle with motion allowed: Calm and reduced motion are one still frame", async () => {
+    const frames = vi.fn(() => 1);
+    vi.stubGlobal("requestAnimationFrame", frames);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const setReduce = motionSetting(false);
+    const user = userEvent.setup();
+    renderWithProviders(<><ThemeSwitch /><Stage /></>);
+    expect(frames).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("switch", { name: "Sparkle mode" }));
+    expect(frames).toHaveBeenCalled();
+
+    frames.mockClear();
+    act(() => setReduce(true));
+    expect(frames).not.toHaveBeenCalled();
+  });
 });

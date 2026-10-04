@@ -54,7 +54,7 @@ same stage, with a disco ball hanging over it.
 | **Card** | White, rounded 28px, a deep soft lift; dark ink | A form: anything holding a field | Automatic for a `Pane` with a `Field`; `<Pane className="is-card">` on purpose |
 | **Button** | White, lifted; dark ink, bold | An action | `<Control>` |
 | **Next step** | Black, in the display font, white ink | The one thing to do next on this screen | `<Control elevation="high">` |
-| **Tile** | Dark frosted pink (`--esc-tile`), white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
+| **Tile** | Dark translucent pink (`--esc-tile`), white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
 | **Proud row** | A white row among the tiles | First place, your own row, the right answer | `<Row elevation="high">` |
 | **Sunk** | A darker, pressed tile | The bottom of a ladder, a wrong pick | `elevation="low"` |
 | **Chosen** | Hot pink (`--esc-accent`), white ink, pressed in | What is picked | `chosen` → `.is-chosen` + `aria-pressed` |
@@ -80,7 +80,7 @@ land. Never set a text colour on a page.
 | Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
 | Disco ball | Hangs still, in muted pinks; soft spots on the stage | White and light pink, turning slowly; brighter spots sweep the stage **left to right** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
-| Stage text | A tight dark halo, for the spots of light behind it | A wider halo, for the sequins too |
+| Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wider glow for the sequins |
 | Materials, sizes, states, copy | Identical | Identical |
 | Motion | The press only | The ball turns and the sequins shimmer, **only** when the system allows motion; with reduced motion it is one still frame |
 
@@ -129,7 +129,7 @@ hex value, a font name, a shadow or a pixel size of their own.
 | `--esc-blush*`, `--esc-light`, `--esc-shade`, `--esc-raise-sm`, `--esc-inset`, `--esc-well` | Inside a card: blush controls and wells, and Pearl's soft depth |
 | `--esc-button*`, `--esc-on-button` | The white action button |
 | `--esc-primary*`, `--esc-on-primary` | The black next-step button |
-| `--esc-tile*` | The dark tile: rest, hover, sunk, edge, press, blur, and a proud row's lift |
+| `--esc-tile*` | The dark tile: rest, hover, sunk, edge, press, and a proud row's lift |
 | `--esc-accent`, `--esc-on-accent`, `--esc-on-accent-muted`, `--esc-accent-press` | Chosen |
 | `--esc-disabled`, `--esc-on-disabled` | Unavailable |
 | `--esc-correct`, `--esc-wrong` | The check and cross glyphs, nothing else |
@@ -191,7 +191,7 @@ follows its role:
 
 | State | Action (white button) | Choice (dark tile) | Next step (black) | On a card (blush) |
 | --- | --- | --- | --- | --- |
-| Rest | White, lifted | Dark frosted tile | Black, lifted, display font | Blush, softly raised |
+| Rest | White, lifted | Dark tile | Black, lifted, display font | Blush, softly raised |
 | Hover | A touch pinker | A touch lighter | A touch lighter | A touch deeper |
 | Pressed | Pressed in, no movement | Pressed in | Pressed in | Pressed in |
 | Chosen | — | Hot pink, white ink, pressed in, `aria-pressed` | — (never chosen) | Hot pink |
@@ -293,10 +293,11 @@ controls live in the host's own tab or pane, never mixed into a guest's.
 ## 8. Accessibility (both themes)
 
 - **Contrast:** text 4.5:1 against what it sits on (the stage's gradient,
-  a tile frosted over a white spot of light, a card, a white or blush
+  a tile over a white spot of light, a card, a white or blush
   button, the black button and a chosen pink one); markers and the focus
   ring 3:1. Text straight on the stage can have a spot of light behind it,
-  so it always carries the dark halo, and the halo holds the 4.5:1.
+  so it always carries a solid dark outline (the halo), and the ink holds
+  4.5:1 against it.
   `src/design/contrast.test.ts` checks the tokens. Disabled controls are
   solid, so the stage never shows through behind their label.
 - **Colour is never alone:** chosen is pink plus pressed in plus

@@ -11,9 +11,10 @@ body {
 }
 
 /*
-  Stage text: on Sparkle's moving sequins it keeps a soft shadow so it
-  reads over a bright spot (the token is `none` in Calm). Surfaces set
-  their own text-shadow back to none.
+  Stage text: a spot of light (or, in Sparkle, a bright sequin) can land
+  behind it, so in both themes it carries a solid dark outline
+  (`--esc-stage-text-shadow`), which contrast.test.ts holds it to. Surfaces
+  set their own text-shadow back to none.
 */
 .esc-app {
   text-shadow: var(--esc-stage-text-shadow);

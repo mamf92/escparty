@@ -54,12 +54,16 @@
   --esc-bg: #3b0628;
   --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #7a1356 0%, #3b0628 72%);
   /*
-    Room the page header leaves for the ball hanging over it. The ball is
-    24% of the stage's width, from 84px to 200px (ballSize in Stage.tsx),
-    so the room grows with it; `cqw` is the stage's width (stage.css makes
-    `.esc-app` the container).
+    The disco ball: how big it is and how far below the stage's top edge it
+    hangs (just under the app bar). Stage.tsx reads both from here, so the
+    header's room for it can't drift: the ball is 24% of the stage's width,
+    84px to 200px (`cqw` is the stage's width; stage.css makes `.esc-app`
+    the container, and keeps a fixed size where `cqw` isn't supported).
   */
-  --esc-stage-clearance: calc(clamp(84px, 24cqw, 200px) + 0.5625rem);
+  --esc-ball-size: 96px;
+  --esc-ball-hang: 56px;
+  /* Room the page header leaves for the ball, which hangs just above it. */
+  --esc-stage-clearance: calc(var(--esc-ball-size) + 0.5625rem);
 
   /* The desktop phone around the stage. */
   --esc-backdrop: #1a0612;
@@ -131,7 +135,6 @@
   --esc-tile-sunk: rgba(18, 0, 12, 0.82);
   --esc-tile-edge: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   --esc-tile-press: inset 0 3px 8px rgba(0, 0, 0, 0.5);
-  --esc-tile-blur: blur(10px);
   /* A picked tile turns hot pink, and stands out. */
   --esc-tile-chosen-lift: 0 10px 24px rgba(15, 0, 10, 0.5);
 
@@ -145,12 +148,13 @@
   --esc-switch-ring: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
 
   /*
-    Stage text sits over the ball's spots of light, so it keeps a tight dark
-    halo that holds its contrast wherever a spot lands (contrast.test.ts).
-    Sparkle widens it for the sequins.
+    Stage text sits over the ball's spots of light, so it keeps a solid
+    dark outline: four unblurred copies a pixel out on each diagonal, so
+    every glyph edge meets the halo, never the spot (contrast.test.ts holds
+    the ink to 4.5:1 on it). A soft glow rounds it off; Sparkle widens it.
   */
   --esc-halo: #1e0014;
-  --esc-stage-text-shadow: 0 0 2px var(--esc-halo), 0 0 4px var(--esc-halo);
+  --esc-stage-text-shadow: -1px -1px 0 var(--esc-halo), 1px -1px 0 var(--esc-halo), -1px 1px 0 var(--esc-halo), 1px 1px 0 var(--esc-halo), 0 0 4px var(--esc-halo);
 
   --esc-press: 120ms ease-out;
 
@@ -164,5 +168,5 @@
 */
 :root[data-theme="sparkle"] {
   --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #8e0f5f 0%, #3b0628 72%);
-  --esc-stage-text-shadow: 0 0 2px var(--esc-halo), 0 0 4px var(--esc-halo), 0 1px 8px var(--esc-halo);
+  --esc-stage-text-shadow: -1px -1px 0 var(--esc-halo), 1px -1px 0 var(--esc-halo), -1px 1px 0 var(--esc-halo), 1px 1px 0 var(--esc-halo), 0 0 4px var(--esc-halo), 0 1px 8px var(--esc-halo);
 }
