@@ -121,7 +121,8 @@ hex value, a font name, a shadow or a pixel size of their own.
 | `--esc-space-1` … `--esc-space-8` | 4px steps: 4, 8, 12, 16, 20, 24, 32 |
 | `--esc-radius-control` / `--esc-radius-field` / `--esc-radius-card` | 18px / 16px / 28px |
 | `--esc-target-min` | 52px: a control's and a field's minimum height |
-| `--esc-bg`, `--esc-screen`, `--esc-stage-top`, `--esc-stage-clearance` | The stage colour, what the screen paints, its brightest spot, and the room the header leaves for the ball (it grows with the ball, which is 24% of the stage's width) |
+| `--esc-bg`, `--esc-screen`, `--esc-stage-top` | The stage colour, what the screen paints, and its brightest spot |
+| `--esc-ball-size`, `--esc-ball-hang`, `--esc-stage-clearance` | The disco ball's size (24% of the stage's width, 84px to 200px) and how far down it hangs, which `<Stage />` measures, and the room the header leaves for it |
 | `--esc-backdrop`, `--esc-frame`, `--esc-bezel`, `--esc-home-bar`, `--esc-frame-glow` | Behind the phone, its body, bezel, home bar and shadow |
 | `--esc-ink`, `--esc-ink-muted`, `--esc-title`, `--esc-link`, `--esc-focus` | Ink on the stage (scoped: a card swaps them) |
 | `--esc-stage-ink*`, `--esc-stage-correct`, `--esc-stage-wrong` | The same stage ink by name, for dark surfaces inside a light scope |
