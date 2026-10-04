@@ -411,7 +411,7 @@ const QuizBuilder = () => {
                 {full && <CalmNote>That's the most a quiz can hold ({QUIZ_LIMITS.maxQuestions}).</CalmNote>}
                 <Ground>
                     <Pane>
-                        <Control onClick={backFromBank}>Use these questions</Control>
+                        <Control elevation="high" onClick={backFromBank}>Use these questions</Control>
                     </Pane>
                 </Ground>
             </CalmPage>
@@ -495,7 +495,7 @@ const QuizBuilder = () => {
                         {draft.options.length > QUESTION_LIMITS.minOptions && (
                             <Control onClick={removeLastOption}>Remove the last answer</Control>
                         )}
-                        <Control onClick={saveDraft}>
+                        <Control elevation="high" onClick={saveDraft}>
                             {draft.index === null ? "Add to the quiz" : "Keep these changes"}
                         </Control>
                     </Pane>
@@ -600,7 +600,7 @@ const QuizBuilder = () => {
                 <Pane>
                     <Control id={fieldId("add-from-bank")} onClick={openBank}>Add from the bank</Control>
                     <Control id={fieldId("write")} disabled={full} onClick={() => openEditor(null)}>Write a question</Control>
-                    <Control disabled={saving || loadingFrom} onClick={saveQuiz}>
+                    <Control elevation="high" disabled={saving || loadingFrom} onClick={saveQuiz}>
                         {saving ? "Saving…" : "Save quiz"}
                     </Control>
                 </Pane>

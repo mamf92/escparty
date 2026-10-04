@@ -1,13 +1,15 @@
 import type { ComponentPropsWithRef, ReactNode } from "react";
 
 /*
- * The surface anatomy every screen is built from (docs/design/design-system.md):
+ * The surface anatomy every screen is built from (docs/design/design-system.md,
+ * "Materials" and "Components"):
  *
- *   <Ground>            the dark, never-flat ground (.calm-ground)
- *     <Pane>            one sheet; controls are direct children (.lycra-pane)
- *       <Control />     a raised control, always a <button> (.lycra)
- *       <Row />         a raised row of information, not a control (.lycra.is-static)
- *       <Field />       a sunken field: input, select or textarea (.lycra-field)
+ *   <Ground>            a section of the page, layout only (.calm-ground)
+ *     <Pane>            a stack, or a white card when it holds a Field (.lycra-pane)
+ *       <Control />     a button, always a <button> (.lycra): white for an
+ *                       action, a dark tile for a choice, black for the next step
+ *       <Row />         a dark tile of information, not a control (.lycra.is-static)
+ *       <Field />       a blush well on a card: input, select or textarea (.lycra-field)
  *
  * These render the classes and nothing else: no wrapper elements, so
  * controls stay direct siblings and the neighbour tug keeps working.
@@ -34,14 +36,14 @@ export const Pane = ({ as: Tag = "div", layout = "stack", className, ...props }:
 };
 
 type ControlProps = ComponentPropsWithRef<"button"> & {
-  /** Chosen stays pressed in: the answer or option someone picked. */
+  /** Chosen turns hot pink: the answer or option someone picked. */
   chosen?: boolean;
   /** A row with a title and detail under it, left aligned. */
   block?: boolean;
   /**
-   * `high` stands proudest: the screen's next step (design-system.md
-   * section 6, "Success"). It still lifts on hover and presses in, and
-   * `chosen` wins over it: a chosen control stays pressed in.
+   * `high` is the black button: the screen's one next step
+   * (design-system.md, "Page anatomy"). It still answers hover and press,
+   * and `chosen` wins over it: a chosen control stays pink.
    */
   elevation?: "high" | "rest";
 };
@@ -64,8 +66,8 @@ type RowProps = {
   /** `li` inside a list pane (`<Pane as="ol">`), `div` anywhere else. */
   as?: "li" | "div";
   /**
-   * Its step on the elevation ladder: `high` stands proud (first place,
-   * your own row), `low` sits pressed in (the bottom of a ladder).
+   * Its rank: `high` is the white proud row (first place, your own row),
+   * `low` a sunk tile (the bottom of a ladder).
    */
   elevation?: "high" | "rest" | "low";
   className?: string;
@@ -73,7 +75,7 @@ type RowProps = {
 } & Omit<ComponentPropsWithRef<"li">, "className" | "children">;
 
 /**
- * Information on the surface: raised like a control, but no pointer, no
+ * Information on the stage: a dark tile like a choice, but no pointer, no
  * hover, no press and no tab stop. Anything you can act on is a Control.
  */
 export const Row = ({ as: Tag = "div", elevation = "rest", className, ...props }: RowProps) => (

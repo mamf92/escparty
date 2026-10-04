@@ -159,7 +159,7 @@ const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity:
                             />
                             {missing && <CalmNote id={`${nameId}-problem`} role="alert">Give yourself a name.</CalmNote>}
                         </div>
-                        <Control type="submit">Join the party</Control>
+                        <Control type="submit" elevation="high">Join the party</Control>
                     </Pane>
                 </Ground>
             </form>
@@ -248,7 +248,7 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
             <Ground>
                 <Pane layout="split">
                     <Control disabled={actIndex === 0} onClick={() => onMove(actIndex - 1)}>Previous act</Control>
-                    <Control disabled={actIndex === party.acts.length - 1} onClick={() => onMove(actIndex + 1)}>Next act</Control>
+                    <Control elevation="high" disabled={actIndex === party.acts.length - 1} onClick={() => onMove(actIndex + 1)}>Next act</Control>
                 </Pane>
             </Ground>
             <Ground>

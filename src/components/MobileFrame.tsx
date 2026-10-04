@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Sparkles, ThemeSwitch } from '../design';
+import { Stage, ThemeSwitch } from '../design';
 
 interface MobileFrameProps {
   children: React.ReactNode;
@@ -11,14 +11,15 @@ interface MobileFrameProps {
  * "Page anatomy"): a bezel on wide screens, full bleed on a phone, and the
  * app bar with the brand and the theme switch. The brand is deliberately not
  * a home link: several screens are mid-game and have their own way out.
- * Sparkle's stars sit behind the scrolling content, fixed to the screen.
+ * The stage (the disco ball, and Sparkle's sequins) sits behind the
+ * scrolling content, fixed to the screen.
  */
 const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
   return (
     <FrameContainer>
       <PhoneFrame>
         <PhoneScreen className="esc-app">
-          <Sparkles />
+          <Stage />
           <Scroller>
             <AppBar>
               <Brand className="esc-title-text">ESCParty</Brand>
@@ -123,7 +124,7 @@ const Brand = styled.span`
   min-height: 44px;
   font-family: var(--esc-font-display);
   font-size: var(--esc-text-control);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: var(--esc-title-tracking);
   text-transform: uppercase;
   color: var(--esc-title);

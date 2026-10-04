@@ -124,7 +124,7 @@ const PartyAwards = () => {
                     <Ground>
                         <Pane layout="split">
                             <Control disabled={page === 0} onClick={() => setIndex(page - 1)}>Previous award</Control>
-                            <Control disabled={page === pages - 1} onClick={() => setIndex(page + 1)}>
+                            <Control elevation="high" disabled={page === pages - 1} onClick={() => setIndex(page + 1)}>
                                 {leaderboard.length > 0 && page + 1 === awards.length ? "Closest to the result" : "Next award"}
                             </Control>
                         </Pane>

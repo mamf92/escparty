@@ -62,21 +62,23 @@ game), and `pathUtils.ts`
 
 One design language, two themes, rules in `docs/design/design-system.md`
 (read it before building or restyling any screen) and code in
-`src/design/` (tokens, the theme switch, `Ground`/`Pane`/`Control`/`Row`/`Field`).
+`src/design/` (tokens, the theme switch, the `Stage`, `Ground`/`Pane`/`Control`/`Row`/`Field`).
 Every screen renders through `CalmPage` on those primitives and never
 writes its own colours, fonts or buttons (epic #166 moved them all over);
 styled-components is for layout only. `src/test/designGuard.test.ts` fails
 `npm test` on a hex or `rgb()`/`hsl()` colour or `theme.colors` outside
 `src/design/` (and the `/fabric-ui` demo, which keeps its own palette).
 
-The language is modern soft neumorphism: one background, and frameless
-surfaces of the same colour raised out of it or pressed into it.
+The language is "Bobby Socks": a dark pink stage under a disco ball,
+where a white card is a form, a white button an action, a dark tile a
+choice or information, hot pink what is chosen, and one black button the
+screen's next step (`elevation="high"`).
 
-- **Calm** — the accessible default and landing state: one flat violet,
-  no motion beyond a press.
-- **Sparkle** — opt-in via the **Sparkle mode** switch: the same shapes in
-  sequins, gold foil and glitter, animated only when the system allows
-  motion.
+- **Calm** — the accessible default and landing state: a still ball in
+  muted pinks, no motion beyond a press.
+- **Sparkle** — opt-in via the **Sparkle mode** switch: the same screens
+  on pink sequins under a turning ball, animated only when the system
+  allows motion. Only the stage (`src/design/Stage.tsx`) differs.
 
 The `escparty-calm`/`escparty-sparkle` skills describe the older lycra
 surface kept for the `/fabric-ui` demo only.

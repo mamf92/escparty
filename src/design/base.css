@@ -10,39 +10,33 @@ body {
   font-family: var(--esc-font-body);
 }
 
-/* The page title: chrome, outside the surface. */
+/*
+  Stage text: a spot of light (or, in Sparkle, a bright sequin) can land
+  behind it, so in both themes it carries a solid dark outline
+  (`--esc-stage-text-shadow`), which contrast.test.ts holds it to. Surfaces
+  set their own text-shadow back to none.
+*/
+.esc-app {
+  text-shadow: var(--esc-stage-text-shadow);
+}
+
+/*
+  Browsers reset text-shadow on form controls, so the links and the
+  switch on the stage (buttons that aren't surfaces) take the outline back.
+*/
+.esc-app :is(button, a):not(.lycra) {
+  text-shadow: inherit;
+}
+
+/* The page title: chrome, outside the surface, in the display face. */
 .esc-title {
   margin: 0;
   font-family: var(--esc-font-display);
   font-size: var(--esc-text-title);
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: 400;
+  line-height: 1.05;
   letter-spacing: var(--esc-title-tracking);
-  text-transform: uppercase;
   color: var(--esc-title);
-}
-
-/*
-  Sparkle sets the title in gold foil. The fill is a background clipped to
-  the glyphs, so a theme without one (Calm sets it to none) keeps the plain
-  colour above.
-*/
-:root[data-theme="sparkle"] .esc-title-text {
-  background: var(--esc-title-fill) 0 50% / 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 0 10px rgba(255, 201, 60, 0.45));
-}
-
-:root[data-theme="sparkle"] .esc-title::before,
-:root[data-theme="sparkle"] .esc-title::after {
-  content: "✦";
-  content: "✦" / "";
-  color: var(--esc-title);
-  margin: 0 0.4em;
-  font-size: 0.7em;
-  vertical-align: 0.2em;
 }
 
 .esc-subtitle {
@@ -91,9 +85,28 @@ body {
 }
 
 /* One focus ring everywhere, in the theme's focus colour. */
+/*
+  Focus: a pale pink ring with a dark ring either side of it, so it holds
+  3:1 wherever a spot of light lands. A plain element draws the dark rings
+  with its box-shadow; a surface keeps its own shadow and draws the outer
+  dark ring with ::after.
+*/
 .esc-app :focus-visible {
   outline: 2px solid var(--esc-focus);
   outline-offset: 3px;
+}
+
+.esc-app :focus-visible:not(.lycra):not(.lycra-field) {
+  box-shadow: 0 0 0 7px var(--esc-halo);
+}
+
+.esc-app .lycra:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 2px solid var(--esc-halo);
+  border-radius: calc(var(--esc-radius-control) + 7px);
+  pointer-events: none;
 }
 
 /*
@@ -118,7 +131,7 @@ body {
     outline-offset: 2px;
   }
 
-  .esc-sparkles {
+  .esc-stage {
     display: none !important;
   }
 }
@@ -131,7 +144,8 @@ body {
 @media (prefers-contrast: more) {
   .esc-app .lycra,
   .esc-app .lycra-field {
-    outline: 1px solid rgba(255, 255, 255, 0.6);
+    /* In the control's own ink: dark on white and blush, white on a tile. */
+    outline: 1px solid currentColor;
     outline-offset: -1px;
   }
 
@@ -169,8 +183,8 @@ body {
   width: 40px;
   height: 22px;
   border-radius: 11px;
-  background: var(--esc-bg);
-  box-shadow: var(--esc-inset-sm);
+  background: var(--esc-primary);
+  box-shadow: var(--esc-switch-ring);
 }
 
 .esc-theme-switch-thumb {
@@ -184,16 +198,20 @@ body {
   border-radius: 50%;
   font-size: 10px;
   line-height: 1;
-  color: var(--esc-ink-muted);
-  background: var(--esc-face-hover);
-  box-shadow: var(--esc-raise-sm);
+  color: transparent;
+  text-shadow: none;
+  background: var(--esc-button);
+  box-shadow: none;
   transition: transform var(--esc-press);
+}
+
+.esc-theme-switch[aria-checked="true"] .esc-theme-switch-track {
+  background: var(--esc-switch-on);
 }
 
 .esc-theme-switch[aria-checked="true"] .esc-theme-switch-thumb {
   transform: translateX(18px);
   color: var(--esc-on-switch);
-  background: var(--esc-switch-on);
 }
 
 @media (prefers-reduced-motion: reduce) {

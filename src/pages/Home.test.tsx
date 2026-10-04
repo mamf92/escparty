@@ -29,6 +29,8 @@ describe("Home", () => {
       // Controls are direct children of their pane, with no wrappers.
       expect(button.parentElement).toBe(group);
     }
+    // Playing together is the next step: the one black button.
+    expect(buttons.filter(button => button.classList.contains("is-high"))).toEqual([buttons[0]]);
   });
 
   it.each(DESTINATIONS)("%s goes to %s", async (label, path) => {

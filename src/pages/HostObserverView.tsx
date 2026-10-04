@@ -169,6 +169,7 @@ const HostObserverView = () => {
             <Ground>
                 <Pane>
                     <Control
+                        elevation="high"
                         onClick={resume}
                         disabled={resuming || !isRoomObserver || !inBreak || (waiting && !waitedLongEnough)}
                         aria-describedby={statusId}

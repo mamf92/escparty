@@ -66,7 +66,7 @@ const PartyHome = () => {
                             {tried && !valid && <CalmNote id={`${codeId}-problem`} role="alert">A party code is four letters, like ABBA.</CalmNote>}
                         </div>
                         <Control onClick={() => go(value => `/party/${value}/screen`)}>Open the big screen</Control>
-                        <Control type="submit">Join to rate</Control>
+                        <Control type="submit" elevation="high">Join to rate</Control>
                     </Pane>
                 </Ground>
             </form>

@@ -129,7 +129,7 @@ const QuizResults = () => {
         </Ground>
         <Ground>
           <Pane>
-            {/* The next step stands proudest (design-system.md section 6). */}
+            {/* The next step is the black button (design-system.md, "Page anatomy"). */}
             <Control elevation="high" onClick={() => leave("/quizzes")}>Play another quiz</Control>
             <Control onClick={() => leave("/scoreboard")}>See the scoreboard</Control>
           </Pane>
@@ -271,7 +271,7 @@ const QuizResults = () => {
       {room && isHost && !room.nextRoomCode && !error && (
         <Ground>
           <Pane>
-            {/* Once everyone is showing, the next round is the next step (design-system.md section 6). */}
+            {/* Once everyone is showing, the next round is the next step (design-system.md, "Page anatomy"). */}
             <Control elevation={done ? "high" : "rest"} disabled={nextRound === "busy"} onClick={playAgain}>Play again with everyone</Control>
           </Pane>
         </Ground>

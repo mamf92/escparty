@@ -299,7 +299,7 @@ const Lobby = () => {
                     {gate.canStart !== "no" && (
                         <Ground>
                             <Pane>
-                                {/* Everyone ready: the next step stands proudest (design-system.md section 6). */}
+                                {/* Everyone ready: the next step is the black button (design-system.md, "Page anatomy"). */}
                                 <Control
                                     elevation={gate.canStart === "yes" ? "high" : "rest"}
                                     disabled={busy}

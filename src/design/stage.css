@@ -1,0 +1,56 @@
+/*
+  The stage behind every screen (docs/design/design-system.md, "Themes and the
+  stage"): <Stage /> paints a disco ball and its spots of light, and in
+  Sparkle a floor of pink sequins, on canvases that sit behind the
+  scrolling content and never take the pointer. The stage's colour itself
+  is `--esc-screen`, painted by the screen the stage sits in.
+*/
+
+.esc-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.esc-stage > canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The screen is the container the ball (and the header's room for it) is sized by. */
+.esc-app {
+  container-type: inline-size;
+  /*
+    The room the page header leaves for the ball, which hangs just above
+    it. Declared here, not on :root: a custom property resolves its var()s
+    where it is declared, so on :root it would keep the fallback ball size.
+  */
+  --esc-stage-clearance: calc(var(--esc-ball-size) + 0.5625rem);
+}
+
+@supports (width: 1cqw) {
+  .esc-app {
+    --esc-ball-size: clamp(84px, 24cqw, 200px);
+  }
+}
+
+/* An invisible box the ball's size and hang are measured from (Stage.tsx). */
+.esc-stage-ball {
+  position: absolute;
+  top: var(--esc-ball-hang);
+  left: 0;
+  width: var(--esc-ball-size);
+  height: 0;
+  visibility: hidden;
+}
+
+/* The page header leaves room for the ball hanging over it. */
+.esc-app .calm-page {
+  padding-top: var(--esc-stage-clearance);
+}
+

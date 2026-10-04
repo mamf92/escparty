@@ -11,20 +11,29 @@ import { answerOptions, hostParty, joinParty, rateActs } from "./helpers";
  * docs/design/design-system.md as the browser actually renders
  * them, in Calm with reduced motion:
  *
- *   - no frames: nothing on the surface draws a border, and the ground and
- *     pane are layout only (no fill, no shadow);
- *   - a control at rest is the background colour, raised by a pair of soft
- *     shadows (one light, one dark), and a chosen one is pressed in;
+ *   - no frames: nothing on the surface draws a border; the ground is
+ *     layout only, and a pane is either layout only or, when it holds a
+ *     field, a white card;
+ *   - an action at rest is a white button (a blush one on a card) lifted by
+ *     a shadow, a choice at rest is a dark tile, and a chosen one is the
+ *     hot pink accent;
  *   - at most four text sizes on a surface;
  *   - nothing moves with reduced motion;
  *   - the check and cross colours stay a small share of the surface.
  *
- * Sparkle dresses the same shapes: its contrast is checked from the tokens
- * (src/design/contrast.test.ts), and the last test here checks the switch.
+ * Sparkle dresses the same surfaces and only changes the stage behind
+ * them; its contrast is checked from the tokens (src/design/contrast.test.ts),
+ * and the last tests here check the switch and the stage.
  */
 
-// The check and cross colours (--esc-correct, --esc-wrong), at any alpha.
-const MARKS = /rgba?\((90, 212, 138|255, 123, 134)[,)]/.source;
+// The check and cross colours, on a tile and on a card, at any alpha.
+const MARKS = /rgba?\((107, 227, 154|255, 138, 149|15, 106, 54|179, 18, 42)[,)]/.source;
+
+// The surface's materials, as the browser reports them.
+const WHITE = "rgb(255, 255, 255)";
+const BLUSH = "rgb(246, 226, 238)";
+const TILE = "rgba(40, 2, 26, 0.72)";
+const ACCENT = "rgb(224, 23, 126)";
 
 const measure = (page: Page) => page.evaluate((marksSource) => {
     const marks = new RegExp(marksSource);
@@ -43,10 +52,17 @@ const measure = (page: Page) => page.evaluate((marksSource) => {
                 && style.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none");
             if (edge) framed.push(describe(el));
         }
-        for (const el of [ground, ...ground.querySelectorAll<HTMLElement>(".lycra-pane")]) {
+        // The ground draws nothing; a pane draws nothing unless it is a card.
+        const groundStyle = getComputedStyle(ground);
+        if (groundStyle.backgroundColor !== "rgba(0, 0, 0, 0)" || groundStyle.backgroundImage !== "none" || groundStyle.boxShadow !== "none") {
+            framed.push(`${describe(ground)} (filled)`);
+        }
+        for (const el of ground.querySelectorAll<HTMLElement>(".lycra-pane")) {
             const style = getComputedStyle(el);
-            const filled = style.backgroundColor !== "rgba(0, 0, 0, 0)" || style.backgroundImage !== "none";
-            if (filled || style.boxShadow !== "none") framed.push(`${describe(el)} (filled)`);
+            const filled = style.backgroundColor !== "rgba(0, 0, 0, 0)" || style.backgroundImage !== "none" || style.boxShadow !== "none";
+            const card = el.matches(".is-card, :has(.lycra-field)");
+            if (filled && !(card && style.backgroundColor === "rgb(255, 255, 255)")) framed.push(`${describe(el)} (filled)`);
+            if (card && style.backgroundColor !== "rgb(255, 255, 255)") framed.push(`${describe(el)} (a card that isn't white)`);
         }
     }
 
@@ -62,17 +78,12 @@ const measure = (page: Page) => page.evaluate((marksSource) => {
         }
     }
 
-    // A control at rest, and a chosen one if the screen has one.
-    const bg = getComputedStyle(document.documentElement).getPropertyValue("--esc-bg").trim();
-    const probe = document.createElement("i");
-    probe.style.color = bg;
-    document.body.append(probe);
-    const bgColour = getComputedStyle(probe).color;
-    probe.remove();
-
-    const rest = [...document.querySelectorAll<HTMLElement>("button.lycra")]
-        .find(el => inGround(el) && !el.matches(".is-chosen, .is-selected, .is-low, :disabled, :hover"));
-    const restShadow = rest ? layers(getComputedStyle(rest).boxShadow) : [];
+    // An action and a choice at rest, and a chosen one if the screen has one.
+    const choice = "[aria-pressed], [role='radio'], [role='tab'], [role='option'], [role='checkbox']";
+    const atRest = [...document.querySelectorAll<HTMLElement>("button.lycra")]
+        .filter(el => inGround(el) && !el.matches(".is-chosen, .is-selected, .is-high, .is-low, .is-marked, :disabled, :hover"));
+    const action = atRest.find(el => !el.matches(choice));
+    const pick = atRest.find(el => el.matches(choice) && !el.closest(".is-card, .lycra-pane:has(.lycra-field)"));
     const chosen = [...document.querySelectorAll<HTMLElement>(".lycra.is-chosen")].find(inGround);
 
     const controls = [...document.querySelectorAll<HTMLElement>(".lycra")].filter(inGround);
@@ -95,13 +106,12 @@ const measure = (page: Page) => page.evaluate((marksSource) => {
     return {
         framed,
         sizes: [...sizes],
-        rest: rest ? {
-            background: getComputedStyle(rest).backgroundColor,
-            image: getComputedStyle(rest).backgroundImage,
-            bg: bgColour,
-            outer: restShadow.filter(layer => !layer.includes("inset")),
+        action: action ? {
+            background: getComputedStyle(action).backgroundColor,
+            lifted: layers(getComputedStyle(action).boxShadow).some(layer => !layer.includes("inset")),
         } : undefined,
-        chosenShadow: chosen ? getComputedStyle(chosen).boxShadow : undefined,
+        pick: pick ? getComputedStyle(pick).backgroundColor : undefined,
+        chosen: chosen ? getComputedStyle(chosen).backgroundColor : undefined,
         transforms: controls.map(el => getComputedStyle(el).transform),
         markPct: surfaceArea ? (markArea / surfaceArea) * 100 : 0,
     };
@@ -116,14 +126,12 @@ const judge = async (page: Page, name: string) => {
 
     expect(m.framed, `${name}: nothing on the surface has a frame`).toEqual([]);
     expect(m.sizes.length, `${name}: at most four text sizes (${m.sizes})`).toBeLessThanOrEqual(4);
-    if (m.rest) {
-        expect(m.rest.background, `${name}: a control is the background colour`).toBe(m.rest.bg);
-        expect(m.rest.image, `${name}: a Calm control has a flat face`).toBe("none");
-        expect(m.rest.outer.length, `${name}: raised by a pair of shadows`).toBe(2);
-        expect(m.rest.outer.some(layer => /rgba\(255, 255, 255/.test(layer)), `${name}: one light`).toBe(true);
-        expect(m.rest.outer.some(layer => !/rgba\(255, 255, 255/.test(layer)), `${name}: one dark`).toBe(true);
+    if (m.action) {
+        expect([WHITE, BLUSH], `${name}: an action is a white button, or blush on a card`).toContain(m.action.background);
+        expect(m.action.lifted, `${name}: an action stands off its surface`).toBe(true);
     }
-    if (m.chosenShadow) expect(m.chosenShadow, `${name}: a chosen control is pressed in`).toContain("inset");
+    if (m.pick) expect(m.pick, `${name}: a choice on the stage is a dark tile`).toBe(TILE);
+    if (m.chosen) expect(m.chosen, `${name}: a chosen control is the pink accent`).toBe(ACCENT);
     expect(m.transforms.filter(t => t !== "none"), `${name}: nothing moves with reduced motion`).toEqual([]);
     expect(m.markPct, `${name}: check and cross stay a small share`).toBeLessThan(2);
 };
@@ -253,12 +261,15 @@ test("the home screen follows the surface rules, and re-skins in Sparkle", async
     // Home re-skins with the switch like every other screen: no photo, no own colours.
     await page.getByRole("switch", { name: "Sparkle mode" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
-    // judge() holds Calm's flat-face rules, so Sparkle is checked here: every
-    // one of the five controls wears the sequin sheet.
+    // Sparkle only changes the stage: the sequin floor appears behind the
+    // ball, and the five destinations stay the same buttons.
+    await expect(page.locator(".esc-stage .esc-stage-sequins")).toHaveCount(1);
+    await judge(page, "home-sparkle");
     const controls = page.locator(".calm-ground button.lycra");
     await expect(controls).toHaveCount(5);
-    for (const control of await controls.all()) {
-        await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
+    await expect(controls.first()).toHaveCSS("background-color", "rgb(20, 8, 16)");
+    for (const control of (await controls.all()).slice(1)) {
+        await expect(control).toHaveCSS("background-color", "rgb(255, 255, 255)");
     }
     await page.context().close();
 });
@@ -276,11 +287,13 @@ test("the solo scoreboard follows the surface rules", async ({ browser }) => {
     await expect(page.getByRole("tab", { name: "Score" })).toHaveAttribute("aria-selected", "true");
     await judge(page, "solo-scoreboard");
 
-    // The best run stands proud in both themes; Sparkle gilds the same lift.
+    // The best run stands proud, a white row among dark tiles, in both themes.
     const best = page.getByRole("list", { name: "Your runs" }).getByRole("listitem").first();
     await expect(best).toHaveClass(/is-high/);
+    await expect(best).toHaveCSS("background-color", "rgb(255, 255, 255)");
     await page.getByRole("switch", { name: "Sparkle mode" }).click();
-    await expect(best).toHaveCSS("box-shadow", /rgba\(255, 201, 60, 0\.4\) 0px 0px 26px/);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
+    await expect(best).toHaveCSS("background-color", "rgb(255, 255, 255)");
 
     await page.context().close();
 });
@@ -326,17 +339,16 @@ test("Sparkle mode switches every screen, is remembered, and keeps still with re
 
     await toggle.click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
-    // The sequin skin (its magenta sheet, #760c52) reaches a control on the surface.
-    const control = page.locator(".calm-ground button.lycra").first();
-    await expect(control).toHaveCSS("background-image", /rgb\(118, 12, 82\)/);
+    // Sparkle swaps the stage only: the sequin floor appears behind the ball.
+    await expect(page.locator(".esc-stage .esc-stage-sequins")).toHaveCount(1);
 
     // Remembered across a reload, with no flash of Calm first.
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
     await expect(page.getByRole("switch", { name: "Sparkle mode" })).toHaveAttribute("aria-checked", "true");
 
-    // Reduced motion: the stars are there, but nothing animates.
-    await expect(page.locator(".esc-sparkles > i").first()).toBeVisible();
+    // Reduced motion: the ball and sequins are there, but nothing animates.
+    await expect(page.locator(".esc-stage canvas")).toHaveCount(2);
     const running = await page.evaluate(() => document.getAnimations().length);
     expect(running).toBe(0);
 

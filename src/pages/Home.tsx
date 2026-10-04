@@ -11,8 +11,10 @@ const DESTINATIONS = [
 ] as const;
 
 /**
- * The landing screen (#169): the five ways into ESCParty, one pane of
- * controls on the ground. It's the root, so it has no way back.
+ * The landing screen: the five ways into ESCParty, under the disco ball.
+ * Playing together is the night's main event, so it is the black button;
+ * the other four are white ones under it. It's the root, so it has no way
+ * back.
  */
 const Home = () => {
   const navigate = useNavigate();
@@ -24,8 +26,8 @@ const Home = () => {
     >
       <Ground>
         <Pane role="group" aria-label="Where to start">
-          {DESTINATIONS.map(({ label, path }) => (
-            <Control key={path} onClick={() => navigate(path)}>
+          {DESTINATIONS.map(({ label, path }, index) => (
+            <Control key={path} elevation={index === 0 ? "high" : "rest"} onClick={() => navigate(path)}>
               {label}
             </Control>
           ))}

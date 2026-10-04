@@ -280,7 +280,7 @@ const MidQuizScoreboard = () => {
       {canContinue ? (
         <Ground>
           <Pane>
-            <Control onClick={continueQuiz} disabled={resuming}>
+            <Control elevation="high" onClick={continueQuiz} disabled={resuming}>
               {resuming ? "Continuing…" : "Continue the quiz"}
             </Control>
           </Pane>
