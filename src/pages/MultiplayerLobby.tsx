@@ -84,8 +84,16 @@ const plainName = (name: string): string =>
  * to rejoin as yourself are notes and controls on the page (#172).
  */
 const MultiplayerLobby = () => {
-  const [step, setStep] = useState<Step>("choose");
-  const [joinCode, setJoinCode] = useState("");
+  // Where the way in sent us: the Host screen straight to hosting, or the
+  // Join screen with a code it found to be a quiz room, joined on arrival.
+  const location = useLocation();
+  const [arrival] = useState(() => {
+    const state = location.state as { step?: string; joinCode?: string } | null;
+    const joinCode = typeof state?.joinCode === "string" && /^[A-Z]{4}$/.test(state.joinCode) ? state.joinCode : null;
+    return { joinCode, step: (joinCode ? "join" : state?.step === "host" ? "host" : "choose") as Step };
+  });
+  const [step, setStep] = useState<Step>(arrival.step);
+  const [joinCode, setJoinCode] = useState(arrival.joinCode ?? "");
   // Four letters, A to Z; the field upper-cases what is typed.
   const codeInvalid = !/^[A-Z]{4}$/.test(joinCode);
   const [loading, setLoading] = useState(false);
@@ -124,7 +132,6 @@ const MultiplayerLobby = () => {
   }, [rejoinAs]);
   // A quiz picked in the library before coming here (#72): the new room
   // starts with it chosen, and the host can start straight away.
-  const location = useLocation();
   const [quizKey, setQuizKey] = useState(() => {
     const picked = (location.state as { quizKey?: string } | null)?.quizKey;
     return isKnownQuizKey(picked) ? picked : null;
@@ -261,6 +268,19 @@ const MultiplayerLobby = () => {
       }
     }
   };
+
+  // A code from the Join screen is joined straight away, once: the same
+  // join as typing it here, rejoin offer and all.
+  const autoJoined = useRef(false);
+  useEffect(() => {
+    if (autoJoined.current || !arrival.joinCode) return;
+    autoJoined.current = true;
+    // Once tried, coming Back here later doesn't join it again.
+    navigate(location.pathname, { replace: true, state: null });
+    void joinGame();
+    // joinGame reads this render's code, which is the arrival's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const submitJoin = (event: FormEvent) => {
     event.preventDefault();

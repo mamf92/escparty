@@ -255,22 +255,39 @@ test("the quiz library and builder follow the surface rules", async ({ browser }
 test("the home screen follows the surface rules, and re-skins in Sparkle", async ({ browser }) => {
     const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "Browse the quiz library" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Join a party" })).toBeVisible();
     await judge(page, "home");
 
     // Home re-skins with the switch like every other screen: no photo, no own colours.
     await page.getByRole("switch", { name: "Sparkle mode" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "sparkle");
     // Sparkle only changes the stage: the sequin floor appears behind the
-    // ball, and the five destinations stay the same buttons.
+    // ball, and the two ways in stay the same buttons.
     await expect(page.locator(".esc-stage .esc-stage-sequins")).toHaveCount(1);
     await judge(page, "home-sparkle");
     const controls = page.locator(".calm-ground button.lycra");
-    await expect(controls).toHaveCount(5);
+    await expect(controls).toHaveCount(2);
     await expect(controls.first()).toHaveCSS("background-color", "rgb(20, 8, 16)");
-    for (const control of (await controls.all()).slice(1)) {
-        await expect(control).toHaveCSS("background-color", "rgb(255, 255, 255)");
-    }
+    await expect(controls.nth(1)).toHaveCSS("background-color", "rgb(255, 255, 255)");
+
+    // Home floats the big ball, and the title still clears it.
+    const ball = await page.locator(".esc-stage-ball").boundingBox();
+    const title = await page.getByRole("heading", { level: 1 }).boundingBox();
+    expect(ball && title && ball.width).toBeGreaterThan(140);
+    expect(ball && title && title.y).toBeGreaterThanOrEqual((ball?.y ?? 0) + (ball?.width ?? 0));
+    await page.context().close();
+});
+
+test("the host and join screens follow the surface rules", async ({ browser }) => {
+    const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    await page.goto("/");
+    await page.getByRole("button", { name: "Host a party" }).click();
+    await expect(page.getByRole("button", { name: /^Host a scoreboard/ })).toBeVisible();
+    await judge(page, "host");
+    await page.getByRole("button", { name: "Back to ESCParty" }).click();
+    await page.getByRole("button", { name: "Join a party" }).click();
+    await expect(page.getByLabel("Party code")).toBeVisible();
+    await judge(page, "join");
     await page.context().close();
 });
 

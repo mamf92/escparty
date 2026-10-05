@@ -14,7 +14,10 @@ Why this runs on Firestore listeners and not WebSockets:
    a 4-letter code) or a player joins one (`joinRoom`). Both paths write
    `playerId`, `playerName`, `gameCode` and `isHost` to `localStorage`, then
    navigate to `/lobby`. Whether the host only observes is stored on the
-   room (`Room.hostIsObserver`) and nowhere else.
+   room (`Room.hostIsObserver`) and nowhere else. It is reached from Home's
+   Host screen (router state `{ step: "host" }`, straight to hosting) or
+   from the Join screen, which passes a code it found in `rooms`
+   (`{ joinCode }`) and has it joined on arrival, rejoin offer included.
 2. **`Lobby.tsx`** — reads those `localStorage` values back out, then opens
    one `onSnapshot` listener via `listenToRoom(gameCode, callback)`. It's
    the "green room" (#65): guests tap "I'm ready" (`setPlayerReady`), the

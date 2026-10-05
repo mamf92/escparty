@@ -15,6 +15,7 @@ generously and so on, each named after a moment in Eurovision history.
 
 | Route | Page | What |
 | --- | --- | --- |
+| `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
 | `/party` | `PartyHome.tsx` | Host, join with a code, open a big screen, or go back to the last party |
 | `/party/new` | `PartySetup.tsx` | Pick the show, the rating sheet (premade or your own categories), bonuses, whether awards name names, your name |
 | `/party/:code` | `PartyRoom.tsx` | Join (a name), then tabs: Rate, My ranking, The room, and Host (`PartyHostTools.tsx`) for the host |

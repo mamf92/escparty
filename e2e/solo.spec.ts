@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { answerOptions } from "./helpers";
 
-// Single player, end to end (#55): Home, the quiz library, a whole quiz,
+// Single player, end to end (#55): Home, solo play, the quiz library, a whole quiz,
 // the results and the scoreboard. No Firestore involved: solo scores stay on
 // the device.
 test("a solo quiz from the home screen to the scoreboard", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Browse the quiz library" }).click();
+    await page.getByRole("button", { name: "Play a quiz solo" }).click();
+    await page.getByRole("button", { name: /^Browse the quiz library/ }).click();
     await page.getByRole("radio", { name: /Quick Fire/ }).click();
     await page.getByRole("button", { name: "Play Quick Fire solo" }).click();
 

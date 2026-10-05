@@ -247,6 +247,11 @@ secondary actions, at least 44px tall. One per footer is the norm.
 case, below the ball (the header's `--esc-stage-clearance` keeps it
 clear).
 
+**Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
+floats a bigger ball (46% of the stage's width, 148px to 280px) with no
+wire (`--esc-ball-wire: none`, which `<Stage />` reads), and the header's
+clearance grows with it. Two ways in under the title, nothing more.
+
 **Big screen** (`calm-screen` on `CalmPage`). The same anatomy for a TV:
 only the sizes and the ball's clearance scale up, together.
 

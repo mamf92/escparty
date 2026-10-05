@@ -39,6 +39,23 @@
   }
 }
 
+/*
+  Home (`calm-hero` on CalmPage) floats a bigger ball, with no wire, over
+  the page: the landing screen's centrepiece. The header's clearance
+  follows the size, as it does everywhere. Where :has() isn't there, Home
+  keeps the hanging ball.
+*/
+.esc-app:has(.calm-page.calm-hero) {
+  --esc-ball-size: 168px;
+  --esc-ball-wire: none;
+}
+
+@supports (width: 1cqw) {
+  .esc-app:has(.calm-page.calm-hero) {
+    --esc-ball-size: clamp(148px, 46cqw, 280px);
+  }
+}
+
 /* An invisible box the ball's size and hang are measured from (Stage.tsx). */
 .esc-stage-ball {
   position: absolute;
