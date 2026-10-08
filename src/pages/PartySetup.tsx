@@ -1,8 +1,9 @@
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { Control, Field, Ground, Pane } from "../design";
+import { NamePicker } from "../components/NamePicker";
+import { Control, Field, Ground, Pane, Row } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
 import {
@@ -16,7 +17,6 @@ import {
     type RatingTemplate,
 } from "../utils/partyModel";
 import { savePartyIdentity } from "../utils/partySession";
-import { randomPartyName } from "../utils/partyNames";
 import "./party-calm.css";
 
 const CUSTOM = "custom";
@@ -26,33 +26,51 @@ const scaleLabel = (max: number) => `1 to ${max}`;
 let categoryCounter = 0;
 const newCategory = (): RatingCategory => ({ id: `c${Date.now().toString(36)}${(categoryCounter++).toString(36)}`, label: "", max: 10 });
 
+/** The questions, in order. A step's heading is also the name of its way back. */
+const STEPS = ["Which show?", "How does everyone rate?", "Any extras?", "Who are you tonight?", "Ready to start?"] as const;
+const LAST = STEPS.length;
+
+const yesNo = (value: boolean | null) => (value === null ? "" : value ? "Yes" : "No");
+
 /**
- * Set up a scoreboard party (#80, #81, #89): which Burgas 2027 show, how
- * everyone rates (a premade sheet or your own categories), whether the
- * party bonuses are on, and whether the end-of-party awards name names.
- * Everything here is fixed for the party once it starts, so every guest
- * rates the same way.
+ * Set up a scoreboard party (#80, #81, #89) one question per screen (#208):
+ * 1 which Burgas 2027 show, 2 how everyone rates (a premade sheet or your
+ * own categories), 3 extras (party bonuses; whether the end-of-party awards
+ * name names), 4 your name (spun from the Eurovision participants, never
+ * typed), 5 start. Nothing starts picked. Tapping a choice moves on, except
+ * where the screen needs more than one answer (our own categories; the two
+ * extras), which has a Continue. Back keeps every answer. Everything is
+ * fixed for the party once it starts, so every guest rates the same way.
  */
 const PartySetup = () => {
     const navigate = useNavigate();
     const ids = useId();
-    const [contestId, setContestId] = useState(CONTESTS_2027[CONTESTS_2027.length - 1].id);
-    const [templateId, setTemplateId] = useState(RATING_TEMPLATES[0].id);
+    const [step, setStep] = useState(1);
+    const [contestId, setContestId] = useState<string | null>(null);
+    const [templateId, setTemplateId] = useState<string | null>(null);
     const [custom, setCustom] = useState<RatingCategory[]>(() => [newCategory()]);
-    const [bonuses, setBonuses] = useState(true);
-    const [showNames, setShowNames] = useState(true);
-    const [name, setName] = useState(randomPartyName);
+    const [bonuses, setBonuses] = useState<boolean | null>(null);
+    const [showNames, setShowNames] = useState<boolean | null>(null);
+    const [name, setName] = useState<string | null>(null);
     const [tried, setTried] = useState(false);
     const [creating, setCreating] = useState(false);
     const [failure, setFailure] = useState<string | null>(null);
+    const heading = useRef<HTMLHeadingElement>(null);
+    const arrived = useRef(false);
 
-    const template: RatingTemplate = templateId === CUSTOM
+    // A new question is read out: focus lands on its heading, not on the
+    // spot where the last control was.
+    useEffect(() => {
+        if (arrived.current) heading.current?.focus();
+        arrived.current = true;
+    }, [step]);
+
+    const contest = CONTESTS_2027.find(entry => entry.id === contestId);
+    const template: RatingTemplate | undefined = templateId === CUSTOM
         ? { id: CUSTOM, name: "Our own sheet", blurb: "Categories made up for this party.", categories: custom.map(category => ({ ...category, label: category.label.trim() })) }
-        : RATING_TEMPLATES.find(entry => entry.id === templateId)!;
-    // Problems are told once Start has been tried: the name's beside its
-    // field, the categories' beside Start, so a tap on Start always shows why.
+        : RATING_TEMPLATES.find(entry => entry.id === templateId);
+    // Problems are told once Continue has been tried, beside Continue.
     const sheetProblems = templateId === CUSTOM ? categoryProblems(custom) : [];
-    const nameMissing = tried && !name.trim();
     const sheetProblemShown = tried && sheetProblems.length > 0;
     // Which category names the problem is about: blank, too long or repeated.
     const labelInvalid = (category: RatingCategory) => sheetProblemShown && categoryLabelProblem(category, custom) !== null;
@@ -60,27 +78,31 @@ const PartySetup = () => {
     const setCategory = (index: number, change: Partial<RatingCategory>) =>
         setCustom(custom.map((category, i) => (i === index ? { ...category, ...change } : category)));
 
+    const go = (to: number) => {
+        setTried(false);
+        setStep(to);
+    };
+
     const create = async () => {
-        setTried(true);
-        if (sheetProblems.length > 0 || !name.trim() || creating) return;
+        if (!contest || !template || bonuses === null || showNames === null || !name || creating) return;
         setCreating(true);
         setFailure(null);
         try {
-            const contest = await fetchContest(contestId);
-            if (!contest) throw new Error(`No show ${contestId}`);
+            const fetched = await fetchContest(contest.id);
+            if (!fetched) throw new Error(`No show ${contest.id}`);
             const hostId = uuidv4();
             const code = await createParty({
                 hostId,
-                title: contest.title,
-                contestId: contest.id,
-                kind: contest.kind,
-                qualifiers: contest.kind === "semi" ? contest.qualifiers ?? 10 : 0,
-                acts: contest.acts,
+                title: fetched.title,
+                contestId: fetched.id,
+                kind: fetched.kind,
+                qualifiers: fetched.kind === "semi" ? fetched.qualifiers ?? 10 : 0,
+                acts: fetched.acts,
                 template,
                 bonuses,
                 showNames,
             });
-            savePartyIdentity(code, { guestId: hostId, name: name.trim(), isHost: true });
+            savePartyIdentity(code, { guestId: hostId, name, isHost: true });
             navigate(`/party/${code}`);
         } catch (error) {
             console.error("Couldn't create the party:", error);
@@ -89,46 +111,47 @@ const PartySetup = () => {
         }
     };
 
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        void create();
+    const continueFromSheet = () => {
+        if (sheetProblems.length > 0) {
+            setTried(true);
+            return;
+        }
+        go(3);
     };
 
-    return (
-        <CalmPage
-            title="Host a party"
-            subtitle="Pick the show and how everyone rates. This is fixed once the party starts."
-            footer={<CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>}
-        >
-            <h2 className="esc-note" id={`${ids}-show`}>Which show?</h2>
-            <Ground>
-                <Pane role="radiogroup" aria-labelledby={`${ids}-show`}>
-                    {CONTESTS_2027.map(contest => (
-                        <Control
-                            key={contest.id}
-                            block
-                            role="radio"
-                            aria-checked={contestId === contest.id}
-                            chosen={contestId === contest.id}
-                            onClick={() => setContestId(contest.id)}
-                        >
-                            <span className="calm-row">
-                                <span>{contest.title}</span>
-                                <span className="calm-sub">{contest.acts.length} acts</span>
-                            </span>
-                            <span className="calm-sub">
-                                {new Date(`${contest.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-                                {contest.kind === "semi" ? ` · ${contest.qualifiers} go through` : " · every act ranked"}
-                            </span>
-                        </Control>
-                    ))}
-                </Pane>
-            </Ground>
-            <CalmNote>The running order is a guess until the real one is announced; the host can edit it any time.</CalmNote>
+    const showChoices = (
+        <Ground>
+            <Pane role="radiogroup" aria-labelledby={`${ids}-q`}>
+                {CONTESTS_2027.map(entry => (
+                    <Control
+                        key={entry.id}
+                        block
+                        role="radio"
+                        aria-checked={contestId === entry.id}
+                        chosen={contestId === entry.id}
+                        onClick={() => {
+                            setContestId(entry.id);
+                            go(2);
+                        }}
+                    >
+                        <span className="calm-row">
+                            <span>{entry.title}</span>
+                            <span className="calm-sub">{entry.acts.length} acts</span>
+                        </span>
+                        <span className="calm-sub">
+                            {new Date(`${entry.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                            {entry.kind === "semi" ? ` · ${entry.qualifiers} go through` : " · every act ranked"}
+                        </span>
+                    </Control>
+                ))}
+            </Pane>
+        </Ground>
+    );
 
-            <h2 className="esc-note" id={`${ids}-sheet`}>How does everyone rate?</h2>
+    const sheetChoices = (
+        <>
             <Ground>
-                <Pane role="radiogroup" aria-labelledby={`${ids}-sheet`}>
+                <Pane role="radiogroup" aria-labelledby={`${ids}-q`}>
                     {[...RATING_TEMPLATES, { id: CUSTOM, name: "Make our own", blurb: "Up to six categories, each on its own scale.", categories: [] }].map(option => (
                         <Control
                             key={option.id}
@@ -136,7 +159,12 @@ const PartySetup = () => {
                             role="radio"
                             aria-checked={templateId === option.id}
                             chosen={templateId === option.id}
-                            onClick={() => setTemplateId(option.id)}
+                            onClick={() => {
+                                setTemplateId(option.id);
+                                // A premade sheet is the whole answer; our own needs its categories.
+                                if (option.id !== CUSTOM) go(3);
+                                else setTried(false);
+                            }}
                         >
                             <span>{option.name}</span>
                             <span className="calm-sub">
@@ -149,7 +177,7 @@ const PartySetup = () => {
 
             {templateId === CUSTOM && (
                 <>
-                    <h2 className="esc-note">Your categories</h2>
+                    <h3 className="esc-note">Your categories</h3>
                     <Ground>
                         <Pane>
                             {custom.map((category, index) => (
@@ -189,56 +217,105 @@ const PartySetup = () => {
                             )}
                         </Pane>
                     </Ground>
+                    <Ground>
+                        <Pane>
+                            {/* Beside Continue, where the tap was; the fields it's about point here. */}
+                            {sheetProblemShown && <CalmNote id={`${ids}-sheet-problem`} role="alert">{sheetProblems.join(" ")}</CalmNote>}
+                            <Control elevation="high" onClick={continueFromSheet}>Continue</Control>
+                        </Pane>
+                    </Ground>
                 </>
             )}
+        </>
+    );
 
-            <h2 className="esc-note">Extras</h2>
+    const extras = (
+        <>
+            <h3 className="esc-heading party-subquestion" id={`${ids}-bonuses`}>Party bonuses?</h3>
+            <CalmNote>{PARTY_BONUSES.map(bonus => `${bonus.label} +${bonus.points}`).join(" · ")}</CalmNote>
+            <Ground>
+                <Pane layout="split" role="radiogroup" aria-labelledby={`${ids}-bonuses`}>
+                    <Control role="radio" aria-checked={bonuses === true} chosen={bonuses === true} onClick={() => setBonuses(true)}>Yes</Control>
+                    <Control role="radio" aria-checked={bonuses === false} chosen={bonuses === false} onClick={() => setBonuses(false)}>No</Control>
+                </Pane>
+            </Ground>
+            <h3 className="esc-heading party-subquestion" id={`${ids}-names`}>Name names in the awards?</h3>
+            <CalmNote>
+                Yes: everyone sees who rated like twins and who was toughest. No: the awards say &quot;two of you&quot; and &quot;one of you&quot;,
+                and each guest is told which are theirs. The ratings themselves aren&apos;t secret from the party.
+            </CalmNote>
+            <Ground>
+                <Pane layout="split" role="radiogroup" aria-labelledby={`${ids}-names`}>
+                    <Control role="radio" aria-checked={showNames === true} chosen={showNames === true} onClick={() => setShowNames(true)}>Yes</Control>
+                    <Control role="radio" aria-checked={showNames === false} chosen={showNames === false} onClick={() => setShowNames(false)}>No</Control>
+                </Pane>
+            </Ground>
             <Ground>
                 <Pane>
-                    <Control block chosen={bonuses} onClick={() => setBonuses(!bonuses)}>
-                        <span>Party bonuses</span>
-                        <span className="calm-sub">
-                            {bonuses ? "" : "Off: "}
-                            {PARTY_BONUSES.map(bonus => `${bonus.label} +${bonus.points}`).join(" · ")}
-                        </span>
-                    </Control>
-                    <Control block chosen={showNames} onClick={() => setShowNames(!showNames)}>
-                        <span>Name names in the awards</span>
-                        <span className="calm-sub">
-                            {showNames
-                                ? "Everyone sees who rated like twins and who was toughest."
-                                : "Off: the awards say \"two of you\" and \"one of you\", and each guest is told which are theirs. It keeps the fun friendly; the ratings themselves aren't secret from the party."}
-                        </span>
+                    <Control elevation="high" disabled={bonuses === null || showNames === null} onClick={() => go(4)}>Continue</Control>
+                </Pane>
+            </Ground>
+        </>
+    );
+
+    const namePicker = (
+        <>
+            <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
+            <NamePicker value={name} onChange={setName} />
+            <Ground>
+                <Pane>
+                    <Control elevation="high" disabled={name === null} onClick={() => go(5)}>Continue</Control>
+                </Pane>
+            </Ground>
+        </>
+    );
+
+    const summary = (
+        <>
+            <Ground>
+                <Pane as="ul" aria-label="Your party">
+                    <Row as="li"><span className="calm-sub">Show</span><span>{contest?.title}</span></Row>
+                    <Row as="li">
+                        <span className="calm-sub">Rating</span>
+                        <span>{template?.categories.map(category => category.label).join(" · ")}</span>
+                    </Row>
+                    <Row as="li"><span className="calm-sub">Party bonuses</span><span>{yesNo(bonuses)}</span></Row>
+                    <Row as="li"><span className="calm-sub">Names in the awards</span><span>{yesNo(showNames)}</span></Row>
+                    <Row as="li"><span className="calm-sub">You are</span><span>{name}</span></Row>
+                </Pane>
+            </Ground>
+            <Ground>
+                <Pane>
+                    <Control elevation="high" disabled={creating} onClick={() => void create()}>
+                        {creating ? "Starting…" : "Start the party"}
                     </Control>
                 </Pane>
             </Ground>
-
-            <h2 className="esc-note">And you?</h2>
-            <form onSubmit={submit} noValidate>
-                <Ground>
-                    <Pane>
-                        <div>
-                            <label className="calm-label" htmlFor={`${ids}-name`}>Your name at the party</label>
-                            <Field
-                                id={`${ids}-name`}
-                                value={name}
-                                maxLength={40}
-                                aria-invalid={nameMissing}
-                                aria-describedby={nameMissing ? `${ids}-name-problem` : undefined}
-                                onChange={event => setName(event.target.value)}
-                            />
-                            {nameMissing && <CalmNote id={`${ids}-name-problem`} role="alert">Give yourself a name.</CalmNote>}
-                        </div>
-                        {/* Beside Start, where the tap was; the fields it's about point here. */}
-                        {sheetProblemShown && <CalmNote id={`${ids}-sheet-problem`} role="alert">{sheetProblems.join(" ")}</CalmNote>}
-                        <Control type="submit" elevation="high" disabled={creating}>
-                            {creating ? "Starting…" : "Start the party"}
-                        </Control>
-                    </Pane>
-                </Ground>
-            </form>
             {failure && <CalmNote role="alert">{failure}</CalmNote>}
-            <CalmNote>The party and everyone's ratings are set to be deleted after {PARTY_LIFETIME_DAYS} days.</CalmNote>
+            <CalmNote>The party and everyone&apos;s ratings are set to be deleted after {PARTY_LIFETIME_DAYS} days.</CalmNote>
+        </>
+    );
+
+    return (
+        <CalmPage
+            title="Host a party"
+            subtitle="This is fixed once the party starts."
+            footer={step === 1
+                ? <CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>
+                : <CalmLink onClick={() => go(step - 1)}>Back to {STEPS[step - 2]}</CalmLink>}
+        >
+            <p className="esc-note" role="status">Step {step} of {LAST}</p>
+            <h2 className="esc-heading party-question" id={`${ids}-q`} ref={heading} tabIndex={-1}>{STEPS[step - 1]}</h2>
+            {step === 1 && (
+                <>
+                    {showChoices}
+                    <CalmNote>The running order is a guess until the real one is announced; the host can edit it any time.</CalmNote>
+                </>
+            )}
+            {step === 2 && sheetChoices}
+            {step === 3 && extras}
+            {step === 4 && namePicker}
+            {step === 5 && summary}
         </CalmPage>
     );
 };

@@ -34,3 +34,57 @@
   align-items: stretch;
   gap: var(--esc-space-4);
 }
+
+/* Party setup, one question per screen (#208): the question is set large,
+   in the display font, and the sub-questions of the extras step a size
+   down. */
+.party-question {
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-title);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+/* Focus lands on the question when a step changes, for screen readers;
+   it isn't a control, so it shows no focus ring. */
+.party-question:focus {
+  outline: none;
+}
+
+.party-subquestion {
+  font-size: var(--esc-text-heading);
+}
+
+/* The name reel: the landed name between its neighbours, which sit back.
+   A swipe on it steps the reel rather than scrolling the page. */
+.party-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--esc-space-4);
+}
+
+.party-reel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-space-3);
+  touch-action: none;
+  user-select: none;
+}
+
+.party-reel-edge {
+  opacity: 0.55;
+}
+
+.party-reel-name {
+  min-height: calc(var(--esc-target-min) * 1.5);
+  align-items: center;
+  justify-content: center;
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-heading);
+  text-align: center;
+}
+
+.party-reel-edge {
+  text-align: center;
+}
