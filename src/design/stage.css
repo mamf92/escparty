@@ -71,3 +71,28 @@
   padding-top: var(--esc-stage-clearance);
 }
 
+
+/*
+  The party room (`calm-compact` on CalmPage) is worked with a thumb on a
+  phone, so its ball is small and its title one line, to leave the screen
+  to the rating sheet. The header's clearance follows the ball's size.
+*/
+.esc-app:has(.calm-page.calm-compact) {
+  --esc-ball-size: 56px;
+  --esc-ball-hang: 40px;
+}
+
+@supports (width: 1cqw) {
+  .esc-app:has(.calm-page.calm-compact) {
+    --esc-ball-size: clamp(48px, 14cqw, 72px);
+  }
+}
+
+.esc-app .calm-compact .esc-title {
+  font-size: var(--esc-text-heading);
+}
+
+.esc-app .calm-compact .esc-subtitle {
+  margin-top: var(--esc-space-1);
+  font-size: var(--esc-text-sub);
+}

@@ -22,6 +22,13 @@ generously and so on, each named after a moment in Eurovision history.
 | `/party/:code/screen` | `PartyScreen.tsx` | The TV: QR code, the code, the room's standings, closest guests. Outside the phone frame |
 | `/party/:code/awards` | `PartyAwards.tsx` | One award at a time, then who came closest. Only after the host opens them (the host can preview) |
 
+On the Rate tab the sheet is a two-column table (`Sheet`/`SheetRow` in
+`src/design`): category on the left, a `Stepper` (a `spinbutton`: big − and +,
+arrow/Home/End keys, drag to scrub, "Not rated" until set) on the right. It
+saves through the same `onRate(actId, categoryId, value)`. The room renders
+with `calm-compact` (small ball, one-line title) so a five-category sheet fits
+one phone screen. e2e's `rateActs` drives the steppers with Home and ArrowUp.
+
 Each guest's place in the running order is kept by act id, so a host
 reordering the lineup doesn't move them to another country.
 

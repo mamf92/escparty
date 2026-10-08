@@ -1,10 +1,10 @@
-import { Fragment, useId, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import PartyHostTools from "../components/PartyHostTools";
 import { PartyError, PartyNotFound } from "../components/PartyStates";
-import { Control, Field, Ground, Pane, Row, useRovingTabs } from "../design";
+import { Control, Field, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } from "../design";
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
 import { usePartyData } from "../hooks/usePartyData";
 import type { Party } from "../utils/partyFirestore";
@@ -80,6 +80,7 @@ const PartyRoom = () => {
 
     return (
         <CalmPage
+            className="calm-compact"
             title={party.title}
             subtitle={`Party ${party.code} · you're ${identity.name}`}
             footer={
@@ -199,29 +200,22 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
                 </Pane>
             </Ground>
 
-            {party.template.categories.map(category => {
-                const current = ballot.ratings[act.id]?.[category.id];
-                return (
-                    <Fragment key={category.id}>
-                        <h2 className="esc-note">{category.label}{current ? `: ${current}` : ""}</h2>
-                        <Ground>
-                            <Pane layout="scale" role="radiogroup" aria-label={`${category.label} for ${act.country}`}>
-                                {Array.from({ length: category.max }, (_, i) => i + 1).map(value => (
-                                    <Control
-                                        key={value}
-                                        role="radio"
-                                        aria-checked={current === value}
-                                        chosen={current === value}
-                                        onClick={() => onRate(act.id, category.id, value)}
-                                    >
-                                        {value}
-                                    </Control>
-                                ))}
-                            </Pane>
-                        </Ground>
-                    </Fragment>
-                );
-            })}
+            <Ground>
+                <Sheet aria-label={`Your ratings for ${act.country}`}>
+                    <tbody>
+                        {party.template.categories.map(category => (
+                            <SheetRow key={category.id} label={category.label}>
+                                <Stepper
+                                    label={`${category.label} for ${act.country}`}
+                                    value={ballot.ratings[act.id]?.[category.id]}
+                                    max={category.max}
+                                    onChange={value => onRate(act.id, category.id, value)}
+                                />
+                            </SheetRow>
+                        ))}
+                    </tbody>
+                </Sheet>
+            </Ground>
 
             {bonuses.length > 0 && (
                 <>

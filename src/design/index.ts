@@ -3,6 +3,8 @@ export { useDesignTheme } from "./useDesignTheme";
 export { ThemeSwitch } from "./ThemeSwitch";
 export { Stage } from "./Stage";
 export { Ground, Pane, Control, Row, Field } from "./Surface";
+export { Stepper } from "./Stepper";
+export { Sheet, SheetRow } from "./Sheet";
 export { Marker } from "./Marker";
 export { cx } from "./cx";
 export { THEMES, THEME_STORAGE_KEY, type ThemeName } from "./theme";
