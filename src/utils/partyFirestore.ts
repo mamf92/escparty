@@ -96,6 +96,10 @@ export const isAct = (value: unknown): value is Act => {
 /** When a document written now can be deleted: PARTY_LIFETIME_DAYS from now. */
 const expiry = () => Timestamp.fromMillis(Date.now() + PARTY_LIFETIME_DAYS * 24 * 60 * 60 * 1000);
 
+/** Whether a party has this code: the Join screen tells a party from a quiz room by it. */
+export const partyExists = async (code: string): Promise<boolean> =>
+    (await getDoc(doc(requireDb(), "parties", code))).exists();
+
 /**
  * Create a party under a fresh 4-letter code and return the code. Tries a
  * few codes, since the create rule refuses an existing one.

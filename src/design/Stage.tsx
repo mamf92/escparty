@@ -32,10 +32,12 @@ import { useDesignTheme } from "./useDesignTheme";
  * (`--esc-ball-size`, `--esc-ball-hang`): the same values the page
  * header leaves room for. 96px under 56px where it can't be measured.
  */
-type BallBox = { size: number; hang: number };
+type BallBox = { size: number; hang: number; wire: boolean };
 const measureBall = (box: HTMLElement | null): BallBox => ({
   size: box?.offsetWidth || 96,
   hang: box?.offsetTop || 56,
+  // Home floats a bigger ball with no wire (`--esc-ball-wire: none`, stage.css).
+  wire: !box || getComputedStyle(box).getPropertyValue("--esc-ball-wire").trim() !== "none",
 });
 /** The longest step the ball turns in one frame, so it never jumps after a hidden tab. */
 const MAX_STEP = 0.1;
@@ -166,7 +168,7 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
 
   const look = sparkle ? SPARKLE_BALL : CALM_BALL;
   const lamp = lampDirection(lampX, lampY);
-  const { size, hang: top } = ball;
+  const { size, hang: top, wire } = ball;
   const left = (width - size) / 2;
   const centreY = top + size / 2;
 
@@ -186,8 +188,10 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
   }
 
   // The wire it hangs from, then the ball, a facet at a time.
-  ctx.fillStyle = sparkle ? "#f3e6ee" : "#b89aac";
-  ctx.fillRect(width / 2 - 1, 0, 2, top + 2);
+  if (wire) {
+    ctx.fillStyle = sparkle ? "#f3e6ee" : "#b89aac";
+    ctx.fillRect(width / 2 - 1, 0, 2, top + 2);
+  }
   ctx.save();
   ctx.beginPath();
   ctx.arc(width / 2, centreY, size / 2, 0, Math.PI * 2);
@@ -313,6 +317,8 @@ export const Stage = () => {
         })
       : null;
     resized?.observe(root);
+    // The ball's own box resizes when a screen asks for the big one (Home).
+    if (ballRef.current) resized?.observe(ballRef.current);
 
     return () => {
       cancelAnimationFrame(frame);

@@ -2,6 +2,8 @@ import { lazy, Suspense, type ReactNode } from "react";
 import { HashRouter as Router, Outlet, Route, Routes } from "react-router-dom";
 import styled from "styled-components";
 import Home from "./pages/Home";
+import HostParty from "./pages/HostParty";
+import JoinParty from "./pages/JoinParty";
 import SelectDifficulty from "./pages/SelectDifficulty";
 import Quiz from "./components/Quiz";
 import QuizResults from "./pages/QuizResults";
@@ -98,6 +100,8 @@ const App = () => {
           <Route path="/party/:code/screen" element={<TvLayout><PartyScreen /></TvLayout>} />
           <Route element={<FramedLayout />}>
             <Route path="/" element={<Home />} />
+            <Route path="/host" element={<HostParty />} />
+            <Route path="/join" element={<JoinParty />} />
             <Route path="/select-difficulty" element={<SelectDifficulty />} />
             <Route path="/quizzes" element={<QuizLibrary />} />
             <Route path="/quizzes/new" element={<QuizBuilder />} />

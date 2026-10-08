@@ -21,6 +21,7 @@
   "dependencies": {
     "@react-three/fiber": "^9.8.1",
     "firebase": "^12.19.0",
+    "jsqr": "^1.4.0",
     "leva": "^0.10.1",
     "qrcode": "^1.5.4",
     "react": "~19.3.0",

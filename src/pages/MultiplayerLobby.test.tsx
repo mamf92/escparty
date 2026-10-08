@@ -350,4 +350,34 @@ describe("MultiplayerLobby", () => {
     expect(id).not.toBe("p-loreen");
     expect(localStorage.getItem("gameCode")).toBe("EFGH");
   });
+
+  it("goes straight to hosting from the Host screen", () => {
+    renderLobby({ step: "host" });
+    expect(button(/^Host and play/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Join a game/ })).not.toBeInTheDocument();
+  });
+
+  it("joins a code from the Join screen on arrival, once", async () => {
+    vi.mocked(getRoom).mockResolvedValue(null);
+    renderLobby({ joinCode: "ABBA" });
+    expect(screen.getByLabelText("Game code")).toHaveValue("ABBA");
+    expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+    expect(joinRoom).toHaveBeenCalledTimes(1);
+    expect(joinRoom).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String));
+  });
+
+  it("offers the rejoin choice for a code from the Join screen this device was in", async () => {
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-loreen");
+    localStorage.setItem("playerName", "Loreen");
+    renderLobby({ joinCode: "ABBA" });
+    expect(await screen.findByRole("button", { name: "Rejoin as Loreen" })).toBeInTheDocument();
+    expect(joinRoom).not.toHaveBeenCalled();
+  });
+
+  it("ignores a code from the router that isn't four letters", () => {
+    renderLobby({ joinCode: "nope!" });
+    expect(button(/^Join a game/)).toBeInTheDocument();
+    expect(joinRoom).not.toHaveBeenCalled();
+  });
 });

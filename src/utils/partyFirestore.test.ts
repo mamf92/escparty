@@ -29,6 +29,7 @@ import {
     isAct,
     listenToBallots,
     listenToParty,
+    partyExists,
     saveBallot,
     setPartyResults,
     setPartyRevealed,
@@ -179,5 +180,14 @@ describe("ballots and host writes", () => {
             [{ path: "parties/ABBA" }, { results: { places: { se: 1 } } }],
             [{ path: "parties/ABBA" }, { revealed: true }],
         ]);
+    });
+});
+
+describe("partyExists", () => {
+    it("says whether a party has the code", async () => {
+        mocks.getDoc.mockResolvedValueOnce(snapshot({ title: "Party" })).mockResolvedValueOnce(snapshot(null));
+        expect(await partyExists("ABBA")).toBe(true);
+        expect(mocks.getDoc).toHaveBeenLastCalledWith({ path: "parties/ABBA" });
+        expect(await partyExists("ZZZZ")).toBe(false);
     });
 });

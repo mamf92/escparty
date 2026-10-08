@@ -5,7 +5,13 @@ moving files between folders.
 
 ## `src/pages/`
 
-Most screens live here: `Home.tsx`, `SelectDifficulty.tsx`,
+Most screens live here: `Home.tsx` (`/`: the big disco ball, "Host a
+party", "Join a party" and a quiet "Play a quiz solo" link),
+`HostParty.tsx` (`/host`: host a quiz, which opens `/multiplayer` straight
+on hosting, or a scoreboard party, `/party/new`), `JoinParty.tsx` (`/join`:
+one code field that goes at the fourth letter, plus a QR scanner,
+`components/QrScanner.tsx`; `utils/joinCode.ts` looks the code up as a quiz
+room and as a party and opens whichever has it), `SelectDifficulty.tsx`,
 `QuizLibrary.tsx` (`/quizzes`, your saved quizzes and every premade one,
 to play solo, host, or take into the builder), `QuizBuilder.tsx`
 (`/quizzes/new`, `/quizzes/edit/:quizId`: bank picker, question editor,
