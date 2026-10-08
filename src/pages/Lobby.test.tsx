@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
 import Lobby from "./Lobby";
+import MobileFrame from "../components/MobileFrame";
 import type { Room } from "../utils/roomsFirestore";
 
 const mocks = vi.hoisted(() => ({
@@ -210,6 +211,26 @@ describe("Lobby", () => {
     expect(mocks.removePlayerFromRoom).toHaveBeenCalledWith("ABBA", loreen);
     // Leaves even when that write fails.
     expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
+  it("takes a guest out of the room when they leave through the brand", async () => {
+    as("p2", "Loreen");
+    renderWithProviders(
+      <MobileFrame>
+        <Routes>
+          <Route path="/lobby" element={<Lobby />} />
+          <Route path="*" element={<ShowLocation />} />
+        </Routes>
+      </MobileFrame>,
+      { initialEntries: ["/lobby"] },
+    );
+    act(() => mocks.onRoom(room()));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("link", { name: "ESCParty" }));
+    expect(screen.getByText(/You'll leave the waiting room/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Go to ESCParty" }));
+    expect(mocks.removePlayerFromRoom).toHaveBeenCalledWith("ABBA", loreen);
+    expect(await screen.findByText(/at \/ with/)).toBeInTheDocument();
   });
 
   it("lets the host leave without touching the room", async () => {

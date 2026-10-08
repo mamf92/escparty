@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
@@ -104,6 +104,7 @@ const MultiplayerLobby = () => {
   // another tab changing the stored game can't swap who rejoins.
   const [rejoinAs, setRejoinAs] = useState<StoredPlayer | null>(null);
   const navigate = useNavigate();
+  const joinFormId = useId();
   // A create or join still running when the page is left must not pull
   // the user into the lobby afterwards.
   const left = useRef(false);
@@ -312,51 +313,69 @@ const MultiplayerLobby = () => {
         ? "Type the four-letter code from the host's screen."
         : "Play the quiz together: one of you hosts, everyone else joins with the code."}
       footer={footer}
-    >
-      {quizKey && step !== "join" && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
-
-      {step === "choose" && (
-        <Ground>
-          <Pane>
-            <Control block onClick={() => setStep("host")}>
-              <span>Host a game</span>
-              <span className="calm-sub">Get a code and invite your party</span>
-            </Control>
-            <Control
-              block
-              // Joining someone else's room: the quiz picked for hosting is
-              // set aside, and dropped once the join goes through.
-              onClick={() => setStep("join")}
-            >
-              <span>Join a game</span>
-              <span className="calm-sub">Got a code from the host? Jump in</span>
-            </Control>
-          </Pane>
-        </Ground>
-      )}
-
-      {step === "host" && (
+      actions={(
         <>
-          <Ground>
-            <Pane role="group" aria-label="How you'll host">
-              <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(false); }}>
-                <span>Host and play</span>
-                <span className="calm-sub">Run the game and answer along with everyone</span>
-              </Control>
-              <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(true); }}>
-                <span>Host only</span>
-                <span className="calm-sub">Run the game and follow everyone's progress</span>
-              </Control>
-            </Pane>
-          </Ground>
-          {error && <CalmNote role="alert">{error}</CalmNote>}
-          {loading && <Loader>Setting up the room…</Loader>}
+          {step === "choose" && (
+            <Ground>
+              <Pane>
+                <Control block onClick={() => setStep("host")}>
+                  <span>Host a game</span>
+                  <span className="calm-sub">Get a code and invite your party</span>
+                </Control>
+                <Control
+                  block
+                  // Joining someone else's room: the quiz picked for hosting is
+                  // set aside, and dropped once the join goes through.
+                  onClick={() => setStep("join")}
+                >
+                  <span>Join a game</span>
+                  <span className="calm-sub">Got a code from the host? Jump in</span>
+                </Control>
+              </Pane>
+            </Ground>
+          )}
+
+          {step === "host" && (
+            <>
+              <Ground>
+                <Pane role="group" aria-label="How you'll host">
+                  <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(false); }}>
+                    <span>Host and play</span>
+                    <span className="calm-sub">Run the game and answer along with everyone</span>
+                  </Control>
+                  <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(true); }}>
+                    <span>Host only</span>
+                    <span className="calm-sub">Run the game and follow everyone's progress</span>
+                  </Control>
+                </Pane>
+              </Ground>
+              {error && <CalmNote role="alert">{error}</CalmNote>}
+              {loading && <Loader>Setting up the room…</Loader>}
+            </>
+          )}
+
+          {step === "join" && (
+            <Ground>
+              <Pane>
+                {rejoinAs ? (
+                  <>
+                    <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
+                    <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
+                  </>
+                ) : (
+                  // The code field is up in the page, out of the keyboard's way.
+                  <Control type="submit" form={joinFormId} elevation="high" disabled={loading} onClick={remember}>Join the game</Control>
+                )}
+              </Pane>
+            </Ground>
+          )}
         </>
       )}
-
+    >
+      {quizKey && step !== "join" && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
       {step === "join" && (
         <>
-          <form onSubmit={submitJoin} noValidate>
+          <form id={joinFormId} onSubmit={submitJoin} noValidate>
             <Ground>
               <Pane>
                 <label>
@@ -378,14 +397,6 @@ const MultiplayerLobby = () => {
                     autoComplete="off"
                   />
                 </label>
-                {rejoinAs ? (
-                  <>
-                    <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
-                    <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
-                  </>
-                ) : (
-                  <Control type="submit" elevation="high" disabled={loading} onClick={remember}>Join the game</Control>
-                )}
               </Pane>
             </Ground>
           </form>

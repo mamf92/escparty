@@ -8,6 +8,7 @@ import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
 import { customQuizKey, listMyQuizzes } from "../utils/customQuizzes";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { roomGuests, startGate } from "../utils/lobbyGate";
+import { useLeaveGuard } from "../hooks/useLeaveGuard";
 
 interface Identity {
     gameCode: string;
@@ -83,7 +84,7 @@ const Lobby = () => {
     // A guest who leaves takes themselves out, so the host's start gate
     // doesn't count them as present (and ready). Leaving goes ahead even if
     // that write fails; the host can still take them out.
-    const leaveRoom = async () => {
+    const leaveRoom = async (to = "/multiplayer") => {
         const self = room && identity && room.hostId !== identity.playerId && !room.started
             ? room.players.find(p => p.id === identity.playerId)
             : undefined;
@@ -94,9 +95,16 @@ const Lobby = () => {
                 console.error("Couldn't leave the room:", err);
             }
         }
-        navigate("/multiplayer");
+        navigate(to);
     };
-    const leave = <CalmLink type="button" onClick={leaveRoom}>Leave the waiting room</CalmLink>;
+    // The brand asks while this tab is in the room, and leaves it the same
+    // way as the footer link, so a guest doesn't linger in the start gate.
+    const inRoom = !!identity && !!room && room.players.some(p => p.id === identity.playerId);
+    useLeaveGuard(inRoom ? {
+        message: "Go back to ESCParty? You'll leave the waiting room.",
+        onLeave: () => void leaveRoom("/"),
+    } : null);
+    const leave = <CalmLink type="button" onClick={() => void leaveRoom()}>Leave the waiting room</CalmLink>;
     /** The footer's way back from a waiting room this tab isn't in. */
     const backToMultiplayer = <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Back to join or host</CalmLink>;
     /** The way out of a waiting room that can't go on. */
@@ -131,7 +139,7 @@ const Lobby = () => {
                 <CalmNote role="alert">
                     We can't find this game. It may have closed, the code may be wrong, or you may be offline. Join with another code, or host your own.
                 </CalmNote>
-                {wayOut("Join or host a game", leaveRoom)}
+                {wayOut("Join or host a game", () => void leaveRoom())}
             </CalmPage>
         );
     }

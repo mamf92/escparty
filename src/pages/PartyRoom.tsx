@@ -6,6 +6,7 @@ import PartyHostTools from "../components/PartyHostTools";
 import { PartyError, PartyNotFound } from "../components/PartyStates";
 import { Control, Field, Ground, Pane, Row, useRovingTabs } from "../design";
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
+import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import { usePartyData } from "../hooks/usePartyData";
 import type { Party } from "../utils/partyFirestore";
 import {
@@ -51,6 +52,12 @@ const PartyRoom = () => {
     const isHost = !!party && !!identity && identity.guestId === party.hostId;
     const tabKeys = isHost ? HOST_TABS : GUEST_TABS;
     const tabs = useRovingTabs(tabKeys, tab, setTab);
+
+    // The brand asks only once this tab is in a party that exists.
+    useLeaveGuard(party && identity ? {
+        message: "Go back to ESCParty? You'll leave the party's rating room. Your ratings are saved.",
+        onLeave: () => navigate("/"),
+    } : null);
 
     const back = <CalmLink onClick={() => navigate("/party")}>Leave the party</CalmLink>;
 
