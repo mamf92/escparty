@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BALL_GRID,
+  type BallLook,
   CALM_BALL,
   RESTING_LIGHT,
   SPARKLE_BALL,
@@ -38,9 +39,9 @@ const measureBall = (box: HTMLElement | null): BallBox => ({
   hang: box?.offsetTop || 56,
 });
 /** The longest step the ball turns in one frame, so it never jumps after a hidden tab. */
-const MAX_STEP = 0.1;
+export const MAX_STEP = 0.1;
 /** Frames a second while turning: enough for a slow ball. */
-const FPS = 30;
+export const FPS = 30;
 /**
  * The most pixels the sequin floor renders; CSS scales it up from there.
  * It is a dimmed backdrop, so a big screen or a dense phone needs no more,
@@ -146,7 +147,41 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
   };
 };
 
-const rgba = ([r, g, b]: readonly number[], a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
+export const rgba = ([r, g, b]: readonly number[], a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
+
+/** Paint the ball, a facet at a time, with its top-left corner at (left, top). */
+export const paintBall = (
+  ctx: CanvasRenderingContext2D,
+  left: number,
+  top: number,
+  size: number,
+  look: BallLook,
+  lamp: ReturnType<typeof lampDirection>,
+  phase: number,
+) => {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(left + size / 2, top + size / 2, size / 2, 0, Math.PI * 2);
+  ctx.clip();
+  const cell = size / BALL_GRID;
+  ballCells(look, lamp, phase).forEach((colour, index) => {
+    if (!colour) return;
+    ctx.fillStyle = rgba(colour, 1);
+    ctx.fillRect(left + (index % BALL_GRID) * cell, top + Math.floor(index / BALL_GRID) * cell, cell + 0.5, cell + 0.5);
+  });
+  // The grout between the mirrors.
+  ctx.strokeStyle = "rgba(30, 0, 20, 0.3)";
+  ctx.lineWidth = 0.5;
+  for (let k = 1; k < BALL_GRID; k += 1) {
+    ctx.beginPath();
+    ctx.moveTo(left + k * cell, top);
+    ctx.lineTo(left + k * cell, top + size);
+    ctx.moveTo(left, top + k * cell);
+    ctx.lineTo(left + size, top + k * cell);
+    ctx.stroke();
+  }
+  ctx.restore();
+};
 
 /** Paint the ball and its spots on the lights canvas. */
 const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean, lampX: number, lampY: number, phase: number) => {
@@ -191,28 +226,7 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
   ctx.restore();
 
   // The ball hangs free, with no wire, on every screen; it is painted a facet at a time.
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(width / 2, centreY, size / 2, 0, Math.PI * 2);
-  ctx.clip();
-  const cell = size / BALL_GRID;
-  ballCells(look, lamp, phase).forEach((colour, index) => {
-    if (!colour) return;
-    ctx.fillStyle = rgba(colour, 1);
-    ctx.fillRect(left + (index % BALL_GRID) * cell, top + Math.floor(index / BALL_GRID) * cell, cell + 0.5, cell + 0.5);
-  });
-  // The grout between the mirrors.
-  ctx.strokeStyle = "rgba(30, 0, 20, 0.3)";
-  ctx.lineWidth = 0.5;
-  for (let k = 1; k < BALL_GRID; k += 1) {
-    ctx.beginPath();
-    ctx.moveTo(left + k * cell, top);
-    ctx.lineTo(left + k * cell, top + size);
-    ctx.moveTo(left, top + k * cell);
-    ctx.lineTo(left + size, top + k * cell);
-    ctx.stroke();
-  }
-  ctx.restore();
+  paintBall(ctx, left, top, size, look, lamp, phase);
 };
 
 /*
@@ -222,7 +236,7 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
 const STILL = "(prefers-reduced-motion: reduce), (forced-colors: active)";
 
 /** Whether the stage should keep still, followed live. */
-const usePrefersStill = () => {
+export const usePrefersStill = () => {
   const query = () => (typeof window.matchMedia === "function" ? window.matchMedia(STILL) : null);
   const [still, setStill] = useState(() => query()?.matches ?? false);
   useEffect(() => {

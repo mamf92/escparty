@@ -11,7 +11,7 @@ import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSes
 import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
 import { ScoreEntry, readScoreHistory } from "../utils/scoreHistory";
 import { useQuizTitle } from "../hooks/useQuizTitle";
-import { Control, Ground, Pane } from "../design";
+import { Control, Ground, Loader, Pane } from "../design";
 import { CalmNote, CalmPage } from "./CalmPage";
 import { QuestionPane } from "./quiz/QuestionPane";
 import { QuizOutcome, QuizStatus } from "./quiz/QuizStatus";
@@ -691,7 +691,7 @@ const Quiz = () => {
   if (loading) {
     return (
       <CalmPage title={quizName}>
-        <CalmNote role="status">{loadingStatus}</CalmNote>
+        <Loader>{loadingStatus}</Loader>
       </CalmPage>
     );
   }
