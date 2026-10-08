@@ -1,12 +1,9 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Control, Ground, Pane, Stage, ThemeSwitch } from '../design';
-import { CalmNote } from './CalmPage';
-
-// The screens that are mid-game: the quiz, its lobby and breaks, the
-// observer's view and a party's rating room. Going home from one asks first.
-const MID_GAME = /^\/(quiz\/|lobby|mid-quiz-scoreboard|host-observer|party\/(?!new$)[^/]+$)/;
+import { Stage, ThemeSwitch } from '../design';
+import { ConfirmLeave } from './ConfirmLeave';
+import { LeaveGuardContext, type LeaveGuard } from '../hooks/useLeaveGuard';
 
 interface MobileFrameProps {
   children: React.ReactNode;
@@ -15,20 +12,21 @@ interface MobileFrameProps {
 /**
  * The phone-frame chrome every app screen sits in (docs/design/design-system.md,
  * "Page anatomy"): a bezel on wide screens, full bleed on a phone, and the
- * app bar with the brand and the theme switch. The brand is a link home;
- * on a mid-game screen (`MID_GAME`) it asks first, with the same
- * stay-or-leave choice as `LeaveQuiz`, so a stray tap can't end a game.
- * The stage (the disco ball, and Sparkle's sequins) sits behind the
- * scrolling content, fixed to the screen.
+ * app bar with the brand and the theme switch. The brand is a link home. A
+ * page with something in progress registers a leave guard
+ * (`useLeaveGuard`); then the brand asks first, with the same stay-or-leave
+ * choice as `LeaveQuiz`, and runs the page's own `onLeave`. With no guard it
+ * simply goes home. The stage (the disco ball, and Sparkle's sequins) sits
+ * behind the scrolling content, fixed to the screen.
  */
 const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const [guard, setGuardState] = useState<LeaveGuard | null>(null);
+  const setGuard = useCallback((update: (current: LeaveGuard | null) => LeaveGuard | null) => setGuardState(update), []);
+  const guardState = useMemo(() => ({ guard, setGuard }), [guard, setGuard]);
   const [asking, setAsking] = useState(false);
-  const stayRef = useRef<HTMLButtonElement>(null);
   const brandRef = useRef<HTMLAnchorElement>(null);
-  const wasAsking = useRef(false);
-  const promptId = useId();
 
   // A new screen answers the question (state reset while rendering, the
   // documented way to reset it when an input changes).
@@ -38,21 +36,27 @@ const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
     setAsking(false);
   }
 
-  // Focus follows the question, as in LeaveQuiz: onto "Stay here" when it
-  // opens, back to the brand when it closes.
-  useEffect(() => {
-    if (asking) stayRef.current?.focus();
-    else if (wasAsking.current) brandRef.current?.focus();
-    wasAsking.current = asking;
-  }, [asking]);
-
   const goHome = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!MID_GAME.test(pathname)) return;
+    if (!guard) return;
     event.preventDefault();
     setAsking(true);
   };
 
+  // Focus goes back to the brand only when the user chose to stay, not when
+  // the question closes because the screen changed.
+  const stay = () => {
+    setAsking(false);
+    brandRef.current?.focus();
+  };
+
+  const leave = () => {
+    setAsking(false);
+    if (guard) guard.onLeave();
+    else navigate("/");
+  };
+
   return (
+    <LeaveGuardContext.Provider value={guardState}>
     <FrameContainer>
       <PhoneFrame>
         <PhoneScreen className="esc-app">
@@ -62,18 +66,16 @@ const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
               <Brand ref={brandRef} to="/" className="esc-title-text" onClick={goHome}>ESCParty</Brand>
               <ThemeSwitch />
             </AppBar>
-            {asking && (
-              <Leave>
-                <CalmNote id={promptId}>Go back to ESCParty? You'll leave what you're in the middle of.</CalmNote>
-                <Ground>
-                  <Pane layout="split">
-                    <Control ref={stayRef} aria-describedby={promptId} onClick={() => setAsking(false)}>Stay here</Control>
-                    <Control onClick={() => { setAsking(false); navigate("/"); }}>Go to ESCParty</Control>
-                  </Pane>
-                </Ground>
-              </Leave>
-            )}
             <ContentConstraint>
+              {asking && guard && (
+                <Asking
+                  prompt={guard.message}
+                  stayLabel="Stay here"
+                  leaveLabel="Go to ESCParty"
+                  onStay={stay}
+                  onLeave={leave}
+                />
+              )}
               {children}
             </ContentConstraint>
           </Scroller>
@@ -81,6 +83,7 @@ const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
         <PhoneButton />
       </PhoneFrame>
     </FrameContainer>
+    </LeaveGuardContext.Provider>
   );
 };
 
@@ -166,11 +169,9 @@ const AppBar = styled.header`
   padding: var(--esc-space-2) var(--esc-space-4) 0;
 `;
 
-const Leave = styled.div`
-  width: 100%;
-  max-width: 355px;
-  margin: 0 auto;
-  padding: var(--esc-space-2) var(--esc-space-3) 0;
+// Above the page it interrupts, as wide as the page.
+const Asking = styled(ConfirmLeave)`
+  padding-top: var(--esc-space-2);
   display: flex;
   flex-direction: column;
   gap: var(--esc-space-3);

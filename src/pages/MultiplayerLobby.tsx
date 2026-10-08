@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
@@ -104,6 +104,7 @@ const MultiplayerLobby = () => {
   // another tab changing the stored game can't swap who rejoins.
   const [rejoinAs, setRejoinAs] = useState<StoredPlayer | null>(null);
   const navigate = useNavigate();
+  const joinFormId = useId();
   // A create or join still running when the page is left must not pull
   // the user into the lobby afterwards.
   const left = useRef(false);
@@ -357,58 +358,65 @@ const MultiplayerLobby = () => {
           )}
 
           {step === "join" && (
-            <>
-              <form onSubmit={submitJoin} noValidate>
-                <Ground>
-                  <Pane>
-                    <label>
-                      <span className="calm-label">Game code</span>
-                      <Field
-                        type="text"
-                        value={joinCode}
-                        onChange={(e) => {
-                          setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
-                          setRejoinAs(null);
-                          setError(null);
-                        }}
-                        placeholder="ABBA"
-                        disabled={loading}
-                        aria-invalid={showCodeHelp}
-                        aria-describedby={showCodeHelp ? "join-code-help" : undefined}
-                        autoFocus
-                        autoCapitalize="characters"
-                        autoComplete="off"
-                      />
-                    </label>
-                    {rejoinAs ? (
-                      <>
-                        <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
-                        <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
-                      </>
-                    ) : (
-                      <Control type="submit" elevation="high" disabled={loading} onClick={remember}>Join the game</Control>
-                    )}
-                  </Pane>
-                </Ground>
-              </form>
-              {showCodeHelp && <CalmNote id="join-code-help" role="alert">A game code is four letters, like ABBA.</CalmNote>}
-              {error && <CalmNote role="alert">{error}</CalmNote>}
-              {/* Mounted before it fills, so screen readers announce what fills
-                  it; the rejoin note also describes the button focus lands on. */}
-              <div role="status">
-                {rejoinAs && !loading && (
-                  <CalmNote id="rejoin-help">
-                    You were in this game as {asNamed(rejoinAs.name)}. Rejoin as them, or join as someone new if someone else is playing on this device.
-                  </CalmNote>
+            <Ground>
+              <Pane>
+                {rejoinAs ? (
+                  <>
+                    <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
+                    <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
+                  </>
+                ) : (
+                  // The code field is up in the page, out of the keyboard's way.
+                  <Control type="submit" form={joinFormId} elevation="high" disabled={loading} onClick={remember}>Join the game</Control>
                 )}
-                {loading && <CalmNote>Joining the game…</CalmNote>}
-              </div>
-            </>
+              </Pane>
+            </Ground>
           )}
         </>
       )}
     >
       {quizKey && step !== "join" && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
+      {step === "join" && (
+        <>
+          <form id={joinFormId} onSubmit={submitJoin} noValidate>
+            <Ground>
+              <Pane>
+                <label>
+                  <span className="calm-label">Game code</span>
+                  <Field
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => {
+                      setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
+                      setRejoinAs(null);
+                      setError(null);
+                    }}
+                    placeholder="ABBA"
+                    disabled={loading}
+                    aria-invalid={showCodeHelp}
+                    aria-describedby={showCodeHelp ? "join-code-help" : undefined}
+                    autoFocus
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                  />
+                </label>
+              </Pane>
+            </Ground>
+          </form>
+          {showCodeHelp && <CalmNote id="join-code-help" role="alert">A game code is four letters, like ABBA.</CalmNote>}
+          {error && <CalmNote role="alert">{error}</CalmNote>}
+          {/* Mounted before it fills, so screen readers announce what fills
+              it; the rejoin note also describes the button focus lands on. */}
+          <div role="status">
+            {rejoinAs && !loading && (
+              <CalmNote id="rejoin-help">
+                You were in this game as {asNamed(rejoinAs.name)}. Rejoin as them, or join as someone new if someone else is playing on this device.
+              </CalmNote>
+            )}
+            {loading && <CalmNote>Joining the game…</CalmNote>}
+          </div>
+        </>
+      )}
     </CalmPage>
   );
 };

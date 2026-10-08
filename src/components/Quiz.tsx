@@ -16,6 +16,7 @@ import { CalmNote, CalmPage } from "./CalmPage";
 import { QuestionPane } from "./quiz/QuestionPane";
 import { QuizOutcome, QuizStatus } from "./quiz/QuizStatus";
 import { LeaveQuiz } from "./quiz/LeaveQuiz";
+import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import "./quiz/quiz.css";
 
 
@@ -690,6 +691,13 @@ const Quiz = () => {
 
   // A player who picked "Leave the quiz" and confirmed it.
   const leaveQuiz = () => navigate("/");
+  // The brand asks before ending a quiz that is running.
+  useLeaveGuard(loading || error || legacyRoom ? null : {
+    message: isMultiplayer
+      ? "Go back to ESCParty? The game carries on without you."
+      : "Go back to ESCParty? This run won't be saved.",
+    onLeave: leaveQuiz,
+  });
 
   // Loading: a note in place of the questions.
   if (loading) {

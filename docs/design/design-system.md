@@ -264,9 +264,12 @@ only the sizes and the ball's clearance scale up, together.
 
 **Navigation.**
 - The app bar carries the brand and the Sparkle mode switch. The brand is
-  a link home; on a mid-game screen (a quiz, the lobby and its breaks, the
-  observer's view, a party's rating room) it first asks "Go back to
-  ESCParty?" with "Stay here" and "Go to ESCParty", like `LeaveQuiz`.
+  a link home. A screen with something in progress (a running quiz, a room
+  this tab is in, a quiz being built) registers a leave guard with
+  `useLeaveGuard`, and then the brand first asks "Go back to ESCParty?" with
+  "Stay here" and "Go to ESCParty" (`ConfirmLeave`, as in `LeaveQuiz`) and
+  runs the screen's own leave (a guest's lobby leave takes them out of the
+  room). With no guard it goes straight home.
   Moves from the quiz to a break or the results, and from a break back
   into the quiz, replace the history entry, so Back can't re-enter a
   finished question.
