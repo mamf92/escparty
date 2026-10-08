@@ -112,4 +112,38 @@ describe("NamePicker", () => {
         unmount();
         expect(vi.getTimerCount()).toBe(0);
     });
+
+    it("never spins again onto the name it already has, with or without motion", async () => {
+        for (const reduced of [true, false]) {
+            reducedMotion(reduced);
+            for (const random of [0, 0.25, 0.5, 0.75, 0.999]) {
+                vi.useFakeTimers();
+                vi.spyOn(Math, "random").mockReturnValue(random);
+                const onPick = vi.fn();
+                const { unmount } = render(<Harness onPick={onPick} />);
+                for (let spins = 0; spins < 3; spins++) {
+                    fireEvent.click(screen.getByRole("button", { name: spins === 0 ? "Spin for a name" : "Spin again" }));
+                    act(() => { vi.runAllTimers(); });
+                }
+                const picks = onPick.mock.calls.map(call => call[0]);
+                expect(picks).toHaveLength(3);
+                picks.slice(1).forEach((pick, i) => expect(pick).not.toBe(picks[i]));
+                unmount();
+                vi.restoreAllMocks();
+                vi.useRealTimers();
+            }
+        }
+    });
+
+    it("tells its parent when a spin starts and ends", () => {
+        reducedMotion(false);
+        vi.useFakeTimers();
+        const onSpinningChange = vi.fn();
+        render(<NamePicker names={NAMES} value={null} onChange={() => {}} onSpinningChange={onSpinningChange} />);
+        expect(onSpinningChange).toHaveBeenLastCalledWith(false);
+        fireEvent.click(screen.getByRole("button", { name: "Spin for a name" }));
+        expect(onSpinningChange).toHaveBeenLastCalledWith(true);
+        act(() => { vi.runAllTimers(); });
+        expect(onSpinningChange).toHaveBeenLastCalledWith(false);
+    });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Control, Pane, Row } from "../design";
 import { PARTY_NAMES } from "../utils/partyNames";
 
@@ -18,9 +18,11 @@ const prefersReducedMotion = () =>
  * `value` is the landed name (or null); `onChange` hears every landing, but
  * not the names that tick past while it spins.
  */
-export const NamePicker = ({ value, onChange, names = PARTY_NAMES, label = "Your name" }: {
+export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NAMES, label = "Your name" }: {
     value: string | null;
     onChange: (name: string) => void;
+    /** Told when a spin starts and ends, so a Continue beside the reel can wait for it. */
+    onSpinningChange?: (spinning: boolean) => void;
     names?: readonly string[];
     label?: string;
 }) => {
@@ -39,17 +41,23 @@ export const NamePicker = ({ value, onChange, names = PARTY_NAMES, label = "Your
 
     const wrap = (index: number) => ((index % count) + count) % count;
 
-    const step = useCallback((delta: number) => {
+    useEffect(() => { onSpinningChange?.(isSpinning); }, [isSpinning, onSpinningChange]);
+
+    const step = (delta: number) => {
         if (isSpinning) return;
         const from = landed < 0 ? (delta > 0 ? -1 : 0) : landed;
-        onChange(names[(((from + delta) % names.length) + names.length) % names.length]);
-    }, [isSpinning, landed, names, onChange]);
+        onChange(names[wrap(from + delta)]);
+    };
+    // The wheel listener is added once and calls whichever step is current.
+    const stepRef = useRef(step);
+    useEffect(() => { stepRef.current = step; });
 
     const spin = () => {
         if (isSpinning) return;
-        const target = Math.floor(Math.random() * count);
+        // Always a different name from the one already landed on.
+        const end = landed < 0 ? Math.floor(Math.random() * count) : wrap(landed + 1 + Math.floor(Math.random() * (count - 1)));
         if (prefersReducedMotion()) {
-            onChange(names[target]);
+            onChange(names[end]);
             return;
         }
         const total = 16 + Math.floor(Math.random() * count);
@@ -63,7 +71,7 @@ export const NamePicker = ({ value, onChange, names = PARTY_NAMES, label = "Your
             // Slows down towards the end, like a reel running out of spin.
             timer.current = setTimeout(() => tick(done + 1, at + 1), 50 + (done / total) ** 2 * 260);
         };
-        tick(0, Math.max(landed, 0) + target + 1);
+        tick(0, end - total);
     };
 
     // A wheel over the reel steps it instead of scrolling the page.
@@ -75,11 +83,11 @@ export const NamePicker = ({ value, onChange, names = PARTY_NAMES, label = "Your
             const now = Date.now();
             if (now - lastWheel.current < WHEEL_GAP_MS || event.deltaY === 0) return;
             lastWheel.current = now;
-            step(event.deltaY > 0 ? 1 : -1);
+            stepRef.current(event.deltaY > 0 ? 1 : -1);
         };
         node.addEventListener("wheel", onWheel, { passive: false });
         return () => node.removeEventListener("wheel", onWheel);
-    }, [step]);
+    }, []);
 
     const onKeyDown = (event: KeyboardEvent) => {
         const moves: Record<string, () => void> = {
@@ -132,7 +140,7 @@ export const NamePicker = ({ value, onChange, names = PARTY_NAMES, label = "Your
                 onPointerCancel={endDrag}
             >
                 <Row className="party-reel-edge" aria-hidden="true">{edge(-1)}</Row>
-                <Row className="party-reel-name" elevation="high" aria-hidden="true">{shown < 0 ? "?" : names[shown]}</Row>
+                <Row className="party-reel-name esc-pick" elevation="high" aria-hidden="true">{shown < 0 ? "?" : names[shown]}</Row>
                 <Row className="party-reel-edge" aria-hidden="true">{edge(1)}</Row>
             </div>
             <p className="esc-note" role="status">

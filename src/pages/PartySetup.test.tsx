@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent } from "../test/test-utils";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { renderWithProviders, screen, userEvent, waitFor } from "../test/test-utils";
 import PartySetup from "./PartySetup";
 import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_NAMES } from "../utils/partyNames";
@@ -14,13 +14,20 @@ vi.mock("../utils/partyFirestore", async (importOriginal) => ({
 }));
 
 const ShowLocation = () => <p>at {useLocation().pathname}</p>;
+const SystemBack = () => {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate(-1)}>System back</button>;
+};
 const renderSetup = () =>
     renderWithProviders(
+        <>
+        <SystemBack />
         <Routes>
             <Route path="/party/new" element={<PartySetup />} />
             <Route path="*" element={<ShowLocation />} />
-        </Routes>,
-        { initialEntries: ["/party/new"] },
+        </Routes>
+        </>,
+        { initialEntries: ["/party", "/party/new"] },
     );
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -187,6 +194,44 @@ describe("PartySetup", () => {
         await user.click(screen.getByRole("button", { name: "Continue" }));
         expect(screen.getAllByRole("radio", { name: "Yes" })[0]).toHaveAttribute("aria-checked", "true");
     });
+
+    it("keeps each step in history, so the system back gesture keeps every answer", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await user.click(screen.getByRole("radio", { name: /Semi-final 1/ }));
+        await user.click(screen.getByRole("radio", { name: /Jury/ }));
+        step(3);
+        await user.click(screen.getByRole("button", { name: "System back" }));
+        step(2);
+        expect(screen.getByRole("radio", { name: /Jury/ })).toHaveAttribute("aria-checked", "true");
+        await user.click(screen.getByRole("button", { name: "System back" }));
+        step(1);
+        expect(screen.getByRole("radio", { name: /Semi-final 1/ })).toHaveAttribute("aria-checked", "true");
+        expect(screen.queryByText(/^at /)).not.toBeInTheDocument();
+    });
+
+    it("never shows a step the answers before it haven't reached", () => {
+        renderWithProviders(
+            <Routes><Route path="/party/new" element={<PartySetup />} /></Routes>,
+            { initialEntries: ["/party/new?step=4"] },
+        );
+        step(1);
+    });
+
+    it("keeps Continue off while the reel spins, so the spin isn't thrown away", async () => {
+        vi.stubGlobal("matchMedia", (query: string) => ({ matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
+        const user = userEvent.setup();
+        renderSetup();
+        await user.click(screen.getByRole("radio", { name: /Grand final/ }));
+        await user.click(screen.getByRole("radio", { name: /Jury/ }));
+        await answerExtras(user, "Yes");
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+        await user.click(screen.getByRole("button", { name: "Spin again" }));
+        expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+        await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled(), { timeout: 15000 });
+    }, 20000);
 
     it("says so when the party can't be created, and can try again", async () => {
         const user = userEvent.setup();

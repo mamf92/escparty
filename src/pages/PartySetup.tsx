@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { NamePicker } from "../components/NamePicker";
@@ -30,6 +30,16 @@ const newCategory = (): RatingCategory => ({ id: `c${Date.now().toString(36)}${(
 const STEPS = ["Which show?", "How does everyone rate?", "Any extras?", "Who are you tonight?", "Ready to start?"] as const;
 const LAST = STEPS.length;
 
+/** A yes/no question: two radios under the heading `labelId` names. */
+const YesNo = ({ labelId, value, onChange }: { labelId: string; value: boolean | null; onChange: (value: boolean) => void }) => (
+    <Ground>
+        <Pane layout="split" role="radiogroup" aria-labelledby={labelId}>
+            <Control role="radio" aria-checked={value === true} chosen={value === true} onClick={() => onChange(true)}>Yes</Control>
+            <Control role="radio" aria-checked={value === false} chosen={value === false} onClick={() => onChange(false)}>No</Control>
+        </Pane>
+    </Ground>
+);
+
 const yesNo = (value: boolean | null) => (value === null ? "" : value ? "Yes" : "No");
 
 /**
@@ -39,13 +49,16 @@ const yesNo = (value: boolean | null) => (value === null ? "" : value ? "Yes" : 
  * name names), 4 your name (spun from the Eurovision participants, never
  * typed), 5 start. Nothing starts picked. Tapping a choice moves on, except
  * where the screen needs more than one answer (our own categories; the two
- * extras), which has a Continue. Back keeps every answer. Everything is
+ * extras), which has a Continue. Each step is a history entry (`?step=N`), so
+ * the system back gesture and the footer Back do the same and keep every
+ * answer; a fresh visit to /party/new has no step and starts at 1, and a
+ * step is only shown once the answers before it are in. Everything is
  * fixed for the party once it starts, so every guest rates the same way.
  */
 const PartySetup = () => {
     const navigate = useNavigate();
     const ids = useId();
-    const [step, setStep] = useState(1);
+    const [params, setParams] = useSearchParams();
     const [contestId, setContestId] = useState<string | null>(null);
     const [templateId, setTemplateId] = useState<string | null>(null);
     const [custom, setCustom] = useState<RatingCategory[]>(() => [newCategory()]);
@@ -55,15 +68,8 @@ const PartySetup = () => {
     const [tried, setTried] = useState(false);
     const [creating, setCreating] = useState(false);
     const [failure, setFailure] = useState<string | null>(null);
+    const [spinning, setSpinning] = useState(false);
     const heading = useRef<HTMLHeadingElement>(null);
-    const arrived = useRef(false);
-
-    // A new question is read out: focus lands on its heading, not on the
-    // spot where the last control was.
-    useEffect(() => {
-        if (arrived.current) heading.current?.focus();
-        arrived.current = true;
-    }, [step]);
 
     const contest = CONTESTS_2027.find(entry => entry.id === contestId);
     const template: RatingTemplate | undefined = templateId === CUSTOM
@@ -71,6 +77,24 @@ const PartySetup = () => {
         : RATING_TEMPLATES.find(entry => entry.id === templateId);
     // Problems are told once Continue has been tried, beside Continue.
     const sheetProblems = templateId === CUSTOM ? categoryProblems(custom) : [];
+    // The step in the address, but never past the answers given so far (a
+    // reload or a pasted link starts over at the first unanswered question).
+    const reached = contestId === null ? 1
+        : templateId === null || sheetProblems.length > 0 ? 2
+        : bonuses === null || showNames === null ? 3
+        : name === null ? 4
+        : LAST;
+    const step = Math.min(Math.max(Math.trunc(Number(params.get("step"))) || 1, 1), reached);
+
+    // A new question is read out: focus lands on its heading, not on the
+    // spot where the last control was. (Compared to the previous step, so
+    // StrictMode's second effect run doesn't count as a change.)
+    const previousStep = useRef(step);
+    useEffect(() => {
+        if (previousStep.current === step) return;
+        previousStep.current = step;
+        heading.current?.focus();
+    }, [step]);
     const sheetProblemShown = tried && sheetProblems.length > 0;
     // Which category names the problem is about: blank, too long or repeated.
     const labelInvalid = (category: RatingCategory) => sheetProblemShown && categoryLabelProblem(category, custom) !== null;
@@ -80,11 +104,11 @@ const PartySetup = () => {
 
     const go = (to: number) => {
         setTried(false);
-        setStep(to);
+        setParams({ step: String(to) });
     };
 
     const create = async () => {
-        if (!contest || !template || bonuses === null || showNames === null || !name || creating) return;
+        if (!contest || !template || sheetProblems.length > 0 || bonuses === null || showNames === null || !name || creating) return;
         setCreating(true);
         setFailure(null);
         try {
@@ -231,25 +255,15 @@ const PartySetup = () => {
 
     const extras = (
         <>
-            <h3 className="esc-heading party-subquestion" id={`${ids}-bonuses`}>Party bonuses?</h3>
+            <h3 className="esc-heading esc-question esc-question-sub" id={`${ids}-bonuses`}>Party bonuses?</h3>
             <CalmNote>{PARTY_BONUSES.map(bonus => `${bonus.label} +${bonus.points}`).join(" · ")}</CalmNote>
-            <Ground>
-                <Pane layout="split" role="radiogroup" aria-labelledby={`${ids}-bonuses`}>
-                    <Control role="radio" aria-checked={bonuses === true} chosen={bonuses === true} onClick={() => setBonuses(true)}>Yes</Control>
-                    <Control role="radio" aria-checked={bonuses === false} chosen={bonuses === false} onClick={() => setBonuses(false)}>No</Control>
-                </Pane>
-            </Ground>
-            <h3 className="esc-heading party-subquestion" id={`${ids}-names`}>Name names in the awards?</h3>
+            <YesNo labelId={`${ids}-bonuses`} value={bonuses} onChange={setBonuses} />
+            <h3 className="esc-heading esc-question esc-question-sub" id={`${ids}-names`}>Name names in the awards?</h3>
             <CalmNote>
                 Yes: everyone sees who rated like twins and who was toughest. No: the awards say &quot;two of you&quot; and &quot;one of you&quot;,
                 and each guest is told which are theirs. The ratings themselves aren&apos;t secret from the party.
             </CalmNote>
-            <Ground>
-                <Pane layout="split" role="radiogroup" aria-labelledby={`${ids}-names`}>
-                    <Control role="radio" aria-checked={showNames === true} chosen={showNames === true} onClick={() => setShowNames(true)}>Yes</Control>
-                    <Control role="radio" aria-checked={showNames === false} chosen={showNames === false} onClick={() => setShowNames(false)}>No</Control>
-                </Pane>
-            </Ground>
+            <YesNo labelId={`${ids}-names`} value={showNames} onChange={setShowNames} />
             <Ground>
                 <Pane>
                     <Control elevation="high" disabled={bonuses === null || showNames === null} onClick={() => go(4)}>Continue</Control>
@@ -261,10 +275,10 @@ const PartySetup = () => {
     const namePicker = (
         <>
             <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
-            <NamePicker value={name} onChange={setName} />
+            <NamePicker value={name} onChange={setName} onSpinningChange={setSpinning} />
             <Ground>
                 <Pane>
-                    <Control elevation="high" disabled={name === null} onClick={() => go(5)}>Continue</Control>
+                    <Control elevation="high" disabled={name === null || spinning} onClick={() => go(5)}>Continue</Control>
                 </Pane>
             </Ground>
         </>
@@ -302,10 +316,10 @@ const PartySetup = () => {
             subtitle="This is fixed once the party starts."
             footer={step === 1
                 ? <CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>
-                : <CalmLink onClick={() => go(step - 1)}>Back to {STEPS[step - 2]}</CalmLink>}
+                : <CalmLink onClick={() => navigate(-1)}>Back to {STEPS[step - 2]}</CalmLink>}
         >
-            <p className="esc-note" role="status">Step {step} of {LAST}</p>
-            <h2 className="esc-heading party-question" id={`${ids}-q`} ref={heading} tabIndex={-1}>{STEPS[step - 1]}</h2>
+            <p className="esc-note">Step {step} of {LAST}</p>
+            <h2 className="esc-heading esc-question" id={`${ids}-q`} ref={heading} tabIndex={-1}>{STEPS[step - 1]}</h2>
             {step === 1 && (
                 <>
                     {showChoices}

@@ -11,6 +11,9 @@ export const answerOptions = (page: Page) =>
  * reel to `name`.
  */
 export const hostParty = async (page: Page, name: string, sheet: RegExp = /Jury/) => {
+    // Leave /party/new first: a hash-only goto to the URL the page is already
+    // on doesn't reload or remount, so a setup left on its last step would stay.
+    await page.goto("/#/party");
     await page.goto("/#/party/new");
     await page.getByRole("radio", { name: /Semi-final 1/ }).click();
     await page.getByRole("radio", { name: sheet }).click();
