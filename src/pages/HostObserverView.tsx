@@ -149,7 +149,7 @@ const HostObserverView = () => {
     return (
         <CalmPage
             title={TITLE}
-            subtitle={roomCode ? <>Game code <strong>{roomCode}</strong></> : undefined}
+            subtitle={roomCode ? <>Game code <strong className="esc-selectable">{roomCode}</strong></> : undefined}
             footer={
                 // Saying what leaving does: nobody else can continue the quiz.
                 <CalmLink type="button" onClick={() => navigate("/multiplayer")}>

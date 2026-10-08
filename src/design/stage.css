@@ -40,14 +40,13 @@
 }
 
 /*
-  Home (`calm-hero` on CalmPage) floats a bigger ball, with no wire, over
+  Home (`calm-hero` on CalmPage) shows a bigger ball over
   the page: the landing screen's centrepiece. The header's clearance
   follows the size, as it does everywhere. Where :has() isn't there, Home
-  keeps the hanging ball.
+  keeps the standard size.
 */
 .esc-app:has(.calm-page.calm-hero) {
   --esc-ball-size: 168px;
-  --esc-ball-wire: none;
 }
 
 @supports (width: 1cqw) {
@@ -95,6 +94,28 @@
 .esc-app .calm-compact .esc-subtitle {
   margin-top: var(--esc-space-1);
   font-size: var(--esc-text-sub);
+}
+
+
+/*
+  The pointer lamp follows a finger, and on mobile web a touch that moves
+  it can select text instead. So text is not selectable by default, on the
+  stage or in headings and body copy. Where copying matters, selection is
+  opted back in: fields always, and anything marked `.esc-selectable` (share
+  links, room and party codes). The long-press callout is left alone, so
+  links and images keep "Open in new tab", "Copy link" and "Save image".
+*/
+.esc-app {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.esc-app :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])),
+.esc-app .esc-selectable,
+.esc-app .esc-selectable * {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 
