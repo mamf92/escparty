@@ -80,41 +80,31 @@ describe("Quiz loading", () => {
 });
 
 describe("Quiz answer selection (#22)", () => {
-  it("doesn't reveal the correct answer before the answer is submitted", async () => {
-    const user = userEvent.setup();
+  it("doesn't reveal the correct answer before an answer is tapped", async () => {
     renderQuiz({ multiplayer: false });
 
-    const correct = await screen.findByRole("button", { name: "Sweden" });
-    const wrong = screen.getByRole("button", { name: "Norway" });
-    const other = screen.getByRole("button", { name: "Ireland" });
-
-    // Whichever option is picked, right or wrong, it's only chosen (sunk),
-    // and nothing is marked yet.
-    await user.click(wrong);
-    expect(wrong).toHaveAttribute("aria-pressed", "true");
-    expect(wrong).toHaveClass("is-chosen");
-    expect(correct).toHaveAttribute("aria-pressed", "false");
-    expect(other).toHaveAttribute("aria-pressed", "false");
-
-    await user.click(correct);
-    expect(correct).toHaveClass("is-chosen");
-    expect(wrong).not.toHaveClass("is-chosen");
+    await screen.findByRole("button", { name: "Sweden" });
+    for (const name of ["Sweden", "Norway", "Ireland"]) {
+      expect(screen.getByRole("button", { name })).toBeEnabled();
+      expect(screen.getByRole("button", { name })).toHaveAttribute("aria-pressed", "false");
+    }
     expect(document.querySelector(".calm-marker")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Lock in/ })).not.toBeInTheDocument();
   });
 
-  it("marks right and wrong only once the answer is submitted, with a glyph and in words", async () => {
+  it("takes a tap as the answer at once: marks right and wrong, with a glyph and in words", async () => {
     const user = userEvent.setup();
     renderQuiz({ multiplayer: false });
 
     await user.click(await screen.findByRole("button", { name: "Norway" }));
-    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
 
     const marker = (name: string) => screen.getByRole("button", { name }).querySelector(".calm-marker")?.getAttribute("data-marker");
     expect(marker("Sweden")).toBe("correct");
     expect(marker("Norway")).toBe("wrong");
     expect(marker("Ireland")).toBeUndefined();
     expect(screen.getByRole("status")).toHaveTextContent("Nul points this time. The answer was Sweden.");
-    expect(screen.getByRole("button", { name: /^Results in \d+s$/ })).toBeDisabled();
+    for (const button of screen.getByRole("group", { name: "Answers" }).querySelectorAll("button")) expect(button).toBeDisabled();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
   it("says the points for a right answer", async () => {
@@ -122,17 +112,36 @@ describe("Quiz answer selection (#22)", () => {
     renderQuiz({ multiplayer: false });
 
     await user.click(await screen.findByRole("button", { name: "Sweden" }));
-    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
 
     expect(screen.getByRole("status")).toHaveTextContent(/^Douze points! That's right: \+\d+ points\.$/);
   });
 
-  it("keeps a keyboard player's focus on the question once locking in disables the button", async () => {
+  it("shows the points so far, and adds the answer's points to them", async () => {
+    const user = userEvent.setup();
+    renderQuiz({ multiplayer: false, score: 500 });
+
+    await screen.findByRole("button", { name: "Sweden" });
+    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 500");
+    await user.click(screen.getByRole("button", { name: "Sweden" }));
+    const total = Number(/(\d+)$/.exec(screen.getByText(/^Points so far:/).textContent ?? "")?.[1]);
+    expect(total).toBeGreaterThan(500);
+  });
+
+  it("answers once, however often the answers are tapped", async () => {
     const user = userEvent.setup();
     renderQuiz({ multiplayer: false });
 
-    await user.click(await screen.findByRole("button", { name: "Sweden" }));
-    screen.getByRole("button", { name: "Lock in my answer" }).focus();
+    await user.click(await screen.findByRole("button", { name: "Norway" }));
+    await user.click(screen.getByRole("button", { name: "Sweden" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Nul points this time.");
+    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 0");
+  });
+
+  it("keeps a keyboard player's focus on the question once answering disables the answers", async () => {
+    const user = userEvent.setup();
+    renderQuiz({ multiplayer: false });
+
+    (await screen.findByRole("button", { name: "Sweden" })).focus();
     await user.keyboard("{Enter}");
 
     expect(screen.getByRole("heading", { level: 2, name: "Which country won in 1974?" })).toHaveFocus();
@@ -140,11 +149,13 @@ describe("Quiz answer selection (#22)", () => {
 });
 
 describe("Quiz screen (#171)", () => {
-  it("names the quiz and the question, with the clock as text", async () => {
+  it("names the quiz and the question, with the clock big and named in real seconds", async () => {
     renderQuiz({ multiplayer: false });
     expect(await screen.findByRole("heading", { level: 1, name: "Classic: Easy" })).toBeInTheDocument();
     expect(screen.getByText("Question 1 of 1")).toBeInTheDocument();
-    expect(screen.getByRole("timer")).toHaveTextContent(/^\d+ seconds? left$/);
+    // 10 seconds left reads 12 on the clock (the Eurovision count), but is said as 10.
+    expect(screen.getByRole("timer")).toHaveAccessibleName(/^(10|9) seconds left$/);
+    expect(screen.getByRole("timer")).toHaveTextContent(/^(12|10)$/);
     expect(screen.getByRole("group", { name: "Answers" })).toBeInTheDocument();
   });
 
@@ -258,7 +269,6 @@ describe("Quiz multiplayer score writes (#131)", () => {
     const user = userEvent.setup();
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "ghost" });
     await user.click(await screen.findByRole("button", { name: "Sweden" }));
-    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
   };
 
   it("says a question settled before a refresh is closed, without claiming it was answered", async () => {
@@ -329,7 +339,6 @@ describe("Quiz multiplayer score writes (#131)", () => {
     send({ ...room, currentQuestionIndex: 1, phaseStartedAt: { toMillis: () => startedAt } as unknown as Room["phaseStartedAt"] });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Switzerland" }));
-    await user.click(screen.getByRole("button", { name: "Lock in my answer" }));
     await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(2));
     expect(await screen.findByText(/^Douze points! That's right/)).toBeInTheDocument();
     expect(screen.queryByText(/didn't reach the room/)).not.toBeInTheDocument();
@@ -359,7 +368,7 @@ describe("Quiz solo clock (#160)", () => {
   it.each([
     ["an empty history", null],
     ["an unreadable history", "{not json"],
-  ])("times out an unanswered question, shows feedback, then saves the run once, from %s", async (_, stored) => {
+  ])("times out an unanswered question, shows the verdict, then saves the run once, from %s", async (_, stored) => {
     // Only the clock and intervals: React schedules its own work on setTimeout.
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     try {
@@ -375,19 +384,20 @@ describe("Quiz solo clock (#160)", () => {
       await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Which country won in 1974?" })).toBeInTheDocument());
 
       const start = Date.now();
-      // Ten seconds with no answer: the question locks with feedback.
+      // Ten seconds with no answer: the question locks with its verdict.
       await vi.advanceTimersByTimeAsync(10_200);
-      expect(screen.getByRole("button", { name: /^Results in \d+s$/ })).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Time's up. The answer was Sweden.");
       expect(screen.queryByText("results")).not.toBeInTheDocument();
 
-      // Five seconds of feedback, then the results, saved once. The clock
-      // steps until the results show, since React starts the feedback
-      // countdown on its own schedule; its deadline was fixed at time's up.
+      // A moment of verdict (1.5 seconds), then the results, saved once.
+      // The clock steps until the results show, since React starts the
+      // verdict's timer on its own schedule; its deadline was fixed at time's up.
       await vi.waitFor(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(100);
         expect(screen.getByText("results")).toBeInTheDocument();
       }, { timeout: 5_000 });
-      expect(Date.now() - start).toBeGreaterThanOrEqual(15_000);
+      expect(Date.now() - start).toBeGreaterThanOrEqual(11_500);
+      expect(Date.now() - start).toBeLessThan(13_500);
       expect(JSON.parse(localStorage.getItem("quizScores") ?? "[]")).toHaveLength(1);
     } finally {
       vi.useRealTimers();

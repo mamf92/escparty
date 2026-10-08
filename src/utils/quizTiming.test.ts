@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     FEEDBACK_MS,
+    countdownLabel,
     QUESTION_MS,
     QUESTION_SLOT_MS,
     hasLeftBreak,
@@ -114,5 +115,16 @@ describe("hasLeftBreak", () => {
     it("stays for a room with no phase, or one still in the lobby", () => {
         expect(hasLeftBreak(undefined, 0, 5)).toBe(false);
         expect(hasLeftBreak("lobby", 0, 5)).toBe(false);
+    });
+});
+
+describe("countdownLabel", () => {
+    it("counts the 10 seconds as 12, 10, 8, 7, 6, 5, 4, 3, 2, 1", () => {
+        const shown = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(countdownLabel);
+        expect(shown).toEqual([12, 10, 8, 7, 6, 5, 4, 3, 2, 1]);
+    });
+
+    it("leaves 0 as it is", () => {
+        expect(countdownLabel(0)).toBe(0);
     });
 });

@@ -38,11 +38,9 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
     await page.getByRole("button", { name: "Start anyway" }).click();
 
     const answer = async (pick?: string) => {
-        const submit = page.getByRole("button", { name: "Lock in my answer" });
-        await expect(submit).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByRole("timer")).toBeVisible({ timeout: 30_000 });
         if (pick) await answerOptions(page).getByText(pick, { exact: true }).click();
         else await answerOptions(page).first().click();
-        await submit.click();
     };
 
     for (let question = 1; question <= 3; question++) await answer();

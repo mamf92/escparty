@@ -8,7 +8,7 @@ import { DEFAULT_BREAK_EVERY, isBreakAfter } from "../utils/quizModel";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
-import { FEEDBACK_MS, MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
 import { ScoreEntry, readScoreHistory } from "../utils/scoreHistory";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { Control, Ground, Pane } from "../design";
@@ -18,6 +18,9 @@ import { QuizOutcome, QuizStatus } from "./quiz/QuizStatus";
 import { LeaveQuiz } from "./quiz/LeaveQuiz";
 import "./quiz/quiz.css";
 
+
+/** Solo: how long the verdict shows before the next question (the room sets the pace in multiplayer). */
+const SOLO_VERDICT_MS = 1_500;
 
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -283,19 +286,17 @@ const Quiz = () => {
     return () => clearInterval(tick);
   }, [currentQuestionIndex, loading, showFeedback, isMultiplayer]);
 
-  // Single player: the feedback countdown, then the next question. It lasts
-  // until the deadline submitAnswer or handleTimeUp set.
+  // Single player: the verdict, then the next question. It lasts until
+  // the deadline submitAnswer or handleTimeUp set.
   useEffect(() => {
     if (!showFeedback || isMultiplayer) return;
     const deadline = feedbackDeadlineRef.current;
     const tick = setInterval(() => {
-      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setTimeLeft(left);
-      if (left === 0) {
+      if (Date.now() >= deadline) {
         clearInterval(tick);
         moveToNextQuestionRef.current();
       }
-    }, 250);
+    }, 100);
     return () => clearInterval(tick);
   }, [showFeedback, isMultiplayer]);
 
@@ -487,11 +488,10 @@ const Quiz = () => {
     rememberAnswered(currentQuestionIndex);
   };
 
-  // Local clock only: time's up, then 5 seconds of feedback
+  // Local clock only: time's up, then the verdict for a moment
   const handleTimeUp = () => {
     markTimeUp();
-    feedbackDeadlineRef.current = Date.now() + FEEDBACK_MS;
-    setTimeLeft(FEEDBACK_MS / 1000);
+    feedbackDeadlineRef.current = Date.now() + SOLO_VERDICT_MS;
   };
 
   // The solo run is saved once, even if the last question's feedback ends
@@ -499,7 +499,7 @@ const Quiz = () => {
   // twice, saving every run twice).
   const savedRunRef = useRef(false);
 
-  // Local clock only: move on once the feedback time is over
+  // Local clock only: move on once the verdict has shown
   const moveToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       if (isBreakAfter(currentQuestionIndex, questions.length, breakEvery)) {
@@ -562,10 +562,11 @@ const Quiz = () => {
     moveToNextQuestionRef.current = moveToNextQuestion;
   });
 
+  // Tapping an answer is the answer: no lock-in step. The ref is the guard
+  // (not the state), so a double tap before the re-render can't answer twice.
   const handleAnswer = (answer: string) => {
-    if (!isSubmitted) {
-      setSelectedAnswer(answer);
-    }
+    if (isSubmittedRef.current) return;
+    void submitAnswer(answer);
   };
 
   const submitAnswer = async (answer: string) => {
@@ -573,21 +574,18 @@ const Quiz = () => {
     if (sharedClock && roomStartMs !== null && !questionClock(roomStartMs, Date.now()).answeringOpen) return;
 
     const answeredQuestion = currentQuestionIndex;
+    setSelectedAnswer(answer);
     lockQuestion("answered"); // also flags the ref the shared tick reads
 
     // Feedback shows right away (lockQuestion above), before awaiting any
     // score write: if the write is slow and the room moves on meanwhile, a
     // late setShowFeedback(true) would land on (and lock) the next question.
-    // Locally: remaining question time PLUS 5 seconds; in multiplayer the
-    // shared tick counts down to the slot's end.
+    // Locally the verdict shows for a moment, then the next question; in
+    // multiplayer the shared tick counts down to the slot's end.
     const msLeft = !isMultiplayer && questionDeadlineRef.current !== null
       ? Math.max(0, questionDeadlineRef.current - Date.now())
       : timeLeftMs;
-    if (!sharedClock) {
-      const feedbackTime = Math.min(Math.ceil(msLeft / 1000), QUESTION_MS / 1000) + FEEDBACK_MS / 1000;
-      feedbackDeadlineRef.current = Date.now() + feedbackTime * 1000;
-      setTimeLeft(feedbackTime);
-    }
+    if (!sharedClock) feedbackDeadlineRef.current = Date.now() + SOLO_VERDICT_MS;
 
     // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
@@ -657,9 +655,8 @@ const Quiz = () => {
     }
   };
 
-  // Where the room (or the solo run) goes once this question's feedback
-  // ends, for the button's countdown: the same arithmetic advanceQuestion
-  // and moveToNextQuestion use.
+  // Where the room goes once this question's feedback ends, for the
+  // countdown under the verdict: the same arithmetic advanceQuestion uses.
   const nextPhase = phaseAfterQuestion(
     currentQuestionIndex,
     questions.length,
@@ -715,10 +712,14 @@ const Quiz = () => {
   return (
     <CalmPage
       title={quizName}
-      subtitle={`Question ${currentQuestionIndex + 1} of ${questions.length}`}
+      className="quiz-screen"
       footer={<LeaveQuiz multiplayer={isMultiplayer} onLeave={leaveQuiz} />}
     >
       <QuizStatus
+        questionNumber={currentQuestionIndex + 1}
+        questionCount={questions.length}
+        score={score}
+        nextIn={sharedClock ? `${nextLabel} in ${timeLeft}s` : undefined}
         timeLeft={timeLeft}
         settled={isSubmitted}
         picked={selectedAnswer}
@@ -734,21 +735,9 @@ const Quiz = () => {
         picked={selectedAnswer}
         correctAnswer={currentQuestion.correctAnswer}
         settled={isSubmitted}
-        lockedIn={outcome === "answered"}
         onPick={handleAnswer}
         headingRef={questionHeadingRef}
       />
-      <Ground>
-        <Pane>
-          <Control
-            elevation="high"
-            onClick={() => submitAnswer(selectedAnswer ?? "")}
-            disabled={!selectedAnswer || isSubmitted || showFeedback}
-          >
-            {showFeedback ? `${nextLabel} in ${timeLeft}s` : "Lock in my answer"}
-          </Control>
-        </Pane>
-      </Ground>
     </CalmPage>
   );
 };

@@ -97,3 +97,13 @@ export const hasLeftBreak = (
     if (phase === "question") return roomIndex >= breakIndex;
     return true;
 };
+
+/**
+ * The number shown on the question clock for `secondsLeft` real seconds: a
+ * nod to the Eurovision points (12, 10, 8, 7 ... 1). Over the question's 10
+ * seconds 10 reads 12, 9 reads 10 and 8 reads 8; the rest read as they are.
+ * Only the picture: scoring counts real time (quizScoring.ts) and screen
+ * readers hear the real seconds.
+ */
+export const countdownLabel = (secondsLeft: number): number =>
+    secondsLeft === 10 ? 12 : secondsLeft === 9 ? 10 : secondsLeft;

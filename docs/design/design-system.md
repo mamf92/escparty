@@ -178,7 +178,7 @@ MobileFrame (or the big screen)    the stage, edge to edge
 - Separate unrelated groups with space (another `Ground`), never a divider
   or a box.
 - **One next step per screen.** The control that moves the person on
-  ("Lock in", "Save quiz", "Start the game") takes `elevation="high"` and
+  ("Save quiz", "Start the game") takes `elevation="high"` and
   turns black. Everything else is a white button. A screen with no single
   next step (a menu) has none, or marks its main way in.
 - A list of things reads as a list: `<Pane as="ol">` with `<Row as="li">`
@@ -187,7 +187,7 @@ MobileFrame (or the big screen)    the stage, edge to edge
 ## 6. Components
 
 **Control** (`<Control>`, `.lycra`). The only button. Label in sentence
-case, verb first ("Host a party", "Lock in", "Next act"). Its material
+case, verb first ("Host a party", "Save quiz", "Next act"). Its material
 follows its role:
 
 | State | Action (white button) | Choice (dark tile) | Next step (black) | On a card (blush) |
