@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderWithProviders, screen, userEvent } from "../test/test-utils";
+import MobileFrame from "../components/MobileFrame";
+import { renderWithProviders, screen, userEvent, waitFor } from "../test/test-utils";
 import { Loader } from "./Loader";
 import { ThemeSwitch } from "./ThemeSwitch";
 
@@ -31,26 +32,50 @@ const motionSetting = (reduce: boolean) => {
 };
 
 describe("Loader", () => {
-  it("is a status that says what we wait for, with the ball as silent decoration", () => {
+  it("announces what we wait for through a status region that starts empty", async () => {
     renderWithProviders(<Loader>Finding the party…</Loader>);
     const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("Finding the party…");
-    expect(status.querySelector("canvas.esc-loader-ball")).toHaveAttribute("aria-hidden", "true");
+    expect(status).toBeEmptyDOMElement();
+    await waitFor(() => expect(status).toHaveTextContent("Finding the party…"));
+    expect(document.querySelector("canvas.esc-loader-ball")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("covers the phone screen when there is one, and the window when there is not", () => {
     const { unmount } = renderWithProviders(<Loader>Waiting…</Loader>);
-    expect(screen.getByRole("status")).toHaveClass("is-window");
+    expect(screen.getByRole("status").parentElement).toHaveClass("is-window");
     unmount();
 
     const phone = document.createElement("div");
     phone.className = "esc-app";
     document.body.append(phone);
     renderWithProviders(<Loader>Waiting…</Loader>);
-    const status = screen.getByRole("status");
-    expect(status.parentElement).toBe(phone);
-    expect(status).not.toHaveClass("is-window");
+    const overlay = screen.getByRole("status").parentElement;
+    expect(overlay?.parentElement).toBe(phone);
+    expect(overlay).not.toHaveClass("is-window");
     phone.remove();
+  });
+
+  it("stays mounted when its text changes", () => {
+    const { rerender } = renderWithProviders(<Loader>One…</Loader>);
+    const overlay = document.querySelector(".esc-loader");
+    rerender(<Loader>Two…</Loader>);
+    expect(document.querySelector(".esc-loader")).toBe(overlay);
+  });
+
+  it("makes the page content inert, but not the app bar, and lifts it afterwards", () => {
+    const view = (loading: boolean) => (
+      <MobileFrame>
+        <a href="/elsewhere">Away</a>
+        {loading && <Loader>Waiting…</Loader>}
+      </MobileFrame>
+    );
+    const { rerender } = renderWithProviders(view(true));
+    const content = document.querySelector(".esc-content");
+    expect(content).toHaveAttribute("inert");
+    expect(content).toContainElement(screen.getByText("Away"));
+    expect(content).not.toContainElement(screen.getByRole("switch", { name: "Sparkle mode" }));
+    rerender(view(false));
+    expect(content).not.toHaveAttribute("inert");
   });
 
   it("paints the ball from the stage's facets", () => {
@@ -88,6 +113,7 @@ describe("Loader", () => {
     const ctx = fakeCanvas();
     const user = userEvent.setup();
     renderWithProviders(<><ThemeSwitch /><Loader>Waiting…</Loader></>);
+    await screen.findByRole("switch", { name: "Sparkle mode" });
     const before = ctx.fillRect.mock.calls.length;
     await act(async () => { await user.click(screen.getByRole("switch", { name: "Sparkle mode" })); });
     expect(ctx.fillRect.mock.calls.length).toBeGreaterThan(before);

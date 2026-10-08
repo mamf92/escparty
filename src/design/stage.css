@@ -75,7 +75,8 @@
 /*
   The wait (Loader.tsx): a small disco ball and a line of text over the
   whole screen. It sits above the scrolling content and takes the pointer,
-  so nothing underneath can be tapped while we wait.
+  so nothing underneath can be tapped while we wait. The app bar
+  (z-index 30, MobileFrame.tsx) stays above it, with the theme switch.
 */
 .esc-loader {
   position: absolute;
@@ -104,6 +105,16 @@
   height: 88px;
   border-radius: 50%;
   box-shadow: 0 0 32px var(--esc-loader-glow);
+}
+
+.esc-loader-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .esc-loader-text {

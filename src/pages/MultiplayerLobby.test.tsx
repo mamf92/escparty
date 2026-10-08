@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { act, fireEvent } from "@testing-library/react";
-import { renderWithProviders, screen, userEvent } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, waitFor } from "../test/test-utils";
 import MultiplayerLobby from "./MultiplayerLobby";
 import { createRoom, getRoom, joinRoom, JoinRejected, setRoomDifficulty } from "../utils/roomsFirestore";
 
@@ -178,9 +178,9 @@ describe("MultiplayerLobby", () => {
     vi.mocked(createRoom).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
     renderLobby();
     await user.click(button(/^Host a game/));
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(screen.queryByRole("status")).toBeNull();
     await user.click(button(/^Host and play/));
-    expect(screen.getByText("Setting up the room…").closest("[role=status]")).not.toBeNull();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Setting up the room…"));
     finish();
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
   });

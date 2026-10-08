@@ -350,8 +350,6 @@ const MultiplayerLobby = () => {
             </Pane>
           </Ground>
           {error && <CalmNote role="alert">{error}</CalmNote>}
-          {/* Mounted before it fills, so screen readers announce what fills it. */}
-          <div role="status" />
           {loading && <Loader>Setting up the room…</Loader>}
         </>
       )}

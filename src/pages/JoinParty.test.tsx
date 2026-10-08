@@ -1,7 +1,7 @@
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, waitFor } from "../test/test-utils";
 import JoinParty from "./JoinParty";
 import { findGame } from "../utils/joinCode";
 import { savePartyIdentity } from "../utils/partySession";
@@ -50,8 +50,8 @@ describe("JoinParty", () => {
     renderJoin();
     expect(screen.queryByRole("status")).toBeNull();
     await user.type(field(), "ABBA");
-    expect(await screen.findByRole("status")).toHaveTextContent("Finding the party…");
-    expect(screen.getByRole("status").querySelector("canvas.esc-loader-ball")).not.toBeNull();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Finding the party…"));
+    expect(document.querySelector("canvas.esc-loader-ball")).not.toBeNull();
     await act(async () => found("quiz"));
     expect(await screen.findByText(/^at \/multiplayer/)).toBeInTheDocument();
     expect(screen.queryByText("Finding the party…")).toBeNull();
