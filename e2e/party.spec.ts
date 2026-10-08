@@ -51,3 +51,40 @@ test("a host and two guests rate a semi and get their awards", async ({ browser 
 
     await Promise.all([host, john, lordi].map(page => page.context().close()));
 });
+
+test("the stepper rates by tapping minus and plus and by dragging the value", async ({ browser }) => {
+    // 320px is the narrowest phone the sheet has to fit.
+    const page = await (await browser.newContext({ viewport: { width: 320, height: 700 } })).newPage();
+    await hostParty(page, "Loreen");
+
+    const picker = page.getByRole("spinbutton").first();
+    const label = (await picker.getAttribute("aria-label"))!;
+    const raise = page.getByRole("button", { name: `Raise ${label}` });
+    const lower = page.getByRole("button", { name: `Lower ${label}` });
+
+    await expect(picker).toHaveAttribute("aria-valuetext", "Not rated");
+    await expect(lower).toBeDisabled();
+    await raise.click();
+    await expect(picker).toHaveAttribute("aria-valuenow", "1");
+    await raise.click();
+    await expect(picker).toHaveAttribute("aria-valuenow", "2");
+    await lower.click();
+    await expect(picker).toHaveAttribute("aria-valuenow", "1");
+    // Focus stays on the value, even as the minus disables itself at the lowest.
+    await expect(picker).toBeFocused();
+    await expect(lower).toBeDisabled();
+
+    // A drag of two steps (24px each) to the right.
+    const box = (await picker.boundingBox())!;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width / 2, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 24, y, { steps: 4 });
+    await page.mouse.move(box.x + box.width / 2 + 48, y, { steps: 4 });
+    await page.mouse.up();
+    await expect(picker).toHaveAttribute("aria-valuenow", "3");
+
+    // The sheet fits the phone: nothing scrolls sideways.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    // No axe in this suite (@axe-core/playwright is not a dependency), so no automated a11y scan here.
+});
