@@ -13,6 +13,7 @@ import {
   type Room,
 } from "../utils/roomsFirestore";
 import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
+import { RESULTS_GRACE_MS, RESULTS_WAIT_FALLBACK_MS, startedAtMillis } from "../utils/quizTiming";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
 import { formatRunDate, readScoreHistory } from "../utils/scoreHistory";
@@ -28,7 +29,10 @@ import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, rev
  * In a room only the host taps: the step lives on the room (`revealStep`) and
  * every phone follows it, with guests waiting under a disco ball until the
  * host starts. Only a room that has gone is revealed locally (no host left
- * to write to).
+ * to write to). A guest whose host never starts it (gone, or forgot) gets a
+ * way to reveal on their own phone once the results are a minute old, and the
+ * host can't reveal until the late answers' grace is over, so the standings
+ * are final by the first tap.
  */
 const QuizResults = () => {
   const location = useLocation();
@@ -62,6 +66,11 @@ const QuizResults = () => {
   const [isObserver, setIsObserver] = useState<boolean>(!!location.state?.observer);
   // Only used once the room has gone; otherwise the room's revealStep rules.
   const [localStep, setLocalStep] = useState(0);
+  // A guest who chose to reveal on their own phone: they get the buttons,
+  // and the step stays local (guests never write to the room).
+  const [localControl, setLocalControl] = useState(false);
+  // Ticks only at the two moments the results' age matters.
+  const [now, setNow] = useState(() => Date.now());
   const [revealError, setRevealError] = useState<string | null>(null);
   const [nextRound, setNextRound] = useState<"idle" | "busy" | string>("idle");
   // A tap in the same render as another can't see "busy" yet.
@@ -102,6 +111,21 @@ const QuizResults = () => {
       }
     });
   }, [gameData.multiplayer, gameData.roomCode, gameData.playerId]);
+
+  // How long the room has been showing the results, from the room's own
+  // clock like every other phase timing. Unknown (null) while the server's
+  // time is still pending; a room with no time at all can't be waited on.
+  const startedAt = room ? startedAtMillis(room.phaseStartedAt) : null;
+  const resultsAge = startedAt !== null ? now - startedAt : room && room.phaseStartedAt === undefined ? Infinity : null;
+  useEffect(() => {
+    if (startedAt === null) return;
+    const ahead = [RESULTS_GRACE_MS, RESULTS_WAIT_FALLBACK_MS]
+      .map(wait => startedAt + wait - Date.now())
+      .filter(wait => wait > 0);
+    if (ahead.length === 0) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(...ahead) + 50);
+    return () => clearTimeout(timer);
+  }, [startedAt, now]);
 
   /** Leave on purpose: this game is over for this tab. */
   const leave = (path: string) => {
@@ -168,32 +192,50 @@ const QuizResults = () => {
   const leads = someoneLeads(placed);
   const steps = revealSteps(placed);
   const isHost = isRoomHost(room, gameData.playerId);
-  // With the room gone, scores the page already holds can still be revealed
-  // by anyone, on their own phone; otherwise everyone follows the host.
+  // A room that never arrived (gone or unreachable) leaves nobody to follow,
+  // so scores the page already holds can be revealed by anyone on their own
+  // phone. Once a room has been seen, its last step keeps ruling: a listener
+  // hiccup must not hand the reveal to guests, and the step never goes back
+  // when the room returns.
   const roomStep = room?.revealStep ?? 0;
-  const step = error ? Math.max(localStep, roomStep) : roomStep;
-  const canReveal = isHost || !!error;
+  const step = Math.max(localStep, roomStep);
+  const roomLost = !!error && !room;
+  const canReveal = isHost || roomLost || localControl;
+  // Late answers are still accepted until the grace is over, so the host
+  // waits for the standings to be final before the first tap.
+  const lastAnswersPending = !!room && isHost && (resultsAge === null || resultsAge < RESULTS_GRACE_MS);
   const waitingForHost = !!room && !canReveal && step === 0 && placed.length > 0;
+  // The host never showed: the guest may reveal on their own phone.
+  const offerLocalReveal = waitingForHost && resultsAge !== null && resultsAge >= RESULTS_WAIT_FALLBACK_MS;
   const shown = revealedCount(steps, step);
   const revealed = placed.slice(placed.length - shown);
   const done = revealDone(steps, step);
-  // One status line for the whole reveal, mounted from the first render so
-  // screen readers announce each change to it: collecting, then how many
-  // are on the board, then what each tap added, then the winner.
-  // With the room gone there is nothing left to collect, but scores the
-  // page already holds can still be revealed and announced.
-  // A guest waiting for the host is told by the Loader, which is a status itself.
-  const statusLine = waitingForHost ? "" : placed.length > 0 ? revealAnnouncement(placed, step, steps) : error ? "" : "Collecting the final scores…";
+  // One status line for the whole reveal, always mounted so screen readers
+  // announce each change to it: collecting, then how many are on the board,
+  // then what each tap added, then the winner. Empty while a guest waits
+  // (the Loader is a status itself) and when there is nothing to say.
+  const statusLine = offerLocalReveal
+    ? "The host hasn't started the reveal."
+    : waitingForHost
+      ? ""
+      : !room && !error
+        ? "Collecting the final scores…"
+        : lastAnswersPending && step === 0
+          ? "Waiting for the last answers…"
+          : placed.length > 0
+            ? revealAnnouncement(placed, step, steps)
+            : "";
   // This player's name in this room (the host included, from the full
   // list), before this device's last-used name, which another tab may have
   // changed since.
   const myName = room?.players.find(p => p.id === gameData.playerId)?.name
     ?? localStorage.getItem("playerName") ?? "Player";
 
-  /** The host's tap: every phone follows the room's step. */
+  /** The host's tap: every phone follows the room's step. Only the host
+   *  writes it; a guest revealing for themselves keeps it on their phone. */
   const revealTo = async (next: number) => {
     setRevealError(null);
-    if (error || !gameData.roomCode) {
+    if (!isHost || !gameData.roomCode) {
       setLocalStep(next);
       return;
     }
@@ -282,24 +324,32 @@ const QuizResults = () => {
         </Ground>
       )}
 
-      {/* Empty only once the room has gone with nobody to show: the alert
-          above says so, and an empty note would just leave a gap. */}
-      {statusLine && <CalmNote role="status">{statusLine}</CalmNote>}
-      {waitingForHost && <Loader inline>Wait to see who won…</Loader>}
+      {/* Mounted at all times, so the first text put in it is announced. */}
+      <CalmNote role="status">{statusLine}</CalmNote>
+      {waitingForHost && !offerLocalReveal && <Loader inline>Wait to see who won…</Loader>}
+      {offerLocalReveal && (
+        <Ground>
+          <Pane>
+            <Control onClick={() => setLocalControl(true)}>Show the results on my phone</Control>
+          </Pane>
+        </Ground>
+      )}
       {canReveal && !done && placed.length > 0 && (
         <Ground>
           <Pane layout="split">
-            <Control onClick={() => revealTo(step + 1)}>
+            <Control disabled={lastAnswersPending} onClick={() => revealTo(step + 1)}>
               {step === 0 ? "Start the reveal" : `Reveal ${nextRevealLabel(placed, shown)}`}
             </Control>
-            <Control onClick={() => revealTo(steps.length)}>Show everything</Control>
+            <Control disabled={lastAnswersPending} onClick={() => revealTo(steps.length)}>Show everything</Control>
           </Pane>
         </Ground>
       )}
       {revealError && <CalmNote role="alert">{revealError}</CalmNote>}
 
-      {/* A room that's gone can't take a next round: the way out above is all. */}
-      {room && isHost && !room.nextRoomCode && !error && (
+      {/* A room that's gone can't take a next round: the way out above is all.
+          The host starts one only after the reveal, so the guests who follow
+          it from here haven't been sent away from their results. */}
+      {room && isHost && !room.nextRoomCode && !error && (done || steps.length === 0) && (
         <Ground>
           <Pane>
             {/* Once everyone is showing, the next round is the next step (design-system.md, "Page anatomy"). */}

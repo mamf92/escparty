@@ -99,7 +99,7 @@ export const Loader = ({ children, inline = false }: LoaderProps) => {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [screen, inline, sparkle, still]);
+  }, [screen, sparkle, still]);
 
   // The status region goes in empty and gets its text a moment later:
   // screen readers announce what fills a live region, not one that arrives full.

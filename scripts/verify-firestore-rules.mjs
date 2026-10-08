@@ -648,6 +648,7 @@ const early = await startedRoom("PHASEEARLY");
 const skip = await startedRoom("PHASESKIP");
 const wrongBreak = await startedRoom("PHASEBRK");
 const toResults = await startedRoom("PHASERES");
+const revealMix = await startedRoom("PHASEREVMIX");
 const forgedClock = await startedRoom("PHASECLK");
 const piggyScore = await startedRoom("PHASEPIG");
 const resumeTooSoon = await startedRoom("PHASERSM");
@@ -887,8 +888,30 @@ await expectDenied("reset the reveal to 0", () =>
 await expectAllowed("reveal up to the cap (100)", () =>
   updateDoc(toResults, { revealStep: 100 })
 );
-await expectDenied("the reveal step riding along with scores", () =>
-  updateDoc(toResults, { revealStep: 100, players: [{ id: "host-1", name: "Host", score: 5 }] })
+// The mixes below need a room still inside the 30s grace (`toResults` is
+// past it by now), so the denials come from the reveal rule's hasOnly and
+// not from the finished-room check. It reaches the results here, its 15s
+// slot long over.
+await expectAllowed("a second room reaches the results", () =>
+  updateDoc(revealMix, advanceTo("results", 0))
+);
+await expectAllowed("start the reveal in a room inside the grace", () =>
+  updateDoc(revealMix, { revealStep: 1 })
+);
+await expectDenied("the reveal step riding along with scores (inside the grace)", () =>
+  updateDoc(revealMix, { revealStep: 2, players: [{ id: "host-1", name: "Host", score: 5 }] })
+);
+await expectDenied("the reveal step riding along with the next round's code", () =>
+  updateDoc(revealMix, { revealStep: 2, nextRoomCode: nextCode })
+);
+await expectDenied("the reveal step riding along with a phase change", () =>
+  updateDoc(revealMix, { revealStep: 2, ...advanceTo("question", 1) })
+);
+await expectAllowed("a late score write in a room that already carries a reveal step", () =>
+  updateDoc(revealMix, { players: [{ id: "host-1", name: "Host", score: 5 }] })
+);
+await expectAllowed("point a room that already carries a reveal step at the next round", () =>
+  updateDoc(revealMix, { nextRoomCode: nextCode })
 );
 
 // 15. The waiting room (#65): players mark themselves ready, and the host

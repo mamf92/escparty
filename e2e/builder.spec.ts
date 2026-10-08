@@ -57,6 +57,8 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
     // The host reveals the standings (#207): the step goes to the room, and
     // the row shows once the room's listener hands it back.
     await expect(page.getByRole("list", { name: "Final standings" })).toHaveCount(0);
+    // It waits out the 30s grace for the last answers first.
+    await expect(page.getByRole("button", { name: "Start the reveal" })).toBeEnabled({ timeout: 45_000 });
     await page.getByRole("button", { name: "Start the reveal" }).click();
     await expect(page.getByRole("list", { name: "Final standings" }).getByRole("listitem")).toHaveCount(1);
 });

@@ -83,9 +83,15 @@ Why this runs on Firestore listeners and not WebSockets:
    `room.revealStep ?? 0` from its listener. Guests, and an observer host's
    guests, see the disco ball `<Loader>` with "Wait to see who won…" until
    the step is above 0, then the rows as the host taps, with no reveal
-   buttons; a guest who arrives late sees what is already revealed. Only
-   once the room has gone (the "no longer exists" notice) can anyone reveal
-   the scores the page holds, locally. Solo results have no reveal. It
+   buttons; a guest who arrives late sees what is already revealed. The
+   host's buttons stay disabled ("Waiting for the last answers…") until the
+   results are `RESULTS_GRACE_MS` old, so the standings are final, and
+   "Play again with everyone" waits for the reveal to be done. A guest whose
+   host never starts is offered "Show the results on my phone" once the
+   results are `RESULTS_WAIT_FALLBACK_MS` (60s) old, and a room that never
+   arrived (the "no longer exists" notice with no snapshot) lets anyone
+   reveal the scores the page holds; both reveal locally, never writing to
+   the room, and the shown step is `max(local, room)`. Solo results have no reveal. It
    listens to the room for as long as it's open and recovers from
    `sessionStorage` if `location.state` is missing (a direct link, a
    reload). The stored game is kept through a reload, so a reload on the results

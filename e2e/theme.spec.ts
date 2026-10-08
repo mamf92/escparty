@@ -212,7 +212,7 @@ test("the green room and the results follow the surface rules", async ({ browser
     // And as a guest, who waits for the host under the disco ball (#207).
     await page.evaluate(game => sessionStorage.setItem("multiplayerGame", JSON.stringify(game)), { multiplayer: true, roomCode: code, playerId: "a-guest" });
     await page.reload();
-    await expect(page.getByRole("status")).toContainText("Wait to see who won…");
+    await expect(page.getByText("Wait to see who won…")).toBeVisible();
     await expect(page.getByRole("button", { name: "Start the reveal" })).toHaveCount(0);
     await judge(page, "results-waiting");
 
