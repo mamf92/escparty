@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation, type InitialEntry } from "react-router-dom";
 import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
 import QuizBuilder from "./QuizBuilder";
+import MobileFrame from "../components/MobileFrame";
 
 const mocks = vi.hoisted(() => ({ saveCustomQuiz: vi.fn(), fetchCustomQuiz: vi.fn(), bankFails: false }));
 vi.mock("../data/questionBank", async (importOriginal) => {
@@ -320,5 +321,34 @@ describe("QuizBuilder", () => {
     renderBuilder();
     await user.click(screen.getByText("Back to the quiz library"));
     expect(screen.getByText("at /quizzes with null")).toBeInTheDocument();
+  });
+
+  describe("the brand", () => {
+    const renderFramed = () =>
+      renderWithProviders(
+        <MobileFrame>
+          <Routes>
+            <Route path="/quizzes/new" element={<QuizBuilder />} />
+            <Route path="*" element={<ShowLocation />} />
+          </Routes>
+        </MobileFrame>,
+        { initialEntries: ["/quizzes/new"] },
+      );
+
+    it("goes straight home from an empty builder", async () => {
+      renderFramed();
+      await userEvent.setup().click(screen.getByRole("link", { name: "ESCParty" }));
+      expect(screen.getByText(/at \/ with/)).toBeInTheDocument();
+    });
+
+    it("asks first once there is a quiz in the making", async () => {
+      renderFramed();
+      const user = userEvent.setup();
+      await user.type(screen.getByLabelText("Name"), "Jedward");
+      await user.click(screen.getByRole("link", { name: "ESCParty" }));
+      expect(screen.getByText(/The quiz you're making won't be saved/)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Go to ESCParty" }));
+      expect(screen.getByText(/at \/ with/)).toBeInTheDocument();
+    });
   });
 });

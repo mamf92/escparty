@@ -6,7 +6,10 @@ import { DEFAULT_BREAK_EVERY, isBreakAfter } from "./quizModel";
 // firestore.rules refuses to end a question before QUESTION_SLOT_MS has
 // passed — keep `duration.value(15, 's')` in isAdvancingPhase in sync.
 export const QUESTION_MS = 10_000; // time to answer
-export const FEEDBACK_MS = 5_000; // answer feedback before the next question
+export const FEEDBACK_MS = 5_000; // in a room: answer feedback before the next question
+// Solo: how long the verdict shows before the next question (the room sets
+// the pace in multiplayer, with FEEDBACK_MS).
+export const SOLO_VERDICT_MS = 1_500;
 export const QUESTION_SLOT_MS = QUESTION_MS + FEEDBACK_MS;
 // How long after a room reaches the results a late score write still
 // counts (#142): enough for the last answer's write and Quiz.tsx's retries.
@@ -99,4 +102,16 @@ export const hasLeftBreak = (
     if (phase === "mid-scoreboard") return roomIndex > breakIndex;
     if (phase === "question") return roomIndex >= breakIndex;
     return true;
+};
+
+/**
+ * The number shown on the question clock for `secondsLeft` real seconds: a
+ * nod to the Eurovision points (12, 10, 8, 7 ... 1). The top second of the
+ * question (QUESTION_MS) reads 12, the next 10 and the rest as they are.
+ * Only the picture: scoring counts real time (quizScoring.ts) and screen
+ * readers hear the real seconds.
+ */
+export const countdownLabel = (secondsLeft: number): number => {
+    const top = QUESTION_MS / 1000;
+    return secondsLeft === top ? 12 : secondsLeft === top - 1 ? 10 : secondsLeft;
 };

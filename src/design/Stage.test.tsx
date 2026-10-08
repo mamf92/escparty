@@ -1,4 +1,4 @@
-import { act, type CSSProperties } from "react";
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import { Stage } from "./Stage";
@@ -75,7 +75,23 @@ describe("Stage", () => {
     expect(frames).not.toHaveBeenCalled();
   });
 
-  it("hangs the ball on its wire, except where the screen floats it (Home)", () => {
+  it("aims the lamp at a finger or a pointer, without stopping a scroll", async () => {
+    vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    motionSetting(false);
+    const add = vi.spyOn(window, "addEventListener");
+    const user = userEvent.setup();
+    renderWithProviders(<><ThemeSwitch /><Stage /></>);
+    await user.click(screen.getByRole("switch", { name: "Sparkle mode" }));
+    for (const type of ["pointerdown", "pointermove", "touchstart", "touchmove"]) {
+      const call = add.mock.calls.find(([name]) => name === type);
+      expect(call, type).toBeDefined();
+      expect(call?.[2]).toMatchObject({ passive: true });
+    }
+    add.mockRestore();
+  });
+
+  it("hangs the ball with no wire on any screen", () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
     const fillRect = vi.fn();
@@ -84,15 +100,10 @@ describe("Stage", () => {
       set: () => true,
     });
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((kind: string) => kind === "2d" ? ctx : null) as never);
-    // The wire: a 2px strip down the stage's middle from its top edge.
+    // The old wire: a 2px strip down the stage's middle from its top edge.
     const wires = () => fillRect.mock.calls.filter(([x, y, w]) => x === 199 && y === 0 && w === 2);
 
-    const hanging = renderWithProviders(<Stage />);
-    expect(wires()).not.toHaveLength(0);
-    hanging.unmount();
-
-    fillRect.mockClear();
-    renderWithProviders(<div style={{ "--esc-ball-wire": "none" } as CSSProperties}><Stage /></div>);
+    renderWithProviders(<Stage />);
     expect(fillRect).toHaveBeenCalled();
     expect(wires()).toHaveLength(0);
     vi.restoreAllMocks();

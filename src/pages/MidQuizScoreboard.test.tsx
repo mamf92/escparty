@@ -1,6 +1,6 @@
 import { act, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import MidQuizScoreboard from "./MidQuizScoreboard";
 import type { Room } from "../utils/roomsFirestore";
@@ -74,6 +74,32 @@ describe("MidQuizScoreboard", () => {
     expect(mocks.listenToRoom).not.toHaveBeenCalled();
     await userEvent.setup().click(screen.getByRole("button", { name: "Continue the quiz" }));
     expect(stateAt("/quiz/hard")).toMatchObject({ currentQuestionIndex: 5, score: 800, multiplayer: false });
+  });
+
+  it("replaces the break with the quiz, so Back can't re-enter a finished question", async () => {
+    const GoBack = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate(-1)}>browser back</button>;
+    };
+    renderWithProviders(
+      <Routes>
+        <Route path="/start" element={<p>the start</p>} />
+        <Route path="/mid-quiz-scoreboard" element={<MidQuizScoreboard />} />
+        <Route path="/quiz/:difficulty" element={<><ShowLocation /><GoBack /></>} />
+      </Routes>,
+      {
+        initialEntries: [
+          "/start",
+          { pathname: "/mid-quiz-scoreboard", state: { score: 800, currentQuestionIndex: 5, difficulty: "hard", multiplayer: false } },
+        ],
+        initialIndex: 1,
+      },
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Continue the quiz" }));
+    expect(screen.getByText(/^at \/quiz\/hard/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "browser back" }));
+    expect(screen.getByText("the start")).toBeInTheDocument();
   });
 
   it("shows a guest the room's standings and waits for the host", () => {

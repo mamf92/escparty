@@ -54,11 +54,11 @@ same stage, with a disco ball hanging over it.
 | **Card** | White, rounded 28px, a deep soft lift; dark ink | A form: anything holding a field | Automatic for a `Pane` with a `Field`; `<Pane className="is-card">` on purpose |
 | **Button** | White, lifted; dark ink, bold | An action | `<Control>` |
 | **Next step** | Black, in the display font, white ink | The one thing to do next on this screen | `<Control elevation="high">` |
-| **Tile** | Dark translucent pink (`--esc-tile`), white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
+| **Tile** | Solid-reading dark wine (`--esc-tile`, 90% opaque), lighter and pinker than the black next step, white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
 | **Proud row** | A white row among the tiles | First place, your own row, the right answer | `<Row elevation="high">` |
 | **Sunk** | A darker, pressed tile | The bottom of a ladder, a wrong pick | `elevation="low"` |
 | **Chosen** | Hot pink (`--esc-accent`), white ink, pressed in | What is picked | `chosen` → `.is-chosen` + `aria-pressed` |
-| **Unavailable** | Solid dark (`--esc-disabled`) with muted ink; faded blush on a card | Can't be used yet | `disabled` |
+| **Unavailable** | Solid, dimmer than a tile (`--esc-disabled`) with muted ink; faded blush on a card | Can't be used yet | `disabled` |
 
 **Inside a card** the same roles are made of **blush** (`--esc-blush`)
 with Pearl's soft neumorphic depth: a button is raised by a light and a
@@ -78,7 +78,7 @@ land. Never set a text colour on a page.
 | --- | --- | --- |
 | Role | Default, accessible, the landing state | Opt-in party stage |
 | Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
-| Disco ball | Hangs still, in muted pinks; soft spots on the stage | White and light pink, turning slowly; brighter spots sweep the stage **left to right** with the ball |
+| Disco ball | Hangs still on every screen with no wire, in muted pinks; soft spots on the stage | White and light pink, turning slowly; brighter square spots in rows sweep the stage **left to right** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
 | Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wider glow for the sequins |
 | Materials, sizes, states, copy | Identical | Identical |
@@ -90,7 +90,18 @@ canvas (the maths is in `src/design/stageLights.ts` and is unit tested),
 and in Sparkle the sequins on a WebGL canvas. Without canvas or WebGL it
 is the CSS gradient alone (`--esc-screen`). The ball turns at
 `SPIN` (negative, so its facets and spots travel left to right, slowly
-enough to read as reflections, not snow).
+enough to read as reflections, not snow). Each lit facet throws one
+square spot (a foreshortened, slightly leaning quad with a soft edge) at
+its place in a magnified copy of the ball's facet grid, so the spots line
+up in rows, one per latitude row of facets, and slide along them in step
+with the ball's rotation. They never draw over the ball's disc. The ball
+has no wire on any screen.
+
+The lamp follows `pointerdown`/`pointermove` and `touchstart`/`touchmove`
+(passive, captured, never `preventDefault`ed, so scrolling is untouched).
+`stage.css` also turns off the tap highlight, the touch callout and text
+selection across `.esc-app`, except in inputs, textareas and selects, so a
+finger dragged over the stage never selects or highlights content.
 
 What a theme may change: `--esc-screen`, `--esc-stage-text-shadow` (never dropping the halo), and
 what `<Stage />` draws. `contrast.test.ts` fails if Sparkle sets any other
@@ -106,6 +117,14 @@ first paint by the script in `index.html`, then kept in sync by
 (`src/design/surface.css`) is scoped to `.esc-app`, the class on the phone
 frame's screen and on the big screen, so the standalone `/fabric-ui` WebGL
 demo keeps its own renderers.
+
+**Selecting text.** The pointer lamp follows a finger, so text in `.esc-app`
+is `user-select: none` by default; a touch that moves the lamp must not
+highlight words. Fields stay selectable. Add `esc-selectable` to anything a
+person may need to copy: a share link or its fallback note, a room or party
+code, an id. Leave it off headings, labels and body copy. Don't set
+`-webkit-touch-callout: none`, which would take "Open in new tab", "Copy link"
+and "Save image" away from links and images.
 
 ## 4. Tokens
 
@@ -149,7 +168,7 @@ needs and no token gives is a new token here, not a literal in the page.
 ```
 MobileFrame (or the big screen)    the stage, edge to edge
 ├─ Stage              <Stage />: the disco ball (and Sparkle's sequins), behind everything
-├─ App bar            ESCParty brand · Sparkle mode switch
+├─ App bar            ESCParty brand (a link home) · Sparkle mode switch
 └─ CalmPage           every screen's chrome
    ├─ Page header     <h1> title (one per page) · optional subtitle
    ├─ Ground          <Ground>  a section of the page (layout only)
@@ -158,11 +177,16 @@ MobileFrame (or the big screen)    the stage, edge to edge
    │     ├─ Row       <Row>     a dark tile of information
    │     └─ Field     <Field>   a blush well, on a card
    ├─ Notes           <CalmNote> status, hints, errors, between sections
+   ├─ Actions         `actions` prop: the next-step area, at the bottom of a short page
    └─ Footer          <CalmLink> the way back
 ```
 
 - Every screen renders through `CalmPage` (`src/components/CalmPage.tsx`).
   No screen builds its own header, background or container.
+- **The next step sits at the thumb.** A screen whose last thing is its
+  next-step area (Home's Host/Join, a menu of choices) passes it as
+  `actions`: on a short page it sticks to the bottom of the screen, on a
+  long one it follows the content, and the footer comes right under it.
 - Use the primitives from `src/design` (`Ground`, `Pane`, `Control`,
   `Row`, `Field`). They render the surface classes (`calm-ground`,
   `lycra-pane`, `lycra`, `lycra-field`; the names are historical) and
@@ -178,7 +202,7 @@ MobileFrame (or the big screen)    the stage, edge to edge
 - Separate unrelated groups with space (another `Ground`), never a divider
   or a box.
 - **One next step per screen.** The control that moves the person on
-  ("Lock in", "Save quiz", "Start the game") takes `elevation="high"` and
+  ("Save quiz", "Start the game") takes `elevation="high"` and
   turns black. Everything else is a white button. A screen with no single
   next step (a menu) has none, or marks its main way in.
 - A list of things reads as a list: `<Pane as="ol">` with `<Row as="li">`
@@ -187,7 +211,7 @@ MobileFrame (or the big screen)    the stage, edge to edge
 ## 6. Components
 
 **Control** (`<Control>`, `.lycra`). The only button. Label in sentence
-case, verb first ("Host a party", "Lock in", "Next act"). Its material
+case, verb first ("Host a party", "Save quiz", "Next act"). Its material
 follows its role:
 
 | State | Action (white button) | Choice (dark tile) | Next step (black) | On a card (blush) |
@@ -222,6 +246,18 @@ never labels). Textareas and selects are Fields too: `<Field as="textarea">`,
 `"split"` (two or three moves side by side, e.g. Previous / Next) and
 `"scale"` (a 1..N rating grid of round keys).
 
+**Sheet and Stepper** (`<Sheet>`/`<SheetRow>`, `<Stepper>`; `.calm-sheet`,
+`.calm-stepper`). One number per row, set in a two-column table: the label
+on the left as a dark tile (white on dark, so it reads in Calm and Sparkle),
+the picker on the right. The picker is a big "−" and "+" (real labelled
+buttons, "Lower/Raise Vocals for Sweden", out of the tab order) around the
+value, which is the `spinbutton` and a Control-look element: arrow keys,
+Page, Home and End move it, a sideways drag across the value scrubs it (a
+tap's jitter under half a step is ignored), and it says "Not rated" until set
+(`aria-valuetext`; the visible text is `aria-hidden`). After a −/+ press focus
+moves to the value, so it is never lost when a button disables. Announce the
+resulting score in a `role="status"` note. Use it where a 1..N scale would wrap to a second row.
+
 **Tabs.** A split pane of controls with `role="tab"`; the current tab is
 chosen (hot pink). `useRovingTabs` (`src/design/`) gives each tab and its
 tab panel their ids, roles, keys and chosen look: one tab stop, arrows, Home
@@ -248,9 +284,12 @@ case, below the ball (the header's `--esc-stage-clearance` keeps it
 clear).
 
 **Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
-floats a bigger ball (46% of the stage's width, 148px to 280px) with no
-wire (`--esc-ball-wire: none`, which `<Stage />` reads), and the header's
-clearance grows with it. Two ways in under the title, nothing more.
+shows a bigger ball (46% of the stage's width, 148px to 280px), and the
+header's clearance grows with it. Two ways in under the title, nothing more.
+
+**Compact** (`calm-compact` on `CalmPage`, the party room). A phone
+worked with a thumb: a 48px to 72px ball (`stage.css`), a one-line
+title, so a five-category rating sheet fits a 390x844 screen.
 
 **Big screen** (`calm-screen` on `CalmPage`). The same anatomy for a TV:
 only the sizes and the ball's clearance scale up, together.
@@ -258,8 +297,16 @@ only the sizes and the ball's clearance scale up, together.
 ## 7. UX patterns
 
 **Navigation.**
-- The app bar carries the brand and the Sparkle mode switch, and is not a
-  home link: several screens are mid-game and need their own way out.
+- The app bar carries the brand and the Sparkle mode switch. The brand is
+  a link home. A screen with something in progress (a running quiz, a room
+  this tab is in, a quiz being built) registers a leave guard with
+  `useLeaveGuard`, and then the brand first asks "Go back to ESCParty?" with
+  "Stay here" and "Go to ESCParty" (`ConfirmLeave`, as in `LeaveQuiz`) and
+  runs the screen's own leave (a guest's lobby leave takes them out of the
+  room). With no guard it goes straight home.
+  Moves from the quiz to a break or the results, and from a break back
+  into the quiz, replace the history entry, so Back can't re-enter a
+  finished question.
   Every screen has one explicit way back in its footer, named for where it
   goes ("Back to the quiz library", not "Back"). The one exception is Home
   (`/`), the root: there is nowhere further back to go.

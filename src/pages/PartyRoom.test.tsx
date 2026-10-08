@@ -89,25 +89,29 @@ describe("PartyRoom", () => {
         expect(screen.getByText("You haven't rated Sweden yet.")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Previous act" })).toBeDisabled();
 
-        const scale = screen.getByRole("radiogroup", { name: "Points for Sweden" });
-        await user.click(within(scale).getByRole("radio", { name: "12" }));
-        expect(within(scale).getByRole("radio", { name: "12" })).toHaveAttribute("aria-checked", "true");
-        // Chosen is pressed in, and said with aria-checked alone (no aria-pressed on a radio).
-        expect(within(scale).getByRole("radio", { name: "12" })).toHaveClass("is-chosen");
-        expect(within(scale).getByRole("radio", { name: "12" })).not.toHaveAttribute("aria-pressed");
+        const points = screen.getByRole("spinbutton", { name: "Points for Sweden" });
+        expect(points).toHaveAttribute("aria-valuetext", "Not rated");
+        expect(points).not.toHaveAttribute("aria-valuenow");
+        expect(screen.getByRole("table", { name: "Your ratings for Sweden" })).toBeInTheDocument();
+        points.focus();
+        await user.keyboard("{End}");
+        expect(points).toHaveAttribute("aria-valuenow", "12");
+        expect(points).toHaveAttribute("aria-valuetext", "12 of 12");
+        // Chosen is pressed in.
+        expect(points).toHaveClass("is-chosen");
         expect(screen.getByRole("tab", { name: "Rate" })).toHaveAttribute("aria-selected", "true");
         expect(screen.getByRole("tab", { name: "Rate" })).toHaveClass("is-chosen");
         await user.click(screen.getByRole("button", { name: /Wind machine/ }));
-        expect(screen.getByText("Your score for Sweden: 11")).toBeInTheDocument();
+        expect(screen.getByText("Your score for Sweden: 11")).toHaveAttribute("role", "status");
 
         await user.click(screen.getByRole("button", { name: "Next act" }));
-        expect(screen.getByRole("radiogroup", { name: "Points for Norway" })).toBeInTheDocument();
+        expect(screen.getByRole("spinbutton", { name: "Points for Norway" })).toBeInTheDocument();
         expect(readPartyIdentity("ABBA")?.actId).toBe("no");
         await user.selectOptions(screen.getByLabelText("Jump to an act"), "3");
         expect(screen.getByRole("button", { name: "Next act" })).toBeDisabled();
         expect(screen.getByRole("option", { name: "1. Sweden ✓" })).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Previous act" }));
-        expect(screen.getByRole("radiogroup", { name: "Points for Finland" })).toBeInTheDocument();
+        expect(screen.getByRole("spinbutton", { name: "Points for Finland" })).toBeInTheDocument();
     });
 
     it("moves between the tabs with the arrow keys, one tab stop for the tablist", async () => {
@@ -133,12 +137,12 @@ describe("PartyRoom", () => {
     it("stays on the same act when the host reorders the lineup", () => {
         savePartyIdentity("ABBA", { ...guest, actId: "fi" });
         const { unmount } = renderRoom();
-        expect(screen.getByRole("radiogroup", { name: "Points for Finland" })).toBeInTheDocument();
+        expect(screen.getByRole("spinbutton", { name: "Points for Finland" })).toBeInTheDocument();
         unmount();
         const [se, no, fi, ie] = makeParty().acts;
         mocks.data = { party: makeParty({ acts: [fi, se, no, ie] }), ballots: [], error: null, retry: vi.fn() };
         renderRoom();
-        expect(screen.getByRole("radiogroup", { name: "Points for Finland" })).toBeInTheDocument();
+        expect(screen.getByRole("spinbutton", { name: "Points for Finland" })).toBeInTheDocument();
         expect(screen.getByText("1 of 4")).toBeInTheDocument();
     });
 
@@ -149,9 +153,11 @@ describe("PartyRoom", () => {
         await user.click(screen.getByRole("tab", { name: "My ranking" }));
         expect(screen.getByText("Rate an act and your ranking starts here.")).toBeInTheDocument();
         await user.click(screen.getByRole("tab", { name: "Rate" }));
-        await user.click(screen.getByRole("radio", { name: "6" }));
+        screen.getByRole("spinbutton", { name: "Points for Sweden" }).focus();
+        await user.keyboard("{Home}{ArrowUp>5/}");
         await user.click(screen.getByRole("button", { name: "Next act" }));
-        await user.click(screen.getByRole("radio", { name: "12" }));
+        screen.getByRole("spinbutton", { name: "Points for Norway" }).focus();
+        await user.keyboard("{End}");
         await user.click(screen.getByRole("tab", { name: "My ranking" }));
         const ranking = screen.getByRole("list", { name: "Your ranking" });
         expect(within(ranking).getAllByRole("listitem").map(item => item.textContent)).toEqual(["1st 🇳🇴 Norway10", "2nd 🇸🇪 Sweden5"]);

@@ -68,9 +68,9 @@ const PartyScreen = () => {
                         {qr && <img className="party-qr" src={qr} alt={`QR code to join party ${party.code}`} width={240} height={240} />}
                         <span className="calm-row">
                             <span>Party code</span>
-                            <span>{party.code}</span>
+                            <span className="esc-selectable">{party.code}</span>
                         </span>
-                        <span className="calm-sub party-link">{link}</span>
+                        <span className="calm-sub party-link esc-selectable">{link}</span>
                     </Row>
                 </Pane>
             </Ground>

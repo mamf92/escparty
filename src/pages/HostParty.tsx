@@ -21,20 +21,21 @@ const HostParty = () => {
           <CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>
         </>
       )}
-    >
-      <Ground>
-        <Pane role="group" aria-label="What to host">
-          <Control block onClick={() => navigate("/multiplayer", { state: { step: "host" } })}>
-            <span>Host a quiz</span>
-            <span className="calm-sub">Everyone answers on their phone, live</span>
-          </Control>
-          <Control block onClick={() => navigate("/party/new")}>
-            <span>Host a scoreboard</span>
-            <span className="calm-sub">Rate every act together and see who called the winner</span>
-          </Control>
-        </Pane>
-      </Ground>
-    </CalmPage>
+      actions={(
+        <Ground>
+          <Pane role="group" aria-label="What to host">
+            <Control block onClick={() => navigate("/multiplayer", { state: { step: "host" } })}>
+              <span>Host a quiz</span>
+              <span className="calm-sub">Everyone answers on their phone, live</span>
+            </Control>
+            <Control block onClick={() => navigate("/party/new")}>
+              <span>Host a scoreboard</span>
+              <span className="calm-sub">Rate every act together and see who called the winner</span>
+            </Control>
+          </Pane>
+        </Ground>
+      )}
+    />
   );
 };
 

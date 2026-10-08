@@ -45,11 +45,11 @@ const stops = (css: string, name: string) => {
   if (start < 0) throw new Error(`${name} isn't declared`);
   return [...css.slice(start, css.indexOf(";", start)).matchAll(/#[0-9a-f]{6}/gi)].map(m => rgb(m[0]));
 };
-const tile = (() => {
-  const m = calm.match(/--esc-tile:\s*rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
-  if (!m) throw new Error("--esc-tile isn't an rgba() colour");
+const tileOf = (name: string) => {
+  const m = calm.match(new RegExp(`${name}:\\s*rgba\\((\\d+), (\\d+), (\\d+), ([\\d.]+)\\)`));
+  if (!m) throw new Error(`${name} isn't an rgba() colour`);
   return { colour: [+m[1], +m[2], +m[3]] as Rgb, alpha: +m[4] };
-})();
+};
 
 // The brightest spot of the stage's gradient in either theme.
 const stage = brightest([...stops(calm, "--esc-screen"), ...stops(glam, "--esc-screen")]);
@@ -59,7 +59,13 @@ const stage = brightest([...stops(calm, "--esc-screen"), ...stops(glam, "--esc-s
  * is checked frosted over white, and text straight on the stage leans on
  * its dark halo (`--esc-stage-text-shadow`) wherever a spot lands.
  */
-const darkTile = over(tile.colour, tile.alpha, [255, 255, 255]);
+const frosted = (name: string) => {
+  const t = tileOf(name);
+  return over(t.colour, t.alpha, [255, 255, 255]);
+};
+const darkTile = frosted("--esc-tile");
+const hoverTile = frosted("--esc-tile-hover");
+const sunkTile = frosted("--esc-tile-sunk");
 const halo = token("--esc-halo");
 
 const expectText = (fg: Rgb | string, bg: Rgb | string, label: string, floor = 4.5) => {
@@ -79,6 +85,8 @@ describe("design token contrast", () => {
       expectText(token(name), stage, `${name} on the stage`);
       expectText(token(name), halo, `${name} in its halo`);
       expectText(token(name), darkTile, `${name} on a tile`);
+      expectText(token(name), hoverTile, `${name} on a hovered tile`);
+      expectText(token(name), sunkTile, `${name} on a sunk tile`);
     }
     for (const name of ["--esc-focus", "--esc-correct", "--esc-wrong", "--esc-stage-correct", "--esc-stage-wrong"]) {
       expectText(token(name), stage, `${name} on the stage`, 3);

@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import { Control, Field, Ground, Pane, Row } from "../design";
 import { customQuizKey, saveCustomQuiz } from "../utils/customQuizzes";
 import { loadQuizForEditing } from "../utils/quizCatalog";
@@ -94,6 +95,13 @@ const QuizBuilder = () => {
     const [bank, setBank] = useState<BankQuestion[] | null>(null);
     const [category, setCategory] = useState<QuestionCategory | "all">("all");
     const [difficulty, setDifficulty] = useState<QuizDifficulty | "all">("all");
+
+    // The brand asks while there is a quiz in the making that isn't saved
+    // (saving leaves the page, which drops the guard).
+    useLeaveGuard(title.trim() || questions.length > 0 ? {
+        message: "Go back to ESCParty? The quiz you're making won't be saved.",
+        onLeave: () => navigate("/"),
+    } : null);
 
     const nameRef = useRef<HTMLInputElement>(null);
     const questionRef = useRef<HTMLTextAreaElement>(null);

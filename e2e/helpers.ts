@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-/** The current question's answer buttons (not "Lock in my answer" or the way out). */
+/** The current question's answer buttons (not the way out). Tapping one is the answer. */
 export const answerOptions = (page: Page) =>
     page.getByRole("group", { name: "Answers" }).getByRole("button");
 
@@ -30,8 +30,12 @@ export const joinParty = async (page: Page, code: string, name: string) => {
  */
 export const rateActs = async (page: Page, values: readonly number[]) => {
     for (const [index, value] of values.entries()) {
-        for (const group of await page.getByRole("radiogroup").all()) {
-            await group.getByRole("radio", { name: String(value), exact: true }).click();
+        for (const picker of await page.getByRole("spinbutton").all()) {
+            // Home is the lowest value, then up to the wanted one (or the most this category allows).
+            const max = Number(await picker.getAttribute("aria-valuemax"));
+            await picker.focus();
+            await picker.press("Home");
+            for (let step = 1; step < Math.min(value, max); step++) await picker.press("ArrowUp");
         }
         await expect(page.getByText(/^Your score for /)).toBeVisible();
         if (index < values.length - 1) await page.getByRole("button", { name: "Next act" }).click();

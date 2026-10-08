@@ -78,6 +78,13 @@ const JoinParty = () => {
       title="Join a party"
       subtitle="Type the four-letter code from the host's screen, or scan its QR code."
       footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
+      actions={previous && (
+        <Ground>
+          <Pane>
+            <Control onClick={() => navigate(`/party/${previous}`)}>Back to party {previous}</Control>
+          </Pane>
+        </Ground>
+      )}
     >
       <form onSubmit={submit} noValidate>
         <Ground>
@@ -106,13 +113,6 @@ const JoinParty = () => {
       {problem && <CalmNote id={`${codeId}-problem`} role="alert">{problem}</CalmNote>}
       {/* Over the whole screen, so nothing underneath can be tapped while we look. */}
       {checking && <Loader>Finding the party…</Loader>}
-      {previous && (
-        <Ground>
-          <Pane>
-            <Control onClick={() => navigate(`/party/${previous}`)}>Back to party {previous}</Control>
-          </Pane>
-        </Ground>
-      )}
     </CalmPage>
   );
 };

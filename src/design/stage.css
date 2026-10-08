@@ -40,14 +40,13 @@
 }
 
 /*
-  Home (`calm-hero` on CalmPage) floats a bigger ball, with no wire, over
+  Home (`calm-hero` on CalmPage) shows a bigger ball over
   the page: the landing screen's centrepiece. The header's clearance
   follows the size, as it does everywhere. Where :has() isn't there, Home
-  keeps the hanging ball.
+  keeps the standard size.
 */
 .esc-app:has(.calm-page.calm-hero) {
   --esc-ball-size: 168px;
-  --esc-ball-wire: none;
 }
 
 @supports (width: 1cqw) {
@@ -69,6 +68,54 @@
 /* The page header leaves room for the ball hanging over it. */
 .esc-app .calm-page {
   padding-top: var(--esc-stage-clearance);
+}
+
+
+/*
+  The party room (`calm-compact` on CalmPage) is worked with a thumb on a
+  phone, so its ball is small and its title one line, to leave the screen
+  to the rating sheet. The header's clearance follows the ball's size.
+*/
+.esc-app:has(.calm-page.calm-compact) {
+  --esc-ball-size: 56px;
+  --esc-ball-hang: 40px;
+}
+
+@supports (width: 1cqw) {
+  .esc-app:has(.calm-page.calm-compact) {
+    --esc-ball-size: clamp(48px, 14cqw, 72px);
+  }
+}
+
+.esc-app .calm-compact .esc-title {
+  font-size: var(--esc-text-heading);
+}
+
+.esc-app .calm-compact .esc-subtitle {
+  margin-top: var(--esc-space-1);
+  font-size: var(--esc-text-sub);
+}
+
+
+/*
+  The pointer lamp follows a finger, and on mobile web a touch that moves
+  it can select text instead. So text is not selectable by default, on the
+  stage or in headings and body copy. Where copying matters, selection is
+  opted back in: fields always, and anything marked `.esc-selectable` (share
+  links, room and party codes). The long-press callout is left alone, so
+  links and images keep "Open in new tab", "Copy link" and "Save image".
+*/
+.esc-app {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.esc-app :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])),
+.esc-app .esc-selectable,
+.esc-app .esc-selectable * {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 
