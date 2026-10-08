@@ -307,7 +307,7 @@ export const Stage = () => {
     // Touch events too: some mobile browsers stop sending pointermove once
     // they take a drag over for scrolling, while touchmove keeps coming.
     const touch = (event: TouchEvent) => {
-      const finger = event.touches[0] ?? event.changedTouches[0];
+      const finger = event.changedTouches[0];
       if (finger) aim(finger.clientX, finger.clientY);
     };
     // Passive and never prevented, so scrolling and taps are left alone;

@@ -50,7 +50,7 @@ export const SPARKLE_BALL: BallLook = {
   sharpness: 24,
   spotShare: 0.6,
   spotStrength: [0.5, 0.5],
-  maxSpots: 140,
+  maxSpots: 60,
 };
 
 /** The facets per row and column the ball is painted at. */
@@ -88,6 +88,7 @@ export const lampDirection = (x: number, y: number): Vec => {
 
 /** The facet in a latitude row and a longitude column (counted from the ball's own zero). */
 const facetAt = (row: number, column: number, phase: number) => {
+  const wrapped = ((column % AROUND) + AROUND) % AROUND;
   const a = (row + 0.5) * FACET;
   const o = (column + 0.5) * FACET - phase;
   return {
@@ -96,7 +97,8 @@ const facetAt = (row: number, column: number, phase: number) => {
     /** How far round from the front it faces (negative: towards the left). */
     longitude: o,
     // The column counted around the ball, so a full turn is the same facet.
-    key: hash(row, ((column % AROUND) + AROUND) % AROUND),
+    column: wrapped,
+    key: hash(row, wrapped),
   };
 };
 
@@ -188,25 +190,27 @@ export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageV
   // How far from the middle a facet facing sideways lands.
   const reach = Math.min(view.width * 0.62, view.height * 0.8);
   const nudgeX = -lamp[0] * reach * 0.2;
-  // Rows fan out further down the stage than across it, since the ball hangs high.
-  const drop = Math.min(view.height * 0.5, reach * 1.5);
-  const nudgeY = -lamp[1] * drop * 0.08;
+  // Rows fan out into the room above the ball and the room below it, each
+  // by its own spread, so the spots fill the whole stage wherever the ball hangs.
+  const up = view.centreY * 0.95;
+  const down = (view.height - view.centreY) * 0.95;
+  const nudgeY = -lamp[1] * Math.min(up, down) * 0.08;
   const first = Math.floor((phase - Math.PI / 2) / FACET);
   const last = Math.ceil((phase + Math.PI / 2) / FACET);
   const rows = AROUND / 4;
   for (let row = -rows; row < rows; row += 1) {
     for (let column = first; column <= last; column += 1) {
-      const { normal: n, latitude, longitude, key } = facetAt(row, column, phase);
+      const { normal: n, latitude, longitude, key, column: wrapped } = facetAt(row, column, phase);
       const lit = dot(n, lamp);
-      if (n[2] < 0.15 || lit < -0.3 || hash(key, 7.7) > look.spotShare) continue;
+      if (n[2] < 0.15 || lit <= 0 || hash(key, 7.7) > look.spotShare) continue;
       // Each facet's spot is its mirror's size on the wall, squashed where it faces away.
       const side = reach * FACET * (0.26 + 0.12 * hash(key, 2.2));
       const width = side * Math.max(Math.cos(longitude), 0.2);
       const height = side * Math.max(Math.cos(latitude), 0.35);
       const x = centreX + nudgeX + reach * Math.cos(latitude) * Math.sin(longitude);
-      const y = view.centreY + nudgeY - drop * Math.sin(latitude);
-      // Keep clear of the ball, fading out on the way.
-      const clear = Math.hypot(x - centreX, y - view.centreY) - view.radius - Math.hypot(width, height) / 2;
+      const y = view.centreY + nudgeY - (latitude > 0 ? up : down) * Math.sin(latitude);
+      // Keep clear of the ball, fading out on the way (a spot's soft edge reaches 0.65 of its size).
+      const clear = Math.hypot(x - centreX, y - view.centreY) - view.radius - 0.65 * Math.hypot(width, height);
       const room = smooth(0, FADE_BAND * view.radius, clear);
       if (room <= 0) continue;
       if (x + width < 0 || x - width > view.width || y + height < 0 || y - height > view.height) continue;
@@ -217,9 +221,9 @@ export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageV
         height,
         rotation: 0.3 * Math.sin(latitude) * Math.sin(longitude),
         colour: look.spotColour ?? tintOf(look, key),
-        alpha: Math.min(1, (look.spotStrength[0] + look.spotStrength[1] * Math.max(0, lit)) * smooth(-0.3, 0.3, lit)) * room * smooth(0.15, 0.5, n[2]),
+        alpha: Math.min(1, (look.spotStrength[0] + look.spotStrength[1] * Math.max(0, lit)) * smooth(0, 0.3, lit)) * room * smooth(0.15, 0.5, n[2]),
         row,
-        column: ((column % AROUND) + AROUND) % AROUND,
+        column: wrapped,
       });
       if (spots.length >= look.maxSpots) return spots;
     }

@@ -35,6 +35,32 @@ describe("the disco ball", () => {
     }
   });
 
+  it("fills the stage above and below the ball, not just one side", () => {
+    const spots = ballSpots(SPARKLE_BALL, lamp, 0.4, VIEW);
+    const above = spots.filter(spot => spot.y < VIEW.centreY - VIEW.radius);
+    const below = spots.filter(spot => spot.y > VIEW.centreY + VIEW.radius);
+    expect(above.length).toBeGreaterThan(2);
+    expect(below.length).toBeGreaterThan(2);
+    // The rows reach towards both ends of the stage, and the cap is a real limit.
+    expect(Math.min(...spots.map(spot => spot.y))).toBeLessThan(VIEW.centreY * 0.4);
+    expect(Math.max(...spots.map(spot => spot.y))).toBeGreaterThan(VIEW.height * 0.6);
+    expect(spots.length).toBeLessThanOrEqual(SPARKLE_BALL.maxSpots);
+    expect(spots.length).toBeGreaterThan(30);
+  });
+
+  it("throws no spot from a facet the lamp does not light", () => {
+    for (const aim of [lamp, lampDirection(0.8, 0.5), lampDirection(-0.9, -0.6)]) {
+      for (const phase of [0, 0.4, 2.1]) {
+        for (const spot of ballSpots(SPARKLE_BALL, aim, phase, VIEW)) {
+          const o = (spot.column + 0.5) * (Math.PI / 12) - phase;
+          const a = (spot.row + 0.5) * (Math.PI / 12);
+          const n = [Math.cos(a) * Math.sin(o), Math.sin(a), Math.cos(a) * Math.cos(o)];
+          expect(n[0] * aim[0] + n[1] * aim[1] + n[2] * aim[2]).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
   it("throws squarish spots, one per facet, never wider than tall by much at the front", () => {
     for (const spot of ballSpots(SPARKLE_BALL, lamp, 0.4, VIEW)) {
       expect(spot.width).toBeLessThanOrEqual(spot.height * 3);
@@ -78,7 +104,7 @@ describe("the disco ball", () => {
       for (const aim of [lamp, lampDirection(0, 0), lampDirection(0.8, 0.5)]) {
         for (const look of [CALM_BALL, SPARKLE_BALL]) {
           for (const spot of ballSpots(look, aim, phase, VIEW)) {
-            const gap = Math.hypot(spot.x - VIEW.width / 2, spot.y - VIEW.centreY) - Math.hypot(spot.width, spot.height) / 2;
+            const gap = Math.hypot(spot.x - VIEW.width / 2, spot.y - VIEW.centreY) - 0.65 * Math.hypot(spot.width, spot.height);
             expect(gap).toBeGreaterThan(VIEW.radius);
           }
         }
