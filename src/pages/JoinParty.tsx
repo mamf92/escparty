@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { QrScanner } from "../components/QrScanner";
-import { Control, Field, Ground, Pane } from "../design";
+import { Control, Field, Ground, Loader, Pane } from "../design";
 import { cleanCode, codeFromScan, CODE_PATTERN, findGame } from "../utils/joinCode";
 import { lastPartyCode } from "../utils/partySession";
 
@@ -111,10 +111,8 @@ const JoinParty = () => {
         </Ground>
       </form>
       {problem && <CalmNote id={`${codeId}-problem`} role="alert">{problem}</CalmNote>}
-      {/* Mounted before it fills, so screen readers announce what fills it. */}
-      <div role="status">
-        {checking && <CalmNote>Finding the party…</CalmNote>}
-      </div>
+      {/* Over the whole screen, so nothing underneath can be tapped while we look. */}
+      {checking && <Loader>Finding the party…</Loader>}
     </CalmPage>
   );
 };

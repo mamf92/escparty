@@ -294,7 +294,11 @@ only the sizes and the ball's clearance scale up, together.
 **States.** Every screen that loads, can be empty, or can fail designs
 all four:
 - *Loading:* a note ("Finding the room…") in place of the content; never a
-  blank pane or a spinner alone.
+  blank pane or a spinner alone. When the screen waits on the network before
+  it moves on (a code being checked, a room being set up), use `<Loader>`
+  (`src/design`): a small disco ball and one line over the whole screen,
+  `role="status"`, blocking taps on the page beneath. The ball turns only in
+  Sparkle and only when the system allows motion.
 - *Empty:* an information row saying what will appear and how to get it
   ("No runs yet — play a quiz and your scores land here").
 - *Error:* a note with what happened and a control for the way out
