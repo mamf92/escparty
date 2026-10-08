@@ -73,6 +73,10 @@
   --esc-ink: #ffffff;
   --esc-ink-muted: #fce3f1;
   --esc-title: #ffffff;
+
+  /* The wait (Loader): a dark veil over the screen, and the ball's glow. */
+  --esc-scrim: rgba(26, 6, 18, 0.86);
+  --esc-loader-glow: rgba(255, 150, 205, 0.35);
   --esc-link: #ffc2e0;
   --esc-focus: #ffc2e0;
   /* Check and cross on a dark tile. A card swaps in darker ones. */
