@@ -48,7 +48,7 @@ export const SPARKLE_BALL: BallLook = {
   ambient: 0.32,
   shine: 1.2,
   sharpness: 24,
-  spotShare: 0.45,
+  spotShare: 0.6,
   spotStrength: [0.5, 0.5],
   maxSpots: 60,
 };
@@ -86,17 +86,24 @@ export const lampDirection = (x: number, y: number): Vec => {
   return [v[0] / length, v[1] / length, v[2] / length];
 };
 
-const facet = (latitude: number, longitude: number, phase: number) => {
-  const row = Math.floor(latitude / FACET);
-  const column = Math.floor(longitude / FACET);
+/** The facet in a latitude row and a longitude column (counted from the ball's own zero). */
+const facetAt = (row: number, column: number, phase: number) => {
+  const wrapped = ((column % AROUND) + AROUND) % AROUND;
   const a = (row + 0.5) * FACET;
   const o = (column + 0.5) * FACET - phase;
   return {
     normal: [Math.cos(a) * Math.sin(o), Math.sin(a), Math.cos(a) * Math.cos(o)] as Vec,
+    latitude: a,
+    /** How far round from the front it faces (negative: towards the left). */
+    longitude: o,
     // The column counted around the ball, so a full turn is the same facet.
-    key: hash(row, ((column % AROUND) + AROUND) % AROUND),
+    column: wrapped,
+    key: hash(row, wrapped),
   };
 };
+
+const facet = (latitude: number, longitude: number, phase: number) =>
+  facetAt(Math.floor(latitude / FACET), Math.floor(longitude / FACET), phase);
 
 const tintOf = (look: BallLook, key: number) =>
   key < look.mix[0] ? look.tints[0] : key < look.mix[1] ? look.tints[1] : look.tints[2];
@@ -131,39 +138,92 @@ export const ballCells = (look: BallLook, lamp: Vec, phase: number): (Rgb | null
 };
 
 export type Spot = {
-  /** Centre, as a share of the stage's width and height (may fall outside 0..1). */
+  /** Centre, in pixels from the stage's top left (may fall off the stage). */
   x: number;
   y: number;
-  /** Diameter, as a share of the ball's diameter. */
-  size: number;
+  /** The square mirror's spot, foreshortened: its width and height in pixels. */
+  width: number;
+  height: number;
+  /** A slight lean in radians, from the facet's tilt towards the wall. */
+  rotation: number;
   colour: Rgb;
   alpha: number;
+  /** The facet that throws it: its latitude row and longitude column on the ball. */
+  row: number;
+  column: number;
+};
+
+/** The stage and the ball on it, in pixels. */
+export type StageView = {
+  width: number;
+  height: number;
+  /** The ball's centre (it hangs on the stage's middle line) and radius. */
+  centreY: number;
+  radius: number;
+};
+
+/** Of the ball's radius, how far a spot fades out before it would reach the ball. */
+const FADE_BAND = 0.9;
+
+const smooth = (edge0: number, edge1: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
 };
 
 /**
- * The spots the lit facets throw, for a ball hanging at `ballY` (a share of
- * the stage's height). They spread across the stage's width and about half
- * its height either side of the ball, as they do off a real one.
+ * The spots the lit facets throw. Each facet throws one square spot, at
+ * the place its own mirror image of the ball would sit on a wall: a bigger
+ * copy of the ball's facet grid. So the spots line up in rows, one for each
+ * latitude row of facets (a row's spots share one y, whatever the lamp),
+ * and slide across the stage as the ball turns, in step with its rotation.
+ * A spot is the facet's shape foreshortened by how far round it faces, so
+ * it is squarish at the front and a slim strip at the edges. Spots never
+ * reach the ball: one that would fades out and goes, and Stage.tsx clips
+ * the ball's disc as well.
+ *
+ * The lamp picks which facets are lit and nudges the whole pattern a
+ * little (rows stay aligned).
  */
-export const ballSpots = (look: BallLook, lamp: Vec, phase: number, ballY: number): Spot[] => {
+export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageView): Spot[] => {
   const spots: Spot[] = [];
-  for (let latitude = -1.35; latitude < 1.4; latitude += FACET) {
-    for (let longitude = -1.5 + phase; longitude < 1.5 + phase; longitude += FACET) {
-      const { normal: n, key } = facet(latitude, longitude, phase);
+  const centreX = view.width / 2;
+  // How far from the middle a facet facing sideways lands.
+  const reach = Math.min(view.width * 0.62, view.height * 0.8);
+  const nudgeX = -lamp[0] * reach * 0.2;
+  // Rows fan out into the room above the ball and the room below it, each
+  // by its own spread, so the spots fill the whole stage wherever the ball hangs.
+  const up = view.centreY * 0.95;
+  const down = (view.height - view.centreY) * 0.95;
+  const nudgeY = -lamp[1] * Math.min(up, down) * 0.08;
+  const first = Math.floor((phase - Math.PI / 2) / FACET);
+  const last = Math.ceil((phase + Math.PI / 2) / FACET);
+  const rows = AROUND / 4;
+  for (let row = -rows; row < rows; row += 1) {
+    for (let column = first; column <= last; column += 1) {
+      const { normal: n, latitude, longitude, key, column: wrapped } = facetAt(row, column, phase);
       const lit = dot(n, lamp);
-      if (n[2] < 0.1 || lit < 0.2 || hash(key, 7.7) > look.spotShare) continue;
-      // The lamp's ray, reflected off the facet, lands on the wall.
-      const rx = -lamp[0] + 2 * lit * n[0];
-      const ry = -lamp[1] + 2 * lit * n[1];
-      const x = 0.5 + rx * 1.44;
-      const y = ballY - ry * 0.52;
-      if (x < -0.05 || x > 1.05 || y < -0.02 || y > 1.02) continue;
+      if (n[2] < 0.15 || lit <= 0 || hash(key, 7.7) > look.spotShare) continue;
+      // Each facet's spot is its mirror's size on the wall, squashed where it faces away.
+      const side = reach * FACET * (0.26 + 0.12 * hash(key, 2.2));
+      const width = side * Math.max(Math.cos(longitude), 0.2);
+      const height = side * Math.max(Math.cos(latitude), 0.35);
+      const x = centreX + nudgeX + reach * Math.cos(latitude) * Math.sin(longitude);
+      const y = view.centreY + nudgeY - (latitude > 0 ? up : down) * Math.sin(latitude);
+      // Keep clear of the ball, fading out on the way (a spot's soft edge reaches 0.65 of its size).
+      const clear = Math.hypot(x - centreX, y - view.centreY) - view.radius - 0.65 * Math.hypot(width, height);
+      const room = smooth(0, FADE_BAND * view.radius, clear);
+      if (room <= 0) continue;
+      if (x + width < 0 || x - width > view.width || y + height < 0 || y - height > view.height) continue;
       spots.push({
         x,
         y,
-        size: 0.03 + 0.06 * hash(key, 2.2),
+        width,
+        height,
+        rotation: 0.3 * Math.sin(latitude) * Math.sin(longitude),
         colour: look.spotColour ?? tintOf(look, key),
-        alpha: Math.min(1, look.spotStrength[0] + look.spotStrength[1] * lit),
+        alpha: Math.min(1, (look.spotStrength[0] + look.spotStrength[1] * Math.max(0, lit)) * smooth(0, 0.3, lit)) * room * smooth(0.15, 0.5, n[2]),
+        row,
+        column: wrapped,
       });
       if (spots.length >= look.maxSpots) return spots;
     }

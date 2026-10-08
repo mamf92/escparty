@@ -78,7 +78,7 @@ land. Never set a text colour on a page.
 | --- | --- | --- |
 | Role | Default, accessible, the landing state | Opt-in party stage |
 | Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
-| Disco ball | Hangs still, in muted pinks; soft spots on the stage | White and light pink, turning slowly; brighter spots sweep the stage **left to right** with the ball |
+| Disco ball | Hangs still on every screen with no wire, in muted pinks; soft spots on the stage | White and light pink, turning slowly; brighter square spots in rows sweep the stage **left to right** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
 | Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wider glow for the sequins |
 | Materials, sizes, states, copy | Identical | Identical |
@@ -90,7 +90,18 @@ canvas (the maths is in `src/design/stageLights.ts` and is unit tested),
 and in Sparkle the sequins on a WebGL canvas. Without canvas or WebGL it
 is the CSS gradient alone (`--esc-screen`). The ball turns at
 `SPIN` (negative, so its facets and spots travel left to right, slowly
-enough to read as reflections, not snow).
+enough to read as reflections, not snow). Each lit facet throws one
+square spot (a foreshortened, slightly leaning quad with a soft edge) at
+its place in a magnified copy of the ball's facet grid, so the spots line
+up in rows, one per latitude row of facets, and slide along them in step
+with the ball's rotation. They never draw over the ball's disc. The ball
+has no wire on any screen.
+
+The lamp follows `pointerdown`/`pointermove` and `touchstart`/`touchmove`
+(passive, captured, never `preventDefault`ed, so scrolling is untouched).
+`stage.css` also turns off the tap highlight, the touch callout and text
+selection across `.esc-app`, except in inputs, textareas and selects, so a
+finger dragged over the stage never selects or highlights content.
 
 What a theme may change: `--esc-screen`, `--esc-stage-text-shadow` (never dropping the halo), and
 what `<Stage />` draws. `contrast.test.ts` fails if Sparkle sets any other
@@ -106,6 +117,14 @@ first paint by the script in `index.html`, then kept in sync by
 (`src/design/surface.css`) is scoped to `.esc-app`, the class on the phone
 frame's screen and on the big screen, so the standalone `/fabric-ui` WebGL
 demo keeps its own renderers.
+
+**Selecting text.** The pointer lamp follows a finger, so text in `.esc-app`
+is `user-select: none` by default; a touch that moves the lamp must not
+highlight words. Fields stay selectable. Add `esc-selectable` to anything a
+person may need to copy: a share link or its fallback note, a room or party
+code, an id. Leave it off headings, labels and body copy. Don't set
+`-webkit-touch-callout: none`, which would take "Open in new tab", "Copy link"
+and "Save image" away from links and images.
 
 ## 4. Tokens
 
@@ -259,9 +278,8 @@ case, below the ball (the header's `--esc-stage-clearance` keeps it
 clear).
 
 **Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
-floats a bigger ball (46% of the stage's width, 148px to 280px) with no
-wire (`--esc-ball-wire: none`, which `<Stage />` reads), and the header's
-clearance grows with it. Two ways in under the title, nothing more.
+shows a bigger ball (46% of the stage's width, 148px to 280px), and the
+header's clearance grows with it. Two ways in under the title, nothing more.
 
 **Big screen** (`calm-screen` on `CalmPage`). The same anatomy for a TV:
 only the sizes and the ball's clearance scale up, together.
