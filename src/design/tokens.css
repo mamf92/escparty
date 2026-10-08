@@ -127,16 +127,16 @@
   --esc-primary-press: inset 0 4px 10px rgba(0, 0, 0, 0.8);
 
   /* A dark tile on the stage: a choice, or a row of information. */
-  --esc-tile: rgba(22, 6, 16, 0.9);
-  --esc-tile-hover: rgba(44, 14, 32, 0.92);
-  --esc-tile-sunk: rgba(10, 2, 7, 0.94);
+  --esc-tile: rgba(58, 10, 38, 0.9);
+  --esc-tile-hover: rgba(84, 20, 58, 0.92);
+  --esc-tile-sunk: rgba(22, 3, 14, 0.94);
   --esc-tile-edge: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   --esc-tile-press: inset 0 3px 8px rgba(0, 0, 0, 0.5);
   /* A picked tile turns hot pink, and stands out. */
   --esc-tile-chosen-lift: 0 10px 24px rgba(15, 0, 10, 0.5);
 
   /* Unavailable: solid, so it never shows the stage through it. */
-  --esc-disabled: #2e1424;
+  --esc-disabled: #24101c;
   --esc-on-disabled: #c9a9bb;
 
   /* The Sparkle mode switch when on. */

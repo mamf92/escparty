@@ -54,11 +54,11 @@ same stage, with a disco ball hanging over it.
 | **Card** | White, rounded 28px, a deep soft lift; dark ink | A form: anything holding a field | Automatic for a `Pane` with a `Field`; `<Pane className="is-card">` on purpose |
 | **Button** | White, lifted; dark ink, bold | An action | `<Control>` |
 | **Next step** | Black, in the display font, white ink | The one thing to do next on this screen | `<Control elevation="high">` |
-| **Tile** | Dark translucent pink (`--esc-tile`), white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
+| **Tile** | Solid-reading dark wine (`--esc-tile`, 90% opaque), lighter and pinker than the black next step, white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
 | **Proud row** | A white row among the tiles | First place, your own row, the right answer | `<Row elevation="high">` |
 | **Sunk** | A darker, pressed tile | The bottom of a ladder, a wrong pick | `elevation="low"` |
 | **Chosen** | Hot pink (`--esc-accent`), white ink, pressed in | What is picked | `chosen` → `.is-chosen` + `aria-pressed` |
-| **Unavailable** | Solid dark (`--esc-disabled`) with muted ink; faded blush on a card | Can't be used yet | `disabled` |
+| **Unavailable** | Solid, dimmer than a tile (`--esc-disabled`) with muted ink; faded blush on a card | Can't be used yet | `disabled` |
 
 **Inside a card** the same roles are made of **blush** (`--esc-blush`)
 with Pearl's soft neumorphic depth: a button is raised by a light and a
