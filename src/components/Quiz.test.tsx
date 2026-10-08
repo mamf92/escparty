@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
+import { act, fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import { loadQuizData, type QuizQuestion } from "../utils/QuizDataProvider";
 import { ScoreWriteRejected, type Room } from "../utils/roomsFirestore";
@@ -128,11 +129,15 @@ describe("Quiz answer selection (#22)", () => {
   });
 
   it("answers once, however often the answers are tapped", async () => {
-    const user = userEvent.setup();
     renderQuiz({ multiplayer: false });
 
-    await user.click(await screen.findByRole("button", { name: "Norway" }));
-    await user.click(screen.getByRole("button", { name: "Sweden" }));
+    const norway = await screen.findByRole("button", { name: "Norway" });
+    const sweden = screen.getByRole("button", { name: "Sweden" });
+    // Two taps before React re-renders: only the ref guard can stop the second.
+    act(() => {
+      fireEvent.click(norway);
+      fireEvent.click(sweden);
+    });
     expect(screen.getByRole("status")).toHaveTextContent("Nul points this time.");
     expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 0");
   });
@@ -279,6 +284,63 @@ describe("Quiz multiplayer score writes (#131)", () => {
     expect(screen.queryByText(/You answered/)).not.toBeInTheDocument();
   });
 
+  it("scores a double tap once", async () => {
+    givenRoom();
+    mocks.updatePlayerScore.mockResolvedValue(undefined);
+    renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+
+    const sweden = await screen.findByRole("button", { name: "Sweden" });
+    act(() => {
+      fireEvent.click(sweden);
+      fireEvent.click(sweden);
+    });
+
+    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes no answer before the first room snapshot", async () => {
+    mocks.listenToRoom.mockImplementation(() => () => { });
+    renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+
+    const sweden = await screen.findByRole("button", { name: "Sweden" });
+    act(() => { fireEvent.click(sweden); });
+
+    expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBeNull();
+    expect(screen.getByRole("button", { name: "Sweden" })).toBeEnabled();
+  });
+
+  it("marks the question answered before the score write lands, so a refresh can't score it twice", async () => {
+    givenRoom();
+    // The write never reports back: the tab is reloaded while it is in flight.
+    mocks.updatePlayerScore.mockReturnValue(new Promise(() => { }));
+    const first = renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+    expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBe("0");
+    first.unmount();
+
+    renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+    expect(await screen.findByText("This question was already settled when you came back. The answer was Sweden.")).toBeInTheDocument();
+    for (const button of screen.getByRole("group", { name: "Answers" }).querySelectorAll("button")) expect(button).toBeDisabled();
+    expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes the points and the answered mark back when the room refuses the write", async () => {
+    givenRoom();
+    mocks.updatePlayerScore.mockRejectedValue(
+      new ScoreWriteRejected("unknown-player", "Failed to update score: Room ABCD has no player ghost"),
+    );
+    renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "ghost", score: 500 });
+
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("isn't being saved to this room");
+    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 500");
+    expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBeNull();
+  });
+
   it("tells the player once when the room doesn't know them, without retrying", async () => {
     givenRoom();
     mocks.updatePlayerScore.mockRejectedValue(
@@ -383,21 +445,17 @@ describe("Quiz solo clock (#160)", () => {
       );
       await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Which country won in 1974?" })).toBeInTheDocument());
 
-      const start = Date.now();
       // Ten seconds with no answer: the question locks with its verdict.
       await vi.advanceTimersByTimeAsync(10_200);
       expect(screen.getByRole("status")).toHaveTextContent("Time's up. The answer was Sweden.");
       expect(screen.queryByText("results")).not.toBeInTheDocument();
 
       // A moment of verdict (1.5 seconds), then the results, saved once.
-      // The clock steps until the results show, since React starts the
-      // verdict's timer on its own schedule; its deadline was fixed at time's up.
-      await vi.waitFor(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-        expect(screen.getByText("results")).toBeInTheDocument();
-      }, { timeout: 5_000 });
-      expect(Date.now() - start).toBeGreaterThanOrEqual(11_500);
-      expect(Date.now() - start).toBeLessThan(13_500);
+      // The verdict's one timer runs in real time (React schedules its own
+      // work on setTimeout, so that stays unfaked) from the deadline fixed
+      // at time's up.
+      expect(screen.queryByText("results")).not.toBeInTheDocument();
+      expect(await screen.findByText("results", {}, { timeout: 4_000 })).toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem("quizScores") ?? "[]")).toHaveLength(1);
     } finally {
       vi.useRealTimers();

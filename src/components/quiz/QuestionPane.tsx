@@ -35,9 +35,8 @@ export const QuestionPane = ({ question, options, picked, correctAnswer, settled
           return (
             <Control
               key={option}
-              // A settled pick is shown by its marker, and still reads as
-              // the one picked.
-              chosen={!settled && isPicked}
+              // A pick settles the question at once, so it is shown by its
+              // marker and still reads as the one picked.
               aria-pressed={isPicked}
               disabled={settled}
               className={marker && `is-marked ${marker === "correct" ? "is-high" : "is-low"}`}

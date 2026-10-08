@@ -8,7 +8,7 @@ import { DEFAULT_BREAK_EVERY, isBreakAfter } from "../utils/quizModel";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
-import { MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, SOLO_VERDICT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
 import { ScoreEntry, readScoreHistory } from "../utils/scoreHistory";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { Control, Ground, Pane } from "../design";
@@ -18,9 +18,6 @@ import { QuizOutcome, QuizStatus } from "./quiz/QuizStatus";
 import { LeaveQuiz } from "./quiz/LeaveQuiz";
 import "./quiz/quiz.css";
 
-
-/** Solo: how long the verdict shows before the next question (the room sets the pace in multiplayer). */
-const SOLO_VERDICT_MS = 1_500;
 
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -290,14 +287,12 @@ const Quiz = () => {
   // the deadline submitAnswer or handleTimeUp set.
   useEffect(() => {
     if (!showFeedback || isMultiplayer) return;
-    const deadline = feedbackDeadlineRef.current;
-    const tick = setInterval(() => {
-      if (Date.now() >= deadline) {
-        clearInterval(tick);
-        moveToNextQuestionRef.current();
-      }
-    }, 100);
-    return () => clearInterval(tick);
+    // The deadline was fixed before showFeedback turned true.
+    const timer = setTimeout(
+      () => moveToNextQuestionRef.current(),
+      Math.max(0, feedbackDeadlineRef.current - Date.now()),
+    );
+    return () => clearTimeout(timer);
   }, [showFeedback, isMultiplayer]);
 
   // --- Shared, room-driven progression (multiplayer) ---
@@ -333,6 +328,14 @@ const Quiz = () => {
     // can resolve after a later one was answered.
     const current = Number(sessionStorage.getItem(answeredKey) ?? -1);
     if (index > current) sessionStorage.setItem(answeredKey, String(index));
+  };
+  // Take a mark back after a write that failed for good, so the player can
+  // answer again after a refresh. Only the mark this answer made.
+  const forgetAnswered = (index: number, previous: number) => {
+    if (!sharedClock || !answeredKey) return;
+    if (Number(sessionStorage.getItem(answeredKey) ?? -1) !== index) return;
+    if (previous < 0) sessionStorage.removeItem(answeredKey);
+    else sessionStorage.setItem(answeredKey, String(previous));
   };
   const answeredIndex = answeredKey ? Number(sessionStorage.getItem(answeredKey) ?? -1) : -1;
 
@@ -564,16 +567,16 @@ const Quiz = () => {
 
   // Tapping an answer is the answer: no lock-in step. The ref is the guard
   // (not the state), so a double tap before the re-render can't answer twice.
-  const handleAnswer = (answer: string) => {
-    if (isSubmittedRef.current) return;
-    void submitAnswer(answer);
-  };
-
   const submitAnswer = async (answer: string) => {
-    if (!answer) return;
-    if (sharedClock && roomStartMs !== null && !questionClock(roomStartMs, Date.now()).answeringOpen) return;
+    if (!answer || isSubmittedRef.current) return;
+    // In a room, nothing is answerable before the first room snapshot: the
+    // question and its clock are the room's.
+    if (isMultiplayer && !room) return;
+    const roomClock = sharedClock && roomStartMs !== null ? questionClock(roomStartMs, Date.now()) : null;
+    if (roomClock && !roomClock.answeringOpen) return;
 
     const answeredQuestion = currentQuestionIndex;
+    const markedBefore = answeredIndex;
     setSelectedAnswer(answer);
     lockQuestion("answered"); // also flags the ref the shared tick reads
 
@@ -582,10 +585,19 @@ const Quiz = () => {
     // late setShowFeedback(true) would land on (and lock) the next question.
     // Locally the verdict shows for a moment, then the next question; in
     // multiplayer the shared tick counts down to the slot's end.
-    const msLeft = !isMultiplayer && questionDeadlineRef.current !== null
-      ? Math.max(0, questionDeadlineRef.current - Date.now())
-      : timeLeftMs;
+    // Scored from the room's start time or the solo deadline, not the last
+    // tick's state. (A room start still pending its server timestamp falls
+    // back to the tick, which counts from when it was first seen.)
+    const msLeft = roomClock ? roomClock.timeLeftMs
+      : !isMultiplayer && questionDeadlineRef.current !== null
+        ? Math.max(0, questionDeadlineRef.current - Date.now())
+        : timeLeftMs;
     if (!sharedClock) feedbackDeadlineRef.current = Date.now() + SOLO_VERDICT_MS;
+
+    // Marked answered before any score write, so a refresh while the write
+    // is in flight can't reopen the question and score it twice: the points
+    // come back from the room's copy (storedScore) if the write landed.
+    rememberAnswered(answeredQuestion);
 
     // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
@@ -601,19 +613,23 @@ const Quiz = () => {
       const newScore = score + pointsForAnswer;
       setScore(newScore);
 
-      // If multiplayer, update score in Firestore. The question only counts
-      // as answered once the score is safely stored: a refresh while the
-      // write is in flight drops it, and the player should get to answer
-      // again rather than find the question locked with the points lost.
-      // A failed write is retried a couple of times, since nothing else
-      // would repair it: the room (and every scoreboard built from it)
-      // would keep the lower score.
+      // If multiplayer, update score in Firestore. A failed write is
+      // retried a couple of times, since nothing else would repair it: the
+      // room (and every scoreboard built from it) would keep the lower
+      // score. One that fails for good takes the points (and the answered
+      // mark) back, so the screen only shows what the room has.
       if (isMultiplayer && roomCode && playerId) {
         let scoreToSave = newScore;
+        let roomHeld = score; // what the room is known to hold
+        const failedForGood = (message: string) => {
+          setScoreSyncError(message);
+          setPointsLostAt(answeredQuestion);
+          setScore(roomHeld);
+          forgetAnswered(answeredQuestion, markedBefore);
+        };
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             await updatePlayerScore(roomCode, playerId, scoreToSave);
-            rememberAnswered(answeredQuestion);
             setScoreSyncError(null);
             break;
           } catch (error) {
@@ -623,35 +639,30 @@ const Quiz = () => {
               // picked the room's score up yet): add this answer's points
               // to the room's score instead, rather than drop them.
               if (error.reason === "lower-score" && error.currentScore !== undefined && attempt < 3) {
+                roomHeld = error.currentScore;
                 scoreToSave = error.currentScore + pointsForAnswer;
                 setScore(scoreToSave);
                 continue;
               }
               if (error.reason === "finished") {
-                setScoreSyncError("The game had already finished, so that answer didn't count.");
-                setPointsLostAt(answeredQuestion);
+                failedForGood("The game had already finished, so that answer didn't count.");
                 break;
               }
               // Retrying can't fix a room that doesn't know this player, or
               // is gone: say so once instead of failing quietly (#131).
               if (error.reason !== "lower-score") {
-                setScoreSyncError("Your score isn't being saved to this room. Ask the host to start a new game.");
-                setPointsLostAt(answeredQuestion);
+                failedForGood("Your score isn't being saved to this room. Ask the host to start a new game.");
                 break;
               }
             }
             if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            else {
-              setScoreSyncError("Your score couldn't reach the room. Check your connection.");
-              setPointsLostAt(answeredQuestion);
-            }
+            else failedForGood("Your score couldn't reach the room. Check your connection.");
           }
         }
       }
     } else {
       // If answer is incorrect, set points to 0
       setCurrentQuestionPoints(0);
-      rememberAnswered(answeredQuestion);
     }
   };
 
@@ -735,7 +746,7 @@ const Quiz = () => {
         picked={selectedAnswer}
         correctAnswer={currentQuestion.correctAnswer}
         settled={isSubmitted}
-        onPick={handleAnswer}
+        onPick={answer => { void submitAnswer(answer); }}
         headingRef={questionHeadingRef}
       />
     </CalmPage>

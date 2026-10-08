@@ -32,12 +32,11 @@ describe("QuestionPane", () => {
     expect(container.querySelector(".calm-marker")).toBeNull();
   });
 
-  it("reports a pick and shows it chosen while the question is open", async () => {
+  it("reports a pick and says it's pressed while the question is open", async () => {
     const onPick = vi.fn();
     const user = userEvent.setup();
     renderPane({ picked: "Norway", onPick });
 
-    expect(screen.getByRole("button", { name: "Norway" })).toHaveClass("is-chosen");
     expect(screen.getByRole("button", { name: "Norway" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Sweden" })).toHaveAttribute("aria-pressed", "false");
 

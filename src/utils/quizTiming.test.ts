@@ -124,6 +124,15 @@ describe("countdownLabel", () => {
         expect(shown).toEqual([12, 10, 8, 7, 6, 5, 4, 3, 2, 1]);
     });
 
+    it("counts from QUESTION_MS, so a longer question keeps the 12 and 10 at its top", () => {
+        const top = QUESTION_MS / 1000;
+        expect(countdownLabel(top)).toBe(12);
+        expect(countdownLabel(top - 1)).toBe(10);
+        expect(countdownLabel(top - 2)).toBe(top - 2);
+        // Never a number above the top, whatever QUESTION_MS is.
+        expect(countdownLabel(top + 1)).toBe(top + 1);
+    });
+
     it("leaves 0 as it is", () => {
         expect(countdownLabel(0)).toBe(0);
     });
