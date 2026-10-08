@@ -9,14 +9,101 @@
 }
 
 /*
-  The clock and the verdict share one slot in the page's column, tall enough
-  for a two-line verdict (a note's margin and two of its lines), so the
-  question below doesn't move when the one-line clock gives way to it.
+  The question screen fits one screen from 360x640 up, so the page gives
+  back what the clock and the answers need: a smaller title, tighter gaps,
+  and less bottom padding.
 */
-.quiz-status {
+.quiz-screen {
+  gap: var(--esc-space-2);
+  padding-bottom: var(--esc-space-2);
+}
+
+.quiz-screen .esc-title {
+  font-size: var(--esc-text-heading);
+}
+
+.quiz-screen .esc-note {
+  margin-top: 0;
+}
+
+/* Which question and the points so far, one line above the clock. */
+.quiz-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-space-1);
+}
+
+.quiz-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esc-space-3);
+  padding: 0 var(--esc-space-1);
+}
+
+.quiz-head-row p {
+  margin: 0;
+}
+
+.quiz-count {
+  font-size: var(--esc-text-heading);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--esc-ink);
+}
+
+.quiz-points {
+  font-size: var(--esc-text-sub);
+  line-height: 1.3;
+  color: var(--esc-ink-muted);
+}
+
+.quiz-points strong {
+  font-size: var(--esc-text-body);
+  color: var(--esc-ink);
+}
+
+/*
+  The clock and then the verdict share one slot, tall enough for the
+  clock's big number and for a two-line verdict with the next-question
+  line, so the question below doesn't move when one replaces the other.
+*/
+.quiz-slot {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: calc(var(--esc-space-2) + 2 * 1.5 * var(--esc-text-sub));
+  min-height: 3.5rem;
+}
+
+.quiz-clock {
+  font-family: var(--esc-font-display);
+  font-size: calc(var(--esc-text-display) * 1.4);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--esc-title);
+}
+
+/*
+  The page's header shrinks on this screen: a smaller ball hangs over a
+  smaller title, so the clock and the answers get the room (stage.css
+  sizes the header's clearance from the ball, as it does for Home).
+*/
+.esc-app:has(.calm-page.quiz-screen) {
+  --esc-ball-size: 48px;
+}
+
+@supports (width: 1cqw) {
+  .esc-app:has(.calm-page.quiz-screen) {
+    --esc-ball-size: clamp(44px, 13cqw, 84px);
+  }
+}
+
+.quiz-screen .esc-heading {
+  line-height: 1.25;
+}
+
+/* Four answers close together, so all of them fit above the way out. */
+.quiz-screen .lycra-pane {
+  --esc-pane-gap: var(--esc-space-2);
 }
