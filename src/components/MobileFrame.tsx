@@ -25,7 +25,7 @@ const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
               <Brand className="esc-title-text">ESCParty</Brand>
               <ThemeSwitch />
             </AppBar>
-            <ContentConstraint>
+            <ContentConstraint className="esc-content">
               {children}
             </ContentConstraint>
           </Scroller>
@@ -103,14 +103,16 @@ const PhoneScreen = styled.div`
 const Scroller = styled.div`
   position: absolute;
   inset: 0;
-  z-index: 1;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
 `;
 
+// Above the wait's scrim (Loader.tsx), so the theme switch stays usable.
 const AppBar = styled.header`
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-between;
