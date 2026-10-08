@@ -31,32 +31,35 @@ const SelectDifficulty = () => {
       title="Pick a difficulty"
       subtitle="The classic quiz, just you. How well do you know your Eurovision?"
       footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
-    >
-      <Ground>
-        <Pane role="group" aria-label="Difficulty">
-          {DIFFICULTIES.map(({ key, title, detail }) => (
-            <Control
-              key={key}
-              block
-              aria-labelledby={`difficulty-${key}`}
-              aria-describedby={`difficulty-${key}-detail`}
-              onClick={() => handleSelect(key)}
-            >
-              <span id={`difficulty-${key}`}>{title}</span>
-              <span id={`difficulty-${key}-detail`} className="calm-sub">{detail}</span>
-            </Control>
-          ))}
-        </Pane>
-      </Ground>
-      <Ground>
-        <Pane>
-          <Control block onClick={() => navigate("/quizzes")}>
-            <span>Browse the quiz library</span>
-            <span className="calm-sub">Premade quizzes, and the ones you build yourself</span>
-          </Control>
-        </Pane>
-      </Ground>
-    </CalmPage>
+      actions={(
+        <>
+          <Ground>
+            <Pane role="group" aria-label="Difficulty">
+              {DIFFICULTIES.map(({ key, title, detail }) => (
+                <Control
+                  key={key}
+                  block
+                  aria-labelledby={`difficulty-${key}`}
+                  aria-describedby={`difficulty-${key}-detail`}
+                  onClick={() => handleSelect(key)}
+                >
+                  <span id={`difficulty-${key}`}>{title}</span>
+                  <span id={`difficulty-${key}-detail`} className="calm-sub">{detail}</span>
+                </Control>
+              ))}
+            </Pane>
+          </Ground>
+          <Ground>
+            <Pane>
+              <Control block onClick={() => navigate("/quizzes")}>
+                <span>Browse the quiz library</span>
+                <span className="calm-sub">Premade quizzes, and the ones you build yourself</span>
+              </Control>
+            </Pane>
+          </Ground>
+        </>
+      )}
+    />
   );
 };
 

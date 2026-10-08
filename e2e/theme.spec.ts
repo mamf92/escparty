@@ -32,7 +32,7 @@ const MARKS = /rgba?\((107, 227, 154|255, 138, 149|15, 106, 54|179, 18, 42)[,)]/
 // The surface's materials, as the browser reports them.
 const WHITE = "rgb(255, 255, 255)";
 const BLUSH = "rgb(246, 226, 238)";
-const TILE = "rgba(40, 2, 26, 0.72)";
+const TILE = "rgba(58, 10, 38, 0.9)";
 const ACCENT = "rgb(224, 23, 126)";
 
 const measure = (page: Page) => page.evaluate((marksSource) => {
