@@ -72,10 +72,22 @@
 
 
 /*
-  The stage is pointer-events: none and its listeners are passive, so
-  nothing needs text selection or the long-press callout turned off:
-  codes, questions and the share-link fallback stay copyable.
+  The pointer lamp follows a finger, and on mobile web a touch that moves
+  it can select text instead. So text is not selectable by default, on the
+  stage or in headings and body copy. Where copying matters, selection is
+  opted back in: fields always, and anything marked `.esc-selectable` (share
+  links, room and party codes). The long-press callout is left alone, so
+  links and images keep "Open in new tab", "Copy link" and "Save image".
 */
 .esc-app {
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.esc-app :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])),
+.esc-app .esc-selectable,
+.esc-app .esc-selectable * {
+  -webkit-user-select: text;
+  user-select: text;
 }

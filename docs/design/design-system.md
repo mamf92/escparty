@@ -118,6 +118,14 @@ first paint by the script in `index.html`, then kept in sync by
 frame's screen and on the big screen, so the standalone `/fabric-ui` WebGL
 demo keeps its own renderers.
 
+**Selecting text.** The pointer lamp follows a finger, so text in `.esc-app`
+is `user-select: none` by default; a touch that moves the lamp must not
+highlight words. Fields stay selectable. Add `esc-selectable` to anything a
+person may need to copy: a share link or its fallback note, a room or party
+code, an id. Leave it off headings, labels and body copy. Don't set
+`-webkit-touch-callout: none`, which would take "Open in new tab", "Copy link"
+and "Save image" away from links and images.
+
 ## 4. Tokens
 
 All in `src/design/tokens.css`. Pages read variables; they never write a
