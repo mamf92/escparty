@@ -452,6 +452,72 @@
   aspect-ratio: 1;
 }
 
+/*
+  A sheet (Sheet.tsx): the label on the left as a dark tile, the value
+  picker on the right. The labels are tiles, so white on dark in both themes.
+*/
+.esc-app table.calm-sheet {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0 var(--esc-space-2);
+  margin: calc(var(--esc-space-2) * -1) 0;
+}
+
+.esc-app .calm-sheet th {
+  width: 38%;
+  padding: 0 var(--esc-space-2) 0 0;
+  text-align: left;
+  font-weight: inherit;
+}
+
+.esc-app .calm-sheet td {
+  padding: 0;
+}
+
+.esc-app .calm-sheet th .lycra {
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  padding: var(--esc-space-2) var(--esc-space-3);
+  overflow-wrap: anywhere;
+}
+
+/* A stepper (Stepper.tsx): big minus, the value, big plus. One focus stop. */
+.esc-app .calm-stepper {
+  display: grid;
+  /* 44px steps keep the value readable at 320px; the rows stay 52px tall. */
+  grid-template-columns: calc(var(--esc-target-min) - 8px) minmax(0, 1fr) calc(var(--esc-target-min) - 8px);
+  gap: var(--esc-space-2);
+}
+
+.esc-app .calm-stepper .calm-stepper-value:focus-visible {
+  outline: 2px solid var(--esc-focus);
+  outline-offset: 3px;
+}
+
+.esc-app .calm-stepper .calm-stepper-step {
+  padding: 0;
+  font-size: var(--esc-text-heading);
+}
+
+.esc-app .calm-stepper .calm-stepper-value {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--esc-space-1);
+  padding: var(--esc-space-2);
+  min-width: 0;
+  min-height: var(--esc-target-min);
+  overflow: hidden;
+  text-align: center;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Correct and wrong: a glyph in the colour, never the colour alone. */
 .esc-app .calm-marker {
   position: absolute;

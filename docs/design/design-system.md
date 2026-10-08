@@ -246,6 +246,18 @@ never labels). Textareas and selects are Fields too: `<Field as="textarea">`,
 `"split"` (two or three moves side by side, e.g. Previous / Next) and
 `"scale"` (a 1..N rating grid of round keys).
 
+**Sheet and Stepper** (`<Sheet>`/`<SheetRow>`, `<Stepper>`; `.calm-sheet`,
+`.calm-stepper`). One number per row, set in a two-column table: the label
+on the left as a dark tile (white on dark, so it reads in Calm and Sparkle),
+the picker on the right. The picker is a big "−" and "+" (real labelled
+buttons, "Lower/Raise Vocals for Sweden", out of the tab order) around the
+value, which is the `spinbutton` and a Control-look element: arrow keys,
+Page, Home and End move it, a sideways drag across the value scrubs it (a
+tap's jitter under half a step is ignored), and it says "Not rated" until set
+(`aria-valuetext`; the visible text is `aria-hidden`). After a −/+ press focus
+moves to the value, so it is never lost when a button disables. Announce the
+resulting score in a `role="status"` note. Use it where a 1..N scale would wrap to a second row.
+
 **Tabs.** A split pane of controls with `role="tab"`; the current tab is
 chosen (hot pink). `useRovingTabs` (`src/design/`) gives each tab and its
 tab panel their ids, roles, keys and chosen look: one tab stop, arrows, Home
@@ -280,6 +292,10 @@ clear).
 **Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
 shows a bigger ball (46% of the stage's width, 148px to 280px), and the
 header's clearance grows with it. Two ways in under the title, nothing more.
+
+**Compact** (`calm-compact` on `CalmPage`, the party room). A phone
+worked with a thumb: a 48px to 72px ball (`stage.css`), a one-line
+title, so a five-category rating sheet fits a 390x844 screen.
 
 **Big screen** (`calm-screen` on `CalmPage`). The same anatomy for a TV:
 only the sizes and the ball's clearance scale up, together.
