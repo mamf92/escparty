@@ -180,7 +180,7 @@ describe("MultiplayerLobby", () => {
     await user.click(button(/^Host a game/));
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     await user.click(button(/^Host and play/));
-    expect(screen.getByRole("status")).toHaveTextContent("Setting up the room…");
+    expect(screen.getByText("Setting up the room…").closest("[role=status]")).not.toBeNull();
     finish();
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
   });
