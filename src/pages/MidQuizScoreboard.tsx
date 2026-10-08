@@ -96,10 +96,10 @@ const MidQuizScoreboard = () => {
     if (leftBreakRef.current) return;
     leftBreakRef.current = true;
     navigate(`/quiz/${room?.difficulty ?? gameData.difficulty}`, {
-      // Multiplayer replaces: Back from the quiz shouldn't land on a break
-      // that's over (it would only send the player forward again). Single
-      // player keeps the break in history, as before.
-      replace: gameData.multiplayer,
+      // Replaces: Back from the quiz shouldn't land on a break that's over
+      // (multiplayer would only send the player forward again, and solo
+      // would re-enter a finished question and restart it).
+      replace: true,
       state: {
         // The index of the question after the break: the room's, or in
         // single player the one the quiz handed over (it used to be

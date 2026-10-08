@@ -22,6 +22,28 @@ describe("CalmPage", () => {
     expect(container.querySelectorAll("p")).toHaveLength(0);
   });
 
+  it("puts the actions after the content and before the footer, in the bottom-sticking area", () => {
+    const { container } = renderWithProviders(
+      <CalmPage title="Home" actions={<button>Host a party</button>} footer={<span>footer</span>}>
+        <p>content</p>
+      </CalmPage>,
+    );
+    const actions = container.querySelector(".calm-actions")!;
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Host a party" }));
+    expect(getComputedStyle(actions).marginTop).toBe("auto");
+    const order = [screen.getByText("content"), actions, container.querySelector("footer")!];
+    order.slice(1).forEach((node, i) => {
+      expect(order[i].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
+  it("works with only actions, and renders no actions area without them", () => {
+    const { container, rerender } = renderWithProviders(<CalmPage title="Only" actions={<b>go</b>} />);
+    expect(screen.getByText("go")).toBeInTheDocument();
+    rerender(<CalmPage title="Only" />);
+    expect(container.querySelector(".calm-actions")).toBeNull();
+  });
+
   it("CalmLink is a button and CalmNote a paragraph", async () => {
     const onClick = vi.fn();
     renderWithProviders(<><CalmLink onClick={onClick}>Back</CalmLink><CalmNote>Saved</CalmNote></>);

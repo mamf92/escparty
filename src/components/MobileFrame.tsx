@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Stage, ThemeSwitch } from '../design';
+import { Control, Ground, Pane, Stage, ThemeSwitch } from '../design';
+import { CalmNote } from './CalmPage';
+
+// The screens that are mid-game: the quiz, its lobby and breaks, the
+// observer's view and a party's rating room. Going home from one asks first.
+const MID_GAME = /^\/(quiz\/|lobby|mid-quiz-scoreboard|host-observer|party\/(?!new$)[^/]+$)/;
 
 interface MobileFrameProps {
   children: React.ReactNode;
@@ -9,12 +15,43 @@ interface MobileFrameProps {
 /**
  * The phone-frame chrome every app screen sits in (docs/design/design-system.md,
  * "Page anatomy"): a bezel on wide screens, full bleed on a phone, and the
- * app bar with the brand and the theme switch. The brand is deliberately not
- * a home link: several screens are mid-game and have their own way out.
+ * app bar with the brand and the theme switch. The brand is a link home;
+ * on a mid-game screen (`MID_GAME`) it asks first, with the same
+ * stay-or-leave choice as `LeaveQuiz`, so a stray tap can't end a game.
  * The stage (the disco ball, and Sparkle's sequins) sits behind the
  * scrolling content, fixed to the screen.
  */
 const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const [asking, setAsking] = useState(false);
+  const stayRef = useRef<HTMLButtonElement>(null);
+  const brandRef = useRef<HTMLAnchorElement>(null);
+  const wasAsking = useRef(false);
+  const promptId = useId();
+
+  // A new screen answers the question (state reset while rendering, the
+  // documented way to reset it when an input changes).
+  const [askedAt, setAskedAt] = useState(pathname);
+  if (askedAt !== pathname) {
+    setAskedAt(pathname);
+    setAsking(false);
+  }
+
+  // Focus follows the question, as in LeaveQuiz: onto "Stay here" when it
+  // opens, back to the brand when it closes.
+  useEffect(() => {
+    if (asking) stayRef.current?.focus();
+    else if (wasAsking.current) brandRef.current?.focus();
+    wasAsking.current = asking;
+  }, [asking]);
+
+  const goHome = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!MID_GAME.test(pathname)) return;
+    event.preventDefault();
+    setAsking(true);
+  };
+
   return (
     <FrameContainer>
       <PhoneFrame>
@@ -22,9 +59,20 @@ const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
           <Stage />
           <Scroller>
             <AppBar>
-              <Brand className="esc-title-text">ESCParty</Brand>
+              <Brand ref={brandRef} to="/" className="esc-title-text" onClick={goHome}>ESCParty</Brand>
               <ThemeSwitch />
             </AppBar>
+            {asking && (
+              <Leave>
+                <CalmNote id={promptId}>Go back to ESCParty? You'll leave what you're in the middle of.</CalmNote>
+                <Ground>
+                  <Pane layout="split">
+                    <Control ref={stayRef} aria-describedby={promptId} onClick={() => setAsking(false)}>Stay here</Control>
+                    <Control onClick={() => { setAsking(false); navigate("/"); }}>Go to ESCParty</Control>
+                  </Pane>
+                </Ground>
+              </Leave>
+            )}
             <ContentConstraint>
               {children}
             </ContentConstraint>
@@ -118,8 +166,19 @@ const AppBar = styled.header`
   padding: var(--esc-space-2) var(--esc-space-4) 0;
 `;
 
-const Brand = styled.span`
+const Leave = styled.div`
+  width: 100%;
+  max-width: 355px;
+  margin: 0 auto;
+  padding: var(--esc-space-2) var(--esc-space-3) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-space-3);
+`;
+
+const Brand = styled(Link)`
   display: inline-flex;
+  text-decoration: none;
   align-items: center;
   min-height: 44px;
   font-family: var(--esc-font-display);

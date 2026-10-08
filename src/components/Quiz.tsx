@@ -440,6 +440,7 @@ const Quiz = () => {
     if (room.phase === "mid-scoreboard") {
       leftQuizRef.current = true;
       navigate("/mid-quiz-scoreboard", {
+        replace: true, // back can't re-enter a finished question
         state: {
           score: bestScore,
           totalQuestions: questions.length,
@@ -454,6 +455,7 @@ const Quiz = () => {
     } else if (room.phase === "results") {
       leftQuizRef.current = true;
       navigate("/results", {
+        replace: true, // back can't re-enter a finished question
         state: {
           score: bestScore,
           totalQuestions: questions.length,
@@ -504,6 +506,7 @@ const Quiz = () => {
     if (currentQuestionIndex < questions.length - 1) {
       if (isBreakAfter(currentQuestionIndex, questions.length, breakEvery)) {
         navigate("/mid-quiz-scoreboard", {
+          replace: true, // back can't re-enter a finished question
           state: {
             score,
             totalQuestions: questions.length,
@@ -540,6 +543,7 @@ const Quiz = () => {
       localStorage.setItem("quizScores", JSON.stringify([...readScoreHistory(), newScore]));
 
       navigate("/results", {
+        replace: true, // back can't re-enter a finished question
         state: {
           score,
           totalQuestions: questions.length,

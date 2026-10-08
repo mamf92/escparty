@@ -11,11 +11,18 @@ import { cx } from "../design/cx";
  * `<Ground><Pane>...` (src/design) as direct children of the pane (the
  * neighbour tug needs it). Titles, notes and the back link stay outside
  * it, as here.
+ *
+ * `actions` is the screen's next-step area (the pane with the black
+ * button). It sits at the bottom of the screen, where a thumb rests: when
+ * the page is shorter than the screen it sticks to the bottom, and when
+ * it's longer it simply follows the content. The footer comes right under.
  */
-export const CalmPage = ({ title, subtitle, children, footer, className }: {
+export const CalmPage = ({ title, subtitle, children, actions, footer, className }: {
   title: string;
   subtitle?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
+  /** The next-step area, pinned to the bottom of a short page. */
+  actions?: ReactNode;
   footer?: ReactNode;
   /** Extra classes, e.g. `calm-screen` for the big-screen sizes. */
   className?: string;
@@ -26,6 +33,7 @@ export const CalmPage = ({ title, subtitle, children, footer, className }: {
       {subtitle && <p className="esc-subtitle">{subtitle}</p>}
     </Header>
     {children}
+    {actions && <Actions className="calm-actions">{actions}</Actions>}
     {footer && <Footer>{footer}</Footer>}
   </Page>
 );
@@ -45,6 +53,8 @@ const Page = styled.div`
   flex-direction: column;
   align-items: stretch;
   gap: var(--esc-space-4);
+  /* Fills the screen, so the actions can sit at its bottom. */
+  flex: 1 0 auto;
   width: 100%;
   padding: var(--esc-space-2) 0 var(--esc-space-6);
   color: var(--esc-ink);
@@ -54,6 +64,15 @@ const Page = styled.div`
 // Not a <header>: the app bar is the page's one banner landmark.
 const Header = styled.div`
   text-align: center;
+`;
+
+// Takes the free space above it, so a short page leaves its actions at the
+// bottom of the scroller; a long page has none to give.
+const Actions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-space-4);
+  margin-top: auto;
 `;
 
 const Footer = styled.footer`

@@ -312,100 +312,103 @@ const MultiplayerLobby = () => {
         ? "Type the four-letter code from the host's screen."
         : "Play the quiz together: one of you hosts, everyone else joins with the code."}
       footer={footer}
-    >
-      {quizKey && step !== "join" && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
-
-      {step === "choose" && (
-        <Ground>
-          <Pane>
-            <Control block onClick={() => setStep("host")}>
-              <span>Host a game</span>
-              <span className="calm-sub">Get a code and invite your party</span>
-            </Control>
-            <Control
-              block
-              // Joining someone else's room: the quiz picked for hosting is
-              // set aside, and dropped once the join goes through.
-              onClick={() => setStep("join")}
-            >
-              <span>Join a game</span>
-              <span className="calm-sub">Got a code from the host? Jump in</span>
-            </Control>
-          </Pane>
-        </Ground>
-      )}
-
-      {step === "host" && (
+      actions={(
         <>
-          <Ground>
-            <Pane role="group" aria-label="How you'll host">
-              <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(false); }}>
-                <span>Host and play</span>
-                <span className="calm-sub">Run the game and answer along with everyone</span>
-              </Control>
-              <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(true); }}>
-                <span>Host only</span>
-                <span className="calm-sub">Run the game and follow everyone's progress</span>
-              </Control>
-            </Pane>
-          </Ground>
-          {error && <CalmNote role="alert">{error}</CalmNote>}
-          {/* Mounted before it fills, so screen readers announce what fills it. */}
-          <div role="status">
-            {loading && <CalmNote>Setting up the room…</CalmNote>}
-          </div>
-        </>
-      )}
-
-      {step === "join" && (
-        <>
-          <form onSubmit={submitJoin} noValidate>
+          {step === "choose" && (
             <Ground>
               <Pane>
-                <label>
-                  <span className="calm-label">Game code</span>
-                  <Field
-                    type="text"
-                    value={joinCode}
-                    onChange={(e) => {
-                      setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
-                      setRejoinAs(null);
-                      setError(null);
-                    }}
-                    placeholder="ABBA"
-                    disabled={loading}
-                    aria-invalid={showCodeHelp}
-                    aria-describedby={showCodeHelp ? "join-code-help" : undefined}
-                    autoFocus
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                  />
-                </label>
-                {rejoinAs ? (
-                  <>
-                    <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
-                    <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
-                  </>
-                ) : (
-                  <Control type="submit" elevation="high" disabled={loading} onClick={remember}>Join the game</Control>
-                )}
+                <Control block onClick={() => setStep("host")}>
+                  <span>Host a game</span>
+                  <span className="calm-sub">Get a code and invite your party</span>
+                </Control>
+                <Control
+                  block
+                  // Joining someone else's room: the quiz picked for hosting is
+                  // set aside, and dropped once the join goes through.
+                  onClick={() => setStep("join")}
+                >
+                  <span>Join a game</span>
+                  <span className="calm-sub">Got a code from the host? Jump in</span>
+                </Control>
               </Pane>
             </Ground>
-          </form>
-          {showCodeHelp && <CalmNote id="join-code-help" role="alert">A game code is four letters, like ABBA.</CalmNote>}
-          {error && <CalmNote role="alert">{error}</CalmNote>}
-          {/* Mounted before it fills, so screen readers announce what fills
-              it; the rejoin note also describes the button focus lands on. */}
-          <div role="status">
-            {rejoinAs && !loading && (
-              <CalmNote id="rejoin-help">
-                You were in this game as {asNamed(rejoinAs.name)}. Rejoin as them, or join as someone new if someone else is playing on this device.
-              </CalmNote>
-            )}
-            {loading && <CalmNote>Joining the game…</CalmNote>}
-          </div>
+          )}
+
+          {step === "host" && (
+            <>
+              <Ground>
+                <Pane role="group" aria-label="How you'll host">
+                  <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(false); }}>
+                    <span>Host and play</span>
+                    <span className="calm-sub">Run the game and answer along with everyone</span>
+                  </Control>
+                  <Control block disabled={loading} onClick={(event) => { remember(event); void createGame(true); }}>
+                    <span>Host only</span>
+                    <span className="calm-sub">Run the game and follow everyone's progress</span>
+                  </Control>
+                </Pane>
+              </Ground>
+              {error && <CalmNote role="alert">{error}</CalmNote>}
+              {/* Mounted before it fills, so screen readers announce what fills it. */}
+              <div role="status">
+                {loading && <CalmNote>Setting up the room…</CalmNote>}
+              </div>
+            </>
+          )}
+
+          {step === "join" && (
+            <>
+              <form onSubmit={submitJoin} noValidate>
+                <Ground>
+                  <Pane>
+                    <label>
+                      <span className="calm-label">Game code</span>
+                      <Field
+                        type="text"
+                        value={joinCode}
+                        onChange={(e) => {
+                          setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
+                          setRejoinAs(null);
+                          setError(null);
+                        }}
+                        placeholder="ABBA"
+                        disabled={loading}
+                        aria-invalid={showCodeHelp}
+                        aria-describedby={showCodeHelp ? "join-code-help" : undefined}
+                        autoFocus
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                      />
+                    </label>
+                    {rejoinAs ? (
+                      <>
+                        <Control disabled={loading} onClick={(event) => { remember(event); void joinGame(false); }}>Join as someone new</Control>
+                        <Control ref={rejoinButton} disabled={loading} aria-describedby="rejoin-help" onClick={(event) => { remember(event); void joinGame(true); }}>Rejoin as {plainName(asNamed(rejoinAs.name))}</Control>
+                      </>
+                    ) : (
+                      <Control type="submit" elevation="high" disabled={loading} onClick={remember}>Join the game</Control>
+                    )}
+                  </Pane>
+                </Ground>
+              </form>
+              {showCodeHelp && <CalmNote id="join-code-help" role="alert">A game code is four letters, like ABBA.</CalmNote>}
+              {error && <CalmNote role="alert">{error}</CalmNote>}
+              {/* Mounted before it fills, so screen readers announce what fills
+                  it; the rejoin note also describes the button focus lands on. */}
+              <div role="status">
+                {rejoinAs && !loading && (
+                  <CalmNote id="rejoin-help">
+                    You were in this game as {asNamed(rejoinAs.name)}. Rejoin as them, or join as someone new if someone else is playing on this device.
+                  </CalmNote>
+                )}
+                {loading && <CalmNote>Joining the game…</CalmNote>}
+              </div>
+            </>
+          )}
         </>
       )}
+    >
+      {quizKey && step !== "join" && <CalmNote>Hosting: {pickedTitle}</CalmNote>}
     </CalmPage>
   );
 };

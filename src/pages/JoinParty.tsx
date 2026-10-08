@@ -78,44 +78,47 @@ const JoinParty = () => {
       title="Join a party"
       subtitle="Type the four-letter code from the host's screen, or scan its QR code."
       footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
-    >
-      <form onSubmit={submit} noValidate>
-        <Ground>
-          <Pane>
-            <label className="calm-label" htmlFor={codeId}>Party code</label>
-            <Field
-              id={codeId}
-              value={code}
-              maxLength={4}
-              autoCapitalize="characters"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="ABBA"
-              disabled={checking}
-              aria-invalid={problem !== null}
-              aria-describedby={problem ? `${codeId}-problem` : undefined}
-              onChange={event => typed(event.target.value)}
-            />
-            {scanning && <QrScanner onScan={scanned} />}
-            <Control disabled={checking} onClick={() => setScanning(open => !open)}>
-              {scanning ? "Stop scanning" : "Scan the QR code"}
-            </Control>
-          </Pane>
-        </Ground>
-      </form>
-      {problem && <CalmNote id={`${codeId}-problem`} role="alert">{problem}</CalmNote>}
-      {/* Mounted before it fills, so screen readers announce what fills it. */}
-      <div role="status">
-        {checking && <CalmNote>Finding the party…</CalmNote>}
-      </div>
-      {previous && (
-        <Ground>
-          <Pane>
-            <Control onClick={() => navigate(`/party/${previous}`)}>Back to party {previous}</Control>
-          </Pane>
-        </Ground>
+      actions={(
+        <>
+          <form onSubmit={submit} noValidate>
+            <Ground>
+              <Pane>
+                <label className="calm-label" htmlFor={codeId}>Party code</label>
+                <Field
+                  id={codeId}
+                  value={code}
+                  maxLength={4}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="ABBA"
+                  disabled={checking}
+                  aria-invalid={problem !== null}
+                  aria-describedby={problem ? `${codeId}-problem` : undefined}
+                  onChange={event => typed(event.target.value)}
+                />
+                {scanning && <QrScanner onScan={scanned} />}
+                <Control disabled={checking} onClick={() => setScanning(open => !open)}>
+                  {scanning ? "Stop scanning" : "Scan the QR code"}
+                </Control>
+              </Pane>
+            </Ground>
+          </form>
+          {problem && <CalmNote id={`${codeId}-problem`} role="alert">{problem}</CalmNote>}
+          {/* Mounted before it fills, so screen readers announce what fills it. */}
+          <div role="status">
+            {checking && <CalmNote>Finding the party…</CalmNote>}
+          </div>
+          {previous && (
+            <Ground>
+              <Pane>
+                <Control onClick={() => navigate(`/party/${previous}`)}>Back to party {previous}</Control>
+              </Pane>
+            </Ground>
+          )}
+        </>
       )}
-    </CalmPage>
+    />
   );
 };
 

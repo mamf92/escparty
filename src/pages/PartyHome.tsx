@@ -34,44 +34,47 @@ const PartyHome = () => {
             title="Scoreboard party"
             subtitle="Rate every act of Burgas 2027 together, see who called the winner, and find out who in the room rated like twins."
             footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
-        >
-            <Ground>
-                <Pane>
-                    {previous && (
-                        <Control onClick={() => navigate(`/party/${previous}`)}>
-                            Back to party {previous}
-                        </Control>
-                    )}
-                    <Control onClick={() => navigate("/party/new")}>Host a party</Control>
-                </Pane>
-            </Ground>
+            actions={(
+                <>
+                    <Ground>
+                        <Pane>
+                            {previous && (
+                                <Control onClick={() => navigate(`/party/${previous}`)}>
+                                    Back to party {previous}
+                                </Control>
+                            )}
+                            <Control onClick={() => navigate("/party/new")}>Host a party</Control>
+                        </Pane>
+                    </Ground>
 
-            <h2 className="esc-note">Got a code from the host?</h2>
-            <form onSubmit={join} noValidate>
-                <Ground>
-                    <Pane>
-                        <div>
-                            <label className="calm-label" htmlFor={codeId}>Party code</label>
-                            <Field
-                                id={codeId}
-                                value={code}
-                                maxLength={4}
-                                autoCapitalize="characters"
-                                autoComplete="off"
-                                placeholder="ABBA"
-                                aria-invalid={tried && !valid}
-                                aria-describedby={tried && !valid ? `${codeId}-problem` : undefined}
-                                onChange={event => setCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
-                            />
-                            {tried && !valid && <CalmNote id={`${codeId}-problem`} role="alert">A party code is four letters, like ABBA.</CalmNote>}
-                        </div>
-                        <Control onClick={() => go(value => `/party/${value}/screen`)}>Open the big screen</Control>
-                        <Control type="submit" elevation="high">Join to rate</Control>
-                    </Pane>
-                </Ground>
-            </form>
-            <CalmNote>The big screen is for the TV: it shows the room's standings, never anyone's own ratings.</CalmNote>
-        </CalmPage>
+                    <h2 className="esc-note">Got a code from the host?</h2>
+                    <form onSubmit={join} noValidate>
+                        <Ground>
+                            <Pane>
+                                <div>
+                                    <label className="calm-label" htmlFor={codeId}>Party code</label>
+                                    <Field
+                                        id={codeId}
+                                        value={code}
+                                        maxLength={4}
+                                        autoCapitalize="characters"
+                                        autoComplete="off"
+                                        placeholder="ABBA"
+                                        aria-invalid={tried && !valid}
+                                        aria-describedby={tried && !valid ? `${codeId}-problem` : undefined}
+                                        onChange={event => setCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
+                                    />
+                                    {tried && !valid && <CalmNote id={`${codeId}-problem`} role="alert">A party code is four letters, like ABBA.</CalmNote>}
+                                </div>
+                                <Control onClick={() => go(value => `/party/${value}/screen`)}>Open the big screen</Control>
+                                <Control type="submit" elevation="high">Join to rate</Control>
+                            </Pane>
+                        </Ground>
+                    </form>
+                    <CalmNote>The big screen is for the TV: it shows the room's standings, never anyone's own ratings.</CalmNote>
+                </>
+            )}
+        />
     );
 };
 

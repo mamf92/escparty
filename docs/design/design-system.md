@@ -149,7 +149,7 @@ needs and no token gives is a new token here, not a literal in the page.
 ```
 MobileFrame (or the big screen)    the stage, edge to edge
 ├─ Stage              <Stage />: the disco ball (and Sparkle's sequins), behind everything
-├─ App bar            ESCParty brand · Sparkle mode switch
+├─ App bar            ESCParty brand (a link home) · Sparkle mode switch
 └─ CalmPage           every screen's chrome
    ├─ Page header     <h1> title (one per page) · optional subtitle
    ├─ Ground          <Ground>  a section of the page (layout only)
@@ -158,11 +158,16 @@ MobileFrame (or the big screen)    the stage, edge to edge
    │     ├─ Row       <Row>     a dark tile of information
    │     └─ Field     <Field>   a blush well, on a card
    ├─ Notes           <CalmNote> status, hints, errors, between sections
+   ├─ Actions         `actions` prop: the next-step area, at the bottom of a short page
    └─ Footer          <CalmLink> the way back
 ```
 
 - Every screen renders through `CalmPage` (`src/components/CalmPage.tsx`).
   No screen builds its own header, background or container.
+- **The next step sits at the thumb.** A screen whose last thing is its
+  next-step area (Home's Host/Join, a menu of choices) passes it as
+  `actions`: on a short page it sticks to the bottom of the screen, on a
+  long one it follows the content, and the footer comes right under it.
 - Use the primitives from `src/design` (`Ground`, `Pane`, `Control`,
   `Row`, `Field`). They render the surface classes (`calm-ground`,
   `lycra-pane`, `lycra`, `lycra-field`; the names are historical) and
@@ -258,8 +263,13 @@ only the sizes and the ball's clearance scale up, together.
 ## 7. UX patterns
 
 **Navigation.**
-- The app bar carries the brand and the Sparkle mode switch, and is not a
-  home link: several screens are mid-game and need their own way out.
+- The app bar carries the brand and the Sparkle mode switch. The brand is
+  a link home; on a mid-game screen (a quiz, the lobby and its breaks, the
+  observer's view, a party's rating room) it first asks "Go back to
+  ESCParty?" with "Stay here" and "Go to ESCParty", like `LeaveQuiz`.
+  Moves from the quiz to a break or the results, and from a break back
+  into the quiz, replace the history entry, so Back can't re-enter a
+  finished question.
   Every screen has one explicit way back in its footer, named for where it
   goes ("Back to the quiz library", not "Back"). The one exception is Home
   (`/`), the root: there is nowhere further back to go.
