@@ -54,11 +54,11 @@ same stage, with a disco ball hanging over it.
 | **Card** | White, rounded 28px, a deep soft lift; dark ink | A form: anything holding a field | Automatic for a `Pane` with a `Field`; `<Pane className="is-card">` on purpose |
 | **Button** | White, lifted; dark ink, bold | An action | `<Control>` |
 | **Next step** | Black, in the display font, white ink | The one thing to do next on this screen | `<Control elevation="high">` |
-| **Tile** | Dark translucent pink (`--esc-tile`), white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
+| **Tile** | Solid-reading dark wine (`--esc-tile`, 90% opaque), lighter and pinker than the black next step, white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
 | **Proud row** | A white row among the tiles | First place, your own row, the right answer | `<Row elevation="high">` |
 | **Sunk** | A darker, pressed tile | The bottom of a ladder, a wrong pick | `elevation="low"` |
 | **Chosen** | Hot pink (`--esc-accent`), white ink, pressed in | What is picked | `chosen` → `.is-chosen` + `aria-pressed` |
-| **Unavailable** | Solid dark (`--esc-disabled`) with muted ink; faded blush on a card | Can't be used yet | `disabled` |
+| **Unavailable** | Solid, dimmer than a tile (`--esc-disabled`) with muted ink; faded blush on a card | Can't be used yet | `disabled` |
 
 **Inside a card** the same roles are made of **blush** (`--esc-blush`)
 with Pearl's soft neumorphic depth: a button is raised by a light and a
@@ -149,7 +149,7 @@ needs and no token gives is a new token here, not a literal in the page.
 ```
 MobileFrame (or the big screen)    the stage, edge to edge
 ├─ Stage              <Stage />: the disco ball (and Sparkle's sequins), behind everything
-├─ App bar            ESCParty brand · Sparkle mode switch
+├─ App bar            ESCParty brand (a link home) · Sparkle mode switch
 └─ CalmPage           every screen's chrome
    ├─ Page header     <h1> title (one per page) · optional subtitle
    ├─ Ground          <Ground>  a section of the page (layout only)
@@ -158,11 +158,16 @@ MobileFrame (or the big screen)    the stage, edge to edge
    │     ├─ Row       <Row>     a dark tile of information
    │     └─ Field     <Field>   a blush well, on a card
    ├─ Notes           <CalmNote> status, hints, errors, between sections
+   ├─ Actions         `actions` prop: the next-step area, at the bottom of a short page
    └─ Footer          <CalmLink> the way back
 ```
 
 - Every screen renders through `CalmPage` (`src/components/CalmPage.tsx`).
   No screen builds its own header, background or container.
+- **The next step sits at the thumb.** A screen whose last thing is its
+  next-step area (Home's Host/Join, a menu of choices) passes it as
+  `actions`: on a short page it sticks to the bottom of the screen, on a
+  long one it follows the content, and the footer comes right under it.
 - Use the primitives from `src/design` (`Ground`, `Pane`, `Control`,
   `Row`, `Field`). They render the surface classes (`calm-ground`,
   `lycra-pane`, `lycra`, `lycra-field`; the names are historical) and
@@ -274,8 +279,16 @@ only the sizes and the ball's clearance scale up, together.
 ## 7. UX patterns
 
 **Navigation.**
-- The app bar carries the brand and the Sparkle mode switch, and is not a
-  home link: several screens are mid-game and need their own way out.
+- The app bar carries the brand and the Sparkle mode switch. The brand is
+  a link home. A screen with something in progress (a running quiz, a room
+  this tab is in, a quiz being built) registers a leave guard with
+  `useLeaveGuard`, and then the brand first asks "Go back to ESCParty?" with
+  "Stay here" and "Go to ESCParty" (`ConfirmLeave`, as in `LeaveQuiz`) and
+  runs the screen's own leave (a guest's lobby leave takes them out of the
+  room). With no guard it goes straight home.
+  Moves from the quiz to a break or the results, and from a break back
+  into the quiz, replace the history entry, so Back can't re-enter a
+  finished question.
   Every screen has one explicit way back in its footer, named for where it
   goes ("Back to the quiz library", not "Back"). The one exception is Home
   (`/`), the root: there is nowhere further back to go.
@@ -297,7 +310,11 @@ only the sizes and the ball's clearance scale up, together.
 **States.** Every screen that loads, can be empty, or can fail designs
 all four:
 - *Loading:* a note ("Finding the room…") in place of the content; never a
-  blank pane or a spinner alone.
+  blank pane or a spinner alone. When the screen waits on the network before
+  it moves on (a code being checked, a room being set up), use `<Loader>`
+  (`src/design`): a small disco ball and one line over the whole screen,
+  `role="status"`, blocking taps on the page beneath. The ball turns only in
+  Sparkle and only when the system allows motion.
 - *Empty:* an information row saying what will appear and how to get it
   ("No runs yet — play a quiz and your scores land here").
 - *Error:* a note with what happened and a control for the way out
