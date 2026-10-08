@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-/** The current question's answer buttons (not "Lock in my answer" or the way out). */
+/** The current question's answer buttons (not the way out). Tapping one is the answer. */
 export const answerOptions = (page: Page) =>
     page.getByRole("group", { name: "Answers" }).getByRole("button");
 

@@ -376,19 +376,17 @@ test("the quiz screen follows the surface rules, open, chosen and settled", asyn
     const page = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
     // Solo questions run on a 10s clock, longer than the judges below can
     // take on a loaded runner: stop the page's clock once the question is
-    // up, so it stays open until it's locked in and settled after that.
+    // up, so it stays open until it's answered and settled after that (the
+    // verdict's moment before the next question is on that clock too).
     await page.clock.install();
     await page.goto("/#/quiz/easy");
-    const lockIn = page.getByRole("button", { name: "Lock in my answer" });
-    await expect(lockIn).toBeVisible();
+    await expect(page.getByRole("timer")).toBeVisible();
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1_000));
     await judge(page, "quiz-open");
 
+    // Tapping is the answer: the question settles at once.
     await answerOptions(page).nth(1).click();
     await expect(answerOptions(page).nth(1)).toHaveAttribute("aria-pressed", "true");
-    await judge(page, "quiz-chosen");
-
-    await lockIn.click();
     await expect(page.locator(".calm-marker").first()).toBeVisible();
     await judge(page, "quiz-settled");
 

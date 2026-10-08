@@ -57,7 +57,7 @@ Mostly not small reusable pieces, despite the folder name:
   and multiplayer quiz flow, answer selection/scoring, and the multiplayer
   progression timer. Its markup is in `src/components/quiz/`
   (`QuestionPane`: the question and answer controls with their markers;
-  `QuizStatus`: the timer and the verdict in words; `LeaveQuiz`: the way
+  `QuizStatus`: "Question N of M", the points so far, the big clock (12, 10, 8, 7 ... 1 over its 10 seconds, said in real seconds) and then the verdict in words; tapping an answer is the answer, and solo shows the verdict 1.5s before moving on; `LeaveQuiz`: the way
   out, which asks first), which are presentation only. A change here is rarely "just a component change" —
   read `docs/agent/multiplayer-sync.md` first if the change touches
   multiplayer behavior.
