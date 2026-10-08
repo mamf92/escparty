@@ -338,7 +338,11 @@ all four:
   it moves on (a code being checked, a room being set up), use `<Loader>`
   (`src/design`): a small disco ball and one line over the whole screen,
   `role="status"`, blocking taps on the page beneath. The ball turns only in
-  Sparkle and only when the system allows motion.
+  Sparkle and only when the system allows motion. When the page's own exits
+  must stay usable while it waits (a guest waiting on the host can still go
+  back), use `<Loader inline>`: the same ball and line in the page flow, with
+  the same empty-then-filled status region, but no portal, no scrim and
+  nothing made inert.
 - *Empty:* an information row saying what will appear and how to get it
   ("No runs yet — play a quiz and your scores land here").
 - *Error:* a note with what happened and a control for the way out

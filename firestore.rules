@@ -41,6 +41,7 @@ service cloud.firestore {
              (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
              !('nextRoomCode' in data) &&
              !('readyPlayers' in data) &&
+             !('revealStep' in data) &&
              (!('continueReady' in data) || data.continueReady is bool) &&
              (!('playersAtMidQuiz' in data) || data.playersAtMidQuiz is list) &&
              // Shared progression state (#61). Optional so clients that predate
@@ -76,6 +77,8 @@ service cloud.firestore {
         isAdvancingPhase(affected) ||
         // Pointing a finished room at the next round (#21)
         isSettingNextRoom(affected) ||
+        // The host revealing the final standings, a step at a time (#207)
+        isRevealing(affected) ||
         // A player saying they're ready in the lobby (#65)
         isSettingReady(affected) ||
         // The host removing a player from the lobby (#65)
@@ -251,6 +254,21 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)) &&
              get(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)).data.hostId == resource.data.hostId &&
              get(/databases/$(database)/documents/rooms/$(request.resource.data.nextRoomCode)).data.get('phase', 'lobby') == 'lobby';
+    }
+
+    // setRevealStep (#207): the host's reveal taps on the results, which
+    // every phone follows. Forward only (a step may repeat, never drop) and
+    // capped, so the number can't be abused; it's a count of taps, and a
+    // quiz's reveal is a handful. Like every room write this checks shape,
+    // not who: with no auth (#115) the rules can't tell the host from a
+    // guest, so "only the host" is the page's job and not enforced here.
+    function isRevealing(affected) {
+      return affected.hasOnly(['revealStep']) &&
+             resource.data.get('phase', '') == 'results' &&
+             'revealStep' in request.resource.data &&
+             request.resource.data.revealStep is int &&
+             request.resource.data.revealStep >= resource.data.get('revealStep', 0) &&
+             request.resource.data.revealStep <= 100;
     }
 
     // setPlayerReady: one id added (arrayUnion) or removed (arrayRemove)

@@ -20,6 +20,7 @@ import {
     JoinRejected,
     MAX_PLAYERS,
     setNextRoom,
+    setRevealStep,
     setPlayerReady,
     removePlayerFromRoom,
 } from "./roomsFirestore";
@@ -917,6 +918,26 @@ describe("setNextRoom", () => {
     it("needs Firebase", async () => {
         firebaseState.db = undefined;
         await expect(setNextRoom("ABCD", "EFGH")).rejects.toThrow("Firebase not initialized");
+    });
+});
+
+describe("setRevealStep", () => {
+    it("writes the reveal step on the room", async () => {
+        mocks.updateDoc.mockResolvedValue(undefined);
+        await setRevealStep("ABCD", 2);
+        expect(mocks.updateDoc).toHaveBeenCalledWith(refFor("ABCD"), { revealStep: 2 });
+    });
+
+    it("refuses a step that is not a whole number from 0", async () => {
+        for (const step of [-1, 1.5, Number.NaN]) {
+            await expect(setRevealStep("ABCD", step)).rejects.toThrow("Invalid reveal step");
+        }
+        expect(mocks.updateDoc).not.toHaveBeenCalled();
+    });
+
+    it("needs Firebase", async () => {
+        firebaseState.db = undefined;
+        await expect(setRevealStep("ABCD", 1)).rejects.toThrow("Firebase not initialized");
     });
 });
 

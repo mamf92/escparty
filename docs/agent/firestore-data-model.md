@@ -35,6 +35,7 @@ interface Room {
   phaseStartedAt?: Timestamp | FieldValue; // always serverTimestamp()
   nextRoomCode?: string;             // the next round's room (#21): set once, on a finished room, to a lobby the same host made
   readyPlayers?: string[];           // lobby ready marks by player id (#65); only before the start
+  revealStep?: number;               // how far the host has revealed the final standings (#207): taps counted from 0 (missing = 0), only raised, only in `results`
 }
 
 interface Player {
@@ -111,9 +112,23 @@ throws `ScoreWriteRejected` with a `reason` (`invalid-score`, `no-room`,
 `unknown-player`, `lower-score` with the room's `currentScore`) when the
 room turns a write down, so callers don't parse messages (#131).
 
+On the results (#207) the host reveals the standings a tap at a time:
+`setRevealStep(roomCode, step)` is a plain `updateDoc` of `revealStep`, and
+every client follows `room.revealStep ?? 0`. `isRevealing` allows an update
+that touches only `revealStep`, only when `phase == 'results'`, as an
+integer that is at least the room's current step (missing counts as 0, a
+repeat is fine, a step back is not) and at most 100; creation refuses the
+field. Like every room write it checks shape, not who: with no auth (#115)
+the rules can't tell the host from a guest, so "only the host" is the
+page's job (`QuizResults` offers the controls to the host only), and any
+client with the room code could still move the reveal forward, but never
+back or outside the results (verify case 14b).
+
 ## Which writes are safe vs. race-prone
 
-- **Safe:** `addPlayerToRoom`, `markPlayerAtMidQuiz`, `setPlayerReady`
+- **Safe:** `setRevealStep` is a single-field write that only the host's
+  page makes and the rules only let rise, so a stale or repeated tap
+  can't undo a later one. `addPlayerToRoom`, `markPlayerAtMidQuiz`, `setPlayerReady`
   and `removePlayerFromRoom` use `arrayUnion`/`arrayRemove` —
   concurrent joins, and every player reaching the mid-quiz break on the same
   snapshot (#62), can't clobber each other. `advanceQuestion` and

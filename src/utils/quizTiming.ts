@@ -15,6 +15,9 @@ export const QUESTION_SLOT_MS = QUESTION_MS + FEEDBACK_MS;
 // counts (#142): enough for the last answer's write and Quiz.tsx's retries.
 // firestore.rules hardcodes it in isNotFinished — keep the two in sync.
 export const RESULTS_GRACE_MS = 30_000;
+// How long a guest waits for the host to start the reveal (#207) before
+// being offered the results on their own phone: the host may have left.
+export const RESULTS_WAIT_FALLBACK_MS = 60_000;
 
 /**
  * A mid-quiz scoreboard break follows every Nth question, unless the room

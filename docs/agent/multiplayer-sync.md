@@ -76,7 +76,22 @@ Why this runs on Firestore listeners and not WebSockets:
    "Leave the waiting room" takes themselves out of the lobby.
 5. **`QuizResults.tsx`** — the finale (#67): the room's final standings,
    revealed a tap at a time (everyone below the podium, then 3rd, 2nd and
-   1st; ties together, `finale.ts`), with no motion, in the Calm style. It
+   1st; ties together, `finale.ts`), with no motion, in the Calm style.
+   Only the host taps (#207): each tap writes the step to the room
+   (`setRevealStep`, `revealStep`, a count of taps; "Show everything" writes
+   `steps.length`), and every phone, the host's included, shows
+   `room.revealStep ?? 0` from its listener. Guests, and an observer host's
+   guests, see the disco ball `<Loader>` with "Wait to see who won…" until
+   the step is above 0, then the rows as the host taps, with no reveal
+   buttons; a guest who arrives late sees what is already revealed. The
+   host's buttons stay disabled ("Waiting for the last answers…") until the
+   results are `RESULTS_GRACE_MS` old, so the standings are final, and
+   "Play again with everyone" waits for the reveal to be done. A guest whose
+   host never starts is offered "Show the results on my phone" once the
+   results are `RESULTS_WAIT_FALLBACK_MS` (60s) old, and a room that never
+   arrived (the "no longer exists" notice with no snapshot) lets anyone
+   reveal the scores the page holds; both reveal locally, never writing to
+   the room, and the shown step is `max(local, room)`. Solo results have no reveal. It
    listens to the room for as long as it's open and recovers from
    `sessionStorage` if `location.state` is missing (a direct link, a
    reload). The stored game is kept through a reload, so a reload on the results

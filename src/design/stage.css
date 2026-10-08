@@ -147,6 +147,15 @@
   position: fixed;
 }
 
+.esc-loader.is-inline {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  background: none;
+  cursor: auto;
+  touch-action: auto;
+}
+
 .esc-loader-ball {
   width: 88px;
   height: 88px;

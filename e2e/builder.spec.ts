@@ -51,4 +51,12 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 2 })).toHaveText("Who sang 'Lipstick' for Ireland in 2011?", { timeout: 30_000 });
     await answer("Jedward");
     await expect(page.getByRole("heading", { name: "The results are in" })).toBeVisible({ timeout: 60_000 });
+
+    // The host reveals the standings (#207): the step goes to the room, and
+    // the row shows once the room's listener hands it back.
+    await expect(page.getByRole("list", { name: "Final standings" })).toHaveCount(0);
+    // It waits out the 30s grace for the last answers first.
+    await expect(page.getByRole("button", { name: "Start the reveal" })).toBeEnabled({ timeout: 45_000 });
+    await page.getByRole("button", { name: "Start the reveal" }).click();
+    await expect(page.getByRole("list", { name: "Final standings" }).getByRole("listitem")).toHaveCount(1);
 });
