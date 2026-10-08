@@ -5,7 +5,7 @@ import { createRoom, joinRoom, generateRoomCode, getRoom, JoinRejected } from ".
 import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { Control, Field, Ground, Pane } from "../design";
+import { Control, Field, Ground, Loader, Pane } from "../design";
 
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
@@ -350,10 +350,7 @@ const MultiplayerLobby = () => {
             </Pane>
           </Ground>
           {error && <CalmNote role="alert">{error}</CalmNote>}
-          {/* Mounted before it fills, so screen readers announce what fills it. */}
-          <div role="status">
-            {loading && <CalmNote>Setting up the room…</CalmNote>}
-          </div>
+          {loading && <Loader>Setting up the room…</Loader>}
         </>
       )}
 
@@ -402,8 +399,8 @@ const MultiplayerLobby = () => {
                 You were in this game as {asNamed(rejoinAs.name)}. Rejoin as them, or join as someone new if someone else is playing on this device.
               </CalmNote>
             )}
-            {loading && <CalmNote>Joining the game…</CalmNote>}
           </div>
+          {loading && <Loader>Joining the game…</Loader>}
         </>
       )}
     </CalmPage>
