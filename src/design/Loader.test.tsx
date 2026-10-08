@@ -31,6 +31,14 @@ const motionSetting = (reduce: boolean) => {
   }));
 };
 
+const render = (inline: boolean) =>
+  renderWithProviders(
+    <MobileFrame>
+      <a href="/elsewhere">Away</a>
+      <Loader inline={inline}>Waiting…</Loader>
+    </MobileFrame>,
+  );
+
 describe("Loader", () => {
   it("announces what we wait for through a status region that starts empty", async () => {
     renderWithProviders(<Loader>Finding the party…</Loader>);
@@ -124,5 +132,40 @@ describe("Loader", () => {
     const rule = css.match(/\.esc-loader \{[^}]*\}/)?.[0] ?? "";
     expect(rule).toMatch(/inset: 0/);
     expect(rule).not.toMatch(/pointer-events:\s*none/);
+  });
+
+  describe("inline", () => {
+    it("sits in the page flow: no portal, no scrim, nothing inert", () => {
+      render(true);
+      const status = screen.getByRole("status");
+      const box = status.parentElement;
+      expect(box).toHaveClass("esc-loader", "is-inline");
+      expect(box).not.toHaveClass("is-window");
+      expect(document.querySelector(".esc-content")).toContainElement(box);
+      expect(document.querySelector(".esc-content")).not.toHaveAttribute("inert");
+      expect(screen.getByText("Away")).toBeVisible();
+    });
+
+    it("announces through a status region that starts empty", async () => {
+      render(true);
+      const status = screen.getByRole("status");
+      expect(status).toBeEmptyDOMElement();
+      await waitFor(() => expect(status).toHaveTextContent("Waiting…"));
+    });
+
+    it("leaves the page's links usable", async () => {
+      const user = userEvent.setup();
+      render(true);
+      const link = screen.getByRole("link", { name: "Away" });
+      await user.click(link);
+      expect(link).toBeInTheDocument();
+    });
+
+    it("does not block the pointer", () => {
+      const css = readFileSync("src/design/stage.css", "utf8");
+      const rule = css.match(/\.esc-loader\.is-inline \{[^}]*\}/)?.[0] ?? "";
+      expect(rule).toMatch(/position: relative/);
+      expect(rule).toMatch(/background: none/);
+    });
   });
 });

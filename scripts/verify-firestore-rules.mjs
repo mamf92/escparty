@@ -840,6 +840,57 @@ await expectDenied("the next round's code riding along with scores", () =>
   updateDoc(score1.roomRef, { nextRoomCode: nextCode, players: [{ id: "host-1", name: "Host", score: 1 }] })
 );
 
+// 14b. The host revealing the standings (#207): `revealStep` moves forward
+// only, only in the results, as an integer up to 100. (No auth, so who writes
+// it isn't checked, #115.)
+await expectDenied("create a room that is already revealed", () => {
+  const { roomCode: c, roomRef: r } = freshRoom("REVEALNEW");
+  return setDoc(r, {
+    id: c,
+    hostId: "host-1",
+    started: false,
+    createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }],
+    revealStep: 1,
+  });
+});
+await expectDenied("reveal in a room still playing", () =>
+  updateDoc(score1.roomRef, { revealStep: 1 })
+);
+await expectDenied("a reveal step that is not an integer", () =>
+  updateDoc(toResults, { revealStep: 1.5 })
+);
+await expectDenied("a reveal step that is a string", () =>
+  updateDoc(toResults, { revealStep: "1" })
+);
+await expectDenied("a negative reveal step", () =>
+  updateDoc(toResults, { revealStep: -1 })
+);
+await expectDenied("a reveal step past 100", () =>
+  updateDoc(toResults, { revealStep: 101 })
+);
+await expectAllowed("start the reveal (step 1)", () =>
+  updateDoc(toResults, { revealStep: 1 })
+);
+await expectAllowed("repeat the same reveal step", () =>
+  updateDoc(toResults, { revealStep: 1 })
+);
+await expectAllowed("reveal everything (step 3)", () =>
+  updateDoc(toResults, { revealStep: 3 })
+);
+await expectDenied("take the reveal back a step", () =>
+  updateDoc(toResults, { revealStep: 2 })
+);
+await expectDenied("reset the reveal to 0", () =>
+  updateDoc(toResults, { revealStep: 0 })
+);
+await expectAllowed("reveal up to the cap (100)", () =>
+  updateDoc(toResults, { revealStep: 100 })
+);
+await expectDenied("the reveal step riding along with scores", () =>
+  updateDoc(toResults, { revealStep: 100, players: [{ id: "host-1", name: "Host", score: 5 }] })
+);
+
 // 15. The waiting room (#65): players mark themselves ready, and the host
 // can remove a player, before the start only.
 const lobby = freshRoom("LOBBY");

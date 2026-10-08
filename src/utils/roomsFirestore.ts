@@ -56,6 +56,10 @@ export interface Room {
     nextRoomCode?: string;
     // The players who've said they're ready in the lobby (#65), by id.
     readyPlayers?: string[];
+    // How far the host has revealed the final standings (#207): the number of
+    // reveal taps (src/utils/finale.ts), only ever raised, only in the
+    // results. Missing means nothing is revealed yet.
+    revealStep?: number;
 }
 
 /**
@@ -641,6 +645,23 @@ export const setNextRoom = async (roomCode: string, nextRoomCode: string): Promi
         throw new Error("Firebase not initialized");
     }
     await updateDoc(doc(db, "rooms", roomCode), { nextRoomCode });
+};
+
+/**
+ * Set how far the final standings are revealed (#207): the host's taps, which
+ * every phone on the results follows. Only forward: firestore.rules refuses
+ * a lower step, a non-integer, one past 100, or any room not yet in its
+ * results. (Like every room write it can't tell the host from a guest, #115;
+ * the page just doesn't offer guests the button.)
+ */
+export const setRevealStep = async (roomCode: string, step: number): Promise<void> => {
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+    if (!Number.isInteger(step) || step < 0) {
+        throw new Error("Invalid reveal step");
+    }
+    await updateDoc(doc(db, "rooms", roomCode), { revealStep: step });
 };
 
 /**

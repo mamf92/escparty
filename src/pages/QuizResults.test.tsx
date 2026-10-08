@@ -1,7 +1,7 @@
 import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, waitFor, within } from "../test/test-utils";
 import QuizResults from "./QuizResults";
 import type { Room } from "../utils/roomsFirestore";
 
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listenToRoom: vi.fn(),
   createRoom: vi.fn(),
   setNextRoom: vi.fn(),
+  setRevealStep: vi.fn(),
   joinRoom: vi.fn(),
   onRoom: (_room: unknown) => {},
 }));
@@ -16,6 +17,7 @@ vi.mock("../utils/roomsFirestore", () => ({
   listenToRoom: mocks.listenToRoom,
   createRoom: mocks.createRoom,
   setNextRoom: mocks.setNextRoom,
+  setRevealStep: mocks.setRevealStep,
   joinRoom: mocks.joinRoom,
   generateRoomCode: () => "NEXT",
 }));
@@ -55,9 +57,17 @@ describe("QuizResults", () => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+    let latest: Room | null = null;
     mocks.listenToRoom.mockImplementation((_code: string, onRoom: (room: Room | null) => void) => {
-      mocks.onRoom = onRoom as (room: unknown) => void;
+      mocks.onRoom = (next: unknown) => {
+        latest = next as Room | null;
+        onRoom(latest);
+      };
       return () => {};
+    });
+    // The room echoes the host's write back to every listener, as Firestore does.
+    mocks.setRevealStep.mockImplementation(async (_code: string, step: number) => {
+      act(() => mocks.onRoom({ ...latest, revealStep: step }));
     });
   });
 
@@ -99,7 +109,7 @@ describe("QuizResults", () => {
     const user = userEvent.setup();
     renderResults({ score: 850, multiplayer: true, roomCode: "ABBA", playerId: "p4" });
     expect(screen.getByRole("status")).toHaveTextContent("Collecting the final scores");
-    act(() => mocks.onRoom(room()));
+    act(() => mocks.onRoom(room({ hostId: "p4" })));
     expect(screen.getByText("You scored 850 points.")).toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
 
@@ -119,9 +129,86 @@ describe("QuizResults", () => {
     expect(screen.queryByRole("button", { name: "Show everything" })).not.toBeInTheDocument();
   });
 
+  describe("who reveals (#207)", () => {
+    it("gives guests a disco ball and no reveal buttons until the host starts", async () => {
+      renderResults({ score: 850, multiplayer: true, roomCode: "ABBA", playerId: "p4" });
+      // Before the room arrives nobody is told to wait for anything.
+      expect(screen.queryByText("Wait to see who won…")).not.toBeInTheDocument();
+      act(() => mocks.onRoom(room()));
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Wait to see who won…"));
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /reveal|Show everything/i })).not.toBeInTheDocument();
+      expect(mocks.setRevealStep).not.toHaveBeenCalled();
+    });
+
+    it("follows the room's step: rows appear for a guest as the host taps, with no buttons of its own", () => {
+      renderResults({ score: 850, multiplayer: true, roomCode: "ABBA", playerId: "p4" });
+      act(() => mocks.onRoom(room()));
+      act(() => mocks.onRoom(room({ revealStep: 1 })));
+      expect(screen.queryByText("Wait to see who won…")).not.toBeInTheDocument();
+      expect(standings()).toEqual(["4. Lordi400 points", "5. Jedward100 points"]);
+      expect(screen.getByRole("status")).toHaveTextContent("On the board: place 4, Lordi, 400 points; place 5, Jedward, 100 points.");
+      expect(screen.queryByRole("button", { name: /reveal|Show everything/i })).not.toBeInTheDocument();
+      act(() => mocks.onRoom(room({ revealStep: 2 })));
+      expect(standings()[0]).toBe("Huit points3. Käärijä (you)700 points");
+      act(() => mocks.onRoom(room({ revealStep: 4 })));
+      expect(standings()).toHaveLength(5);
+      expect(screen.getByRole("status")).toHaveTextContent("Loreen wins with 1200 points!");
+    });
+
+    it("shows a guest who arrives late what the host has already revealed", () => {
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p4" });
+      act(() => mocks.onRoom(room({ revealStep: 3 })));
+      expect(standings()).toHaveLength(4);
+      expect(screen.queryByText("Wait to see who won…")).not.toBeInTheDocument();
+    });
+
+    it("makes guests wait when the host only observes", async () => {
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+      act(() => mocks.onRoom(room({ hostIsObserver: true })));
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Wait to see who won…"));
+    });
+
+    it("lets the host write each step to the room", async () => {
+      const user = userEvent.setup();
+      renderResults({ score: 0, multiplayer: true, roomCode: "ABBA", playerId: "host", observer: true });
+      act(() => mocks.onRoom(room({ hostIsObserver: true })));
+      expect(screen.queryByText("Wait to see who won…")).not.toBeInTheDocument();
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Start the reveal" }));
+      expect(mocks.setRevealStep).toHaveBeenLastCalledWith("ABBA", 1);
+      expect(standings()).toEqual(["4. Jedward100 points"]);
+      await user.click(screen.getByRole("button", { name: /^Reveal / }));
+      expect(mocks.setRevealStep).toHaveBeenLastCalledWith("ABBA", 2);
+    });
+
+    it("says when the host's tap didn't reach the room, and lets them try again", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mocks.setRevealStep.mockRejectedValueOnce(new Error("offline"));
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
+      act(() => mocks.onRoom(room()));
+      await user.click(screen.getByRole("button", { name: "Start the reveal" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reveal that. Try again.");
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Start the reveal" }));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(standings().length).toBeGreaterThan(0);
+    });
+
+    it("lets anyone reveal what they hold when the room is gone, on their own phone", async () => {
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p4" });
+      act(() => mocks.onRoom(room()));
+      act(() => mocks.onRoom(null));
+      await userEvent.setup().click(screen.getByRole("button", { name: "Start the reveal" }));
+      expect(mocks.setRevealStep).not.toHaveBeenCalled();
+      expect(standings()).toHaveLength(2);
+    });
+  });
+
   it("raises first place and your own row, and picks none of them", async () => {
     renderResults({ score: 850, multiplayer: true, roomCode: "ABBA", playerId: "p4" });
-    act(() => mocks.onRoom(room()));
+    act(() => mocks.onRoom(room({ hostId: "p4" })));
     expect(screen.getByRole("heading", { level: 1, name: "The results are in" })).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Show everything" }));
     const rows = within(screen.getByRole("list", { name: "Final standings" })).getAllByRole("listitem");
@@ -136,7 +223,7 @@ describe("QuizResults", () => {
       { id: "p3", name: "Lordi", score: 1 },
     ];
     renderResults({ score: 1, multiplayer: true, roomCode: "ABBA", playerId: "p2" });
-    act(() => mocks.onRoom(room({ players: level })));
+    act(() => mocks.onRoom(room({ players: level, hostId: "p2" })));
     expect(screen.getByText("You scored 1 point.")).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Start the reveal" }));
     const rows = within(screen.getByRole("list", { name: "Final standings" })).getAllByRole("listitem");
@@ -156,13 +243,14 @@ describe("QuizResults", () => {
     const user = userEvent.setup();
     sessionStorage.setItem("multiplayerGame", JSON.stringify({ multiplayer: true, roomCode: "ABBA", playerId: "p2" }));
     renderResults();
-    act(() => mocks.onRoom(room()));
+    act(() => mocks.onRoom(room({ hostId: "p2" })));
     await user.click(screen.getByRole("button", { name: "Show everything" }));
+    expect(mocks.setRevealStep).toHaveBeenCalledWith("ABBA", 4);
     expect(standings()).toHaveLength(5);
     // A reload here would still find the room.
     expect(sessionStorage.getItem("multiplayerGame")).not.toBeNull();
-    await user.click(screen.getByRole("button", { name: "Join or host another game" }));
-    expect(screen.getByText("at /multiplayer")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back to ESCParty" }));
+    expect(screen.getByText("at /")).toBeInTheDocument();
     expect(sessionStorage.getItem("multiplayerGame")).toBeNull();
   });
 
@@ -193,7 +281,7 @@ describe("QuizResults", () => {
   });
 
   it("keeps one status line through the whole reveal", async () => {
-    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+    renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent("Collecting the final scores");
     act(() => mocks.onRoom(room()));

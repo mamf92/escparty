@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { Control, Ground, Pane, Row } from "../design";
+import { Control, Ground, Loader, Pane, Row } from "../design";
 import {
   createRoom,
   generateRoomCode,
   joinRoom,
   listenToRoom,
   setNextRoom,
+  setRevealStep,
   type Player,
   type Room,
 } from "../utils/roomsFirestore";
@@ -24,6 +25,10 @@ import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, rev
  * another round with the same guests, who follow from here (#21).
  *
  * Calm, so the reveal is staged by taps, never animated: each tap adds rows.
+ * In a room only the host taps: the step lives on the room (`revealStep`) and
+ * every phone follows it, with guests waiting under a disco ball until the
+ * host starts. Only a room that has gone is revealed locally (no host left
+ * to write to).
  */
 const QuizResults = () => {
   const location = useLocation();
@@ -55,7 +60,9 @@ const QuizResults = () => {
   // score. Decided from the room once it arrives; the quiz page's router
   // flag only covers the first render.
   const [isObserver, setIsObserver] = useState<boolean>(!!location.state?.observer);
-  const [step, setStep] = useState(0);
+  // Only used once the room has gone; otherwise the room's revealStep rules.
+  const [localStep, setLocalStep] = useState(0);
+  const [revealError, setRevealError] = useState<string | null>(null);
   const [nextRound, setNextRound] = useState<"idle" | "busy" | string>("idle");
   // A tap in the same render as another can't see "busy" yet.
   const inFlight = useRef(false);
@@ -160,6 +167,13 @@ const QuizResults = () => {
   // first when everyone is level, only your own row.
   const leads = someoneLeads(placed);
   const steps = revealSteps(placed);
+  const isHost = isRoomHost(room, gameData.playerId);
+  // With the room gone, scores the page already holds can still be revealed
+  // by anyone, on their own phone; otherwise everyone follows the host.
+  const roomStep = room?.revealStep ?? 0;
+  const step = error ? Math.max(localStep, roomStep) : roomStep;
+  const canReveal = isHost || !!error;
+  const waitingForHost = !!room && !canReveal && step === 0 && placed.length > 0;
   const shown = revealedCount(steps, step);
   const revealed = placed.slice(placed.length - shown);
   const done = revealDone(steps, step);
@@ -168,13 +182,28 @@ const QuizResults = () => {
   // are on the board, then what each tap added, then the winner.
   // With the room gone there is nothing left to collect, but scores the
   // page already holds can still be revealed and announced.
-  const statusLine = placed.length > 0 ? revealAnnouncement(placed, step, steps) : error ? "" : "Collecting the final scores…";
-  const isHost = isRoomHost(room, gameData.playerId);
+  // A guest waiting for the host is told by the Loader, which is a status itself.
+  const statusLine = waitingForHost ? "" : placed.length > 0 ? revealAnnouncement(placed, step, steps) : error ? "" : "Collecting the final scores…";
   // This player's name in this room (the host included, from the full
   // list), before this device's last-used name, which another tab may have
   // changed since.
   const myName = room?.players.find(p => p.id === gameData.playerId)?.name
     ?? localStorage.getItem("playerName") ?? "Player";
+
+  /** The host's tap: every phone follows the room's step. */
+  const revealTo = async (next: number) => {
+    setRevealError(null);
+    if (error || !gameData.roomCode) {
+      setLocalStep(next);
+      return;
+    }
+    try {
+      await setRevealStep(gameData.roomCode, next);
+    } catch (err) {
+      console.error("Couldn't reveal:", err);
+      setRevealError("Couldn't reveal that. Try again.");
+    }
+  };
 
   const nextRoundStep = async (what: string, run: (playerId: string) => Promise<void>) => {
     if (inFlight.current || !gameData.playerId) return;
@@ -256,16 +285,18 @@ const QuizResults = () => {
       {/* Empty only once the room has gone with nobody to show: the alert
           above says so, and an empty note would just leave a gap. */}
       {statusLine && <CalmNote role="status">{statusLine}</CalmNote>}
-      {!done && placed.length > 0 && (
+      {waitingForHost && <Loader inline>Wait to see who won…</Loader>}
+      {canReveal && !done && placed.length > 0 && (
         <Ground>
           <Pane layout="split">
-            <Control onClick={() => setStep(step + 1)}>
+            <Control onClick={() => revealTo(step + 1)}>
               {step === 0 ? "Start the reveal" : `Reveal ${nextRevealLabel(placed, shown)}`}
             </Control>
-            <Control onClick={() => setStep(steps.length)}>Show everything</Control>
+            <Control onClick={() => revealTo(steps.length)}>Show everything</Control>
           </Pane>
         </Ground>
       )}
+      {revealError && <CalmNote role="alert">{revealError}</CalmNote>}
 
       {/* A room that's gone can't take a next round: the way out above is all. */}
       {room && isHost && !room.nextRoomCode && !error && (

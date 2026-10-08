@@ -200,13 +200,21 @@ test("the green room and the results follow the surface rules", async ({ browser
     await judge(page, "lobby-host");
     const { code, playerId } = await page.evaluate(() => ({ code: localStorage.getItem("gameCode"), playerId: localStorage.getItem("playerId") }));
 
-    // The same room's standings (one player on nought), fully revealed.
+    // The same room's results as the host sees them: the reveal controls.
+    // (The room is still in its lobby, so nothing is written: the reveal
+    // itself, which the rules only take in the results, is in builder.spec.)
     await page.evaluate(game => sessionStorage.setItem("multiplayerGame", JSON.stringify(game)), { multiplayer: true, roomCode: code, playerId });
     await page.goto("/#/results");
     await expect(page.getByRole("heading", { name: "The results are in" })).toBeVisible();
-    await page.getByRole("button", { name: "Show everything" }).click();
-    await expect(page.getByRole("list", { name: "Final standings" }).getByRole("listitem")).toHaveCount(1);
-    await judge(page, "results-standings");
+    await expect(page.getByRole("button", { name: "Start the reveal" })).toBeVisible();
+    await judge(page, "results-host");
+
+    // And as a guest, who waits for the host under the disco ball (#207).
+    await page.evaluate(game => sessionStorage.setItem("multiplayerGame", JSON.stringify(game)), { multiplayer: true, roomCode: code, playerId: "a-guest" });
+    await page.reload();
+    await expect(page.getByRole("status")).toContainText("Wait to see who won…");
+    await expect(page.getByRole("button", { name: "Start the reveal" })).toHaveCount(0);
+    await judge(page, "results-waiting");
 
     // A solo finish with a past score.
     await page.evaluate(() => {

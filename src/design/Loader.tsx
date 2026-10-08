@@ -13,6 +13,10 @@ import { useDesignTheme } from "./useDesignTheme";
  * announced to a screen reader through a status region that is mounted
  * empty and filled afterwards. The app bar stays above the scrim.
  *
+ * `<Loader inline>` is the same ball and line placed in the page flow, for a
+ * wait that must leave the page's own exits usable (a guest waiting on the
+ * host can still go back): no portal, no scrim, nothing inert.
+ *
  * - Calm, reduced motion and forced colours: the ball hangs still.
  * - Sparkle: the ball turns, a few times faster than the stage's.
  */
@@ -46,6 +50,8 @@ const paintLoader = (canvas: HTMLCanvasElement, sparkle: boolean, phase: number)
 export type LoaderProps = {
   /** What we are waiting for, as a short line ("Finding the party…"). */
   children: string;
+  /** Sit in the page flow instead of covering it: nothing is blocked or made inert. */
+  inline?: boolean;
 };
 
 /**
@@ -53,7 +59,7 @@ export type LoaderProps = {
  * over. It covers the phone screen (`.esc-app`), or the window where
  * there is none.
  */
-export const Loader = ({ children }: LoaderProps) => {
+export const Loader = ({ children, inline = false }: LoaderProps) => {
   const { theme } = useDesignTheme();
   const sparkle = theme === "sparkle";
   const still = usePrefersStill();
@@ -64,13 +70,14 @@ export const Loader = ({ children }: LoaderProps) => {
   // overlay then mounts once and stays through text changes.
   const [screen, setScreen] = useState<Element | null>(null);
   const findScreen = useCallback((marker: HTMLElement | null) => {
-    if (marker) setScreen(document.querySelector(".esc-app") ?? document.body);
-  }, []);
+    if (marker && !inline) setScreen(document.querySelector(".esc-app") ?? document.body);
+  }, [inline]);
   useLayoutEffect(() => {
+    if (inline) return;
     const content = document.querySelector(".esc-app")?.querySelector(CONTENT);
     content?.setAttribute("inert", "");
     return () => content?.removeAttribute("inert");
-  }, []);
+  }, [inline]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -92,7 +99,7 @@ export const Loader = ({ children }: LoaderProps) => {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [screen, sparkle, still]);
+  }, [screen, inline, sparkle, still]);
 
   // The status region goes in empty and gets its text a moment later:
   // screen readers announce what fills a live region, not one that arrives full.
@@ -102,13 +109,15 @@ export const Loader = ({ children }: LoaderProps) => {
     return () => clearTimeout(timer);
   }, [children]);
 
+  const className = inline ? "esc-loader is-inline" : `esc-loader${screen === document.body ? " is-window" : ""}`;
   const overlay = (
-    <div className={`esc-loader${screen === document.body ? " is-window" : ""}`}>
+    <div className={className}>
       <canvas ref={canvasRef} className="esc-loader-ball" width={SIZE} height={SIZE} aria-hidden="true" />
       <p className="esc-loader-text" aria-hidden="true">{children}</p>
       <div className="esc-loader-status" role="status" aria-live="polite">{announced}</div>
     </div>
   );
+  if (inline) return overlay;
   return (
     <>
       <span hidden ref={findScreen} />
