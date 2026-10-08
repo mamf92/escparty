@@ -486,12 +486,12 @@
 /* A stepper (Stepper.tsx): big minus, the value, big plus. One focus stop. */
 .esc-app .calm-stepper {
   display: grid;
-  grid-template-columns: var(--esc-target-min) minmax(0, 1fr) var(--esc-target-min);
+  /* 44px steps keep the value readable at 320px; the rows stay 52px tall. */
+  grid-template-columns: calc(var(--esc-target-min) - 8px) minmax(0, 1fr) calc(var(--esc-target-min) - 8px);
   gap: var(--esc-space-2);
-  border-radius: var(--esc-radius-control);
 }
 
-.esc-app .calm-stepper:focus-visible {
+.esc-app .calm-stepper .calm-stepper-value:focus-visible {
   outline: 2px solid var(--esc-focus);
   outline-offset: 3px;
 }
@@ -509,6 +509,9 @@
   justify-content: center;
   gap: var(--esc-space-1);
   padding: var(--esc-space-2);
+  min-width: 0;
+  min-height: var(--esc-target-min);
+  overflow: hidden;
   text-align: center;
   touch-action: pan-y;
   user-select: none;

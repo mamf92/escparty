@@ -164,7 +164,7 @@ const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity:
                     </Pane>
                 </Ground>
             </form>
-            <CalmNote>
+            <CalmNote role="status">
                 {party.showNames
                     ? "At the end, the awards name who rated most alike and most differently."
                     : "The awards at the end don't name names: you're only told which ones are yours."}
@@ -235,7 +235,7 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
                 </>
             )}
 
-            <CalmNote>
+            <CalmNote role="status">
                 {score === null ? `You haven't rated ${act.country} yet.` : `Your score for ${act.country}: ${formatScore(score)}`}
             </CalmNote>
 

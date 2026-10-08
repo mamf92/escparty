@@ -98,11 +98,11 @@ describe("PartyRoom", () => {
         expect(points).toHaveAttribute("aria-valuenow", "12");
         expect(points).toHaveAttribute("aria-valuetext", "12 of 12");
         // Chosen is pressed in.
-        expect(points.querySelector(".calm-stepper-value")).toHaveClass("is-chosen");
+        expect(points).toHaveClass("is-chosen");
         expect(screen.getByRole("tab", { name: "Rate" })).toHaveAttribute("aria-selected", "true");
         expect(screen.getByRole("tab", { name: "Rate" })).toHaveClass("is-chosen");
         await user.click(screen.getByRole("button", { name: /Wind machine/ }));
-        expect(screen.getByText("Your score for Sweden: 11")).toBeInTheDocument();
+        expect(screen.getByText("Your score for Sweden: 11")).toHaveAttribute("role", "status");
 
         await user.click(screen.getByRole("button", { name: "Next act" }));
         expect(screen.getByRole("spinbutton", { name: "Points for Norway" })).toBeInTheDocument();
