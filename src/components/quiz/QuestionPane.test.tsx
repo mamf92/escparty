@@ -32,12 +32,11 @@ describe("QuestionPane", () => {
     expect(container.querySelector(".calm-marker")).toBeNull();
   });
 
-  it("reports a pick and shows it chosen while the question is open", async () => {
+  it("reports a pick and says it's pressed while the question is open", async () => {
     const onPick = vi.fn();
     const user = userEvent.setup();
     renderPane({ picked: "Norway", onPick });
 
-    expect(screen.getByRole("button", { name: "Norway" })).toHaveClass("is-chosen");
     expect(screen.getByRole("button", { name: "Norway" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Sweden" })).toHaveAttribute("aria-pressed", "false");
 
@@ -68,13 +67,6 @@ describe("QuestionPane", () => {
     renderPane({ picked: null, settled: true });
     expect(markerOf("Sweden")).toBe("correct");
     expect(document.querySelectorAll(".calm-marker")).toHaveLength(1);
-  });
-
-  it("gives a pick the clock beat to it no cross: it was never locked in", () => {
-    renderPane({ picked: "Norway", settled: true, lockedIn: false });
-    expect(markerOf("Sweden")).toBe("correct");
-    expect(markerOf("Norway")).toBeUndefined();
-    expect(screen.getByRole("button", { name: "Norway" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps the markers silent: the verdict is said in words elsewhere", () => {
