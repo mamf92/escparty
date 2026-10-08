@@ -4,12 +4,28 @@ import { expect, type Page } from "@playwright/test";
 export const answerOptions = (page: Page) =>
     page.getByRole("group", { name: "Answers" }).getByRole("button");
 
-/** Host a scoreboard party for Semi-final 1 with the given sheet; returns its code. */
-export const hostParty = async (page: Page, name: string, sheet?: RegExp) => {
+/**
+ * Host a scoreboard party for Semi-final 1 with the given sheet (the jury's
+ * by default), answering yes to both extras; returns its code. Setup is one
+ * question per screen and the name is picked from the reel, so it steps the
+ * reel to `name`.
+ */
+export const hostParty = async (page: Page, name: string, sheet: RegExp = /Jury/) => {
+    // Leave /party/new first: a hash-only goto to the URL the page is already
+    // on doesn't reload or remount, so a setup left on its last step would stay.
+    await page.goto("/#/party");
     await page.goto("/#/party/new");
     await page.getByRole("radio", { name: /Semi-final 1/ }).click();
-    if (sheet) await page.getByRole("radio", { name: sheet }).click();
-    await page.getByLabel("Your name at the party").fill(name);
+    await page.getByRole("radio", { name: sheet }).click();
+    await page.getByRole("radio", { name: "Yes" }).first().click();
+    await page.getByRole("radio", { name: "Yes" }).nth(1).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    for (let tries = 0; tries < 60; tries++) {
+        await page.getByRole("button", { name: "Next name" }).click();
+        if (await page.getByText(`You're ${name}.`).isVisible()) break;
+    }
+    await expect(page.getByText(`You're ${name}.`)).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Start the party" }).click();
     await expect(page).toHaveURL(/#\/party\/[A-Z]{4}$/);
     return page.url().split("/").pop()!;
