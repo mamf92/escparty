@@ -70,6 +70,33 @@ body {
   color: var(--esc-ink);
 }
 
+/*
+  One question per screen (party setup): the question set large in the display
+  font, with sub-questions a size down. Focus lands on it when the step
+  changes, for screen readers; it is not a control, so it shows no ring.
+*/
+.esc-question {
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-title);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.esc-question:focus {
+  outline: none;
+}
+
+.esc-question-sub {
+  font-size: var(--esc-text-heading);
+}
+
+/* The name a reel has landed on: display font, heading size, centred. */
+.esc-pick {
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-heading);
+  text-align: center;
+}
+
 /* The quiet underlined link for "back" and secondary moves. */
 .esc-link {
   font-family: var(--esc-font-body);

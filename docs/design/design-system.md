@@ -279,6 +279,12 @@ next, without red text.
 **Link** (`<CalmLink>`). The quiet underlined move for "back" and
 secondary actions, at least 44px tall. One per footer is the norm.
 
+**Question** (`.esc-heading esc-question`, `esc-question-sub`) and **pick**
+(`.esc-pick`). One question per screen is set large in the display font
+(`esc-question`; `esc-question-sub` a size down for a screen's second
+question) and takes focus when the step changes. `esc-pick` is the type of
+a name a reel has landed on. Page stylesheets only lay these out.
+
 **Page title.** One `<h1>` in Righteous, white on the stage, sentence
 case, below the ball (the header's `--esc-stage-clearance` keeps it
 clear).
