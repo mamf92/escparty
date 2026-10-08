@@ -211,7 +211,7 @@ const Lobby = () => {
     return (
         <CalmPage
             title="The green room"
-            subtitle={<>Game code <strong>{gameCode}</strong> · you are {me.name}</>}
+            subtitle={<>Game code <strong className="esc-selectable">{gameCode}</strong> · you are {me.name}</>}
             footer={leave}
         >
             <CalmNote>Quiz: {room.difficulty ? roomQuizTitle : isHost ? "pick one below" : "the host is picking"}</CalmNote>

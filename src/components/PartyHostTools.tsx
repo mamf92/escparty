@@ -54,7 +54,7 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
     return (
         <>
             <h2 className="esc-note">Guests</h2>
-            <CalmNote aria-live="polite">
+            <CalmNote className="esc-selectable" aria-live="polite">
                 Guests join with the code {party.code}. {ballots.length === 1 ? "1 guest" : `${ballots.length} guests`} so far.
             </CalmNote>
             <Ground>
@@ -91,8 +91,8 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
                 </Pane>
             </Ground>
             {/* Kept in the page, so a screen reader hears each note as it lands. */}
-            <div role="status">{note && !note.failed && <CalmNote>{note.text}</CalmNote>}</div>
-            {note?.failed && <CalmNote role="alert">{note.text}</CalmNote>}
+            <div role="status">{note && !note.failed && <CalmNote className="esc-selectable">{note.text}</CalmNote>}</div>
+            {note?.failed && <CalmNote className="esc-selectable" role="alert">{note.text}</CalmNote>}
         </>
     );
 };
