@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { QrScanner } from "../components/QrScanner";
-import { Control, Field, Ground, Pane } from "../design";
+import { Control, Field, Ground, Loader, Pane } from "../design";
 import { cleanCode, codeFromScan, CODE_PATTERN, findGame } from "../utils/joinCode";
 import { lastPartyCode } from "../utils/partySession";
 
@@ -78,6 +78,13 @@ const JoinParty = () => {
       title="Join a party"
       subtitle="Type the four-letter code from the host's screen, or scan its QR code."
       footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
+      actions={previous && (
+        <Ground>
+          <Pane>
+            <Control onClick={() => navigate(`/party/${previous}`)}>Back to party {previous}</Control>
+          </Pane>
+        </Ground>
+      )}
     >
       <form onSubmit={submit} noValidate>
         <Ground>
@@ -104,17 +111,8 @@ const JoinParty = () => {
         </Ground>
       </form>
       {problem && <CalmNote id={`${codeId}-problem`} role="alert">{problem}</CalmNote>}
-      {/* Mounted before it fills, so screen readers announce what fills it. */}
-      <div role="status">
-        {checking && <CalmNote>Finding the party…</CalmNote>}
-      </div>
-      {previous && (
-        <Ground>
-          <Pane>
-            <Control onClick={() => navigate(`/party/${previous}`)}>Back to party {previous}</Control>
-          </Pane>
-        </Ground>
-      )}
+      {/* Over the whole screen, so nothing underneath can be tapped while we look. */}
+      {checking && <Loader>Finding the party…</Loader>}
     </CalmPage>
   );
 };

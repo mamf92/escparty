@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Stage, ThemeSwitch } from '../design';
+import { ConfirmLeave } from './ConfirmLeave';
+import { LeaveGuardContext, type LeaveGuard } from '../hooks/useLeaveGuard';
 
 interface MobileFrameProps {
   children: React.ReactNode;
@@ -9,23 +12,70 @@ interface MobileFrameProps {
 /**
  * The phone-frame chrome every app screen sits in (docs/design/design-system.md,
  * "Page anatomy"): a bezel on wide screens, full bleed on a phone, and the
- * app bar with the brand and the theme switch. The brand is deliberately not
- * a home link: several screens are mid-game and have their own way out.
- * The stage (the disco ball, and Sparkle's sequins) sits behind the
- * scrolling content, fixed to the screen.
+ * app bar with the brand and the theme switch. The brand is a link home. A
+ * page with something in progress registers a leave guard
+ * (`useLeaveGuard`); then the brand asks first, with the same stay-or-leave
+ * choice as `LeaveQuiz`, and runs the page's own `onLeave`. With no guard it
+ * simply goes home. The stage (the disco ball, and Sparkle's sequins) sits
+ * behind the scrolling content, fixed to the screen.
  */
 const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const [guard, setGuardState] = useState<LeaveGuard | null>(null);
+  const setGuard = useCallback((update: (current: LeaveGuard | null) => LeaveGuard | null) => setGuardState(update), []);
+  const guardState = useMemo(() => ({ guard, setGuard }), [guard, setGuard]);
+  const [asking, setAsking] = useState(false);
+  const brandRef = useRef<HTMLAnchorElement>(null);
+
+  // A new screen answers the question (state reset while rendering, the
+  // documented way to reset it when an input changes).
+  const [askedAt, setAskedAt] = useState(pathname);
+  if (askedAt !== pathname) {
+    setAskedAt(pathname);
+    setAsking(false);
+  }
+
+  const goHome = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!guard) return;
+    event.preventDefault();
+    setAsking(true);
+  };
+
+  // Focus goes back to the brand only when the user chose to stay, not when
+  // the question closes because the screen changed.
+  const stay = () => {
+    setAsking(false);
+    brandRef.current?.focus();
+  };
+
+  const leave = () => {
+    setAsking(false);
+    if (guard) guard.onLeave();
+    else navigate("/");
+  };
+
   return (
+    <LeaveGuardContext.Provider value={guardState}>
     <FrameContainer>
       <PhoneFrame>
         <PhoneScreen className="esc-app">
           <Stage />
           <Scroller>
             <AppBar>
-              <Brand className="esc-title-text">ESCParty</Brand>
+              <Brand ref={brandRef} to="/" className="esc-title-text" onClick={goHome}>ESCParty</Brand>
               <ThemeSwitch />
             </AppBar>
-            <ContentConstraint>
+            <ContentConstraint className="esc-content">
+              {asking && guard && (
+                <Asking
+                  prompt={guard.message}
+                  stayLabel="Stay here"
+                  leaveLabel="Go to ESCParty"
+                  onStay={stay}
+                  onLeave={leave}
+                />
+              )}
               {children}
             </ContentConstraint>
           </Scroller>
@@ -33,6 +83,7 @@ const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
         <PhoneButton />
       </PhoneFrame>
     </FrameContainer>
+    </LeaveGuardContext.Provider>
   );
 };
 
@@ -103,14 +154,16 @@ const PhoneScreen = styled.div`
 const Scroller = styled.div`
   position: absolute;
   inset: 0;
-  z-index: 1;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
 `;
 
+// Above the wait's scrim (Loader.tsx), so the theme switch stays usable.
 const AppBar = styled.header`
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -118,8 +171,17 @@ const AppBar = styled.header`
   padding: var(--esc-space-2) var(--esc-space-4) 0;
 `;
 
-const Brand = styled.span`
+// Above the page it interrupts, as wide as the page.
+const Asking = styled(ConfirmLeave)`
+  padding-top: var(--esc-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-space-3);
+`;
+
+const Brand = styled(Link)`
   display: inline-flex;
+  text-decoration: none;
   align-items: center;
   min-height: 44px;
   font-family: var(--esc-font-display);

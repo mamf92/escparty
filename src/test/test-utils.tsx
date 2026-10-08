@@ -22,6 +22,8 @@ export type RenderWithProvidersOptions = Omit<RenderOptions, "wrapper"> & {
    * with router state: `[{ pathname: "/quiz/easy", state: { ... } }]`.
    */
   initialEntries?: InitialEntry[];
+  /** Which of `initialEntries` is current (default: the last), to test Back. */
+  initialIndex?: number;
 };
 
 /**
@@ -32,11 +34,11 @@ export type RenderWithProvidersOptions = Omit<RenderOptions, "wrapper"> & {
  */
 export const renderWithProviders = (
   ui: ReactElement,
-  { initialEntries = ["/"], ...options }: RenderWithProvidersOptions = {},
+  { initialEntries = ["/"], initialIndex, ...options }: RenderWithProvidersOptions = {},
 ): RenderResult =>
   render(ui, {
     wrapper: ({ children }) => (
-      <MemoryRouter initialEntries={initialEntries}>
+      <MemoryRouter initialEntries={initialEntries} initialIndex={initialIndex}>
         <Providers>{children}</Providers>
       </MemoryRouter>
     ),
