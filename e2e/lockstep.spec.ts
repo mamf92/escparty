@@ -16,7 +16,6 @@ const question = (page: Page) => page.getByRole("heading", { level: 2 });
 
 const answer = async (page: Page) => {
     await answerOptions(page).first().click();
-    await page.getByRole("button", { name: "Lock in my answer" }).click();
 };
 
 test("host and a throttled guest see the same questions through a break", async ({ browser }) => {
@@ -77,7 +76,7 @@ test("host and a throttled guest see the same questions through a break", async 
     // Both come back on question 5, and move on to question 6 together. (Wait
     // until the break is gone, so the question read is the quiz's.)
     await expect(host.getByRole("heading", { name: "Scoreboard break" })).toBeHidden({ timeout: 30_000 });
-    await expect(host.getByRole("button", { name: "Lock in my answer" })).toBeVisible();
+    await expect(host.getByRole("timer")).toBeVisible();
     await expect(question(guest)).toHaveText((await question(host).textContent())!);
     const fifth = await question(host).textContent();
     await Promise.all([answer(host), answer(guest)]);

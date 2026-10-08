@@ -11,14 +11,13 @@ test("a solo quiz from the home screen to the scoreboard", async ({ page }) => {
     await page.getByRole("radio", { name: /Quick Fire/ }).click();
     await page.getByRole("button", { name: "Play Quick Fire solo" }).click();
 
-    // Ten questions: answer each with its first option and move on.
+    // Ten questions: tap the first option of each and move on.
     for (let question = 1; question <= 10; question++) {
-        const submit = page.getByRole("button", { name: "Lock in my answer" });
-        await expect(submit).toBeVisible();
+        await expect(page.getByRole("timer")).toBeVisible();
+        await expect(page.getByText(`Question ${question} of 10`)).toBeVisible();
         const text = await page.getByRole("heading", { level: 2 }).textContent();
+        // Tapping is the answer; the verdict shows a moment, then the next question.
         await answerOptions(page).first().click();
-        await submit.click();
-        await expect(page.getByRole("button", { name: question < 10 ? /^Next question in \d+s$/ : /^Results in \d+s$/ })).toBeVisible();
         if (question < 10) await expect(page.getByRole("heading", { level: 2 })).not.toHaveText(text ?? "");
     }
 
