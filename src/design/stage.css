@@ -40,14 +40,13 @@
 }
 
 /*
-  Home (`calm-hero` on CalmPage) floats a bigger ball, with no wire, over
+  Home (`calm-hero` on CalmPage) floats a bigger ball over
   the page: the landing screen's centrepiece. The header's clearance
   follows the size, as it does everywhere. Where :has() isn't there, Home
   keeps the hanging ball.
 */
 .esc-app:has(.calm-page.calm-hero) {
   --esc-ball-size: 168px;
-  --esc-ball-wire: none;
 }
 
 @supports (width: 1cqw) {
@@ -71,3 +70,21 @@
   padding-top: var(--esc-stage-clearance);
 }
 
+
+/*
+  The stage's pointer lamp follows a finger, so a long press or a drag on
+  plain content must not select text, open the callout or flash a tap
+  highlight. Fields keep their text selectable, and scrolling is untouched
+  (no touch-action change).
+*/
+.esc-app {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.esc-app :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])) {
+  -webkit-user-select: text;
+  user-select: text;
+}

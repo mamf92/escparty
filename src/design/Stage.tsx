@@ -32,12 +32,10 @@ import { useDesignTheme } from "./useDesignTheme";
  * (`--esc-ball-size`, `--esc-ball-hang`): the same values the page
  * header leaves room for. 96px under 56px where it can't be measured.
  */
-type BallBox = { size: number; hang: number; wire: boolean };
+type BallBox = { size: number; hang: number };
 const measureBall = (box: HTMLElement | null): BallBox => ({
   size: box?.offsetWidth || 96,
   hang: box?.offsetTop || 56,
-  // Home floats a bigger ball with no wire (`--esc-ball-wire: none`, stage.css).
-  wire: !box || getComputedStyle(box).getPropertyValue("--esc-ball-wire").trim() !== "none",
 });
 /** The longest step the ball turns in one frame, so it never jumps after a hidden tab. */
 const MAX_STEP = 0.1;
@@ -168,30 +166,31 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
 
   const look = sparkle ? SPARKLE_BALL : CALM_BALL;
   const lamp = lampDirection(lampX, lampY);
-  const { size, hang: top, wire } = ball;
+  const { size, hang: top } = ball;
   const left = (width - size) / 2;
   const centreY = top + size / 2;
 
-  // The spots first, so the ball hangs in front of them.
-  for (const spot of ballSpots(look, lamp, phase, centreY / height)) {
-    const radius = (spot.size * size) / 2 + 2;
-    const x = spot.x * width;
-    const y = spot.y * height;
-    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    glow.addColorStop(0, rgba(spot.colour, spot.alpha));
-    glow.addColorStop(0.6, rgba(spot.colour, spot.alpha * 0.7));
-    glow.addColorStop(1, rgba(spot.colour, 0));
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
+  // The spots first, so the ball hangs in front of them: square, slightly
+  // leaning mirrors with a soft edge (a faint larger square under a brighter
+  // one), and never over the ball's disc, which is cut out of the stage.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.arc(width / 2, centreY, size / 2 + 1, 0, Math.PI * 2);
+  ctx.clip("evenodd");
+  for (const spot of ballSpots(look, lamp, phase, { width, height, centreY, radius: size / 2 })) {
+    ctx.save();
+    ctx.translate(spot.x, spot.y);
+    ctx.rotate(spot.rotation);
+    ctx.fillStyle = rgba(spot.colour, spot.alpha * 0.35);
+    ctx.fillRect(-spot.width * 0.65, -spot.height * 0.65, spot.width * 1.3, spot.height * 1.3);
+    ctx.fillStyle = rgba(spot.colour, spot.alpha);
+    ctx.fillRect(-spot.width / 2, -spot.height / 2, spot.width, spot.height);
+    ctx.restore();
   }
+  ctx.restore();
 
-  // The wire it hangs from, then the ball, a facet at a time.
-  if (wire) {
-    ctx.fillStyle = sparkle ? "#f3e6ee" : "#b89aac";
-    ctx.fillRect(width / 2 - 1, 0, 2, top + 2);
-  }
+  // The ball hangs free, with no wire, on every screen; it is painted a facet at a time.
   ctx.save();
   ctx.beginPath();
   ctx.arc(width / 2, centreY, size / 2, 0, Math.PI * 2);
@@ -297,17 +296,33 @@ export const Stage = () => {
       box = root.getBoundingClientRect();
       ball = measureBall(ballRef.current);
     };
-    const point = (event: PointerEvent) => {
+    const aim = (clientX: number, clientY: number) => {
       if (!box.width || !box.height) return;
       lamp = {
-        x: Math.min(1, Math.max(-1, ((event.clientX - box.left) / box.width) * 2 - 1)),
-        y: Math.min(1, Math.max(-1, ((event.clientY - box.top) / box.height) * 2 - 1)),
+        x: Math.min(1, Math.max(-1, ((clientX - box.left) / box.width) * 2 - 1)),
+        y: Math.min(1, Math.max(-1, ((clientY - box.top) / box.height) * 2 - 1)),
       };
     };
+    const point = (event: PointerEvent) => aim(event.clientX, event.clientY);
+    // Touch events too: some mobile browsers stop sending pointermove once
+    // they take a drag over for scrolling, while touchmove keeps coming.
+    const touch = (event: TouchEvent) => {
+      const finger = event.touches[0] ?? event.changedTouches[0];
+      if (finger) aim(finger.clientX, finger.clientY);
+    };
+    // Passive and never prevented, so scrolling and taps are left alone;
+    // captured, so a control that stops the event still lights the lamp.
+    const listen = { passive: true, capture: true } as const;
+    const events = [
+      ["pointerdown", point],
+      ["pointermove", point],
+      ["touchstart", touch],
+      ["touchmove", touch],
+    ] as const;
 
     draw(performance.now());
     if (!still) {
-      window.addEventListener("pointermove", point, { passive: true });
+      for (const [type, handler] of events) window.addEventListener(type, handler as EventListener, listen);
       frame = requestAnimationFrame(tick);
     }
     const resized = typeof ResizeObserver === "function"
@@ -322,7 +337,7 @@ export const Stage = () => {
 
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("pointermove", point);
+      for (const [type, handler] of events) window.removeEventListener(type, handler as EventListener, listen);
       resized?.disconnect();
       sequinCanvas?.removeEventListener("webglcontextlost", lost);
       sequins?.release();
