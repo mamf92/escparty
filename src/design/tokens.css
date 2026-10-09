@@ -47,11 +47,12 @@
   --esc-target-min: 52px;
 
   /*
-    The stage: dark pink, brightest under the ball (the gradient's first
-    stop, which contrast.test.ts holds stage text against).
+    The stage: a bright berry pink, brightest under the ball (the gradient's
+    first stop, which contrast.test.ts holds stage text against), and light
+    enough at its foot that the dark tiles stand off it.
   */
-  --esc-bg: #3b0628;
-  --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #7a1356 0%, #3b0628 72%);
+  --esc-bg: #6e1150;
+  --esc-screen: radial-gradient(ellipse 160% 70% at 50% 0%, #a0156c 0%, #6e1150 62%, #520c3b 100%);
   /*
     The disco ball: how big it is and how far below the stage's top edge it
     hangs (just under the app bar). Stage.tsx reads both from here, so the
@@ -169,6 +170,6 @@
   a wide soft glow that dims the bright sequins right behind each line.
 */
 :root[data-theme="sparkle"] {
-  --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #8e0f5f 0%, #3b0628 72%);
+  --esc-screen: radial-gradient(ellipse 160% 70% at 50% 0%, #a0156c 0%, #6e1150 62%, #520c3b 100%);
   --esc-stage-text-shadow: -1px -1px 0 var(--esc-halo), 1px -1px 0 var(--esc-halo), -1px 1px 0 var(--esc-halo), 1px 1px 0 var(--esc-halo), 0 0 4px var(--esc-halo), 0 1px 8px var(--esc-halo), 0 0 14px var(--esc-halo);
 }
