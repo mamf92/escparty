@@ -20,7 +20,7 @@ import { useDesignTheme } from "./useDesignTheme";
  * - Calm: the ball hangs still, in muted pinks.
  * - Sparkle: pink sequins cover the stage (a WebGL shader), and the ball,
  *   white and light pink, turns slowly with the pointer as its lamp. Its
- *   spots sweep the room left to right, with the ball. With reduced
+ *   spots sweep the room right to left, with the ball. With reduced
  *   motion it is one still frame.
  *
  * Where a canvas or WebGL isn't there (an old browser, a test), the stage

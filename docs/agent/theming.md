@@ -46,7 +46,7 @@ outside `src/design/`.
   press.
 - **Sparkle** — opt-in, never the landing state. The same screens on a
   floor of pink sequins, with a white and light pink ball turning slowly
-  and its light spots sweeping left to right; the pointer is the lamp.
+  clockwise and its light spots sweeping right to left; the pointer is the lamp.
   It only moves when the system allows motion.
 
 The boards both were chosen from, and two style studies kept for later

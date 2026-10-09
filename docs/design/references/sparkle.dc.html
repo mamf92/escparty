@@ -215,10 +215,11 @@ void main(){
   }
   componentDidMount() {
     if (this.still) return;
-    // The ball turns slowly so its front moves left to right, and the light
-    // spots it throws sweep the room the same way, at the ball's own pace.
+    // The ball turns slowly clockwise (seen from above), so its front moves
+    // right to left, and the light spots it throws sweep the room the same
+    // way, at the ball's own pace.
     const TAU = Math.PI * 2;
-    this.timer = setInterval(() => this.setState((s) => ({ phase: (s.phase - 0.006 + TAU) % TAU })), 50);
+    this.timer = setInterval(() => this.setState((s) => ({ phase: (s.phase + 0.006) % TAU })), 50);
   }
   componentWillUnmount() { clearInterval(this.timer); this.stopGl(); }
   renderVals() {
