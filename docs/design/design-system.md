@@ -95,7 +95,11 @@ enough to read as reflections, not snow). Each lit facet throws one
 square spot (a foreshortened, slightly leaning quad with a soft edge) at
 its place in a magnified copy of the ball's facet grid, so the spots line
 up in rows, one per latitude row of facets, and slide along them in step
-with the ball's rotation. They never draw over the ball's disc. The ball
+with the ball's rotation. A spot is brighter the more directly its mirror
+reflection points at the viewer. Every spot hangs behind the ball, and one
+whose centre falls over the ball's disc shows again in front of it (`glare`),
+as glare on its glass, fading in as it crosses the edge, with a soft glow over
+the ball (`BallLook.glare`: full in Sparkle, faint in Calm). The ball
 has no wire on any screen.
 
 The lamp follows `pointerdown`/`pointermove` and `touchstart`/`touchmove`

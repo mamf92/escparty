@@ -183,6 +183,9 @@ export const paintBall = (
   ctx.restore();
 };
 
+/** How strong the soft glow over the ball is at its brightest, of full white-pink. */
+const GLOW = 0.6;
+
 /** Paint the ball and its spots on the lights canvas. */
 const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean, lampX: number, lampY: number, phase: number) => {
   const ctx = canvas.getContext("2d");
@@ -205,28 +208,50 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
   const left = (width - size) / 2;
   const centreY = top + size / 2;
 
-  // The spots first, so the ball hangs in front of them: square, slightly
-  // leaning mirrors with a soft edge (a faint larger square under a brighter
-  // one), and never over the ball's disc, which is cut out of the stage.
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, width, height);
-  ctx.arc(width / 2, centreY, size / 2 + 1, 0, Math.PI * 2);
-  ctx.clip("evenodd");
-  for (const spot of ballSpots(look, lamp, phase, { width, height, centreY, radius: size / 2 })) {
+  // Every spot behind the ball first: square, slightly leaning mirrors with a
+  // soft edge (a faint larger square under a brighter one). Those over the
+  // ball's disc show again after it, as glare on its glass.
+  const spots = ballSpots(look, lamp, phase, { width, height, centreY, radius: size / 2 });
+  const paintSpot = (spot: (typeof spots)[number], alpha: number) => {
     ctx.save();
     ctx.translate(spot.x, spot.y);
     ctx.rotate(spot.rotation);
-    ctx.fillStyle = rgba(spot.colour, spot.alpha * 0.35);
+    ctx.fillStyle = rgba(spot.colour, alpha * 0.35);
     ctx.fillRect(-spot.width * 0.65, -spot.height * 0.65, spot.width * 1.3, spot.height * 1.3);
-    ctx.fillStyle = rgba(spot.colour, spot.alpha);
+    ctx.fillStyle = rgba(spot.colour, alpha);
     ctx.fillRect(-spot.width / 2, -spot.height / 2, spot.width, spot.height);
     ctx.restore();
+  };
+  const glare: typeof spots = [];
+  let strongest = 0;
+  for (const spot of spots) {
+    paintSpot(spot, spot.alpha);
+    if (spot.glare > 0) {
+      glare.push(spot);
+      strongest = Math.max(strongest, spot.directness * spot.glare);
+    }
   }
-  ctx.restore();
 
   // The ball hangs free, with no wire, on every screen; it is painted a facet at a time.
   paintBall(ctx, left, top, size, look, lamp, phase);
+
+  // The light in front of the ball: a soft glow in one colour, clipped to its
+  // glass and as strong as the most direct glare, then the glare itself (not
+  // clipped, so a spot at the rim keeps its shape).
+  if (strongest > 0) {
+    const tone = look.spotColour ?? look.tints[0];
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(width / 2, centreY, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+    const gradient = ctx.createRadialGradient(width / 2, centreY, 0, width / 2, centreY, size / 2);
+    gradient.addColorStop(0, rgba(tone, GLOW * look.glare * strongest));
+    gradient.addColorStop(1, rgba(tone, 0));
+    ctx.fillStyle = gradient;
+    ctx.fillRect(left, top, size, size);
+    ctx.restore();
+  }
+  for (const spot of glare) paintSpot(spot, spot.glare);
 };
 
 /*
