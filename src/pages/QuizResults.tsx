@@ -154,7 +154,7 @@ const QuizResults = () => {
           <Pane>
             <Row elevation="high">
               <span className="calm-label">You scored</span>
-              <span>{points(gameData.score)}</span>
+              <span className="esc-hero-number">{points(gameData.score)}</span>
             </Row>
           </Pane>
         </Ground>

@@ -119,6 +119,15 @@ body {
   font-size: var(--esc-text-heading);
 }
 
+/* A screen's one hero number (your score), in the display face. */
+.esc-hero-number {
+  display: block;
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-display);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
 /* The name a reel has landed on: display font, heading size, centred. */
 .esc-pick {
   font-family: var(--esc-font-display);

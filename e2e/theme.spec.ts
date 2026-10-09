@@ -174,10 +174,10 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await rateActs(guest, [9, 5, 3]);
     await judge(guest, "party-rate");
 
-    await guest.getByRole("tab", { name: "My ranking" }).click();
+    await guest.getByRole("tab", { name: "Ranking" }).click();
     await expect(guest.getByRole("list", { name: "Your ranking" })).toBeVisible();
     await judge(guest, "party-my-ranking");
-    await guest.getByRole("tab", { name: "The room" }).click();
+    await guest.getByRole("tab", { name: "Room" }).click();
     const standings = guest.getByRole("list", { name: "The room's standings" }).getByRole("listitem");
     await expect(standings.filter({ hasText: "2 ratings" })).toHaveCount(3);
     await judge(guest, "party-the-room");

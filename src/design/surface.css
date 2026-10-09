@@ -81,13 +81,22 @@
   --esc-correct: var(--esc-card-correct);
   --esc-wrong: var(--esc-card-wrong);
   --esc-label: var(--esc-card-label);
-  --esc-pane-gap: var(--esc-space-4);
-  padding: var(--esc-space-5);
+  /*
+    Field groups sit 24px apart and a label 8px above its field (the label
+    rules below), so each label reads with its own field, not the one above.
+  */
+  --esc-pane-gap: var(--esc-space-6);
+  padding: var(--esc-space-6);
   border-radius: var(--esc-radius-card);
   color: var(--esc-ink);
   text-shadow: none;
   background: var(--esc-card);
   box-shadow: var(--esc-card-lift);
+}
+
+/* Buttons in a row of buttons on a card stay a button's gap apart. */
+.esc-app .lycra-pane:is(.is-card, :has(.lycra-field)) > .lycra + .lycra {
+  margin-top: calc(var(--esc-space-3) - var(--esc-pane-gap));
 }
 
 /* The button: white on the stage, an action. */

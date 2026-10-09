@@ -60,6 +60,12 @@ same stage, with a disco ball hanging over it.
 | **Chosen** | Hot pink (`--esc-accent`), white ink, pressed in | What is picked | `chosen` → `.is-chosen` + `aria-pressed` |
 | **Unavailable** | Solid, dimmer than a tile (`--esc-disabled`) with muted ink; faded blush on a card | Can't be used yet | `disabled` |
 
+**A card has one job.** It holds one form and its submit; another way
+to use the same field (scan a QR code instead of typing) may stay, but a
+different move ("Open the big screen") goes under the card as a link.
+Inside, field groups sit 24px apart and each label 8px above its field,
+so a label reads with its own field; buttons stay 12px apart.
+
 **Inside a card** the same roles are made of **blush** (`--esc-blush`)
 with Pearl's soft neumorphic depth: a button is raised by a light and a
 shade, a field and a pressed control are pressed in. A card never holds a
@@ -303,6 +309,10 @@ secondary actions, at least 44px tall. One per footer is the norm.
 (`esc-question`; `esc-question-sub` a size down for a screen's second
 question) and takes focus when the step changes. `esc-pick` is the type of
 a name a reel has landed on. Page stylesheets only lay these out.
+
+**Hero number** (`.esc-hero-number`). A screen's one big number (your
+score on the results) in the display font at `--esc-text-display`, on a
+proud row under its label.
 
 **Page title.** One `<h1>` in Righteous, white on the stage, sentence
 case, below the ball (the header's `--esc-stage-clearance` keeps it

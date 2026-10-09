@@ -66,11 +66,12 @@ const PartyHome = () => {
                                     />
                                     {tried && !valid && <CalmNote id={`${codeId}-problem`} role="alert">A party code is four letters, like ABBA.</CalmNote>}
                                 </div>
-                                <Control onClick={() => go(value => `/party/${value}/screen`)}>Open the big screen</Control>
                                 <Control type="submit" elevation="high">Join to rate</Control>
                             </Pane>
                         </Ground>
                     </form>
+                    {/* The card's one job is joining; the TV's way in is a quieter move under it. */}
+                    <CalmLink onClick={() => go(value => `/party/${value}/screen`)}>Open the big screen</CalmLink>
                     <CalmNote>The big screen is for the TV: it shows the room's standings, never anyone's own ratings.</CalmNote>
                 </>
             )}
