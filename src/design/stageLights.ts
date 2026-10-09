@@ -231,3 +231,127 @@ export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageV
   }
   return spots;
 };
+
+/*
+ * Spots on the sequin wall: the light a lamp behind the ball (or the rim of
+ * the ball lit from the front) throws onto the wall behind it.
+ *
+ * Coordinates: x right, y up, z towards the viewer; the ball sits at the
+ * origin with radius 1. The wall is the plane z = -WALL_DISTANCE and the
+ * viewer is at z = +VIEWER_DISTANCE, so the wall is seen at
+ * VIEWER_DISTANCE / (VIEWER_DISTANCE + WALL_DISTANCE) of the ball's scale.
+ * Light travels along `d` (lamp to ball); a facet with normal n is lit when
+ * dot(d, n) < 0 and sends the ray r = d - 2 dot(d, n) n on. Only the rays
+ * with r.z < 0 reach the wall; the rest come back to the viewer (the spots
+ * on the glass that ballSpots draws).
+ */
+
+/** How far behind the ball the sequin wall is, in ball radii. */
+export const WALL_DISTANCE = 3;
+/** How far in front of the ball the viewer is, in ball radii. */
+export const VIEWER_DISTANCE = 12;
+/**
+ * The wall as magnified on the stage, over the ball's own radius in pixels:
+ * the pattern needs to fill a phone, which the ball (96px) is too small for.
+ */
+export const WALL_MAGNIFY = 2;
+/** How much a beam widens per radius travelled (the lamp is not a point). */
+export const BEAM_SPREAD = 0.05;
+/** The longest a spot stretches along its direction, as the ray leans away from the wall's normal. */
+export const MAX_STRETCH = 2.5;
+/** Rays flatter than this to the wall (|r.z|) are dropped; they fade in up to GRAZING_FADE. */
+export const GRAZING_DROP = 0.08;
+export const GRAZING_FADE = 0.4;
+/** The most wall spots in a frame (24 columns × 12 rows is 288 facets). */
+export const MAX_WALL_SPOTS = 160;
+
+/** A lamp for the wall: the direction its light travels (lamp to ball) and how bright it is. */
+export type WallLamp = { direction: Vec; strength: number };
+
+/** A spot on the sequin wall, in stage pixels. */
+export type WallSpot = {
+  x: number;
+  y: number;
+  /** Along the spot's direction (the long side when stretched), and across it, in pixels. */
+  width: number;
+  height: number;
+  /** The direction of the spot's long side on screen, in radians (y down). */
+  rotation: number;
+  /** 0..1 */
+  alpha: number;
+  lamp: number;
+  row: number;
+  column: number;
+};
+
+const norm = (v: Vec): Vec => {
+  const length = Math.hypot(...v) || 1;
+  return [v[0] / length, v[1] / length, v[2] / length];
+};
+
+/**
+ * The unit vector from the ball towards the lamp behind it (negative z)
+ * for a pointer at x, y (-1..1 across the stage): the pointer to the right
+ * puts the lamp behind-right, so its light travels left and towards the viewer.
+ */
+export const backLampDirection = (x: number, y: number): Vec => norm([x * 1.2, -y * 1.2 + 0.3, -1]);
+
+/** The second, fixed, dimmer back lamp, from the other side and above. */
+export const SECOND_BACK_LAMP: Vec = norm([-0.7, 0.55, -1]);
+
+const travel = (towardLamp: Vec): Vec => [-towardLamp[0], -towardLamp[1], -towardLamp[2]];
+
+/** The lamps that light the wall for a lighting mode with the pointer at x, y. */
+export const wallLamps = (mode: "front" | "back" | "both", x: number, y: number): WallLamp[] => {
+  if (mode === "front") return [];
+  const lamps: WallLamp[] = [
+    { direction: travel(backLampDirection(x, y)), strength: 1 },
+    { direction: travel(SECOND_BACK_LAMP), strength: 0.5 },
+  ];
+  // The front lamp throws its outer facets' light round the ball onto the wall.
+  if (mode === "both") lamps.push({ direction: travel(lampDirection(x, y)), strength: 0.9 });
+  return lamps;
+};
+
+/**
+ * The spots the lamps throw onto the sequin wall. Every facet of the ball,
+ * back ones too, reflects its lamp's ray; where it reaches the wall it makes
+ * a spot the facet's size plus the beam's spread, stretched along the ray's
+ * lean, as bright as the facet is lit and as the ray is square on to the wall.
+ */
+export const wallSpots = (lamps: readonly WallLamp[], phase: number, view: StageView): WallSpot[] => {
+  const spots: WallSpot[] = [];
+  const unit = view.radius * WALL_MAGNIFY;
+  const scale = VIEWER_DISTANCE / (VIEWER_DISTANCE + WALL_DISTANCE);
+  const facetSize = 2 * Math.sin(FACET / 2);
+  // The viewer looks along the stage's middle, so the wall behind the ball
+  // sits nearer that middle than the ball does, by the same scale.
+  const originY = view.height / 2 + (view.centreY - view.height / 2) * scale;
+  const rows = AROUND / 4;
+  lamps.forEach((lamp, index) => {
+    const d = lamp.direction;
+    for (let row = -rows; row < rows; row += 1) {
+      for (let column = 0; column < AROUND; column += 1) {
+        const { normal: n, key } = facetAt(row, column, phase);
+        const lit = -dot(d, n);
+        if (lit <= 0) continue;
+        const k = 2 * dot(d, n);
+        const r: Vec = [d[0] - k * n[0], d[1] - k * n[1], d[2] - k * n[2]];
+        if (r[2] >= -GRAZING_DROP) continue;
+        const t = (-WALL_DISTANCE - n[2]) / r[2];
+        const x = view.width / 2 + (n[0] + t * r[0]) * scale * unit;
+        const y = originY - (n[1] + t * r[1]) * scale * unit;
+        const side = (facetSize + t * BEAM_SPREAD) * scale * unit;
+        const stretch = Math.min(MAX_STRETCH, 1 / -r[2]);
+        const width = side * stretch;
+        const height = side;
+        const reach = Math.hypot(width, height);
+        if (x + reach < 0 || x - reach > view.width || y + reach < 0 || y - reach > view.height) continue;
+        const alpha = Math.min(1, (lamp.strength * lit * (0.75 + 0.25 * hash(key, 4.4)) * smooth(GRAZING_DROP, GRAZING_FADE, -r[2])) / Math.sqrt(stretch));
+        spots.push({ x, y, width, height, rotation: Math.atan2(-r[1], r[0]), alpha, lamp: index, row, column });
+      }
+    }
+  });
+  // The brightest if there are too many.
+  return spots.length > MAX_WALL_SPOTS ? spots.sort((a, b) => b.alpha - a.alpha).slice(0, MAX_WALL_SPOTS) : spots;
+};

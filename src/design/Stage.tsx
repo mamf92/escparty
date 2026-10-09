@@ -8,8 +8,14 @@ import {
   SPIN,
   ballCells,
   ballSpots,
+  backLampDirection,
   lampDirection,
+  wallLamps,
+  wallSpots,
+  type StageView,
+  type WallSpot,
 } from "./stageLights";
+import { type StageLighting, readStageLighting } from "./stageLighting";
 import { useDesignTheme } from "./useDesignTheme";
 
 /*
@@ -48,23 +54,30 @@ export const FPS = 30;
  * and a TV stick keeps its frame rate.
  */
 const MAX_SEQUIN_PIXELS = 900_000;
+/** The wall light map is this many times smaller than the sequin canvas: soft anyway, and cheap to upload. */
+const LIGHT_MAP_SHRINK = 4;
 
 const SEQUINS = `precision highp float;
 uniform float t; uniform vec2 m; uniform float s;
+// The back-lit wall (?lights=back|both): u_wall is 0 in front mode, which skips all of it.
+uniform sampler2D w; uniform float u_wall; uniform vec2 res;
 float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main(){
   vec2 p=gl_FragCoord.xy/s;
   float rowH=.74; float j0=floor(p.y/rowH);
-  float best=-1e9; vec2 bid=vec2(0.); vec2 bd=vec2(0.); float found=0.;
+  float best=-1e9; vec2 bid=vec2(0.); vec2 bd=vec2(0.); vec2 bc=vec2(0.); float found=0.;
   for(int dj=-1;dj<=2;dj++){
     float j=j0+float(dj); float off=mod(j,2.)*.5; float i0=floor(p.x-off);
     for(int di=-1;di<=1;di++){
       float i=i0+float(di);
       vec2 c=vec2(i+off+.5,j*rowH+.5); vec2 d=p-c;
-      if(length(d)<.64 && -j>best){best=-j; bid=vec2(i,j); bd=d; found=1.;}
+      if(length(d)<.64 && -j>best){best=-j; bid=vec2(i,j); bd=d; bc=c; found=1.;}
     }
   }
   vec3 col=vec3(.14,.0,.08);
+  // Light from the wall spots, sampled at the sequin's centre so each sequin is lit or not as a whole.
+  float lit=0.;
+  if(u_wall>.5) lit=smoothstep(.1,.6,texture2D(w,vec2(bc.x*s/res.x,1.-bc.y*s/res.y)).r);
   if(found>.5){
     float k=h(bid); float rr=length(bd);
     vec2 tilt=(vec2(h(bid+1.7),h(bid+5.3))-.5)*.8+.22*vec2(sin(t*.8+k*6.28),cos(t*.65+k*9.1));
@@ -76,16 +89,25 @@ void main(){
     vec3 R=reflect(vec3(0.,0.,-1.),N);
     vec3 env=mix(vec3(.25,.0,.14),vec3(1.,.7,.86),smoothstep(-.4,.6,R.y));
     col=base*(.14+.45*dif)+base*env*.3+vec3(1.,.9,.95)*sp*1.3;
+    if(lit>0.){
+      // Lit sequins brighten and glint, each on its own beat and its own tilt.
+      float k2=h(bid+3.1);
+      float tw=pow(.5+.5*sin(t*(1.6+2.4*k2)+k*40.),5.);
+      vec3 B=normalize(vec3(.35*sin(t*.5+k*6.28),.35*cos(t*.4+k2*6.28),1.));
+      float face=pow(max(dot(N,B),0.),24.);
+      col+=base*lit*1.5+vec3(1.,.92,.97)*lit*(.2*tw+1.3*face);
+    }
     col*=mix(.5,1.,smoothstep(.64,.5,rr));
     col*=mix(.6,1.,smoothstep(.04,.1,rr));
   }
   col=col/(1.+col*.4);
   // Dimmed to a backdrop; stage text keeps its outline over a bright sequin.
-  gl_FragColor=vec4(pow(col,vec3(.95))*.62,1.);
+  gl_FragColor=vec4(pow(col,vec3(.95))*(.62+.26*lit),1.);
 }`;
 
 type Sequins = {
-  draw: (time: number, lampX: number, lampY: number) => void;
+  /** `paintWall`, when given, paints the wall's light map (lit = white) and the shader lights the sequins by it. */
+  draw: (time: number, lampX: number, lampY: number, paintWall?: ((map: CanvasRenderingContext2D, scaleX: number, scaleY: number) => void) | null) => void;
   /** Hand the WebGL context back, so switching themes never piles them up. */
   release: () => void;
 };
@@ -122,11 +144,34 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
   gl.enableVertexAttribArray(a);
   gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
   const u = (name: string) => gl.getUniformLocation(program, name);
-  const [ut, um, us] = [u("t"), u("m"), u("s")];
+  const [ut, um, us, uw, uwall, ures] = [u("t"), u("m"), u("s"), u("w"), u("u_wall"), u("res")];
+  // The wall's light map: made and bound only when the page is back-lit.
+  let map: HTMLCanvasElement | null = null;
+  let texture: WebGLTexture | null = null;
+
+  const mapOf = (w: number, h: number) => {
+    if (!map) {
+      map = document.createElement("canvas");
+      texture = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    const mw = Math.max(1, Math.ceil(w / LIGHT_MAP_SHRINK));
+    const mh = Math.max(1, Math.ceil(h / LIGHT_MAP_SHRINK));
+    if (map.width !== mw || map.height !== mh) {
+      map.width = mw;
+      map.height = mh;
+    }
+    return map.getContext("2d");
+  };
 
   return {
     release: () => gl.getExtension("WEBGL_lose_context")?.loseContext(),
-    draw: (time, lampX, lampY) => {
+    draw: (time, lampX, lampY, paintWall) => {
       if (gl.isContextLost()) return;
       const area = canvas.clientWidth * canvas.clientHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5, area ? Math.sqrt(MAX_SEQUIN_PIXELS / area) : 1);
@@ -142,6 +187,22 @@ const sequinFloor = (canvas: HTMLCanvasElement): Sequins | null => {
       // The lamp, from -1..1 across the stage, in the shader's pixels (y up).
       gl.uniform2f(um, ((lampX + 1) / 2) * w, (1 - (lampY + 1) / 2) * h);
       gl.uniform1f(us, 13 * dpr);
+      const mapContext = paintWall ? mapOf(w, h) : null;
+      if (paintWall && map && texture && mapContext) {
+        mapContext.setTransform(1, 0, 0, 1, 0, 0);
+        mapContext.globalCompositeOperation = "source-over";
+        mapContext.fillStyle = "rgb(0, 0, 0)";
+        mapContext.fillRect(0, 0, map.width, map.height);
+        paintWall(mapContext, map.width / canvas.clientWidth, map.height / canvas.clientHeight);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, map);
+        gl.uniform1i(uw, 0);
+        gl.uniform2f(ures, w, h);
+        gl.uniform1f(uwall, 1);
+      } else {
+        gl.uniform1f(uwall, 0);
+      }
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
   };
@@ -183,8 +244,41 @@ export const paintBall = (
   ctx.restore();
 };
 
+/** Paint the wall spots into the light map: soft, additive, rotated squares. */
+const paintWallMap = (ctx: CanvasRenderingContext2D, spots: readonly WallSpot[], scaleX: number, scaleY: number) => {
+  ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+  ctx.globalCompositeOperation = "lighter";
+  for (const spot of spots) {
+    ctx.save();
+    ctx.translate(spot.x, spot.y);
+    ctx.rotate(spot.rotation);
+    // A soft edge: a faint larger square, a stronger one, and a bright core.
+    for (const [grow, strength] of [[1.5, 0.2], [1.15, 0.4], [0.8, 0.7]] as const) {
+      ctx.fillStyle = rgba([255, 255, 255], spot.alpha * strength);
+      ctx.fillRect((-spot.width * grow) / 2, (-spot.height * grow) / 2, spot.width * grow, spot.height * grow);
+    }
+    ctx.restore();
+  }
+};
+
+/** The stage's size and the ball on it, in the lights canvas's pixels. */
+const viewOf = (canvas: HTMLCanvasElement, ball: BallBox): StageView => ({
+  width: canvas.clientWidth,
+  height: canvas.clientHeight,
+  centreY: ball.hang + ball.size / 2,
+  radius: ball.size / 2,
+});
+
 /** Paint the ball and its spots on the lights canvas. */
-const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean, lampX: number, lampY: number, phase: number) => {
+const paintLights = (
+  canvas: HTMLCanvasElement,
+  ball: BallBox,
+  sparkle: boolean,
+  lampX: number,
+  lampY: number,
+  phase: number,
+  lighting: StageLighting = "front",
+) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   // Soft spots and a small ball: 1.5x is as sharp as they look.
@@ -200,7 +294,9 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
   ctx.clearRect(0, 0, width, height);
 
   const look = sparkle ? SPARKLE_BALL : CALM_BALL;
-  const lamp = lampDirection(lampX, lampY);
+  // Front (and both): the pointer lights the ball from the front. Back: only
+  // a lamp behind it does, so the ball's face is mostly in shade.
+  const lamp = lighting === "back" ? backLampDirection(lampX, lampY) : lampDirection(lampX, lampY);
   const { size, hang: top } = ball;
   const left = (width - size) / 2;
   const centreY = top + size / 2;
@@ -213,7 +309,7 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
   ctx.rect(0, 0, width, height);
   ctx.arc(width / 2, centreY, size / 2 + 1, 0, Math.PI * 2);
   ctx.clip("evenodd");
-  for (const spot of ballSpots(look, lamp, phase, { width, height, centreY, radius: size / 2 })) {
+  for (const spot of lighting === "back" ? [] : ballSpots(look, lamp, phase, { width, height, centreY, radius: size / 2 })) {
     ctx.save();
     ctx.translate(spot.x, spot.y);
     ctx.rotate(spot.rotation);
@@ -271,6 +367,9 @@ export const Stage = () => {
       root.insertBefore(sequinCanvas, lights);
     }
     let sequins = sequinCanvas ? sequinFloor(sequinCanvas) : null;
+    // Opt-in exploration (?lights=): where the sequins can't be drawn, it is front.
+    const chosen = sparkle ? readStageLighting() : "front";
+    const lighting = () => (sequins ? chosen : "front");
     // No sequins (no WebGL, or a shader the GPU can't run): the CSS stage
     // shows through, never an opaque, empty canvas.
     if (sequinCanvas && !sequins) sequinCanvas.style.display = "none";
@@ -287,8 +386,16 @@ export const Stage = () => {
     let drawn = 0;
 
     const draw = (now: number) => {
-      sequins?.draw(still ? 0 : now / 1000, lamp.x, lamp.y);
-      paintLights(lights, ball, sparkle, lamp.x, lamp.y, phase);
+      const mode = lighting();
+      sequins?.draw(
+        still ? 0 : now / 1000,
+        lamp.x,
+        lamp.y,
+        mode === "front"
+          ? null
+          : (map, scaleX, scaleY) => paintWallMap(map, wallSpots(wallLamps(mode, lamp.x, lamp.y), phase, viewOf(lights, ball)), scaleX, scaleY),
+      );
+      paintLights(lights, ball, sparkle, lamp.x, lamp.y, phase, mode);
     };
 
     const tick = (now: number) => {

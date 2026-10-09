@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { BALL_GRID, CALM_BALL, RESTING_LIGHT, SPARKLE_BALL, SPIN, ballCells, ballSpots, lampDirection } from "./stageLights";
+import {
+  BALL_GRID,
+  CALM_BALL,
+  MAX_WALL_SPOTS,
+  RESTING_LIGHT,
+  SPARKLE_BALL,
+  SPIN,
+  VIEWER_DISTANCE,
+  WALL_DISTANCE,
+  backLampDirection,
+  ballCells,
+  ballSpots,
+  lampDirection,
+  wallLamps,
+  wallSpots,
+} from "./stageLights";
 
 /** A phone-sized stage with a 96px ball hanging near the top. */
 const VIEW = { width: 390, height: 844, centreY: 104, radius: 48 };
@@ -139,5 +154,104 @@ describe("the disco ball", () => {
     const after = ballSpots(SPARKLE_BALL, lamp, turned, VIEW);
     expect(after.length).toBe(before.length);
     after.forEach((spot, i) => expect(spot.x).toBeCloseTo(before[i].x, 6));
+  });
+});
+
+describe("spots on the sequin wall", () => {
+  /** The mean sideways move of the same spots (same lamp, row and column) between two phases. */
+  const meanShift = (lamps: ReturnType<typeof wallLamps>, from: number, to: number, lamp?: number) => {
+    const before = wallSpots(lamps, from, VIEW).filter(spot => lamp === undefined || spot.lamp === lamp);
+    const after = new Map(wallSpots(lamps, to, VIEW).map(spot => [`${spot.lamp}:${spot.row}:${spot.column}`, spot]));
+    const moves = before.flatMap(spot => {
+      const next = after.get(`${spot.lamp}:${spot.row}:${spot.column}`);
+      return next ? [next.x - spot.x] : [];
+    });
+    expect(moves.length).toBeGreaterThan(4);
+    return moves.reduce((sum, move) => sum + move, 0) / moves.length;
+  };
+
+  it("has no wall lamps in front mode, so nothing changes there", () => {
+    expect(wallLamps("front", 0.3, -0.2)).toEqual([]);
+    expect(wallSpots([], 0.4, VIEW)).toEqual([]);
+  });
+
+  it("moves the back lamp with the pointer: on the right, behind-right, light travelling left and towards the viewer", () => {
+    const towards = backLampDirection(0.8, 0);
+    expect(towards[0]).toBeGreaterThan(0);
+    expect(towards[2]).toBeLessThan(0);
+    expect(Math.hypot(...towards)).toBeCloseTo(1);
+    const { direction } = wallLamps("back", 0.8, 0)[0];
+    expect(direction[0]).toBeLessThan(0);
+    expect(direction[2]).toBeGreaterThan(0);
+  });
+
+  it("uses at most two back lamps, and a third for the front lamp in both", () => {
+    expect(wallLamps("back", 0, 0)).toHaveLength(2);
+    expect(wallLamps("both", 0, 0)).toHaveLength(3);
+  });
+
+  it("moves every back lamp's spots left to right as the ball turns clockwise", () => {
+    const lamps = wallLamps("back", 0.2, -0.4);
+    expect(meanShift(lamps, 0.4, 0.4 + 0.05, 0)).toBeGreaterThan(0);
+    expect(meanShift(lamps, 0.4, 0.4 + 0.05, 1)).toBeGreaterThan(0);
+    // The ball's own phase grows with SPIN, so this is the way the show runs.
+    expect(SPIN).toBeGreaterThan(0);
+  });
+
+  it("throws a front lamp's outer ring onto the wall, left to right, never behind the ball's centre", () => {
+    const front = [wallLamps("both", 0, 0)[2]];
+    const glass = ballSpots(SPARKLE_BALL, lampDirection(0, 0), 0.4, VIEW);
+    expect(glass.length).toBeGreaterThan(0);
+    const spots = wallSpots(front, 0.4, VIEW);
+    expect(spots.length).toBeGreaterThan(0);
+    expect(meanShift(front, 0.4, 0.45)).toBeGreaterThan(0);
+    // A lamp dead in front: the centre facets reflect to the viewer, so nothing lands at the middle.
+    const dead = wallSpots([{ direction: [0, 0, -1], strength: 1 }], 0.4, VIEW);
+    expect(dead.length).toBeGreaterThan(0);
+    for (const spot of dead) expect(Math.hypot(spot.x - VIEW.width / 2, spot.y - (VIEW.height / 2 + (VIEW.centreY - VIEW.height / 2) * (VIEWER_DISTANCE / (VIEWER_DISTANCE + WALL_DISTANCE))))).toBeGreaterThan(30);
+  });
+
+  it("keeps its count bounded, its alphas in range and its spots on the stage", () => {
+    for (const mode of ["back", "both"] as const) {
+      for (const phase of [0, 1, 2.5, 5]) {
+        const spots = wallSpots(wallLamps(mode, -0.6, 0.5), phase, VIEW);
+        expect(spots.length).toBeGreaterThan(8);
+        expect(spots.length).toBeLessThanOrEqual(MAX_WALL_SPOTS);
+        for (const spot of spots) {
+          expect(spot.alpha).toBeGreaterThan(0);
+          expect(spot.alpha).toBeLessThanOrEqual(1);
+          const reach = Math.hypot(spot.width, spot.height);
+          expect(spot.x + reach).toBeGreaterThanOrEqual(0);
+          expect(spot.x - reach).toBeLessThanOrEqual(VIEW.width);
+          expect(spot.width).toBeGreaterThanOrEqual(spot.height - 1e-9);
+          expect(spot.width / spot.height).toBeLessThanOrEqual(2.5 + 1e-9);
+        }
+      }
+    }
+  });
+
+  it("fills the phone stage with the back lamps, not just a corner", () => {
+    const spots = wallSpots(wallLamps("back", 0, 0), 0.4, VIEW);
+    const cells = new Set(spots.map(spot => `${Math.floor((spot.x / VIEW.width) * 3)}:${Math.floor((spot.y / VIEW.height) * 4)}`));
+    expect(cells.size).toBeGreaterThanOrEqual(6);
+  });
+
+  it("fades the rays that graze the wall", () => {
+    const mean = (list: { alpha: number }[]) => list.reduce((sum, spot) => sum + spot.alpha, 0) / Math.max(1, list.length);
+    // Light from straight behind lands square on the wall; light skimming along y mostly grazes it.
+    const square = wallSpots([{ direction: [0, 0, 1], strength: 1 }], 0.4, VIEW);
+    const grazing = wallSpots([{ direction: [0, -1, 0.05], strength: 1 }], 0.4, VIEW);
+    expect(square.length).toBeGreaterThan(0);
+    expect(mean(grazing)).toBeLessThan(mean(square));
+    // Nothing is thrown by a facet the light does not reach.
+    expect(wallSpots([{ direction: [0, 0, -1], strength: 1 }], 0.4, VIEW).every(spot => spot.alpha < 0.5)).toBe(true);
+  });
+});
+
+describe("the front-lit glass spots", () => {
+  it("are unchanged by the wall maths", () => {
+    const a = ballSpots(SPARKLE_BALL, lamp, 0.4, VIEW);
+    wallSpots(wallLamps("both", 0.1, 0.1), 0.4, VIEW);
+    expect(ballSpots(SPARKLE_BALL, lamp, 0.4, VIEW)).toEqual(a);
   });
 });
