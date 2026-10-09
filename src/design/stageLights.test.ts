@@ -123,8 +123,9 @@ describe("the disco ball", () => {
     // The brightest glare comes from the facets facing the viewer most directly.
     const sorted = [...glare].sort((a, b) => a.directness - b.directness);
     expect(sorted.at(-1)!.alpha).toBeGreaterThan(sorted[0].alpha);
-    // Calm, still at its resting lamp, keeps its glare faint.
-    const calm = ballSpots(CALM_BALL, lamp, 0, VIEW);
+    // Calm, at its resting lamp, keeps its glare faint.
+    const calm = Array.from({ length: 48 }, (_, i) => ballSpots(CALM_BALL, lamp, (i * Math.PI) / 24, VIEW)).flat().filter(spot => spot.glare > 0);
+    expect(calm.length).toBeGreaterThan(0);
     for (const spot of calm) expect(spot.alpha).toBeLessThan(0.45);
     expect(CALM_BALL.glare).toBeLessThan(SPARKLE_BALL.glare);
   });

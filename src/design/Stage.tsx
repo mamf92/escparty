@@ -204,7 +204,8 @@ const paintSpot = (ctx: CanvasRenderingContext2D, spot: Spot) => {
  * in one colour clipped to its glass, as strong as the most direct glare
  * among `spots`, then those spots over the ball. The stage and the wait
  * (Loader.tsx) share it, so every disco ball catches the light the same way.
- * With `onlyGlare` the spots clear of the ball are left out (the wait has no stage).
+ * With `onlyGlare` only the spots over the ball are painted, clipped to it and
+ * faded by how far over it they are (the wait has no stage around its ball).
  */
 export const paintLitBall = (
   ctx: CanvasRenderingContext2D,
@@ -234,7 +235,17 @@ export const paintLitBall = (
     ctx.fillRect(left, top, size, size);
     ctx.restore();
   }
-  for (const spot of spots) if (!onlyGlare || spot.glare > 0) paintSpot(ctx, spot);
+  if (!onlyGlare) {
+    for (const spot of spots) paintSpot(ctx, spot);
+    return;
+  }
+  // Only the glare, kept on the ball's glass and fading in as it crosses the rim.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(left + size / 2, top + size / 2, size / 2, 0, Math.PI * 2);
+  ctx.clip();
+  for (const spot of spots) if (spot.glare > 0) paintSpot(ctx, { ...spot, alpha: spot.alpha * spot.glare });
+  ctx.restore();
 };
 
 /** Paint the ball and its spots on the lights canvas. */
