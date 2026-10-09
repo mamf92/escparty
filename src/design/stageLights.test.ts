@@ -112,7 +112,7 @@ describe("the disco ball", () => {
     }
   });
 
-  it("turns so its spots sweep the room left to right, slowly, in step with the ball", () => {
+  it("turns clockwise, so its spots sweep the room right to left, slowly, in step with the ball", () => {
     const step = SPIN * 0.1; // a tenth of a second of turning
     const before = ballSpots(SPARKLE_BALL, lamp, 1, VIEW);
     const after = new Map(ballSpots(SPARKLE_BALL, lamp, 1 + step, VIEW).map(spot => [`${spot.row}/${spot.column}`, spot]));
@@ -120,15 +120,15 @@ describe("the disco ball", () => {
       const next = after.get(`${spot.row}/${spot.column}`);
       return next ? [next.x - spot.x] : [];
     });
-    expect(SPIN).toBeLessThan(0);
+    expect(SPIN).toBeGreaterThan(0);
     expect(moves.length).toBeGreaterThan(10);
-    // Every spot that stays moves right, never more than the ball's own turn, magnified onto the wall.
+    // Every spot that stays moves left, never more than the ball's own turn, magnified onto the wall.
     for (const move of moves) {
-      expect(move).toBeGreaterThan(0);
-      expect(move).toBeLessThanOrEqual(VIEW.width * 0.62 * -step + 1e-6);
+      expect(move).toBeLessThan(0);
+      expect(-move).toBeLessThanOrEqual(VIEW.width * 0.62 * step + 1e-6);
     }
     const mean = moves.reduce((a, b) => a + b, 0) / moves.length;
-    expect(mean).toBeLessThan(VIEW.width * 0.05);
+    expect(-mean).toBeLessThan(VIEW.width * 0.05);
   });
 
   it("comes round to the same pattern after a full turn, instead of reshuffling", () => {

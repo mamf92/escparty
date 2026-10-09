@@ -63,10 +63,11 @@ export const BALL_GRID = 24;
 const AROUND = 24;
 const FACET = (Math.PI * 2) / AROUND;
 /**
- * How fast the ball turns, in radians a second. Negative, so its front
- * moves left to right and the spots sweep the room the same way.
+ * How fast the ball turns, in radians a second. Positive, so it turns
+ * clockwise seen from above: its front moves right to left and the spots
+ * sweep the room the same way.
  */
-export const SPIN = -0.12;
+export const SPIN = 0.12;
 /** Where the lamp sits when nothing points at the stage: up and to the left. */
 export const RESTING_LIGHT = { x: -0.45, y: -0.7 } as const;
 

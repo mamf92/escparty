@@ -78,7 +78,7 @@ land. Never set a text colour on a page.
 | --- | --- | --- |
 | Role | Default, accessible, the landing state | Opt-in party stage |
 | Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
-| Disco ball | Hangs still on every screen with no wire, in muted pinks; soft spots on the stage | White and light pink, turning slowly; brighter square spots in rows sweep the stage **left to right** with the ball |
+| Disco ball | Hangs still on every screen with no wire, in muted pinks; soft spots on the stage | White and light pink, turning slowly clockwise; brighter square spots in rows sweep the stage **right to left** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
 | Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wider glow for the sequins |
 | Materials, sizes, states, copy | Identical | Identical |
@@ -89,7 +89,8 @@ The stage is `<Stage />` (`src/design/Stage.tsx`), rendered once by
 canvas (the maths is in `src/design/stageLights.ts` and is unit tested),
 and in Sparkle the sequins on a WebGL canvas. Without canvas or WebGL it
 is the CSS gradient alone (`--esc-screen`). The ball turns at
-`SPIN` (negative, so its facets and spots travel left to right, slowly
+`SPIN` (positive, so it turns clockwise seen from above and its facets
+and spots travel right to left, slowly
 enough to read as reflections, not snow). Each lit facet throws one
 square spot (a foreshortened, slightly leaning quad with a soft edge) at
 its place in a magnified copy of the ball's facet grid, so the spots line
@@ -423,7 +424,7 @@ controls live in the host's own tab or pane, never mixed into a guest's.
 - `src/design/contrast.test.ts` — token contrast on every material, and
   that Sparkle changes only the stage.
 - `src/design/stageLights.test.ts` — the ball's facets and spots, and that
-  they sweep left to right, slowly.
+  they sweep right to left (the ball turns clockwise), slowly.
 - `src/test/designGuard.test.ts` — no colour literals outside
   `src/design/`.
 - `e2e/theme.spec.ts` — measures live screens: no frames, a card only
