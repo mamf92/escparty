@@ -16,7 +16,8 @@ afterEach(() => {
 const fakeCanvas = () => {
   const fillRect = vi.fn();
   const ctx = new Proxy({ fillRect } as Record<string, unknown>, {
-    get: (target, key: string) => (key in target ? target[key] : (target[key] = vi.fn())),
+    get: (target, key: string) =>
+      key in target ? target[key] : (target[key] = key === "createRadialGradient" ? () => ({ addColorStop: vi.fn() }) : vi.fn()),
     set: (target, key: string, value) => ((target[key] = value), true),
   });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx as unknown as CanvasRenderingContext2D);

@@ -166,9 +166,10 @@ export type Spot = {
    */
   directness: number;
   /**
-   * How strongly the spot shows again in front of the ball, as glare on its
-   * glass (0 when it is clear of the ball). It fades in as the spot's centre
-   * moves over the ball's disc, so a spot never jumps in front of it.
+   * How far the spot is over the ball's disc, 0 (clear of it) to 1 (well
+   * inside): there it is glare on the ball's glass, brightened by how
+   * directly it faces the viewer. It rises smoothly as the spot crosses the
+   * ball's edge, so nothing jumps.
    */
   glare: number;
 };
@@ -190,7 +191,7 @@ const DIRECT_FLOOR = 0.3;
 const DIRECT_FOCUS = 3;
 /** The most a front spot (glare on the ball) is brightened, at full glare. */
 const GLARE_BOOST = 0.9;
-/** Of the ball's radius, where a spot's glare starts to fade in (full) and where it is gone. */
+/** Of the ball's radius, where a spot's glare is full and where it has faded out. */
 const GLARE_FULL = 0.8;
 const GLARE_EDGE = 1;
 
@@ -208,9 +209,9 @@ const smooth = (edge0: number, edge1: number, x: number) => {
  * A spot is the facet's shape foreshortened by how far round it faces, so
  * it is squarish at the front and a slim strip at the edges. A spot is
  * brighter the more directly its reflected ray (r = 2(n.L)n - L, with the
- * viewer on +z) points at the screen. Spots may fall over the ball: those
- * show again in front of it (`glare`), as glare on its glass, fading in as
- * they cross its edge; behind it, every spot hangs as before.
+ * viewer on +z) points at the screen. The spots are light on the glass,
+ * between the viewer and the ball, so they always pass in front of it; over
+ * the ball they brighten into glare (`glare`), smoothly as they cross its edge.
  *
  * The lamp picks which facets are lit and nudges the whole pattern a
  * little (rows stay aligned).
@@ -247,9 +248,6 @@ export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageV
       const over = 1 - smooth(GLARE_FULL * view.radius, GLARE_EDGE * view.radius, fromCentre);
       const aimed = DIRECT_FLOOR + (1 - DIRECT_FLOOR) * Math.pow(directness, DIRECT_FOCUS);
       const strength = (look.spotStrength[0] + look.spotStrength[1] * Math.max(0, lit)) * smooth(0, 0.3, lit) * aimed * smooth(0.15, 0.5, n[2]);
-      const glare = over > 0 ? Math.min(1, strength * (1 + GLARE_BOOST * look.glare * directness)) * over : 0;
-      // A spot wholly hidden behind the ball, with no glare, adds nothing.
-      if (glare <= 0 && fromCentre + 0.65 * Math.hypot(width, height) < view.radius) continue;
       if (x + width < 0 || x - width > view.width || y + height < 0 || y - height > view.height) continue;
       spots.push({
         x,
@@ -258,11 +256,11 @@ export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageV
         height,
         rotation: 0.3 * Math.sin(latitude) * Math.sin(longitude),
         colour: look.spotColour ?? tintOf(look, key),
-        alpha: Math.min(1, strength),
+        alpha: Math.min(1, strength * (1 + GLARE_BOOST * look.glare * directness * over)),
         row,
         column: wrapped,
         directness,
-        glare,
+        glare: over,
       });
       if (spots.length >= look.maxSpots) return spots;
     }
