@@ -80,7 +80,7 @@ land. Never set a text colour on a page.
 | Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
 | Disco ball | Hangs still on every screen with no wire, in muted pinks; soft spots on the stage | White and light pink, turning slowly clockwise; brighter square spots in rows sweep the stage **right to left** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
-| Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wider glow for the sequins |
+| Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wide soft glow that dims the sequins right behind each line |
 | Materials, sizes, states, copy | Identical | Identical |
 | Motion | The press only | The ball turns and the sequins shimmer, **only** when the system allows motion; with reduced motion it is one still frame |
 
@@ -204,7 +204,9 @@ MobileFrame (or the big screen)    the stage, edge to edge
 - Surfaces need room for their shadows: keep at least `--esc-space-3`
   between them, and never clip them with `overflow: hidden` on a tight box.
 - One `<h1>` per screen, in the page header. Sections inside a page use
-  `<h2>` labels outside the pane, set as a note.
+  an `<h2>` outside the pane, set as a **section heading**
+  (`className="esc-section"`), never as a note: a heading that looks like
+  the hints around it can't tell the eye where a group starts.
 - Separate unrelated groups with space (another `Ground`), never a divider
   or a box.
 - **One next step per screen.** The control that moves the person on
@@ -278,8 +280,19 @@ thing for screen readers. Use `<Marker kind="correct" | "wrong" />` from
 `is-marked` (which keeps its label clear of the glyph); the right answer
 may stand proud (`is-high`, white) and a wrong pick sit sunk (`is-low`).
 
+**Section heading** (`<h2 className="esc-section">`, `<h3>` under a
+step's question). The level between the page title and the surfaces: DM
+Sans bold at the heading size (body size in `calm-compact`, scaled up on
+the big screen), full ink, left-aligned with the panes. It sits a small
+step above the group it heads and a full gap below the one before, so the
+eye groups it with what follows. A note that opens the section lines up
+under it, left-aligned. Name the group in a few words ("Pick a quiz",
+"The running order"); the instruction, if any, is the note under it, and
+doesn't repeat the heading.
+
 **Note** (`<CalmNote>`). Status, hints and errors around the surface, in
-`--esc-ink-muted` (pale pink on the stage, plum on a card). Errors are notes too: say what happened and what to do
+`--esc-ink-muted` (pale pink on the stage, plum on a card), medium weight
+so the strokes hold up over Sparkle's sequins. A note is never a heading. Errors are notes too: say what happened and what to do
 next, without red text.
 
 **Link** (`<CalmLink>`). The quiet underlined move for "back" and

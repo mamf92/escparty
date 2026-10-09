@@ -165,9 +165,10 @@
 /*
   Sparkle: the same cards, buttons and tiles. Only the stage changes: pink
   sequins (Stage.tsx draws them in WebGL; this gradient is what shows
-  without it) and a turning disco ball, so stage text keeps a shadow.
+  without it) and a turning disco ball, so stage text keeps a shadow, with
+  a wide soft glow that dims the bright sequins right behind each line.
 */
 :root[data-theme="sparkle"] {
   --esc-screen: radial-gradient(ellipse 160% 60% at 50% 0%, #8e0f5f 0%, #3b0628 72%);
-  --esc-stage-text-shadow: -1px -1px 0 var(--esc-halo), 1px -1px 0 var(--esc-halo), -1px 1px 0 var(--esc-halo), 1px 1px 0 var(--esc-halo), 0 0 4px var(--esc-halo), 0 1px 8px var(--esc-halo);
+  --esc-stage-text-shadow: -1px -1px 0 var(--esc-halo), 1px -1px 0 var(--esc-halo), -1px 1px 0 var(--esc-halo), 1px 1px 0 var(--esc-halo), 0 0 4px var(--esc-halo), 0 1px 8px var(--esc-halo), 0 0 14px var(--esc-halo);
 }

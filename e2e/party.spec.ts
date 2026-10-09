@@ -33,7 +33,7 @@ test("a host and two guests rate a semi and get their awards", async ({ browser 
     // The host ticks the first act through and opens the awards.
     await host.getByRole("tab", { name: "Host" }).click();
     await host.getByLabel("Who goes through").getByRole("button").first().click();
-    await expect(host.getByText(/tick who goes through \(1 of 10\)/)).toBeVisible();
+    await expect(host.getByText(/Tick who goes through \(1 of 10\)/)).toBeVisible();
     await host.getByRole("button", { name: "Open the awards for everyone" }).click();
     await expect(host.getByRole("button", { name: "Hide the awards again" })).toBeVisible();
 

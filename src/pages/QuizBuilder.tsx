@@ -518,6 +518,22 @@ const QuizBuilder = () => {
             title={quizId ? "Edit quiz" : "Build a quiz"}
             subtitle="Mix questions from the bank with your own, then save it to host or play."
             footer={<CalmLink onClick={() => navigate("/quizzes")}>Back to the quiz library</CalmLink>}
+            actions={
+                <>
+                    {/* What stops the save, beside the button that tried it. */}
+                    {quizWideProblems.length > 0 && <CalmNote role="alert">{quizWideProblems.join(" ")}</CalmNote>}
+                    {saveFailed && (
+                        <CalmNote role="alert">The quiz couldn't be saved. Check your connection and try again.</CalmNote>
+                    )}
+                    <Ground>
+                        <Pane>
+                            <Control elevation="high" disabled={saving || loadingFrom} onClick={saveQuiz}>
+                                {saving ? "Saving…" : "Save quiz"}
+                            </Control>
+                        </Pane>
+                    </Ground>
+                </>
+            }
         >
             {loadNotice && <CalmNote role="status">{loadNotice}</CalmNote>}
             <Ground>
@@ -555,6 +571,8 @@ const QuizBuilder = () => {
                     </Pane>
                 </Ground>
             ) : (
+                <>
+                <h2 className="esc-section">Questions</h2>
                 <Ground>
                     <Pane ref={listRef} role="radiogroup" aria-label="Questions in this quiz">
                         {questions.map((question, index) => (
@@ -577,13 +595,19 @@ const QuizBuilder = () => {
                         ))}
                     </Pane>
                 </Ground>
+                </>
             )}
 
             {picked && selected !== null && (
-                <Ground>
-                    <Pane role="group" aria-label={`Question ${selected + 1}`}>
+                <>
+                <h2 className="esc-section" id={fieldId("picked")}>Question {selected + 1}</h2>
+                <Ground role="group" aria-labelledby={fieldId("picked")}>
+                    {/* The two moves side by side, a thumb's reach apart. */}
+                    <Pane layout="split">
                         <Control ref={moveUpRef} disabled={selected === 0} onClick={() => move(selected, selected - 1)}>Move up</Control>
                         <Control ref={moveDownRef} disabled={selected === questions.length - 1} onClick={() => move(selected, selected + 1)}>Move down</Control>
+                    </Pane>
+                    <Pane>
                         <Control ref={editRef} onClick={() => openEditor(selected)}>Edit this question</Control>
                         {confirmingRemove ? (
                             <>
@@ -598,19 +622,14 @@ const QuizBuilder = () => {
                         )}
                     </Pane>
                 </Ground>
+                </>
             )}
 
-            {quizWideProblems.length > 0 && <CalmNote role="alert">{quizWideProblems.join(" ")}</CalmNote>}
-            {saveFailed && (
-                <CalmNote role="alert">The quiz couldn't be saved. Check your connection and try again.</CalmNote>
-            )}
+            <h2 className="esc-section">Add questions</h2>
             <Ground>
                 <Pane>
                     <Control id={fieldId("add-from-bank")} onClick={openBank}>Add from the bank</Control>
                     <Control id={fieldId("write")} disabled={full} onClick={() => openEditor(null)}>Write a question</Control>
-                    <Control elevation="high" disabled={saving || loadingFrom} onClick={saveQuiz}>
-                        {saving ? "Saving…" : "Save quiz"}
-                    </Control>
                 </Pane>
             </Ground>
         </CalmPage>

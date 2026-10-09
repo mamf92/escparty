@@ -42,18 +42,47 @@ body {
 .esc-subtitle {
   margin: var(--esc-space-2) 0 0;
   font-size: var(--esc-text-body);
+  font-weight: 500;
   line-height: 1.5;
   color: var(--esc-ink-muted);
 }
 
+/*
+  A hint, status or error between surfaces. Medium weight, so its strokes
+  are wider than a sequin and hold up over Sparkle's stage.
+*/
 .esc-note {
   margin: var(--esc-space-2) 0 0;
   font-size: var(--esc-text-sub);
-  /* A section heading set as a note reads as one, not as a bold h2. */
-  font-weight: inherit;
+  font-weight: 500;
   line-height: 1.5;
   text-align: center;
   color: var(--esc-ink-muted);
+}
+
+/*
+  A section heading: the level between the page title and the surfaces.
+  Bold, full ink and left-aligned with the panes, so it reads as the start
+  of a group and never as a note. It sits close to the content it heads
+  (the page's gap less a step) and a full gap further from the section
+  before, so the eye groups it with what follows.
+*/
+.esc-section {
+  margin: var(--esc-space-4) 0 calc(var(--esc-space-2) - var(--esc-space-4));
+  padding-inline: var(--esc-space-1);
+  font-family: var(--esc-font-body);
+  font-size: var(--esc-text-heading);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--esc-ink);
+}
+
+/* A note that opens a section lines up under its heading. */
+.esc-section + .esc-note {
+  margin-top: 0;
+  padding-inline: var(--esc-space-1);
+  text-align: left;
 }
 
 /*

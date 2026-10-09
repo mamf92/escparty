@@ -90,7 +90,7 @@ describe("Lobby", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Opening the waiting room");
     act(() => mocks.onRoom(room()));
     expect(players()).toEqual(["MartinHost", "Loreen (you)Getting ready", "LordiGetting ready"]);
-    expect(screen.getByText("Quiz: the host is picking")).toBeInTheDocument();
+    expect(screen.getByText("The host is picking…")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Start/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "I'm ready", pressed: false }));

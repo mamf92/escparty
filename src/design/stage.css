@@ -91,6 +91,11 @@
   font-size: var(--esc-text-heading);
 }
 
+/* A section heading stays under the one-line title. */
+.esc-app .calm-compact .esc-section {
+  font-size: var(--esc-text-body);
+}
+
 .esc-app .calm-compact .esc-subtitle {
   margin-top: var(--esc-space-1);
   font-size: var(--esc-text-sub);

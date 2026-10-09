@@ -201,7 +201,7 @@ const PartySetup = () => {
 
             {templateId === CUSTOM && (
                 <>
-                    <h3 className="esc-note">Your categories</h3>
+                    <h3 className="esc-section">Your categories</h3>
                     <Ground>
                         <Pane>
                             {custom.map((category, index) => (

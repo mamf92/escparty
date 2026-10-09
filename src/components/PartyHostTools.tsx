@@ -53,7 +53,7 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
 
     return (
         <>
-            <h2 className="esc-note">Guests</h2>
+            <h2 className="esc-section">Guests</h2>
             <CalmNote className="esc-selectable" aria-live="polite">
                 Guests join with the code {party.code}. {ballots.length === 1 ? "1 guest" : `${ballots.length} guests`} so far.
             </CalmNote>
@@ -63,7 +63,7 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
                 </Pane>
             </Ground>
 
-            <h2 className="esc-note">The real result</h2>
+            <h2 className="esc-section">The real result</h2>
             {party.kind === "final"
                 ? <FinalResults party={party} busy={busy} onSave={saveResults} />
                 : <SemiResults party={party} busy={busy} onSave={saveResults} />}
@@ -79,7 +79,7 @@ const PartyHostTools = ({ party, ballots }: { party: Party; ballots: Ballot[] })
                 }, "Loaded the latest lineup.")}
             />
 
-            <h2 className="esc-note">The awards</h2>
+            <h2 className="esc-section">The awards</h2>
             <Ground>
                 <Pane>
                     <Control
@@ -191,7 +191,7 @@ const FinalResults = ({ party, busy, onSave }: { party: Party; busy: boolean; on
             <CalmNote aria-live="polite">
                 {unplaced.length === 0
                     ? "The real result is in."
-                    : `The real result: tap who came ${ordinal(next)}.`}
+                    : `Tap who came ${ordinal(next)}.`}
             </CalmNote>
             {unplaced.length > 0 && (
                 <Ground>
@@ -254,7 +254,7 @@ const SemiResults = ({ party, busy, onSave }: { party: Party; busy: boolean; onS
         onSave({ qualifiers: qualifiers.includes(actId) ? qualifiers.filter(id => id !== actId) : [...qualifiers, actId] });
     return (
         <>
-            <CalmNote aria-live="polite">The real result: tick who goes through ({qualifiers.length} of {party.qualifiers}).</CalmNote>
+            <CalmNote aria-live="polite">Tick who goes through ({qualifiers.length} of {party.qualifiers}).</CalmNote>
             <Ground>
                 <Pane role="group" aria-label="Who goes through">
                     {party.acts.map(act => {
@@ -304,7 +304,7 @@ const RunningOrder = ({ party, busy, onSave, onLoadLatest }: {
 
     return (
         <>
-            <h2 className="esc-note">The running order</h2>
+            <h2 className="esc-section">The running order</h2>
             <Ground>
                 <Pane>
                     <div>

@@ -47,7 +47,7 @@ const PartyHome = () => {
                         </Pane>
                     </Ground>
 
-                    <h2 className="esc-note">Got a code from the host?</h2>
+                    <h2 className="esc-section">Got a code from the host?</h2>
                     <form onSubmit={join} noValidate>
                         <Ground>
                             <Pane>

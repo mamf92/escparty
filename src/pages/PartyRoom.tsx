@@ -226,7 +226,7 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
 
             {bonuses.length > 0 && (
                 <>
-                    <h2 className="esc-note">Party bonuses</h2>
+                    <h2 className="esc-section">Party bonuses</h2>
                     <Ground>
                         <Pane>
                             {bonuses.map(bonus => (
@@ -353,7 +353,7 @@ const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: 
             {leaderboard.length > 0 && (
                 party.showNames ? (
                     <>
-                        <h2 className="esc-note">Closest to the real result</h2>
+                        <h2 className="esc-section">Closest to the real result</h2>
                         <Ground>
                             <Pane as="ol" aria-label="Closest to the real result">
                                 {leaderboard.map((row, index) => (
