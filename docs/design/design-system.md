@@ -83,7 +83,7 @@ land. Never set a text colour on a page.
 | | Calm | Sparkle |
 | --- | --- | --- |
 | Role | Default, accessible, the landing state | Opt-in party stage |
-| Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content, and faded to half strength down the content column (full at the edges) so text sits on a calmer floor |
+| Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
 | Disco ball | Hangs still on every screen with no wire, in muted pinks; soft spots on the stage | White and light pink, turning slowly clockwise; brighter square spots in rows sweep the stage **right to left** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
 | Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wide soft glow that dims the sequins right behind each line |
