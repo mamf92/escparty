@@ -26,6 +26,12 @@ export type BallLook = {
   /** One colour for every spot, or each spot in its facet's tint. */
   spotColour?: Rgb;
   maxSpots: number;
+  /**
+   * How strongly light shows in front of the ball, as glare on its glass:
+   * 0 none, 1 full. Spots whose centre falls over the ball's disc are
+   * brightened by it, and Stage.tsx lays a soft glow over the ball.
+   */
+  glare: number;
 };
 
 /** Calm: a still ball in muted, dusty pinks, throwing a few faint spots. */
@@ -39,6 +45,7 @@ export const CALM_BALL: BallLook = {
   spotStrength: [0.18, 0.2],
   spotColour: [230, 170, 200],
   maxSpots: 24,
+  glare: 0.25,
 };
 
 /** Sparkle: white and light pink mirrors, a few hot pink, throwing bright spots. */
@@ -51,6 +58,7 @@ export const SPARKLE_BALL: BallLook = {
   spotShare: 0.6,
   spotStrength: [0.5, 0.5],
   maxSpots: 60,
+  glare: 1,
 };
 
 /** The facets per row and column the ball is painted at. */
@@ -152,6 +160,13 @@ export type Spot = {
   /** The facet that throws it: its latitude row and longitude column on the ball. */
   row: number;
   column: number;
+  /**
+   * How directly the facet's mirror image points at the viewer, 0..1: the
+   * spot gets brighter the nearer it is to 1.
+   */
+  directness: number;
+  /** The spot's centre is over the ball's disc: Stage.tsx paints it after the ball, as glare. */
+  front: boolean;
 };
 
 /** The stage and the ball on it, in pixels. */
@@ -163,8 +178,14 @@ export type StageView = {
   radius: number;
 };
 
-/** Of the ball's radius, how far a spot fades out before it would reach the ball. */
-const FADE_BAND = 0.9;
+/**
+ * How sharply a spot's brightness follows how directly it faces the viewer:
+ * the share of its strength is FLOOR + (1 - FLOOR) * directness ** FOCUS.
+ */
+const DIRECT_FLOOR = 0.3;
+const DIRECT_FOCUS = 3;
+/** The most a front spot (glare on the ball) is brightened, at full glare. */
+const GLARE_BOOST = 0.9;
 
 const smooth = (edge0: number, edge1: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
@@ -178,9 +199,11 @@ const smooth = (edge0: number, edge1: number, x: number) => {
  * latitude row of facets (a row's spots share one y, whatever the lamp),
  * and slide across the stage as the ball turns, in step with its rotation.
  * A spot is the facet's shape foreshortened by how far round it faces, so
- * it is squarish at the front and a slim strip at the edges. Spots never
- * reach the ball: one that would fades out and goes, and Stage.tsx clips
- * the ball's disc as well.
+ * it is squarish at the front and a slim strip at the edges. A spot is
+ * brighter the more directly its reflected ray (r = 2(n.L)n - L, with the
+ * viewer on +z) points at the screen. Spots may fall over the ball: those
+ * are marked `front` and Stage.tsx paints them after the ball, as glare on
+ * its glass; the rest hang behind it.
  *
  * The lamp picks which facets are lit and nudges the whole pattern a
  * little (rows stay aligned).
@@ -210,10 +233,12 @@ export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageV
       const height = side * Math.max(Math.cos(latitude), 0.35);
       const x = centreX + nudgeX + reach * Math.cos(latitude) * Math.sin(longitude);
       const y = view.centreY + nudgeY - (latitude > 0 ? up : down) * Math.sin(latitude);
-      // Keep clear of the ball, fading out on the way (a spot's soft edge reaches 0.65 of its size).
-      const clear = Math.hypot(x - centreX, y - view.centreY) - view.radius - 0.65 * Math.hypot(width, height);
-      const room = smooth(0, FADE_BAND * view.radius, clear);
-      if (room <= 0) continue;
+      // The facet's mirror image of the lamp: how directly it points at the viewer (+z).
+      const reflected = 2 * lit * n[2] - lamp[2];
+      const directness = Math.min(1, Math.max(0, reflected));
+      const front = Math.hypot(x - centreX, y - view.centreY) < view.radius;
+      const aimed = DIRECT_FLOOR + (1 - DIRECT_FLOOR) * Math.pow(directness, DIRECT_FOCUS);
+      const boost = front ? 1 + GLARE_BOOST * look.glare * directness : 1;
       if (x + width < 0 || x - width > view.width || y + height < 0 || y - height > view.height) continue;
       spots.push({
         x,
@@ -222,9 +247,11 @@ export const ballSpots = (look: BallLook, lamp: Vec, phase: number, view: StageV
         height,
         rotation: 0.3 * Math.sin(latitude) * Math.sin(longitude),
         colour: look.spotColour ?? tintOf(look, key),
-        alpha: Math.min(1, (look.spotStrength[0] + look.spotStrength[1] * Math.max(0, lit)) * smooth(0, 0.3, lit)) * room * smooth(0.15, 0.5, n[2]),
+        alpha: Math.min(1, (look.spotStrength[0] + look.spotStrength[1] * Math.max(0, lit)) * smooth(0, 0.3, lit) * aimed * boost * smooth(0.15, 0.5, n[2])),
         row,
         column: wrapped,
+        directness,
+        front,
       });
       if (spots.length >= look.maxSpots) return spots;
     }

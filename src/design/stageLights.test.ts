@@ -99,17 +99,44 @@ describe("the disco ball", () => {
     shifts.forEach(shift => expect(shift).toBeCloseTo(shifts[0], 6));
   });
 
-  it("never throws a spot over the ball", () => {
-    for (const phase of [0, 0.4, 1.3, 2.9, 5.5]) {
-      for (const aim of [lamp, lampDirection(0, 0), lampDirection(0.8, 0.5)]) {
-        for (const look of [CALM_BALL, SPARKLE_BALL]) {
-          for (const spot of ballSpots(look, aim, phase, VIEW)) {
-            const gap = Math.hypot(spot.x - VIEW.width / 2, spot.y - VIEW.centreY) - 0.65 * Math.hypot(spot.width, spot.height);
-            expect(gap).toBeGreaterThan(VIEW.radius);
-          }
-        }
-      }
+  it("makes spots aimed more directly at the viewer brighter, for the same facet look", () => {
+    const spots = ballSpots(SPARKLE_BALL, lampDirection(0, 0), 0.4, VIEW).filter(spot => !spot.front);
+    expect(spots.length).toBeGreaterThan(8);
+    const sorted = [...spots].sort((a, b) => a.directness - b.directness);
+    const low = sorted.slice(0, 4);
+    const high = sorted.slice(-4);
+    const mean = (list: typeof spots) => list.reduce((sum, spot) => sum + spot.alpha, 0) / list.length;
+    expect(high[0].directness).toBeGreaterThan(low[3].directness);
+    expect(mean(high)).toBeGreaterThan(mean(low));
+    // Calm keeps its single spot colour and strength, so only the aim differs there too.
+    const calm = ballSpots(CALM_BALL, lampDirection(0, 0), 0.4, VIEW).filter(spot => !spot.front);
+    const best = calm.reduce((a, b) => (b.directness > a.directness ? b : a));
+    const worst = calm.reduce((a, b) => (b.directness < a.directness ? b : a));
+    expect(best.alpha).toBeGreaterThan(worst.alpha);
+  });
+
+  it("lets light fall over the ball when the lamp is straight in front, marking those spots front", () => {
+    const front = [0, 0.4, 1.3, 2.9].flatMap(phase => ballSpots(SPARKLE_BALL, lampDirection(0, 0), phase, VIEW).filter(spot => spot.front));
+    expect(front.length).toBeGreaterThan(0);
+    for (const spot of front) {
+      expect(Math.hypot(spot.x - VIEW.width / 2, spot.y - VIEW.centreY)).toBeLessThan(VIEW.radius);
     }
+    for (const spot of ballSpots(SPARKLE_BALL, lampDirection(0, 0), 0.4, VIEW)) {
+      const over = Math.hypot(spot.x - VIEW.width / 2, spot.y - VIEW.centreY) < VIEW.radius;
+      expect(spot.front).toBe(over);
+    }
+  });
+
+  it("makes the spots in front of the ball the brightest, and Calm's glare stays faint", () => {
+    const all = [0, 0.4, 1.3, 2.9].flatMap(phase => ballSpots(SPARKLE_BALL, lampDirection(0, 0), phase, VIEW));
+    const front = all.filter(spot => spot.front);
+    const behind = all.filter(spot => !spot.front);
+    const mean = (list: typeof all) => list.reduce((sum, spot) => sum + spot.alpha, 0) / list.length;
+    expect(mean(front)).toBeGreaterThan(mean(behind));
+    expect(Math.max(...front.map(spot => spot.alpha))).toBeGreaterThanOrEqual(Math.max(...behind.map(spot => spot.alpha)));
+    const calm = [0, 0.4, 1.3, 2.9].flatMap(phase => ballSpots(CALM_BALL, lampDirection(0, 0), phase, VIEW));
+    expect(Math.max(...calm.map(spot => spot.alpha))).toBeLessThan(0.45);
+    expect(CALM_BALL.glare).toBeLessThan(SPARKLE_BALL.glare);
   });
 
   it("turns clockwise, so its spots sweep the room right to left, slowly, in step with the ball", () => {
