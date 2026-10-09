@@ -39,7 +39,7 @@ describe("PartyHostTools", () => {
         const user = userEvent.setup();
         const { rerender } = renderTools(makeParty());
         expect(screen.getByText(/1 guest so far/)).toBeInTheDocument();
-        expect(screen.getByText("The real result: tap who came 1st.")).toBeInTheDocument();
+        expect(screen.getByText("Tap who came 1st.")).toBeInTheDocument();
         await user.click(within(screen.getByLabelText("Who came 1st")).getByRole("button", { name: /Finland/ }));
         expect(mocks.setPartyResults).toHaveBeenLastCalledWith("ABBA", { places: { fi: 1 } });
 
@@ -144,7 +144,7 @@ describe("PartyHostTools", () => {
     it("ignores places and qualifiers of acts that left the lineup", () => {
         const { unmount } = renderTools(makeParty({ acts: fixtureActs.slice(0, 3), results: { places: { ie: 1, fi: 2 } } }));
         expect(screen.getByText("So far: 1st Finland.")).toBeInTheDocument();
-        expect(screen.getByText("The real result: tap who came 2nd.")).toBeInTheDocument();
+        expect(screen.getByText("Tap who came 2nd.")).toBeInTheDocument();
         unmount();
         renderTools(makeParty({ kind: "semi", qualifiers: 1, acts: fixtureActs.slice(0, 3), results: { qualifiers: ["ie"] } }));
         expect(screen.getByText(/\(0 of 1\)/)).toBeInTheDocument();

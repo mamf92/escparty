@@ -184,7 +184,7 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
 
     await host.getByRole("tab", { name: "Host" }).click();
     await host.getByLabel("Who goes through").getByRole("button").first().click();
-    await expect(host.getByText(/tick who goes through \(1 of 10\)/)).toBeVisible();
+    await expect(host.getByText(/Tick who goes through \(1 of 10\)/)).toBeVisible();
     await judge(host, "party-host-tools");
     await host.getByRole("button", { name: "Open the awards for everyone" }).click();
 

@@ -95,7 +95,7 @@ const PartyAwards = () => {
 
                 {!award && leaderboard.length > 0 && (
                     <>
-                        <h2 className="esc-note">Closest to the real result</h2>
+                        <h2 className="esc-section">Closest to the real result</h2>
                         <Ground>
                             <Pane as="ol" aria-label="Closest to the real result">
                                 {leaderboard.map((row, place) => {

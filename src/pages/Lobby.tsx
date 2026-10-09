@@ -208,80 +208,9 @@ const Lobby = () => {
         return ready.includes(id) ? "Ready" : "Getting ready";
     };
 
-    return (
-        <CalmPage
-            title="The green room"
-            subtitle={<>Game code <strong className="esc-selectable">{gameCode}</strong> · you are {me.name}</>}
-            footer={leave}
-        >
-            <CalmNote>Quiz: {room.difficulty ? roomQuizTitle : isHost ? "pick one below" : "the host is picking"}</CalmNote>
-
-            {isHost && !room.difficulty && (
-                <>
-                    <h2 className="esc-note" id="lobby-pick-quiz">Pick a quiz</h2>
-                    <Ground>
-                        <Pane role="group" aria-labelledby="lobby-pick-quiz">
-                            {myQuizzes.map(quiz => (
-                                <Control key={quiz.id} disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
-                                    {quiz.title}
-                                </Control>
-                            ))}
-                            {QUIZ_CHOICES.map(choice => (
-                                <Control key={choice.key} disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
-                                    {choice.title}
-                                </Control>
-                            ))}
-                        </Pane>
-                    </Ground>
-                </>
-            )}
-
-            {/* Polite: someone joining or leaving is news to whoever waits. */}
-            <h2 className="esc-note" aria-live="polite">{players.length === 1 ? "1 player" : `${players.length} players`}</h2>
-            <Ground>
-                <Pane as="ol" aria-label="Players">
-                    {players.map(player => (
-                        <Row key={player.id} as="li" elevation={player.id === playerId ? "high" : "rest"}>
-                            <span className="calm-row">
-                                <span>{player.name}{player.id === playerId ? " (you)" : ""}</span>
-                                <span>{status(player.id)}</span>
-                            </span>
-                        </Row>
-                    ))}
-                </Pane>
-            </Ground>
-
-            {isHost && guests.length > 0 && (
-                <>
-                    <h2 className="esc-note" id="lobby-take-out">Joined by mistake? Pick who to take out</h2>
-                    <Ground>
-                        <Pane role="group" aria-labelledby="lobby-take-out">
-                            {guests.map(guest => (
-                                <Control
-                                    key={guest.id}
-                                    chosen={selected === guest.id}
-                                    disabled={busy}
-                                    onClick={() => setSelected(selected === guest.id ? null : guest.id)}
-                                >
-                                    {guest.name}
-                                </Control>
-                            ))}
-                            {chosen && (
-                                <Control
-                                    disabled={busy}
-                                    onClick={() => run(`remove ${chosen.name}`, async () => {
-                                        await removePlayerFromRoom(gameCode, chosen);
-                                        setSelected(current => current === chosen.id ? null : current);
-                                    })}
-                                >
-                                    Take {chosen.name} out of the game
-                                </Control>
-                            )}
-                        </Pane>
-                    </Ground>
-                </>
-            )}
-
+    // The guest's "I'm ready" and the host's start sit at the thumb (design-system.md, "Page anatomy").
+    const actions = (
+        <>
             {!isHost && (
                 <>
                     <Ground>
@@ -320,6 +249,91 @@ const Lobby = () => {
                     )}
                 </>
             )}
+        </>
+    );
+
+    return (
+        <CalmPage
+            title="The green room"
+            subtitle={<>Game code <strong className="esc-selectable">{gameCode}</strong> · you are {me.name}</>}
+            footer={leave}
+            actions={actions}
+        >
+            {isHost && !room.difficulty ? (
+                <>
+                    <h2 className="esc-section" id="lobby-pick-quiz">Pick a quiz</h2>
+                    <Ground>
+                        <Pane role="group" aria-labelledby="lobby-pick-quiz">
+                            {myQuizzes.map(quiz => (
+                                <Control key={quiz.id} disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
+                                    {quiz.title}
+                                </Control>
+                            ))}
+                            {QUIZ_CHOICES.map(choice => (
+                                <Control key={choice.key} disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
+                                    {choice.title}
+                                </Control>
+                            ))}
+                        </Pane>
+                    </Ground>
+                </>
+            ) : (
+                <>
+                    <h2 className="esc-section">The quiz</h2>
+                    <Ground>
+                        <Pane>
+                            <Row>{room.difficulty ? roomQuizTitle : "The host is picking…"}</Row>
+                        </Pane>
+                    </Ground>
+                </>
+            )}
+
+            {/* Polite: someone joining or leaving is news to whoever waits. */}
+            <h2 className="esc-section" aria-live="polite">{players.length === 1 ? "1 player" : `${players.length} players`}</h2>
+            <Ground>
+                <Pane as="ol" aria-label="Players">
+                    {players.map(player => (
+                        <Row key={player.id} as="li" elevation={player.id === playerId ? "high" : "rest"}>
+                            <span className="calm-row">
+                                <span>{player.name}{player.id === playerId ? " (you)" : ""}</span>
+                                <span>{status(player.id)}</span>
+                            </span>
+                        </Row>
+                    ))}
+                </Pane>
+            </Ground>
+
+            {isHost && guests.length > 0 && (
+                <>
+                    <h2 className="esc-section" id="lobby-take-out">Joined by mistake? Pick who to take out</h2>
+                    <Ground>
+                        <Pane role="group" aria-labelledby="lobby-take-out">
+                            {guests.map(guest => (
+                                <Control
+                                    key={guest.id}
+                                    chosen={selected === guest.id}
+                                    disabled={busy}
+                                    onClick={() => setSelected(selected === guest.id ? null : guest.id)}
+                                >
+                                    {guest.name}
+                                </Control>
+                            ))}
+                            {chosen && (
+                                <Control
+                                    disabled={busy}
+                                    onClick={() => run(`remove ${chosen.name}`, async () => {
+                                        await removePlayerFromRoom(gameCode, chosen);
+                                        setSelected(current => current === chosen.id ? null : current);
+                                    })}
+                                >
+                                    Take {chosen.name} out of the game
+                                </Control>
+                            )}
+                        </Pane>
+                    </Ground>
+                </>
+            )}
+
             {pickRefused && !room.difficulty && <CalmNote role="alert">This room won't take that quiz. Pick another one.</CalmNote>}
             {pickError && <CalmNote role="alert">{pickError}</CalmNote>}
         </CalmPage>

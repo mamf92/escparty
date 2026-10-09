@@ -34,7 +34,7 @@ test("build a quiz, save it, host it and play it through", async ({ page }) => {
     await page.getByRole("button", { name: /^Host and play/ }).click();
     await expect(page.getByRole("heading", { name: "The green room" })).toBeVisible();
     await page.getByRole("button", { name: "Jedward's Revenge" }).click();
-    await expect(page.getByText("Quiz: Jedward's Revenge")).toBeVisible();
+    await expect(page.getByText("Jedward's Revenge", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Start anyway" }).click();
 
     const answer = async (pick?: string) => {

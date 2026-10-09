@@ -42,6 +42,11 @@
   margin-top: var(--esc-space-4);
 }
 
+/* Two panes in one section (a split row over a stack) keep a pane's gap. */
+.esc-app .calm-ground > .lycra-pane + .lycra-pane {
+  margin-top: var(--esc-space-3);
+}
+
 /* A pane is a stack on the stage, unless it is a card (below). */
 .esc-app .lycra-pane {
   position: relative;
@@ -555,6 +560,10 @@
 
 .esc-app .calm-screen .calm-sub {
   font-size: 1rem;
+}
+
+.esc-app .calm-screen .esc-section {
+  font-size: 1.75rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

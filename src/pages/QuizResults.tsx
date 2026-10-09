@@ -167,7 +167,7 @@ const QuizResults = () => {
         </Ground>
         {scoreHistory.length > 0 && (
           <>
-            <h2 className="esc-note" id="results-past-scores">Your past scores</h2>
+            <h2 className="esc-section" id="results-past-scores">Your past scores</h2>
             <Ground>
               <Pane as="ol" aria-labelledby="results-past-scores">
                 {scoreHistory.map((entry, index) => (

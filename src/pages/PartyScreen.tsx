@@ -82,7 +82,7 @@ const PartyScreen = () => {
                 <>
                     <CalmNote aria-live="polite">{all.length === 1 ? "1 guest is rating." : `${all.length} guests are rating.`}</CalmNote>
 
-                    <h2 className="esc-note">The room's standings</h2>
+                    <h2 className="esc-section">The room's standings</h2>
                     <Ground>
                         {standings.length === 0 ? (
                             <Pane>
@@ -112,7 +112,7 @@ const PartyScreen = () => {
 
             {leaderboard.length > 0 && (
                 <>
-                    <h2 className="esc-note">Closest to the real result</h2>
+                    <h2 className="esc-section">Closest to the real result</h2>
                     <Ground>
                         <Pane as="ol" aria-label="Closest to the real result">
                             {leaderboard.map((row, index) => (
