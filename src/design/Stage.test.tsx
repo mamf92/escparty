@@ -1,7 +1,8 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
-import { Stage } from "./Stage";
+import { Stage, paintLitBall } from "./Stage";
+import { RESTING_LIGHT, SPARKLE_BALL, ballSpots, lampDirection } from "./stageLights";
 import { ThemeSwitch } from "./ThemeSwitch";
 
 afterEach(() => {
@@ -107,5 +108,22 @@ describe("Stage", () => {
     expect(fillRect).toHaveBeenCalled();
     expect(wires()).toHaveLength(0);
     vi.restoreAllMocks();
+  });
+
+  it("paints every spot after the ball, so the light never slips behind it", () => {
+    const styles: string[] = [];
+    const ctx = new Proxy({} as Record<string, unknown>, {
+      get: (target, key: string) =>
+        key === "fillRect" ? () => styles.push(String(target.fillStyle)) : key === "createRadialGradient" ? () => ({ addColorStop: vi.fn() }) : (target[key] ?? vi.fn()),
+      set: (target, key: string, value) => ((target[key] = value), true),
+    }) as unknown as CanvasRenderingContext2D;
+    const lamp = lampDirection(RESTING_LIGHT.x, RESTING_LIGHT.y);
+    const view = { width: 390, height: 844, centreY: 104, radius: 48 };
+    const spots = ballSpots(SPARKLE_BALL, lamp, 0.4, view);
+    expect(spots.length).toBeGreaterThan(4);
+    paintLitBall(ctx, 147, 56, 96, SPARKLE_BALL, lamp, 0.4, spots);
+    // Each spot is two fills (its soft edge, then itself), and they come last.
+    const last = styles.slice(-2 * spots.length);
+    spots.forEach((spot, i) => expect(last[2 * i + 1]).toBe(`rgba(${spot.colour.join(", ")}, ${spot.alpha})`));
   });
 });

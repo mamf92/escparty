@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FPS, MAX_STEP, paintBall, usePrefersStill } from "./Stage";
-import { CALM_BALL, RESTING_LIGHT, SPARKLE_BALL, SPIN, lampDirection } from "./stageLights";
+import { FPS, MAX_STEP, paintLitBall, usePrefersStill } from "./Stage";
+import { CALM_BALL, RESTING_LIGHT, SPARKLE_BALL, SPIN, ballSpots, lampDirection } from "./stageLights";
 import { useDesignTheme } from "./useDesignTheme";
 
 /*
@@ -17,6 +17,10 @@ import { useDesignTheme } from "./useDesignTheme";
  * wait that must leave the page's own exits usable (a guest waiting on the
  * host can still go back): no portal, no scrim, nothing inert.
  *
+ * The ball catches the light like the stage's: the spots its facets throw
+ * that land over it show as glare on its glass (only those, as the wait
+ * has no stage of its own around it).
+ *
  * - Calm, reduced motion and forced colours: the ball hangs still.
  * - Sparkle: the ball turns, a few times faster than the stage's.
  */
@@ -27,6 +31,11 @@ const SIZE = 88;
 const SPEED = 6;
 /** The lamp never moves here, so its direction is worked out once. */
 const LAMP = lampDirection(RESTING_LIGHT.x, RESTING_LIGHT.y);
+/**
+ * The phone-sized stage the ball's spots are worked out on, with the ball
+ * where the stage hangs its own, so its glare matches the stage's.
+ */
+const VIEW = { width: 390, height: 844, centreY: 56 + SIZE / 2, radius: SIZE / 2 };
 /** The page content the app frame makes inert while we wait (MobileFrame.tsx). */
 const CONTENT = ".esc-content";
 /** How long the status region sits empty before it is filled, so it is announced. */
@@ -44,7 +53,10 @@ const paintLoader = (canvas: HTMLCanvasElement, sparkle: boolean, phase: number)
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, SIZE, SIZE);
-  paintBall(ctx, 0, 0, SIZE, sparkle ? SPARKLE_BALL : CALM_BALL, LAMP, phase);
+  const look = sparkle ? SPARKLE_BALL : CALM_BALL;
+  // Work on the stage-sized view, shifted so the ball lands on this canvas.
+  ctx.translate(SIZE / 2 - VIEW.width / 2, SIZE / 2 - VIEW.centreY);
+  paintLitBall(ctx, VIEW.width / 2 - SIZE / 2, VIEW.centreY - SIZE / 2, SIZE, look, LAMP, phase, ballSpots(look, LAMP, phase, VIEW), true);
 };
 
 export type LoaderProps = {
