@@ -2,6 +2,7 @@
 
 ## [0.1.0] - 2025-05-13
 ### Added
+- Opt-in lighting exploration for the Sparkle stage: `?lights=back` puts a lamp behind the disco ball whose spots light up the sequins on the wall behind it (moving left to right), `?lights=both` adds it to today's glass spots, and `?lights=front` (the default, unchanged) is how it looks now. Remembered per browser, no visible control (2026-10-09)
 - Added multiplayer quiz mode
 
 ### Fixed

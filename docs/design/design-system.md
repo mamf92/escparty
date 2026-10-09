@@ -98,6 +98,33 @@ up in rows, one per latitude row of facets, and slide along them in step
 with the ball's rotation. They never draw over the ball's disc. The ball
 has no wire on any screen.
 
+**Lighting modes (an opt-in exploration).** The Sparkle stage can be lit
+three ways, chosen with `?lights=front|back|both` in the address (links look
+like `https://host/?lights=back#/`, since the app uses a HashRouter),
+remembered in `localStorage` (`escparty-lights`) and read by
+`src/design/stageLighting.ts`; there is no control for it, and Calm never
+changes.
+
+- `front` (the default, and the look described above): the pointer is a lamp
+  in front of the ball, and its reflections land on the glass as square spots.
+- `back`: the pointer moves a lamp behind the ball (pointer on the right,
+  lamp behind-right, its light travelling left and towards the viewer), plus
+  a fixed dimmer second back lamp. Its light hits the ball's back facets,
+  which throw square spots onto the sequin wall behind it. The spots are
+  not drawn: they light the sequins, which brighten and glint as a whole
+  (the shader samples a small light map at each sequin's centre). No spots on
+  the glass, and the ball's face is mostly in shade. They move **left to
+  right**, because a clockwise ball's back moves that way.
+- `both`: the front lamp as now, plus the wall spots from the back lamps and
+  from the front lamp's outer facets.
+
+The maths (`wallSpots`, in `stageLights.ts`) reflects each facet's ray
+off a lamp onto the wall plane behind the ball and sizes the spot by the
+distance the beam travelled; the constants (wall and viewer distance, beam
+spread) are named there. In `front` nothing extra is bound or uploaded and
+the stage is pixel-identical to before; with no WebGL, `back` and `both`
+behave like `front`.
+
 The lamp follows `pointerdown`/`pointermove` and `touchstart`/`touchmove`
 (passive, captured, never `preventDefault`ed, so scrolling is untouched).
 `stage.css` also turns off the tap highlight, the touch callout and text

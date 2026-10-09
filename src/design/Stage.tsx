@@ -102,7 +102,7 @@ void main(){
   }
   col=col/(1.+col*.4);
   // Dimmed to a backdrop; stage text keeps its outline over a bright sequin.
-  gl_FragColor=vec4(pow(col,vec3(.95))*(.62+.26*lit),1.);
+  gl_FragColor=vec4(pow(col,vec3(.95))*(.62+.2*lit),1.);
 }`;
 
 type Sequins = {
