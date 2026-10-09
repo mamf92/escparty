@@ -22,6 +22,17 @@
   display: block;
 }
 
+/*
+  Sparkle's sequins fade to half strength behind the content column, where
+  the text sits, and keep their full sparkle at the stage's edges. The
+  stage colour shows through the faded part, so notes and subtitles read
+  on a calmer floor and no gap between letters lights up.
+*/
+.esc-stage > canvas.esc-stage-sequins {
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.5) 14%, rgba(0, 0, 0, 0.5) 86%, #000 100%);
+  mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.5) 14%, rgba(0, 0, 0, 0.5) 86%, #000 100%);
+}
+
 /* The screen is the container the ball (and the header's room for it) is sized by. */
 .esc-app {
   container-type: inline-size;

@@ -27,7 +27,7 @@ type Tab = "rate" | "ranking" | "room" | "host";
 
 const GUEST_TABS: readonly Tab[] = ["rate", "ranking", "room"];
 const HOST_TABS: readonly Tab[] = [...GUEST_TABS, "host"];
-const TAB_LABELS: Record<Tab, string> = { rate: "Rate", ranking: "My ranking", room: "The room", host: "Host" };
+const TAB_LABELS: Record<Tab, string> = { rate: "Rate", ranking: "Ranking", room: "Room", host: "Host" };
 
 const SAVE_NOTES: Record<SaveState, string> = {
     saved: "Your ratings are saved.",

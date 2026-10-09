@@ -24,7 +24,7 @@ test("a host and two guests rate a semi and get their awards", async ({ browser 
     await rateActs(lordi, [1, 4, 8, 12]);
 
     // Every rating reached Firestore: all four acts have three on another phone.
-    await john.getByRole("tab", { name: "The room" }).click();
+    await john.getByRole("tab", { name: "Room" }).click();
     await expect(john.getByText("3 guests are rating.")).toBeVisible();
     const standings = john.getByRole("list", { name: "The room's standings" }).getByRole("listitem");
     await expect(standings).toHaveCount(4);
