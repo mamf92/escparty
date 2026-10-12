@@ -13,6 +13,27 @@
   min-width: 0;
   height: 100%;
   overflow-wrap: anywhere;
+  /* Every card in a row starts its text at the top, however tall the row. */
+  justify-content: flex-start;
+}
+
+/* The tag over the title: small, spaced capitals in the card's own ink. */
+.esc-app .esc-choice-tag {
+  font-size: var(--esc-text-sub);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Said to a screen reader in place of a shortened line. */
+.esc-app .esc-choice-spoken {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .esc-app .esc-choice-title {

@@ -1,6 +1,6 @@
 import type { Ref } from "react";
 import { ChoiceCard, ChoiceGrid, Ground } from "../design";
-import { quizMeta, type QuizCardInfo } from "../utils/quizCatalog";
+import { quizLength, quizLevelWord, type QuizCardInfo } from "../utils/quizCatalog";
 import { radioGroupKeys, radioTabIndex } from "../utils/radioGroupKeys";
 
 interface QuizCardGridProps {
@@ -39,7 +39,8 @@ export const QuizCardGrid = ({ label, labelledBy, quizzes, picked, onPick, disab
                         chosen={picked === quiz.key}
                         disabled={disabled}
                         title={quiz.title}
-                        meta={quizMeta(quiz)}
+                        tag={quizLevelWord(quiz)}
+                        meta={<QuizLength quiz={quiz} />}
                         sub={quiz.description}
                         onClick={() => onPick(quiz.key)}
                         onKeyDown={event => radioGroupKeys(event, index, quizzes.length, next => onPick(quizzes[next].key))}
@@ -47,5 +48,16 @@ export const QuizCardGrid = ({ label, labelledBy, quizzes, picked, onPick, disab
                 ))}
             </ChoiceGrid>
         </Ground>
+    );
+};
+
+/** "10 Qs · ca. 3 min" on the card, "10 questions, about 3 minutes" to a screen reader. */
+const QuizLength = ({ quiz }: { quiz: QuizCardInfo }) => {
+    const { shown, spoken } = quizLength(quiz);
+    return (
+        <>
+            <span aria-hidden="true">{shown}</span>
+            <span className="esc-choice-spoken">{spoken}</span>
+        </>
     );
 };

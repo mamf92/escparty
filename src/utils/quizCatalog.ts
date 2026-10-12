@@ -157,11 +157,17 @@ export interface QuizCardInfo {
 
 const LEVEL_WORDS = { easy: "Easy", medium: "Medium", hard: "Hard" } as const;
 
-/** "Easy · 10 questions · about 3 min"; "Your quiz" stands in for the level of a quiz built here. */
-export const quizMeta = (quiz: QuizCardInfo): string => {
-    const questions = `${quiz.questionCount} ${quiz.questionCount === 1 ? "question" : "questions"}`;
-    return `${quiz.level ? LEVEL_WORDS[quiz.level] : "Your quiz"} · ${questions} · about ${quiz.minutes} min`;
-};
+/** The card's tag: the quiz's level, or "Your quiz" for a quiz built on this device. */
+export const quizLevelWord = (quiz: QuizCardInfo): string => (quiz.level ? LEVEL_WORDS[quiz.level] : "Your quiz");
+
+/**
+ * How long a quiz is, short enough for a card two to a row: shown as
+ * "10 Qs · ca. 3 min", spoken as "10 questions, about 3 minutes".
+ */
+export const quizLength = (quiz: QuizCardInfo): { shown: string; spoken: string } => ({
+    shown: `${quiz.questionCount} ${quiz.questionCount === 1 ? "Q" : "Qs"} · ca. ${quiz.minutes} min`,
+    spoken: `${quiz.questionCount} ${quiz.questionCount === 1 ? "question" : "questions"}, about ${quiz.minutes} ${quiz.minutes === 1 ? "minute" : "minutes"}`,
+});
 
 /**
  * The cards for every quiz this device can pick, in one order for the

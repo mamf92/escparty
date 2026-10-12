@@ -4,7 +4,9 @@ import { cx } from "./cx";
 
 type ChoiceCardProps = {
   title: ReactNode;
-  /** A line of detail under the title (e.g. "Easy · 10 questions · about 3 min"). */
+  /** A short tag over the title (e.g. "Easy"). */
+  tag?: ReactNode;
+  /** A line of detail under the title (e.g. "10 Qs · ca. 3 min"). */
   meta?: ReactNode;
   /** One sentence on what the choice is. */
   sub?: ReactNode;
@@ -12,12 +14,13 @@ type ChoiceCardProps = {
 } & Omit<ComponentPropsWithRef<"button">, "title" | "children">;
 
 /**
- * A choice as a tile: a bold title, an optional meta line and a one-sentence
+ * A choice as a tile: an optional tag, a bold title, an optional meta line and a one-sentence
  * description. A `Control` underneath, so it is a dark tile that turns pink
  * when chosen. Give it `role="radio"` and `aria-checked` inside a radio group.
  */
-export const ChoiceCard = ({ title, meta, sub, chosen, className, ...props }: ChoiceCardProps) => (
+export const ChoiceCard = ({ title, tag, meta, sub, chosen, className, ...props }: ChoiceCardProps) => (
   <Control block chosen={chosen} className={cx("esc-choice-card", className)} {...props}>
+    {tag && <span className="esc-choice-tag">{tag}</span>}
     <span className="esc-choice-title">{title}</span>
     {meta && <span className="calm-sub">{meta}</span>}
     {sub && <span className="calm-sub">{sub}</span>}

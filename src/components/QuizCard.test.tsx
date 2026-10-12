@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QuizCardGrid } from "./QuizCard";
-import { quizCardsFor, quizMeta } from "../utils/quizCatalog";
+import { quizCardsFor, quizLength } from "../utils/quizCatalog";
 
 const cards = quizCardsFor([{ id: "AbCdEfGhIjKlMnOpQrSt", title: "Mine", questionCount: 1 }]);
 
@@ -16,8 +16,11 @@ describe("QuizCardGrid", () => {
   it("shows level, length and a sentence on each card", () => {
     render(<Harness />);
     const easy = screen.getByRole("radio", { name: /Classic: Easy/ });
-    expect(easy).toHaveTextContent("Easy · 10 questions · about 3 min");
-    expect(screen.getByRole("radio", { name: /Mine/ })).toHaveTextContent("Your quiz · 1 question · about 1 min");
+    expect(easy).toHaveTextContent(/^Easy/);
+    expect(easy).toHaveTextContent("10 Qs · ca. 3 min");
+    // The shortened length is spoken in full.
+    expect(easy).toHaveAccessibleName(/10 questions, about 3 minutes/);
+    expect(screen.getByRole("radio", { name: /Mine/ })).toHaveTextContent(/^Your quizMine1 Q · ca. 1 min/);
     expect(screen.getByRole("radiogroup", { name: "Quizzes" })).toBeInTheDocument();
   });
 
@@ -40,8 +43,9 @@ describe("QuizCardGrid", () => {
   });
 });
 
-describe("quizMeta", () => {
-  it("says question or questions", () => {
-    expect(quizMeta({ ...cards[0], questionCount: 1, minutes: 1 })).toBe("Your quiz · 1 question · about 1 min");
+describe("quizLength", () => {
+  it("says question or questions, minute or minutes", () => {
+    expect(quizLength({ ...cards[0], questionCount: 1, minutes: 1 })).toEqual({ shown: "1 Q · ca. 1 min", spoken: "1 question, about 1 minute" });
+    expect(quizLength({ ...cards[0], questionCount: 12, minutes: 4 })).toEqual({ shown: "12 Qs · ca. 4 min", spoken: "12 questions, about 4 minutes" });
   });
 });
