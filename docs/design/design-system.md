@@ -341,6 +341,9 @@ top, on a `Control` tile that turns
 pink when chosen. `ChoiceGrid` lays cards out two to a row (`columns={1}` for
 one), equal heights, text wrapping at 320px. In a radio group give each card
 `role="radio"`, `aria-checked` and the roving tab stop (`radioGroupKeys`).
+A menu of what to start is ChoiceCards too: the Host screen (a plain-button
+`ChoiceGrid` with `role="group"`) and the scoreboard setup's show and sheet
+picks match the quiz cards. A ChoiceCard is a dark tile even as a plain button.
 
 **Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
 shows a bigger ball (46% of the stage's width, 148px to 280px), and the

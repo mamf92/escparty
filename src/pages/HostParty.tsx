@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmPage } from "../components/CalmPage";
-import { Control, Ground, Pane } from "../design";
+import { ChoiceCard, ChoiceGrid, Ground } from "../design";
 
 /**
  * What a host can start (Home's "Host a party"): a multiplayer quiz,
@@ -23,16 +23,18 @@ const HostParty = () => {
       )}
       actions={(
         <Ground>
-          <Pane role="group" aria-label="What to host">
-            <Control block onClick={() => navigate("/multiplayer", { state: { step: "host" } })}>
-              <span>Host a quiz</span>
-              <span className="calm-sub">Everyone answers on their phone, live</span>
-            </Control>
-            <Control block onClick={() => navigate("/party/new")}>
-              <span>Host a scoreboard</span>
-              <span className="calm-sub">Rate every act together and see who called the winner</span>
-            </Control>
-          </Pane>
+          <ChoiceGrid role="group" aria-label="What to host">
+            <ChoiceCard
+              title="Host a quiz"
+              sub="Everyone answers on their phone, live"
+              onClick={() => navigate("/multiplayer", { state: { step: "host" } })}
+            />
+            <ChoiceCard
+              title="Host a scoreboard"
+              sub="Rate every act together, see who called the winner"
+              onClick={() => navigate("/party/new")}
+            />
+          </ChoiceGrid>
         </Ground>
       )}
     />

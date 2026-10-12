@@ -79,7 +79,8 @@ const measure = (page: Page) => page.evaluate((marksSource) => {
     }
 
     // An action and a choice at rest, and a chosen one if the screen has one.
-    const choice = "[aria-pressed], [role='radio'], [role='tab'], [role='option'], [role='checkbox'], [role='switch']";
+    // A ChoiceCard is a tile by design, even as a plain button (the Host screen's menu of what to start).
+    const choice = "[aria-pressed], [role='radio'], [role='tab'], [role='option'], [role='checkbox'], [role='switch'], .esc-choice-card";
     const atRest = [...document.querySelectorAll<HTMLElement>("button.lycra")]
         .filter(el => inGround(el) && !el.matches(".is-chosen, .is-selected, .is-high, .is-low, .is-marked, :disabled, :hover"));
     const action = atRest.find(el => !el.matches(choice));

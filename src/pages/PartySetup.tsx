@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { NamePicker } from "../components/NamePicker";
-import { Control, Field, Ground, Pane, Row } from "../design";
+import { ChoiceCard, ChoiceGrid, Control, Field, Ground, Pane, Row } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
 import {
@@ -20,6 +20,7 @@ import {
     type RatingCategory,
     type RatingTemplate,
 } from "../utils/partyModel";
+import { radioGroupKeys, radioTabIndex } from "../utils/radioGroupKeys";
 import { savePartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
 
@@ -175,60 +176,60 @@ const PartySetup = () => {
 
     const toggleBonus = (id: string) => setPicked(picked.includes(id) ? picked.filter(other => other !== id) : [...picked, id]);
 
+    const contestIndex = CONTESTS_2027.findIndex(entry => entry.id === contestId);
+    const pickContest = (id: string) => {
+        setContestId(id);
+        go(2);
+    };
     const showChoices = (
         <Ground>
-            <Pane role="radiogroup" aria-labelledby={`${ids}-q`}>
-                {CONTESTS_2027.map(entry => (
-                    <Control
+            <ChoiceGrid columns={1} role="radiogroup" aria-labelledby={`${ids}-q`}>
+                {CONTESTS_2027.map((entry, index) => (
+                    <ChoiceCard
                         key={entry.id}
-                        block
                         role="radio"
                         aria-checked={contestId === entry.id}
+                        tabIndex={radioTabIndex(index, contestIndex >= 0 ? contestIndex : null)}
                         chosen={contestId === entry.id}
-                        onClick={() => {
-                            setContestId(entry.id);
-                            go(2);
-                        }}
-                    >
-                        <span className="calm-row">
-                            <span>{entry.title}</span>
-                            <span className="calm-sub">{entry.acts.length} acts</span>
-                        </span>
-                        <span className="calm-sub">
-                            {new Date(`${entry.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-                            {entry.kind === "semi" ? ` · ${entry.qualifiers} go through` : " · every act ranked"}
-                        </span>
-                    </Control>
+                        tag={new Date(`${entry.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
+                        title={entry.title.replace(/^Burgas 2027 · /, "")}
+                        meta={`${entry.acts.length} acts · ${entry.kind === "semi" ? `${entry.qualifiers} go through` : "every act ranked"}`}
+                        onClick={() => pickContest(entry.id)}
+                        onKeyDown={event => radioGroupKeys(event, index, CONTESTS_2027.length, next => pickContest(CONTESTS_2027[next].id))}
+                    />
                 ))}
-            </Pane>
+            </ChoiceGrid>
         </Ground>
     );
 
+    const sheetOptions = [...RATING_TEMPLATES, { id: CUSTOM, name: "Make our own", blurb: "Up to six categories, each on its own scale.", categories: [] as RatingCategory[] }];
+    const sheetIndex = sheetOptions.findIndex(option => option.id === templateId);
+    const pickSheet = (id: string) => {
+        setTemplateId(id);
+        // A premade sheet is the whole answer; our own needs its categories.
+        if (id !== CUSTOM) go(3);
+        else setTried(false);
+    };
     const sheetChoices = (
         <>
             <Ground>
-                <Pane role="radiogroup" aria-labelledby={`${ids}-q`}>
-                    {[...RATING_TEMPLATES, { id: CUSTOM, name: "Make our own", blurb: "Up to six categories, each on its own scale.", categories: [] }].map(option => (
-                        <Control
+                <ChoiceGrid role="radiogroup" aria-labelledby={`${ids}-q`}>
+                    {sheetOptions.map((option, index) => (
+                        <ChoiceCard
                             key={option.id}
-                            block
                             role="radio"
                             aria-checked={templateId === option.id}
+                            tabIndex={radioTabIndex(index, sheetIndex >= 0 ? sheetIndex : null)}
                             chosen={templateId === option.id}
-                            onClick={() => {
-                                setTemplateId(option.id);
-                                // A premade sheet is the whole answer; our own needs its categories.
-                                if (option.id !== CUSTOM) go(3);
-                                else setTried(false);
-                            }}
-                        >
-                            <span>{option.name}</span>
-                            <span className="calm-sub">
-                                {option.categories.length > 0 ? option.categories.map(category => category.label).join(" · ") : option.blurb}
-                            </span>
-                        </Control>
+                            tag={option.categories.length === 0 ? `Up to ${CATEGORY_LIMITS.max}` : `${option.categories.length} ${option.categories.length === 1 ? "category" : "categories"}`}
+                            title={option.name}
+                            meta={option.id === "douze" ? scaleLabel(12) : option.categories.map(category => category.label).join(" · ") || undefined}
+                            sub={option.blurb}
+                            onClick={() => pickSheet(option.id)}
+                            onKeyDown={event => radioGroupKeys(event, index, sheetOptions.length, next => pickSheet(sheetOptions[next].id))}
+                        />
                     ))}
-                </Pane>
+                </ChoiceGrid>
             </Ground>
 
             {templateId === CUSTOM && (

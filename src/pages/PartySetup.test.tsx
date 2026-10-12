@@ -75,6 +75,36 @@ describe("PartySetup", () => {
         expect(screen.queryByRole("button", { name: "Start the party" })).not.toBeInTheDocument();
     });
 
+    it("shows each show as a card: date, name without the prefix, acts and how many go through", () => {
+        renderSetup();
+        const cards = screen.getAllByRole("radio");
+        expect(cards[0]).toHaveTextContent(/11 May/);
+        expect(cards[0]).toHaveTextContent("Semi-final 1");
+        expect(cards[0]).not.toHaveTextContent("Burgas 2027");
+        expect(cards[0]).toHaveTextContent(/\d+ acts · \d+ go through/);
+        expect(cards[cards.length - 1]).toHaveTextContent(/every act ranked/);
+        for (const card of cards) expect(card).toHaveClass("esc-choice-card");
+    });
+
+    it("moves the pick with the arrow keys, one tab stop", async () => {
+        renderSetup();
+        const cards = screen.getAllByRole("radio");
+        expect(cards.map(card => card.tabIndex)).toEqual([0, -1, -1]);
+        cards[0].focus();
+        await userEvent.setup().keyboard("{ArrowDown}");
+        step(2);
+    });
+
+    it("shows the sheets as cards with a category count, list and blurb", async () => {
+        renderSetup();
+        await userEvent.setup().click(screen.getByRole("radio", { name: /Grand final/ }));
+        const jury = screen.getByRole("radio", { name: /Jury/ });
+        expect(jury).toHaveTextContent("5 categories");
+        expect(screen.getByRole("radio", { name: /Douze/ })).toHaveTextContent("1 category");
+        expect(screen.getByRole("radio", { name: /Douze/ })).toHaveTextContent("1 to 12");
+        expect(screen.getByRole("radio", { name: /Make our own/ })).toHaveTextContent("Up to 6");
+    });
+
     it("moves on as soon as a show is tapped", async () => {
         renderSetup();
         await userEvent.setup().click(screen.getByRole("radio", { name: /Semi-final 2/ }));
