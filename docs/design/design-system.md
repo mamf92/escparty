@@ -55,6 +55,7 @@ same stage, with a disco ball hanging over it.
 | **Button** | White, lifted; dark ink, bold | An action | `<Control>` |
 | **Next step** | Black, in the display font, white ink | The one thing to do next on this screen | `<Control elevation="high">` |
 | **Tile** | Solid-reading dark wine (`--esc-tile`, 90% opaque), lighter and pinker than the black next step, white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
+| **Badge** | A dark tile with a large display-font value | A code or number to read from afar | `<Badge>` |
 | **Proud row** | A white row among the tiles | First place, your own row, the right answer | `<Row elevation="high">` |
 | **Sunk** | A darker, pressed tile | The bottom of a ladder, a wrong pick | `elevation="low"` |
 | **Chosen** | Hot pink (`--esc-accent`), white ink, pressed in | What is picked | `chosen` → `.is-chosen` + `aria-pressed` |
@@ -250,6 +251,14 @@ list pane. Its elevation carries rank: `"high"` is the white proud row
 tile (the bottom). A row may be `is-chosen` only to show the viewer's own
 pick, in the accent.
 
+**Badge** (`<Badge label="Game code" value="ABBA" />`, `.esc-badge`).
+A number or code worth reading from across the room: a dark tile like a
+Row, the optional label small above, the value large in the display font.
+Information, not a control: no pointer, hover, press or tab stop. A
+screen reader hears one line ("Game code A B B A", spelled out with
+`spell`); `selectable` lets the value be copied. Reuse it for big numbers
+(points, a score at a break).
+
 **Field** (`<Field>`, `.lycra-field`). A blush well pressed into a white
 card (its pane becomes the card). Always has a visible `.calm-label`, in
 `--esc-card-label`, above it (placeholders are examples,
@@ -317,6 +326,15 @@ proud row under its label.
 **Page title.** One `<h1>` in Righteous, white on the stage, sentence
 case, below the ball (the header's `--esc-stage-clearance` keeps it
 clear).
+
+**ChoiceCard and ChoiceGrid** (`src/design/ChoiceCard.tsx`). A choice with
+something to say: an optional tag in small capitals ("EASY"), a bold title,
+an optional meta line ("10 Qs · ca. 3 min", short enough for two to a row; say
+it in full to a screen reader) and one sentence of description, text from the
+top, on a `Control` tile that turns
+pink when chosen. `ChoiceGrid` lays cards out two to a row (`columns={1}` for
+one), equal heights, text wrapping at 320px. In a radio group give each card
+`role="radio"`, `aria-checked` and the roving tab stop (`radioGroupKeys`).
 
 **Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
 shows a bigger ball (46% of the stage's width, 148px to 280px), and the

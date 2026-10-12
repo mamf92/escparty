@@ -25,6 +25,13 @@ export const codeFromScan = (text: string): string | null => {
     return /^[A-Za-z]{4}$/.test(trimmed) ? trimmed.toUpperCase() : null;
 };
 
+/**
+ * The link a QR code carries to bring a phone to Join with this code
+ * looked up: `<this site>#/join/ABBA` (the app is a HashRouter).
+ */
+export const joinLink = (code: string): string =>
+    `${window.location.origin}${window.location.pathname}#/join/${code}`;
+
 export type GameKind = "quiz" | "party";
 
 /**

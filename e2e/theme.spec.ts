@@ -210,7 +210,7 @@ test("the green room and the results follow the surface rules", async ({ browser
     await expect(page.getByRole("heading", { name: "The green room" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Players" }).getByRole("listitem")).toHaveCount(1);
     await judge(page, "lobby-pick-quiz");
-    await page.getByRole("button", { name: "Nul Points" }).click();
+    await page.getByRole("radio", { name: /Nul Points/ }).click();
     await expect(page.getByRole("button", { name: "Start anyway" })).toBeVisible();
     await judge(page, "lobby-host");
     const { code, playerId } = await page.evaluate(() => ({ code: localStorage.getItem("gameCode"), playerId: localStorage.getItem("playerId") }));

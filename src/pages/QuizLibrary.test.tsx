@@ -71,7 +71,7 @@ describe("QuizLibrary", () => {
     saveOne();
     renderLibrary({ pathname: "/quizzes", state: { picked: `c-${ID}` } });
     const first = screen.getAllByRole("radio")[0];
-    expect(first).toHaveTextContent("Jedward's Revenge7 questionsYour quiz");
+    expect(first).toHaveTextContent("Your quizJedward's Revenge7 Qs · ca. 3 min7 questions, about 3 minutesBuilt by you on this device.");
     expect(first).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText(/listed on this device only/)).toBeInTheDocument();
   });
