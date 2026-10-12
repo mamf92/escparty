@@ -146,7 +146,7 @@
   The tile: a choice (a toggle, a radio, a tab, an option) or a row of
   information, a dark tile on the stage, set in white.
 */
-.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], .is-static) {
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], [role="switch"], .is-static) {
   --esc-ink: var(--esc-stage-ink);
   --esc-ink-muted: var(--esc-stage-ink-muted);
   --esc-correct: var(--esc-stage-correct);
@@ -157,11 +157,11 @@
   box-shadow: var(--esc-tile-edge);
 }
 
-.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):hover:where(:not(:disabled)) {
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], [role="switch"]):hover:where(:not(:disabled)) {
   background: var(--esc-tile-hover);
 }
 
-.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):active:where(:not(:disabled)) {
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], [role="switch"]):active:where(:not(:disabled)) {
   box-shadow: var(--esc-tile-press);
 }
 

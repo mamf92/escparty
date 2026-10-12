@@ -6,7 +6,7 @@ export const answerOptions = (page: Page) =>
 
 /**
  * Host a scoreboard party for Semi-final 1 with the given sheet (the jury's
- * by default), answering yes to both extras; returns its code. Setup is one
+ * by default), switching the wind machine bonus on; returns its code. Setup is one
  * question per screen and the name is picked from the reel, so it steps the
  * reel to `name`.
  */
@@ -17,8 +17,7 @@ export const hostParty = async (page: Page, name: string, sheet: RegExp = /Jury/
     await page.goto("/#/party/new");
     await page.getByRole("radio", { name: /Semi-final 1/ }).click();
     await page.getByRole("radio", { name: sheet }).click();
-    await page.getByRole("radio", { name: "Yes" }).first().click();
-    await page.getByRole("radio", { name: "Yes" }).nth(1).click();
+    await page.getByRole("switch", { name: /Wind machine/ }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     for (let tries = 0; tries < 60; tries++) {
         await page.getByRole("button", { name: "Next name" }).click();

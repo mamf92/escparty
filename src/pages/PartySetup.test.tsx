@@ -3,6 +3,7 @@ import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { renderWithProviders, screen, userEvent, waitFor } from "../test/test-utils";
 import PartySetup from "./PartySetup";
 import { CONTESTS_2027 } from "../data/contests2027";
+import { PARTY_BONUSES } from "../utils/partyModel";
 import { PARTY_NAMES } from "../utils/partyNames";
 import { readPartyIdentity } from "../utils/partySession";
 
@@ -34,17 +35,14 @@ type User = ReturnType<typeof userEvent.setup>;
 const step = (n: number) => expect(screen.getByText(`Step ${n} of 5`)).toBeInTheDocument();
 const question = (name: string) => expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
 
-/** Answer both extras on step 3: the first radio of each pair is Yes. */
-const answerExtras = async (user: User, answer: "Yes" | "No") => {
-    await user.click(screen.getAllByRole("radio", { name: answer })[0]);
-    await user.click(screen.getAllByRole("radio", { name: answer })[1]);
-};
+/** Switch on the wind machine on step 3. */
+const windOn = (user: User) => user.click(screen.getByRole("switch", { name: /Wind machine/ }));
 
-/** Walk steps 1 to 4 with yes to both extras and the first name, landing on the last screen. */
+/** Walk steps 1 to 4 with the wind machine on and the first name, landing on the last screen. */
 const reachStart = async (user: User, sheet: RegExp = /Jury/) => {
     await user.click(screen.getByRole("radio", { name: /Grand final/ }));
     await user.click(screen.getByRole("radio", { name: sheet }));
-    await answerExtras(user, "Yes");
+    await windOn(user);
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await user.click(screen.getByRole("button", { name: "Next name" }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -79,30 +77,101 @@ describe("PartySetup", () => {
         expect(screen.getByRole("heading", { level: 2 })).toHaveFocus();
     });
 
-    it("moves on when a premade sheet is tapped, and leaves the extras unanswered", async () => {
+    it("moves on when a premade sheet is tapped, with every bonus off", async () => {
         const user = userEvent.setup();
         renderSetup();
         await user.click(screen.getByRole("radio", { name: /Grand final/ }));
         await user.click(screen.getByRole("radio", { name: /Jury/ }));
         step(3);
-        question("Any extras?");
-        for (const radio of screen.getAllByRole("radio")) expect(radio).toHaveAttribute("aria-checked", "false");
-        expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+        question("Add bonus points?");
+        expect(screen.getAllByRole("switch")).toHaveLength(PARTY_BONUSES.length + 1);
+        for (const toggle of screen.getAllByRole("switch")) {
+            expect(toggle).toHaveAttribute("aria-checked", "false");
+            expect(toggle).toHaveTextContent("Off");
+        }
+        expect(screen.getByRole("switch", { name: /Wind machine \+1/ })).toBeInTheDocument();
+        expect(screen.queryByLabelText("Bonus name")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
     });
 
-    it("needs both extras answered before it continues", async () => {
+    it("flips a bonus on and off, saying so in words", async () => {
         const user = userEvent.setup();
         renderSetup();
         await user.click(screen.getByRole("radio", { name: /Grand final/ }));
         await user.click(screen.getByRole("radio", { name: /Jury/ }));
-        const [bonusYes] = screen.getAllByRole("radio", { name: "Yes" });
-        await user.click(bonusYes);
-        expect(bonusYes).toHaveAttribute("aria-checked", "true");
-        expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
-        await user.click(screen.getAllByRole("radio", { name: "No" })[1]);
+        const wind = screen.getByRole("switch", { name: /Wind machine/ });
+        await user.click(wind);
+        expect(wind).toHaveAttribute("aria-checked", "true");
+        expect(wind).toHaveTextContent("On");
+        await user.click(wind);
+        expect(wind).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("continues with no bonuses at all, and starts a party without any", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await user.click(screen.getByRole("radio", { name: /Grand final/ }));
+        await user.click(screen.getByRole("radio", { name: /Jury/ }));
         await user.click(screen.getByRole("button", { name: "Continue" }));
         step(4);
         question("Who are you tonight?");
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        expect(screen.getByRole("list", { name: "Your party" })).toHaveTextContent("Party bonusesNone");
+        await user.click(screen.getByRole("button", { name: "Start the party" }));
+        const party = mocks.createParty.mock.calls[0][0];
+        expect(party.bonuses).toBe(false);
+        expect(party.template).not.toHaveProperty("bonuses");
+    });
+
+    it("asks for a name and 1 to 5 points when the host's own bonus is on", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await user.click(screen.getByRole("radio", { name: /Grand final/ }));
+        await user.click(screen.getByRole("radio", { name: /Jury/ }));
+        await user.click(screen.getByRole("switch", { name: /Add your own/ }));
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        step(3);
+        expect(screen.getByRole("alert")).toHaveTextContent("Name your bonus.");
+        expect(screen.getByRole("alert").nextElementSibling).toBe(screen.getByRole("button", { name: "Continue" }));
+        expect(screen.getByLabelText("Bonus name")).toHaveAttribute("aria-invalid", "true");
+
+        await user.type(screen.getByLabelText("Bonus name"), "  Glitter cannon ");
+        await user.selectOptions(screen.getByLabelText("Points it adds"), "3");
+        await windOn(user);
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        step(4);
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        expect(screen.getByRole("list", { name: "Your party" })).toHaveTextContent("Wind machine +1 · Glitter cannon +3");
+        await user.click(screen.getByRole("button", { name: "Start the party" }));
+        const party = mocks.createParty.mock.calls[0][0];
+        expect(party).toMatchObject({ bonuses: true, showNames: true });
+        expect(party.template.bonuses).toEqual([
+            { id: "wind", label: "Wind machine", points: 1 },
+            { id: "own", label: "Glitter cannon", points: 3 },
+        ]);
+    });
+
+    it("ignores the own bonus's fields while it's off", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await user.click(screen.getByRole("radio", { name: /Grand final/ }));
+        await user.click(screen.getByRole("radio", { name: /Jury/ }));
+        const own = screen.getByRole("switch", { name: /Add your own/ });
+        await user.click(own);
+        await user.type(screen.getByLabelText("Bonus name"), "Confetti");
+        await user.click(own);
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        step(4);
+    });
+
+    it("has no question about names in the awards", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await reachStart(user);
+        expect(screen.queryByText(/names in the awards/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/stay as they are, so everyone rates the same way/)).toBeInTheDocument();
     });
 
     it("picks the name from the reel only, with no text field", async () => {
@@ -110,7 +179,6 @@ describe("PartySetup", () => {
         renderSetup();
         await user.click(screen.getByRole("radio", { name: /Grand final/ }));
         await user.click(screen.getByRole("radio", { name: /Jury/ }));
-        await answerExtras(user, "Yes");
         await user.click(screen.getByRole("button", { name: "Continue" }));
         expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
@@ -133,10 +201,11 @@ describe("PartySetup", () => {
         const party = mocks.createParty.mock.calls[0][0];
         expect(party).toMatchObject({ contestId: "burgas-2027-final", kind: "final", qualifiers: 0, bonuses: true, showNames: true });
         expect(party.template.id).toBe("jury");
+        expect(party.template.bonuses).toEqual([{ id: "wind", label: "Wind machine", points: 1 }]);
         expect(readPartyIdentity("ABBA")).toEqual({ guestId: party.hostId, name: PARTY_NAMES[0], isHost: true });
     });
 
-    it("sets up a semi with our own categories, no bonuses and anonymous awards", async () => {
+    it("sets up a semi with our own categories and no bonuses", async () => {
         const user = userEvent.setup();
         renderSetup();
         await user.click(screen.getByRole("radio", { name: /Semi-final 2/ }));
@@ -158,14 +227,13 @@ describe("PartySetup", () => {
         await user.click(screen.getByRole("button", { name: "Remove the last one" }));
         await user.click(screen.getByRole("button", { name: "Continue" }));
         step(3);
-        await answerExtras(user, "No");
         await user.click(screen.getByRole("button", { name: "Continue" }));
         await user.click(screen.getByRole("button", { name: "Previous name" }));
         await user.click(screen.getByRole("button", { name: "Continue" }));
         await user.click(screen.getByRole("button", { name: "Start the party" }));
 
         const party = mocks.createParty.mock.calls[0][0];
-        expect(party).toMatchObject({ contestId: "burgas-2027-semi-2", kind: "semi", qualifiers: 10, bonuses: false, showNames: false });
+        expect(party).toMatchObject({ contestId: "burgas-2027-semi-2", kind: "semi", qualifiers: 10, bonuses: false, showNames: true });
         expect(party.template.categories.map((category: { label: string; max: number }) => [category.label, category.max]))
             .toEqual([["Hair height", 5], ["Key changes", 10]]);
         expect(readPartyIdentity("ABBA")?.name).toBe(PARTY_NAMES[PARTY_NAMES.length - 1]);
@@ -178,7 +246,7 @@ describe("PartySetup", () => {
         await user.click(screen.getByRole("radio", { name: /Make our own/ }));
         await user.type(screen.getByLabelText("Category 1"), "Hair height");
         await user.click(screen.getByRole("button", { name: "Continue" }));
-        await user.click(screen.getAllByRole("radio", { name: "Yes" })[0]);
+        await windOn(user);
 
         await user.click(screen.getByRole("button", { name: "Back to How does everyone rate?" }));
         step(2);
@@ -192,7 +260,7 @@ describe("PartySetup", () => {
 
         await user.click(screen.getByRole("radio", { name: /Semi-final 1/ }));
         await user.click(screen.getByRole("button", { name: "Continue" }));
-        expect(screen.getAllByRole("radio", { name: "Yes" })[0]).toHaveAttribute("aria-checked", "true");
+        expect(screen.getByRole("switch", { name: /Wind machine/ })).toHaveAttribute("aria-checked", "true");
     });
 
     it("keeps each step in history, so the system back gesture keeps every answer", async () => {
@@ -224,7 +292,6 @@ describe("PartySetup", () => {
         renderSetup();
         await user.click(screen.getByRole("radio", { name: /Grand final/ }));
         await user.click(screen.getByRole("radio", { name: /Jury/ }));
-        await answerExtras(user, "Yes");
         await user.click(screen.getByRole("button", { name: "Continue" }));
         await user.click(screen.getByRole("button", { name: "Next name" }));
         expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();

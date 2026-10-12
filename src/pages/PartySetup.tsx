@@ -7,12 +7,16 @@ import { Control, Field, Ground, Pane, Row } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
 import {
+    BONUS_LIMITS,
     CATEGORY_LIMITS,
+    OWN_BONUS_ID,
     PARTY_BONUSES,
     RATING_TEMPLATES,
     SCALE_CHOICES,
     categoryLabelProblem,
+    bonusProblems,
     categoryProblems,
+    type BonusCategory,
     type RatingCategory,
     type RatingTemplate,
 } from "../utils/partyModel";
@@ -27,33 +31,38 @@ let categoryCounter = 0;
 const newCategory = (): RatingCategory => ({ id: `c${Date.now().toString(36)}${(categoryCounter++).toString(36)}`, label: "", max: 10 });
 
 /** The questions, in order. A step's heading is also the name of its way back. */
-const STEPS = ["Which show?", "How does everyone rate?", "Any extras?", "Who are you tonight?", "Ready to start?"] as const;
+const STEPS = ["Which show?", "How does everyone rate?", "Add bonus points?", "Who are you tonight?", "Ready to start?"] as const;
 const LAST = STEPS.length;
 
-/** A yes/no question: two radios under the heading `labelId` names. */
-const YesNo = ({ labelId, value, onChange }: { labelId: string; value: boolean | null; onChange: (value: boolean) => void }) => (
-    <Ground>
-        <Pane layout="split" role="radiogroup" aria-labelledby={labelId}>
-            <Control role="radio" aria-checked={value === true} chosen={value === true} onClick={() => onChange(true)}>Yes</Control>
-            <Control role="radio" aria-checked={value === false} chosen={value === false} onClick={() => onChange(false)}>No</Control>
-        </Pane>
-    </Ground>
-);
+/** A bonus as the summary and the screen say it: "Wind machine +1". */
+const bonusText = (bonus: BonusCategory) => `${bonus.label} +${bonus.points}`;
 
-const yesNo = (value: boolean | null) => (value === null ? "" : value ? "Yes" : "No");
+/** A switch tile: the bonus on the left, its points and a plain On or Off on the right. */
+const BonusSwitch = ({ label, points, on, onToggle }: { label: string; points?: number; on: boolean; onToggle: () => void }) => (
+    <Control role="switch" aria-checked={on} chosen={on} onClick={onToggle}>
+        <span className="calm-row">
+            <span>{label}</span>{" "}
+            <span className="calm-sub">{points !== undefined ? `+${points} · ` : ""}{on ? "On" : "Off"}</span>
+        </span>
+    </Control>
+);
 
 /**
  * Set up a scoreboard party (#80, #81, #89) one question per screen (#208):
  * 1 which Burgas 2027 show, 2 how everyone rates (a premade sheet or your
- * own categories), 3 extras (party bonuses; whether the end-of-party awards
- * name names), 4 your name (spun from the Eurovision participants, never
- * typed), 5 start. Nothing starts picked. Tapping a choice moves on, except
- * where the screen needs more than one answer (our own categories; the two
- * extras), which has a Continue. Each step is a history entry (`?step=N`), so
+ * own categories), 3 bonus points (a list of switches, all off to begin with,
+ * and one of the host's own), 4 your name (spun from the Eurovision
+ * participants, never typed), 5 start. Nothing starts picked. Tapping a
+ * choice moves on, except where the screen needs more than one answer (our
+ * own categories; the bonuses), which has a Continue. The chosen bonuses go
+ * in `template.bonuses` (the rules fix a party's top-level keys), and
+ * `bonuses` says whether there are any. New parties always name names in the
+ * awards (`showNames: true`; older parties may have chosen otherwise). Each step is a history entry (`?step=N`), so
  * the system back gesture and the footer Back do the same and keep every
  * answer; a fresh visit to /party/new has no step and starts at 1, and a
- * step is only shown once the answers before it are in. Everything is
- * fixed for the party once it starts, so every guest rates the same way.
+ * step is only shown once the answers before it are in. The show, the sheet
+ * and the bonuses are fixed once the party starts, so every guest rates the
+ * same way (the summary says so).
  */
 const PartySetup = () => {
     const navigate = useNavigate();
@@ -62,8 +71,11 @@ const PartySetup = () => {
     const [contestId, setContestId] = useState<string | null>(null);
     const [templateId, setTemplateId] = useState<string | null>(null);
     const [custom, setCustom] = useState<RatingCategory[]>(() => [newCategory()]);
-    const [bonuses, setBonuses] = useState<boolean | null>(null);
-    const [showNames, setShowNames] = useState<boolean | null>(null);
+    const [picked, setPicked] = useState<string[]>([]);
+    const [ownOn, setOwnOn] = useState(false);
+    const [ownLabel, setOwnLabel] = useState("");
+    const [ownPoints, setOwnPoints] = useState(1);
+    const [bonusesDone, setBonusesDone] = useState(false);
     const [name, setName] = useState<string | null>(null);
     const [tried, setTried] = useState(false);
     const [creating, setCreating] = useState(false);
@@ -75,13 +87,18 @@ const PartySetup = () => {
     const template: RatingTemplate | undefined = templateId === CUSTOM
         ? { id: CUSTOM, name: "Our own sheet", blurb: "Categories made up for this party.", categories: custom.map(category => ({ ...category, label: category.label.trim() })) }
         : RATING_TEMPLATES.find(entry => entry.id === templateId);
+    const ownProblems = ownOn ? bonusProblems({ label: ownLabel, points: ownPoints }) : [];
+    const chosenBonuses: BonusCategory[] = [
+        ...PARTY_BONUSES.filter(bonus => picked.includes(bonus.id)),
+        ...(ownOn && ownProblems.length === 0 ? [{ id: OWN_BONUS_ID, label: ownLabel.trim(), points: ownPoints }] : []),
+    ];
     // Problems are told once Continue has been tried, beside Continue.
     const sheetProblems = templateId === CUSTOM ? categoryProblems(custom) : [];
     // The step in the address, but never past the answers given so far (a
     // reload or a pasted link starts over at the first unanswered question).
     const reached = contestId === null ? 1
         : templateId === null || sheetProblems.length > 0 ? 2
-        : bonuses === null || showNames === null ? 3
+        : !bonusesDone ? 3
         : name === null ? 4
         : LAST;
     const step = Math.min(Math.max(Math.trunc(Number(params.get("step"))) || 1, 1), reached);
@@ -97,6 +114,7 @@ const PartySetup = () => {
     }, [step]);
     const sheetProblemShown = tried && sheetProblems.length > 0;
     // Which category names the problem is about: blank, too long or repeated.
+    const ownProblemShown = tried && ownProblems.length > 0;
     const labelInvalid = (category: RatingCategory) => sheetProblemShown && categoryLabelProblem(category, custom) !== null;
 
     const setCategory = (index: number, change: Partial<RatingCategory>) =>
@@ -108,13 +126,14 @@ const PartySetup = () => {
     };
 
     const create = async () => {
-        if (!contest || !template || sheetProblems.length > 0 || bonuses === null || showNames === null || !name || creating) return;
+        if (!contest || !template || sheetProblems.length > 0 || !bonusesDone || ownProblems.length > 0 || !name || creating) return;
         setCreating(true);
         setFailure(null);
         try {
             const fetched = await fetchContest(contest.id);
             if (!fetched) throw new Error(`No show ${contest.id}`);
             const hostId = uuidv4();
+            const withBonuses: RatingTemplate = chosenBonuses.length > 0 ? { ...template, bonuses: chosenBonuses } : template;
             const code = await createParty({
                 hostId,
                 title: fetched.title,
@@ -122,9 +141,9 @@ const PartySetup = () => {
                 kind: fetched.kind,
                 qualifiers: fetched.kind === "semi" ? fetched.qualifiers ?? 10 : 0,
                 acts: fetched.acts,
-                template,
-                bonuses,
-                showNames,
+                template: withBonuses,
+                bonuses: chosenBonuses.length > 0,
+                showNames: true,
             });
             savePartyIdentity(code, { guestId: hostId, name, isHost: true });
             navigate(`/party/${code}`);
@@ -142,6 +161,17 @@ const PartySetup = () => {
         }
         go(3);
     };
+
+    const continueFromBonuses = () => {
+        if (ownProblems.length > 0) {
+            setTried(true);
+            return;
+        }
+        setBonusesDone(true);
+        go(4);
+    };
+
+    const toggleBonus = (id: string) => setPicked(picked.includes(id) ? picked.filter(other => other !== id) : [...picked, id]);
 
     const showChoices = (
         <Ground>
@@ -255,18 +285,59 @@ const PartySetup = () => {
 
     const extras = (
         <>
-            <h3 className="esc-heading esc-question esc-question-sub" id={`${ids}-bonuses`}>Party bonuses?</h3>
-            <CalmNote>{PARTY_BONUSES.map(bonus => `${bonus.label} +${bonus.points}`).join(" · ")}</CalmNote>
-            <YesNo labelId={`${ids}-bonuses`} value={bonuses} onChange={setBonuses} />
-            <h3 className="esc-heading esc-question esc-question-sub" id={`${ids}-names`}>Name names in the awards?</h3>
-            <CalmNote>
-                Yes: everyone sees who rated like twins and who was toughest. No: the awards say &quot;two of you&quot; and &quot;one of you&quot;,
-                and each guest is told which are theirs. The ratings themselves aren&apos;t secret from the party.
-            </CalmNote>
-            <YesNo labelId={`${ids}-names`} value={showNames} onChange={setShowNames} />
+            <CalmNote>Switch on what counts tonight. Each one adds its points to an act&apos;s score when a guest ticks it. All off means no bonuses.</CalmNote>
+            <Ground>
+                <Pane role="group" aria-labelledby={`${ids}-q`}>
+                    {PARTY_BONUSES.map(bonus => (
+                        <BonusSwitch
+                            key={bonus.id}
+                            label={bonus.label}
+                            points={bonus.points}
+                            on={picked.includes(bonus.id)}
+                            onToggle={() => toggleBonus(bonus.id)}
+                        />
+                    ))}
+                </Pane>
+            </Ground>
+            <h3 className="esc-section" id={`${ids}-own`}>Your own bonus</h3>
+            <Ground>
+                <Pane className="is-card" role="group" aria-labelledby={`${ids}-own`}>
+                    <BonusSwitch label="Add your own" on={ownOn} onToggle={() => { setOwnOn(!ownOn); setTried(false); }} />
+                    {ownOn && (
+                        <>
+                            <div>
+                                <label className="calm-label" htmlFor={`${ids}-own-name`}>Bonus name</label>
+                                <Field
+                                    id={`${ids}-own-name`}
+                                    value={ownLabel}
+                                    maxLength={BONUS_LIMITS.maxLabel}
+                                    placeholder="Glitter cannon"
+                                    aria-invalid={ownProblemShown}
+                                    aria-describedby={ownProblemShown ? `${ids}-own-problem` : undefined}
+                                    onChange={event => setOwnLabel(event.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="calm-label" htmlFor={`${ids}-own-points`}>Points it adds</label>
+                                <select
+                                    id={`${ids}-own-points`}
+                                    className="lycra-field"
+                                    value={ownPoints}
+                                    onChange={event => setOwnPoints(Number(event.target.value))}
+                                >
+                                    {Array.from({ length: BONUS_LIMITS.maxPoints - BONUS_LIMITS.minPoints + 1 }, (_, i) => BONUS_LIMITS.minPoints + i).map(points => (
+                                        <option key={points} value={points}>+{points}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </>
+                    )}
+                </Pane>
+            </Ground>
             <Ground>
                 <Pane>
-                    <Control elevation="high" disabled={bonuses === null || showNames === null} onClick={() => go(4)}>Continue</Control>
+                    {ownProblemShown && <CalmNote id={`${ids}-own-problem`} role="alert">{ownProblems.join(" ")}</CalmNote>}
+                    <Control elevation="high" onClick={continueFromBonuses}>Continue</Control>
                 </Pane>
             </Ground>
         </>
@@ -293,8 +364,10 @@ const PartySetup = () => {
                         <span className="calm-sub">Rating</span>
                         <span>{template?.categories.map(category => category.label).join(" · ")}</span>
                     </Row>
-                    <Row as="li"><span className="calm-sub">Party bonuses</span><span>{yesNo(bonuses)}</span></Row>
-                    <Row as="li"><span className="calm-sub">Names in the awards</span><span>{yesNo(showNames)}</span></Row>
+                    <Row as="li">
+                        <span className="calm-sub">Party bonuses</span>
+                        <span>{chosenBonuses.length > 0 ? chosenBonuses.map(bonusText).join(" · ") : "None"}</span>
+                    </Row>
                     <Row as="li"><span className="calm-sub">You are</span><span>{name}</span></Row>
                 </Pane>
             </Ground>
@@ -306,6 +379,7 @@ const PartySetup = () => {
                 </Pane>
             </Ground>
             {failure && <CalmNote role="alert">{failure}</CalmNote>}
+            <CalmNote>Once the party starts, the show, the rating sheet and the bonuses stay as they are, so everyone rates the same way.</CalmNote>
             <CalmNote>The party and everyone&apos;s ratings are set to be deleted after {PARTY_LIFETIME_DAYS} days.</CalmNote>
         </>
     );
@@ -313,7 +387,7 @@ const PartySetup = () => {
     return (
         <CalmPage
             title="Host a party"
-            subtitle="This is fixed once the party starts."
+            subtitle="Everyone rates each act on their phone, and the big screen shows the room's scoreboard."
             footer={step === 1
                 ? <CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>
                 : <CalmLink onClick={() => navigate(-1)}>Back to {STEPS[step - 2]}</CalmLink>}

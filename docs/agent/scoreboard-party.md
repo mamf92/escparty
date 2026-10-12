@@ -17,7 +17,7 @@ generously and so on, each named after a moment in Eurovision history.
 | --- | --- | --- |
 | `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
 | `/party` | `PartyHome.tsx` | Host, join with a code, open a big screen, or go back to the last party |
-| `/party/new` | `PartySetup.tsx` | Five steps, one big question each, nothing preselected (local step state, no routes): the show; the rating sheet (premade, or your own categories with a Continue); extras (party bonuses and whether awards name names, two yes/no pairs on one screen with a Continue); your name, spun on the `NamePicker` reel from `partyNames.ts` (no free text); a summary and the black "Start the party". Back keeps the answers |
+| `/party/new` | `PartySetup.tsx` | Five steps, one big question each, nothing preselected (local step state, no routes): the show; the rating sheet (premade, or your own categories with a Continue); bonus points (a list of switches for the premade bonuses, all off to begin with, plus one of the host's own with a name and 1 to 5 points, and a Continue); your name, spun on the `NamePicker` reel from `partyNames.ts` (no free text); a summary and the black "Start the party". Back keeps the answers |
 | `/party/:code` | `PartyRoom.tsx` | Join (a name), then tabs: Rate, Ranking, Room, and Host (`PartyHostTools.tsx`) for the host |
 | `/party/:code/screen` | `PartyScreen.tsx` | The TV: QR code, the code, the room's standings, closest guests. Outside the phone frame |
 | `/party/:code/awards` | `PartyAwards.tsx` | One award at a time, then who came closest. Only after the host opens them (the host can preview) |
@@ -82,8 +82,15 @@ lineup" from `contests/`.
   staging, crowd-pleaser), Douze Points (one 1-12 score), or up to six
   custom categories, each 1-5, 1-10 or 1-12.
 - **An act's score** is the mean of its rated categories, each scaled to
-  0-10, plus any party bonuses ticked (sung in their own language +2, wind
-  machine +1, key change +1, pyro +1, a grandma on stage +2).
+  0-10, plus any party bonuses ticked. The host switches on the ones that
+  count at setup, from the premade `PARTY_BONUSES` (sung in their own
+  language +2, wind machine +1, key change +1, pyro +1, a grandma on stage
+  +2) and optionally one of their own (id `own`, a name up to 30 characters,
+  1 to 5 points; `bonusProblems` checks it). The chosen list is
+  `template.bonuses`, and `partyBonusList` (`partyResults.ts`) is the one
+  place that reads it: with `bonuses` false it is empty, and a party from
+  before the list existed (no `template.bonuses`) offers all five premade
+  ones.
 - **The room's standings** average each act over the guests who rated it.
 - **Closeness to a final's result** (#86): only acts with a real place
   count, and only the ones the guest rated: both the guest's scores and
@@ -111,8 +118,11 @@ left out rather than faked.
 
 ## Privacy (#89)
 
-The host picks at setup whether the awards name names (`showNames`). With
-names off, awards say "one of you" or "two of you", except that each guest
+The awards name names for every new party: the setup no longer asks, since
+guests' names are already the anonymous Eurovision participants from the
+reel, and it writes `showNames: true`. The field stays on the party, and
+the code for `showNames: false` stays, for parties made while the host
+could choose. With names off, awards say "one of you" or "two of you", except that each guest
 is told when one is theirs, and the closeness table shows only their own
 place. The TV never shows anyone's own ratings; it names the closest
 guests only when names are on.
@@ -134,8 +144,12 @@ collection):
 {
   code, hostId, title, contestId, kind: "semi" | "final", qualifiers,
   acts: Act[],                    // 1-40
-  template: { id, name, blurb, categories: { id, label, max }[] },  // 1-6 categories
-  bonuses: boolean, showNames: boolean,
+  template: {
+    id, name, blurb, categories: { id, label, max }[],              // 1-6 categories
+    bonuses?: { id, label, points }[],                              // the host's chosen bonuses, 1-8, points 1-5
+  },
+  bonuses: boolean,               // whether any bonus is on (template.bonuses is non-empty)
+  showNames: boolean,             // true for new parties; older ones may be false
   results: { places?: { [actId]: place }, qualifiers?: actId[] },
   revealed: boolean,
   createdAt: serverTimestamp, expireAt: Timestamp  // createdAt + 30 days
@@ -146,6 +160,12 @@ collection):
 (`expireAt` 30 days after the guest's last change).
 One document per guest, written whole by that guest only, so no two
 clients ever write the same document.
+
+`template.bonuses` sits inside the template because the rules fix a party's
+top-level keys and check only `template.categories`, so the bonus list
+needs no rules change. Anyone with the code could write it, so
+`listenToParty` tidies it with `sanitiseBonuses` (drops entries that aren't
+`{ id, label <= 30, points 1-5 }` and repeated ids).
 
 Rules (`firestore.rules`, verify cases 5i): a party is created with exactly
 those keys, an empty result, not revealed, and an `expireAt` 29-31 days

@@ -5,6 +5,7 @@ import {
     RATING_TEMPLATES,
     actScore,
     ballotScores,
+    bonusProblems,
     categoryLabelProblem,
     categoryProblems,
     isValidRating,
@@ -16,6 +17,7 @@ import {
     predictionLeaderboard,
     rankPositions,
     roomStandings,
+    sanitiseBonuses,
     type Ballot,
     type RatingCategory,
 } from "./partyModel";
@@ -249,5 +251,53 @@ describe("partyAwards", () => {
     it("doesn't name the same pair twins and opposites", () => {
         const awards = partyAwards([ballot("a", [1, 2, 3]), ballot("b", [1, 2, 4])], acts, douze);
         expect(awards.filter(entry => entry.id === "twins" || entry.id === "opposites").map(entry => entry.id)).toEqual(["twins"]);
+    });
+});
+
+describe("bonusProblems", () => {
+    it("accepts a short name and 1 to 5 points", () => {
+        expect(bonusProblems({ label: "Glitter cannon", points: 3 })).toEqual([]);
+        expect(bonusProblems({ label: " x ", points: 1 })).toEqual([]);
+        expect(bonusProblems({ label: "x", points: 5 })).toEqual([]);
+    });
+
+    it("tells a blank or overlong name and points out of range", () => {
+        expect(bonusProblems({ label: "   ", points: 2 })).toEqual(["Name your bonus."]);
+        expect(bonusProblems({ label: "x".repeat(31), points: 2 })).toEqual(["Keep the bonus name under 30 characters."]);
+        expect(bonusProblems({ label: "x", points: 0 })).toEqual(["Give it 1 to 5 points."]);
+        expect(bonusProblems({ label: "x", points: 6 })).toEqual(["Give it 1 to 5 points."]);
+        expect(bonusProblems({ label: "x", points: 1.5 })).toEqual(["Give it 1 to 5 points."]);
+        expect(bonusProblems({ label: "", points: 9 })).toHaveLength(2);
+    });
+});
+
+describe("sanitiseBonuses", () => {
+    it("is undefined when there is no list", () => {
+        expect(sanitiseBonuses(undefined)).toBeUndefined();
+        expect(sanitiseBonuses({ id: "wind" })).toBeUndefined();
+    });
+
+    it("keeps good entries, trimmed, and drops the bad and the repeated", () => {
+        expect(sanitiseBonuses([
+            { id: "wind", label: "Wind machine", points: 1 },
+            { id: "own", label: "  Glitter  ", points: 3 },
+            { id: "own", label: "Again", points: 2 },
+            { id: "x", label: "", points: 2 },
+            { id: "y", label: "x".repeat(31), points: 2 },
+            { id: "z", label: "Too much", points: 50 },
+            { id: "w", label: "Words", points: "2" },
+            { label: "No id", points: 2 },
+            null,
+            "wind",
+        ])).toEqual([
+            { id: "wind", label: "Wind machine", points: 1 },
+            { id: "own", label: "Glitter", points: 3 },
+        ]);
+        expect(sanitiseBonuses([])).toEqual([]);
+    });
+
+    it("keeps at most eight", () => {
+        const many = Array.from({ length: 12 }, (_, i) => ({ id: `b${i}`, label: `B${i}`, points: 1 }));
+        expect(sanitiseBonuses(many)).toHaveLength(8);
     });
 });
