@@ -318,6 +318,13 @@ proud row under its label.
 case, below the ball (the header's `--esc-stage-clearance` keeps it
 clear).
 
+**ChoiceCard and ChoiceGrid** (`src/design/ChoiceCard.tsx`). A choice with
+something to say: a bold title, an optional meta line ("Easy · 10 questions ·
+about 3 min") and one sentence of description, on a `Control` tile that turns
+pink when chosen. `ChoiceGrid` lays cards out two to a row (`columns={1}` for
+one), equal heights, text wrapping at 320px. In a radio group give each card
+`role="radio"`, `aria-checked` and the roving tab stop (`radioGroupKeys`).
+
 **Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
 shows a bigger ball (46% of the stage's width, 148px to 280px), and the
 header's clearance grows with it. Two ways in under the title, nothing more.

@@ -4,8 +4,9 @@ import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane, Row } from "../design";
 import { listenToRoom, QuizPickRefused, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
-import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
-import { customQuizKey, listMyQuizzes } from "../utils/customQuizzes";
+import { quizCardsFor, setRoomQuiz } from "../utils/quizCatalog";
+import { QuizCardGrid } from "../components/QuizCard";
+import { listMyQuizzes } from "../utils/customQuizzes";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { roomGuests, startGate } from "../utils/lobbyGate";
 import { useLeaveGuard } from "../hooks/useLeaveGuard";
@@ -45,6 +46,7 @@ const Lobby = () => {
     const roomQuizTitle = useQuizTitle(room?.difficulty);
     // This device's saved quizzes, offered alongside the premade ones.
     const [myQuizzes] = useState(listMyQuizzes);
+    const quizCards = quizCardsFor(myQuizzes);
 
     useEffect(() => {
         if (!identity) {
@@ -262,20 +264,7 @@ const Lobby = () => {
             {isHost && !room.difficulty ? (
                 <>
                     <h2 className="esc-section" id="lobby-pick-quiz">Pick a quiz</h2>
-                    <Ground>
-                        <Pane role="group" aria-labelledby="lobby-pick-quiz">
-                            {myQuizzes.map(quiz => (
-                                <Control key={quiz.id} disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
-                                    {quiz.title}
-                                </Control>
-                            ))}
-                            {QUIZ_CHOICES.map(choice => (
-                                <Control key={choice.key} disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
-                                    {choice.title}
-                                </Control>
-                            ))}
-                        </Pane>
-                    </Ground>
+                    <QuizCardGrid labelledBy="lobby-pick-quiz" quizzes={quizCards} picked={null} onPick={handleSelectQuiz} disabled={busy} />
                 </>
             ) : (
                 <>

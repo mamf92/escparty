@@ -1,0 +1,20 @@
+/* Choice cards (ChoiceCard.tsx): layout only; colours come from .lycra. */
+.esc-app .lycra-pane.esc-choice-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  --esc-pane-gap: var(--esc-space-3);
+  align-items: stretch;
+}
+
+.esc-app .lycra-pane.esc-choice-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.esc-app .lycra.esc-choice-card {
+  min-width: 0;
+  height: 100%;
+  overflow-wrap: anywhere;
+}
+
+.esc-app .esc-choice-title {
+  font-weight: 700;
+}

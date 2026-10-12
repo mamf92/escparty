@@ -119,7 +119,7 @@ describe("Lobby", () => {
     mocks.startGame.mockResolvedValue(undefined);
     renderLobby();
     act(() => mocks.onRoom(room()));
-    await user.click(screen.getByRole("button", { name: "Classic: Easy" }));
+    await user.click(screen.getByRole("radio", { name: /Classic: Easy/ }));
     expect(mocks.setRoomQuiz).toHaveBeenCalledWith("ABBA", "easy");
 
     act(() => mocks.onRoom(room({ difficulty: "easy", readyPlayers: ["p2"] })));
@@ -139,14 +139,14 @@ describe("Lobby", () => {
     renderLobby();
     act(() => mocks.onRoom(room()));
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Classic: Easy" }));
+    await user.click(screen.getByRole("radio", { name: /Classic: Easy/ }));
     expect(screen.getByRole("alert")).toHaveTextContent("That quiz couldn't be loaded");
-    await user.click(screen.getByRole("button", { name: "Classic: Easy" }));
+    await user.click(screen.getByRole("radio", { name: /Classic: Easy/ }));
     expect(screen.getByRole("alert")).toHaveTextContent("This room won't take that quiz. Pick another one.");
     expect(screen.queryByText(/Failed to set difficulty/)).not.toBeInTheDocument();
     // A refused quiz wrote nothing: the host can still pick another.
     mocks.setRoomQuiz.mockResolvedValueOnce(undefined);
-    await user.click(screen.getByRole("button", { name: "Classic: Hard" }));
+    await user.click(screen.getByRole("radio", { name: /Classic: Hard/ }));
     expect(mocks.setRoomQuiz).toHaveBeenLastCalledWith("ABBA", "hard");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -157,7 +157,7 @@ describe("Lobby", () => {
     mocks.setRoomQuiz.mockRejectedValueOnce(new mocks.QuizPickRefused("Failed to set difficulty: denied"));
     renderLobby();
     act(() => mocks.onRoom(room()));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Classic: Easy" }));
+    await userEvent.setup().click(screen.getByRole("radio", { name: /Classic: Easy/ }));
     expect(screen.getByRole("alert")).toHaveTextContent("This room won't take that quiz");
     // Another tab of this host picked first: the room has its quiz after all.
     act(() => mocks.onRoom(room({ difficulty: "easy" })));
@@ -171,9 +171,9 @@ describe("Lobby", () => {
     mocks.setRoomQuiz.mockRejectedValueOnce(new Error("Failed to set difficulty: unavailable", { cause: { code: "unavailable" } }));
     renderLobby();
     act(() => mocks.onRoom(room()));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Classic: Easy" }));
+    await userEvent.setup().click(screen.getByRole("radio", { name: /Classic: Easy/ }));
     expect(screen.getByRole("alert")).toHaveTextContent("That quiz couldn't be loaded");
-    expect(screen.getByRole("button", { name: "Classic: Easy" })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: /Classic: Easy/ })).toBeEnabled();
   });
 
   it("keeps a way back in the footer of every dead end", () => {
@@ -314,7 +314,7 @@ describe("Lobby", () => {
     as("host", "Martin");
     renderLobby();
     act(() => mocks.onRoom(room()));
-    expect(within(screen.getByRole("group", { name: "Pick a quiz" })).getByRole("button", { name: "Classic: Easy" })).toBeInTheDocument();
+    expect(within(screen.getByRole("radiogroup", { name: "Pick a quiz" })).getByRole("radio", { name: /Classic: Easy/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Pick a quiz" })).toBeInTheDocument();
   });
 });
