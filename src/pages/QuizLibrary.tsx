@@ -2,10 +2,10 @@ import { useId, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Pane } from "../design";
-import { QUIZ_CHOICES } from "../utils/quizCatalog";
-import { customQuizId, customQuizKey, forgetMyQuiz, isCustomQuizKey, listMyQuizzes, type MyQuiz } from "../utils/customQuizzes";
+import { QuizCardGrid } from "../components/QuizCard";
+import { quizCardsFor } from "../utils/quizCatalog";
+import { customQuizId, forgetMyQuiz, isCustomQuizKey, listMyQuizzes, type MyQuiz } from "../utils/customQuizzes";
 import { focusSoon } from "../utils/focusSoon";
-import { radioGroupKeys, radioTabIndex } from "../utils/radioGroupKeys";
 
 /**
  * Every quiz this device can play (#72, #76): the quizzes you saved, then
@@ -33,17 +33,8 @@ const QuizLibrary = () => {
         ? [{ ...returned.saved, savedAt: 0 }]
         : [];
 
-    const choices = [
-        ...[...justSaved, ...myQuizzes].map(quiz => ({
-            key: customQuizKey(quiz.id),
-            title: quiz.title,
-            detail: "Your quiz",
-            questionCount: quiz.questionCount as number | null,
-        })),
-        ...QUIZ_CHOICES.map(choice => ({ key: choice.key, title: choice.title, detail: choice.tagline, questionCount: choice.questionCount })),
-    ];
-    const pickedIndex = choices.findIndex(option => option.key === picked);
-    const choice = pickedIndex >= 0 ? choices[pickedIndex] : null;
+    const choices = quizCardsFor([...justSaved, ...myQuizzes]);
+    const choice = choices.find(option => option.key === picked) ?? null;
     const mine = choice !== null && isCustomQuizKey(choice.key);
 
     const pick = (key: string) => {
@@ -86,30 +77,7 @@ const QuizLibrary = () => {
                 </Pane>
             </Ground>
 
-            <Ground>
-                <Pane ref={listRef} role="radiogroup" aria-label="Quizzes">
-                    {choices.map((option, index) => (
-                        <Control
-                            key={option.key}
-                            block
-                            role="radio"
-                            aria-checked={picked === option.key}
-                            tabIndex={radioTabIndex(index, pickedIndex >= 0 ? pickedIndex : null)}
-                            chosen={picked === option.key}
-                            onClick={() => pick(option.key)}
-                            onKeyDown={event => radioGroupKeys(event, index, choices.length, next => pick(choices[next].key))}
-                        >
-                            <span className="calm-row">
-                                <span>{option.title}</span>
-                                {option.questionCount !== null && (
-                                    <span className="calm-sub">{option.questionCount} questions</span>
-                                )}
-                            </span>
-                            <span className="calm-sub">{option.detail}</span>
-                        </Control>
-                    ))}
-                </Pane>
-            </Ground>
+            <QuizCardGrid ref={listRef} label="Quizzes" quizzes={choices} picked={picked} onPick={pick} />
 
             {choice ? (
                 <Ground>

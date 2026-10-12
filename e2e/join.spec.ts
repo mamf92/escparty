@@ -32,3 +32,20 @@ test("Join a party joins a quiz room from its code", async ({ browser }) => {
     await expect(guest).toHaveURL(/#\/lobby$/);
     await expect(guest.getByRole("button", { name: "I'm ready" })).toBeVisible();
 });
+
+test("The green room's QR link joins the room", async ({ browser }) => {
+    const [host, guest] = await Promise.all([0, 1].map(async () => (await browser.newContext()).newPage()));
+    await host.goto("/");
+    await host.getByRole("button", { name: "Host a party" }).click();
+    await host.getByRole("button", { name: /^Host a quiz/ }).click();
+    await host.getByRole("button", { name: /^Host and play/ }).click();
+    await expect(host).toHaveURL(/#\/lobby$/);
+    await host.getByRole("button", { name: "Show QR code" }).click();
+    await expect(host.getByRole("dialog", { name: "Scan to join" })).toBeVisible();
+    const code = await host.evaluate(() => localStorage.getItem("gameCode"));
+
+    // What the QR code carries: a join link with the code in it.
+    await guest.goto(`/#/join/${code}`);
+    await expect(guest).toHaveURL(/#\/lobby$/);
+    await expect(guest.getByRole("button", { name: "I'm ready" })).toBeVisible();
+});

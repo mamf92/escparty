@@ -577,8 +577,108 @@
   font-size: 1.75rem;
 }
 
+/*
+  The badge (Badge.tsx): a dark tile like a Row, for a number or code
+  worth reading from across the room. Information, so no pointer, hover
+  or press.
+*/
+.esc-app .esc-badge {
+  --esc-ink: var(--esc-stage-ink);
+  --esc-ink-muted: var(--esc-stage-ink-muted);
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: var(--esc-target-min);
+  padding: var(--esc-space-2) var(--esc-space-6);
+  border-radius: var(--esc-radius-control);
+  color: var(--esc-ink);
+  text-align: center;
+  background: var(--esc-tile);
+  box-shadow: var(--esc-tile-edge);
+  cursor: default;
+}
+
+.esc-app .esc-badge-label {
+  font-family: var(--esc-font-body);
+  font-size: var(--esc-text-sub);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--esc-ink);
+}
+
+.esc-app .esc-badge-value {
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-title);
+  line-height: 1.1;
+  letter-spacing: var(--esc-title-tracking);
+  color: var(--esc-ink);
+}
+
+.esc-app .esc-badge-spoken {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .esc-app .lycra {
     transition: none;
   }
+}
+
+/*
+  The full-screen QR code (QrFullScreen.tsx): covers the phone screen on
+  the stage, the code on a white card as wide as the screen allows.
+*/
+.esc-qr {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--esc-space-4);
+  box-sizing: border-box;
+  padding: var(--esc-space-4);
+  overflow-y: auto;
+  color: var(--esc-ink);
+  text-shadow: var(--esc-stage-text-shadow);
+  background: var(--esc-bg);
+}
+
+.esc-qr.is-window {
+  position: fixed;
+}
+
+.esc-qr-title {
+  margin: 0;
+  font-family: var(--esc-font-display);
+  font-size: var(--esc-text-title);
+  letter-spacing: var(--esc-title-tracking);
+}
+
+.esc-app .esc-qr .esc-qr-card {
+  width: min(100%, 22rem);
+  padding: var(--esc-space-4);
+  box-sizing: border-box;
+}
+
+.esc-qr-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+}
+
+.esc-qr-actions {
+  width: min(100%, 22rem);
 }

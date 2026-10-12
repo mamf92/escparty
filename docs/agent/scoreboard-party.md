@@ -18,6 +18,7 @@ generously and so on, each named after a moment in Eurovision history.
 | `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
 | `/party` | `PartyHome.tsx` | Host, join with a code, open a big screen, or go back to the last party |
 | `/party/new` | `PartySetup.tsx` | Five steps, one big question each, nothing preselected (local step state, no routes): the show; the rating sheet (premade, or your own categories with a Continue); bonus points (a list of switches for the premade bonuses, all off to begin with, plus one of the host's own with a name and 1 to 5 points, and a Continue); your name, spun on the `NamePicker` reel from `partyNames.ts` (no free text); a summary and the black "Start the party". Back keeps the answers |
+| `/join/:code` | `JoinParty.tsx` | A join link, what the green room's "Show QR code" encodes (`joinLink` in `src/utils/joinCode.ts`): fills the code in and looks it up once, like typing it |
 | `/party/:code` | `PartyRoom.tsx` | Join (spin the `NamePicker` reel for a name nobody has taken; no free text), then tabs: Rate, Ranking, Room, and Host (`PartyHostTools.tsx`) for the host |
 | `/party/:code/screen` | `PartyScreen.tsx` | The TV: QR code, the code, the room's standings, closest guests. Outside the phone frame |
 | `/party/:code/awards` | `PartyAwards.tsx` | One award at a time, then who came closest. Only after the host opens them (the host can preview) |

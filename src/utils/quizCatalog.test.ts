@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
     QUIZ_CHOICES,
+    CLASSIC_QUESTION_COUNT,
+    quizMinutes,
+    quizCardsFor,
     fetchQuizTitle,
     isKnownQuizKey,
     loadQuiz,
@@ -13,6 +16,10 @@ import {
 } from "./quizCatalog";
 import { QUIZ_TEMPLATES } from "../data/quizTemplates";
 import { bankQuestion } from "../data/questionBank";
+import easyJson from "../data/escBeginnerQuiz.json";
+import mediumJson from "../data/escIntermediateQuiz.json";
+import hardJson from "../data/escAdvancedQuiz.json";
+import { QUESTION_SLOT_MS } from "./quizTiming";
 
 const mocks = vi.hoisted(() => ({ loadQuizData: vi.fn(), fetchCustomQuiz: vi.fn(), setRoomDifficulty: vi.fn() }));
 vi.mock("./roomsFirestore", () => ({ setRoomDifficulty: mocks.setRoomDifficulty }));
@@ -181,5 +188,49 @@ describe("QUIZ_CHOICES", () => {
     it("lists the classics first, then every template once", () => {
         expect(QUIZ_CHOICES.slice(0, 3).map(choice => choice.key)).toEqual(["easy", "medium", "hard"]);
         expect(QUIZ_CHOICES.slice(3).map(choice => choice.key)).toEqual(QUIZ_TEMPLATES.map(templateKey));
+    });
+});
+
+describe("classic question counts and levels", () => {
+    it("matches the JSON files", () => {
+        for (const json of [easyJson, mediumJson, hardJson]) expect(json.length).toBe(CLASSIC_QUESTION_COUNT);
+        expect(QUIZ_CHOICES.slice(0, 3).map(choice => choice.level)).toEqual(["easy", "medium", "hard"]);
+    });
+
+    it("gives every template a level that is the rounded mean difficulty of its questions", () => {
+        const number = { easy: 1, medium: 2, hard: 3 } as const;
+        for (const template of QUIZ_TEMPLATES) {
+            const mean = template.questionIds.reduce((sum, id) => sum + number[bankQuestion(id)!.difficulty], 0) / template.questionIds.length;
+            expect(number[template.level], template.id).toBe(Math.round(mean));
+        }
+    });
+
+    it("gives every premade quiz one sentence", () => {
+        for (const choice of QUIZ_CHOICES) expect(choice.tagline, choice.key).toMatch(/^[A-Z].*[.]$/);
+    });
+});
+
+describe("quizMinutes", () => {
+    it("counts a slot per question, rounded up, at least a minute", () => {
+        expect(quizMinutes(10, 0)).toBe(Math.ceil(10 * QUESTION_SLOT_MS / 60_000));
+        expect(quizMinutes(1, 0)).toBe(1);
+        expect(quizMinutes(0, 0)).toBe(1);
+    });
+
+    it("adds half a minute per break, none after the last question", () => {
+        // 10 questions, a break after 5 only: 150 s + 30 s = 3 min exactly.
+        expect(quizMinutes(10, 5)).toBe(3);
+        // 12 questions every 4: breaks after 4 and 8, not 12: 180 s + 60 s.
+        expect(quizMinutes(12, 4)).toBe(4);
+        expect(quizMinutes(10, 5)).toBeGreaterThanOrEqual(quizMinutes(10, 0));
+    });
+});
+
+describe("quizCardsFor", () => {
+    it("lists the device's quizzes first, then the premade ones", () => {
+        const cards = quizCardsFor([{ id: "AbCdEfGhIjKlMnOpQrSt", title: "Mine", questionCount: 4 }]);
+        expect(cards.map(card => card.key)).toEqual(["c-AbCdEfGhIjKlMnOpQrSt", ...QUIZ_CHOICES.map(choice => choice.key)]);
+        expect(cards[0]).toMatchObject({ level: null, questionCount: 4 });
+        expect(cards[1]).toMatchObject({ level: "easy", questionCount: 10, minutes: 3 });
     });
 });
