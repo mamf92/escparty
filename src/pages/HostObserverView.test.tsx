@@ -56,52 +56,6 @@ describe("HostObserverView", () => {
     expect(button).not.toHaveAttribute("title");
   });
 
-  describe("while a question is open", () => {
-    const START = 1_000_000;
-    const at = (ms: number) => ({ toMillis: () => ms }) as unknown as Room["phaseStartedAt"];
-    const standings = () => within(screen.getByRole("list", { name: "Standings" })).getAllByRole("listitem").map(row => row.textContent);
-
-    it("keeps the standings at the question's start scores until answering closes", () => {
-      vi.useFakeTimers();
-      try {
-        vi.setSystemTime(START + 2_000);
-        renderView();
-        act(() => mocks.onRoom(room({ phaseStartedAt: at(START) })));
-        const answered = [{ id: "host", name: "Host", score: 0 }, { id: "p2", name: "Loreen", score: 1200 }, { id: "p3", name: "Lordi", score: 900 }];
-        act(() => mocks.onRoom(room({ phaseStartedAt: at(START), players: answered })));
-        // Loreen's tap landed, but the order and scores hold.
-        expect(standings()).toEqual(["1. Lordi900 points", "2. Loreen700 points"]);
-        expect(screen.getByText("Scores update when answering closes.")).toBeInTheDocument();
-        act(() => vi.advanceTimersByTime(8_000));
-        expect(standings()).toEqual(["1. Loreen1200 points", "2. Lordi900 points"]);
-        expect(screen.queryByText("Scores update when answering closes.")).not.toBeInTheDocument();
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    it("freezes at the next question's start too, and treats a pending start as open", () => {
-      vi.useFakeTimers();
-      try {
-        vi.setSystemTime(START + 2_000);
-        renderView();
-        act(() => mocks.onRoom(room({ phaseStartedAt: null as unknown as Room["phaseStartedAt"] })));
-        expect(screen.getByText("Scores update when answering closes.")).toBeInTheDocument();
-        act(() => mocks.onRoom(room({
-          currentQuestionIndex: 3, phaseStartedAt: at(START + 2_000),
-          players: [{ id: "p2", name: "Loreen", score: 1000 }, { id: "p3", name: "Lordi", score: 900 }],
-        })));
-        act(() => mocks.onRoom(room({
-          currentQuestionIndex: 3, phaseStartedAt: at(START + 2_000),
-          players: [{ id: "p2", name: "Loreen", score: 1000 }, { id: "p3", name: "Lordi", score: 1500 }],
-        })));
-        expect(standings()).toEqual(["1. Loreen1000 points", "2. Lordi900 points"]);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-  });
-
   it("follows the room to the results when the quiz is over (#21)", () => {
     renderView();
     act(() => mocks.onRoom(room({ phase: "results" })));

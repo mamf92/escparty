@@ -7,7 +7,7 @@ import { Control, Ground, Pane } from "../design";
 import { LEGACY_ROOM_MESSAGE, ObserverRouteState, isObserverHost, playingPlayers } from "../utils/roomRoles";
 import { useResumeRoom } from "../hooks/useResumeRoom";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
-import { questionClock, startedAtMillis } from "../utils/quizTiming";
+import { startedAtMillis } from "../utils/quizTiming";
 
 /** How long the break waits for every player before Continue can go on without some. */
 export const MISSING_PLAYER_GRACE_MS = 20_000;
@@ -40,34 +40,7 @@ const HostObserverView = () => {
     const [error, setError] = useState<string | null>(
         roomCode ? null : "This tab lost track of the game. Find it again from multiplayer."
     );
-    const livePlayers = room ? playingPlayers(room) : (routeState.players ?? []);
-    // While a question is open for answering, the standings (often on a
-    // shared screen) keep the scores the question started with: a score
-    // write lands at the tap, and re-sorting then would show who was right
-    // while others are still answering.
-    const index = room?.phase === "question" ? room.currentQuestionIndex ?? 0 : null;
-    const startMs = room ? startedAtMillis(room.phaseStartedAt) : null;
-    const [frozen, setFrozen] = useState<{ index: number; startMs: number | null; scores: Record<string, number> } | null>(null);
-    // Captured on the first snapshot of each question (adjusting state while
-    // rendering). A start that was pending and is now confirmed is the same
-    // question, so it keeps its scores.
-    if (index !== null && (!frozen || frozen.index !== index || (frozen.startMs !== null && frozen.startMs !== startMs))) {
-        setFrozen({ index, startMs, scores: Object.fromEntries(livePlayers.map(p => [p.id, p.score])) });
-    } else if (frozen && index !== null && frozen.startMs === null && startMs !== null) {
-        setFrozen({ ...frozen, startMs });
-    }
-    const [now, setNow] = useState(() => Date.now());
-    // A pending start (null) counts as open.
-    const answeringOpen = index !== null && (startMs === null || questionClock(startMs, now).answeringOpen);
-    useEffect(() => {
-        if (!answeringOpen) return;
-        const timer = setInterval(() => setNow(Date.now()), 250);
-        return () => clearInterval(timer);
-    }, [answeringOpen]);
-    const frozenScores = answeringOpen && frozen && frozen.index === index ? frozen.scores : null;
-    const players = frozenScores
-        ? livePlayers.map(p => ({ ...p, score: frozenScores[p.id] ?? p.score }))
-        : livePlayers;
+    const players = room ? playingPlayers(room) : (routeState.players ?? []);
     const playersAtMidQuiz = room?.playersAtMidQuiz ?? [];
     const allPlayersReady = players.length > 0 && players.every(player => playersAtMidQuiz.includes(player.id));
     const inBreak = room?.phase === "mid-scoreboard";
@@ -192,7 +165,6 @@ const HostObserverView = () => {
                     empty="Nobody's playing in this room yet."
                 />
             )}
-            {frozenScores && <CalmNote>Scores update when answering closes.</CalmNote>}
 
             <Ground>
                 <Pane>

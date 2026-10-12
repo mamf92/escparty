@@ -168,16 +168,6 @@
   box-shadow: 0 0 32px var(--esc-loader-glow);
 }
 
-.esc-loader-status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .esc-loader-text {
   margin: 0;
   font-family: var(--esc-font-display);
