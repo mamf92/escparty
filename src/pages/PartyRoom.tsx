@@ -180,10 +180,11 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
     const [name, setName] = useState<string | null>(null);
     const [spinning, setSpinning] = useState(false);
     const checking = ballots === undefined && !error;
+    // Any listener error stops joining, even with ballots on screen: they may be stale.
     // The names nobody has yet.
-    const names = useMemo(() => availablePartyNames((ballots ?? []).map(ballot => ballot.name)), [ballots]);
+    const names = useMemo(() => availablePartyNames((ballots ?? []).map(ballot => ballot.name), withDistinctNames(ballots ?? []).map(ballot => ballot.name)), [ballots]);
     // A landed name that a ballots update takes before this guest joins is let go.
-    const blocked = ballots === undefined && !!error;
+    const blocked = !!error;
     const landed = name !== null && names.includes(name) ? name : null;
     const justTaken = name !== null && landed === null ? name : null;
     return (

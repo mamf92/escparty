@@ -20,6 +20,11 @@ describe("availablePartyNames", () => {
         expect(names[0]).toBe("Loreen 3");
         expect(names[1]).toBe("Käärijä 2");
     });
+
+    it("doesn't offer a numbered name a guest is already shown as", () => {
+        const names = availablePartyNames(PARTY_NAMES, ["Loreen 2"]);
+        expect(names[0]).toBe("Loreen 3");
+    });
 });
 
 describe("distinctNames", () => {

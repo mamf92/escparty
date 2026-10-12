@@ -19,10 +19,11 @@ export const PARTY_NAMES = [
  * name's first free numbered variant (" 2", " 3"...), so a newcomer is never
  * offered a name a guest already has.
  */
-export const availablePartyNames = (takenNames: readonly string[]): string[] => {
+export const availablePartyNames = (takenNames: readonly string[], shownNames: readonly string[] = []): string[] => {
     const free = freeNames(takenNames, PARTY_NAMES);
     if (free.length > 0) return free;
-    const takenKeys = new Set(takenNames.map(nameKey));
+    // Numbered names guests are shown as (a same-instant duplicate's "Loreen 2") count as taken too.
+    const takenKeys = new Set([...takenNames, ...shownNames].map(nameKey));
     return PARTY_NAMES.map(name => firstFreeNumbered(name, takenKeys));
 };
 

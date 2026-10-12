@@ -106,6 +106,14 @@ describe("PartyRoom", () => {
         expect(retry).toHaveBeenCalledOnce();
     });
 
+    it("stops joining on a listener error even with ballots already on screen, since they may be stale", () => {
+        mocks.data = { party: makeParty(), ballots: [], error: "The party couldn't be reached.", retry: vi.fn() };
+        renderRoom();
+        expect(screen.getByRole("alert")).toHaveTextContent("The party couldn't be reached.");
+        expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeDisabled();
+    });
+
     it("turns the reel off too until the taken names have arrived", () => {
         mocks.data = { party: makeParty(), ballots: undefined, error: null, retry: vi.fn() };
         renderRoom();

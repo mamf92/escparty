@@ -71,18 +71,17 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
     }, []);
 
     // Merge with the server's copy once, when it first arrives.
-    const known = serverBallots;
     useEffect(() => {
-        if (merged.current || !known || !identity) return;
+        if (merged.current || !serverBallots || !identity) return;
         merged.current = true;
-        const server = known.find(entry => entry.guestId === identity.guestId) ?? null;
+        const server = serverBallots.find(entry => entry.guestId === identity.guestId) ?? null;
         const next = mergeBallots(server, latest.current);
         latest.current = next;
         setBallot(next);
         if (code) storeBallot(code, next);
         // No ballot yet: write the empty one, which claims the name for the next guest.
         if (!server || !same(server, next)) schedule(0);
-    }, [known, identity, code, schedule]);
+    }, [serverBallots, identity, code, schedule]);
 
     const change = useCallback((update: (current: { ratings: Ratings; bonuses: Bonuses }) => { ratings: Ratings; bonuses: Bonuses }) => {
         const next = update(latest.current);

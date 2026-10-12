@@ -251,14 +251,14 @@ const PartySetup = () => {
                                     <label className="calm-label party-label-gap" htmlFor={`${ids}-${category.id}-scale`}>
                                         Scale for category {index + 1}
                                     </label>
-                                    <select
+                                    <Field
                                         id={`${ids}-${category.id}-scale`}
-                                        className="lycra-field"
+                                        as="select"
                                         value={category.max}
                                         onChange={event => setCategory(index, { max: Number(event.target.value) as RatingCategory["max"] })}
                                     >
                                         {SCALE_CHOICES.map(max => <option key={max} value={max}>{scaleLabel(max)}</option>)}
-                                    </select>
+                                    </Field>
                                 </div>
                             ))}
                         </Pane>
@@ -321,16 +321,16 @@ const PartySetup = () => {
                             </div>
                             <div>
                                 <label className="calm-label" htmlFor={`${ids}-own-points`}>Points it adds</label>
-                                <select
+                                <Field
                                     id={`${ids}-own-points`}
-                                    className="lycra-field"
+                                    as="select"
                                     value={ownPoints}
                                     onChange={event => setOwnPoints(Number(event.target.value))}
                                 >
                                     {Array.from({ length: BONUS_LIMITS.maxPoints - BONUS_LIMITS.minPoints + 1 }, (_, i) => BONUS_LIMITS.minPoints + i).map(points => (
                                         <option key={points} value={points}>+{points}</option>
                                     ))}
-                                </select>
+                                </Field>
                             </div>
                         </>
                     )}
