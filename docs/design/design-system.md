@@ -110,6 +110,12 @@ a soft glow over the ball (`BallLook.glare`: full in Sparkle, faint in Calm).
 The wait's ball (`Loader`) catches the same glare (`paintLitBall`). The ball
 has no wire on any screen.
 
+A screen that needs the room (the party room) passes `calm-noball` to
+`CalmPage`: `stage.css` then sets `--esc-ball-size: 0px` and a small
+`--esc-stage-clearance`, and `Stage` reads the 0 and paints no ball and no
+spots. Sparkle's sequins and Calm's gradient stay, so it is the same theme
+with a bare stage, and the page title starts near the top.
+
 The lamp follows `pointerdown`/`pointermove` and `touchstart`/`touchmove`
 (passive, captured, never `preventDefault`ed, so scrolling is untouched).
 `stage.css` also turns off the tap highlight, the touch callout and text
@@ -180,7 +186,7 @@ needs and no token gives is a new token here, not a literal in the page.
 
 ```
 MobileFrame (or the big screen)    the stage, edge to edge
-├─ Stage              <Stage />: the disco ball (and Sparkle's sequins), behind everything
+├─ Stage              <Stage />: the disco ball (and Sparkle's sequins), behind everything; `calm-noball` on CalmPage leaves the ball out
 ├─ App bar            ESCParty brand (a link home) · Sparkle mode switch
 └─ CalmPage           every screen's chrome
    ├─ Page header     <h1> title (one per page) · optional subtitle
@@ -335,6 +341,9 @@ top, on a `Control` tile that turns
 pink when chosen. `ChoiceGrid` lays cards out two to a row (`columns={1}` for
 one), equal heights, text wrapping at 320px. In a radio group give each card
 `role="radio"`, `aria-checked` and the roving tab stop (`radioGroupKeys`).
+A menu of what to start is ChoiceCards too: the Host screen (a plain-button
+`ChoiceGrid` with `role="group"`) and the scoreboard setup's show and sheet
+picks match the quiz cards. A ChoiceCard is a dark tile even as a plain button.
 
 **Hero** (`calm-hero` on `CalmPage`, Home only). The landing screen
 shows a bigger ball (46% of the stage's width, 148px to 280px), and the

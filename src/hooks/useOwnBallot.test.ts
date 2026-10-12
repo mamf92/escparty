@@ -72,6 +72,14 @@ describe("useOwnBallot", () => {
         expect(mocks.saveBallot).not.toHaveBeenCalled();
     });
 
+    it("writes an empty ballot as soon as the party's ballots arrive without one, claiming the name", async () => {
+        const other: Ballot = { guestId: "g2", name: "Lordi", ratings: {}, bonuses: {} };
+        renderHook(() => useOwnBallot("ABBA", me, [other]));
+        await act(() => vi.advanceTimersByTimeAsync(0));
+        expect(mocks.saveBallot).toHaveBeenCalledTimes(1);
+        expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", { guestId: "g1", name: "Jedward", ratings: {}, bonuses: {} });
+    });
+
     it("doesn't save before the guest has joined", async () => {
         const { result, unmount } = renderHook(() => useOwnBallot("ABBA", null, []));
         act(() => result.current.rate("se", "points", 1));

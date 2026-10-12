@@ -7,6 +7,7 @@ import {
     generateRoomCode,
     getRoom,
     joinRoom,
+    joinRoomWithFreeName,
     listenToRoom,
     markPlayerAtMidQuiz,
     resetPlayersAtMidQuiz,
@@ -418,6 +419,242 @@ describe("joinRoom", () => {
         await expect(joinRoom("ABCD", "p-2", "Ida")).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
+    });
+});
+
+describe("joinRoomWithFreeName", () => {
+    const POOL = ["Loreen", "Netta", "Lordi"];
+
+    it("joins in a transaction under the wanted name when it is free", async () => {
+        const update = givenTransactionSees(roomWith());
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Loreen");
+
+        expect(mocks.updateDoc).not.toHaveBeenCalled();
+        expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
+            players: [
+                player("host-1", "Martin"),
+                { id: "p-2", name: "Loreen", score: 0, joinedAt: NOW },
+            ],
+        });
+    });
+
+    it("gives another name from the pool when the wanted one is taken", async () => {
+        const update = givenTransactionSees(roomWith({ players: [player("host-1", "Loreen")] }));
+
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen");
+
+        expect(["Netta", "Lordi"]).toContain(name);
+        const written = update.mock.calls[0][1].players as Player[];
+        expect(written.map(p => p.name)).toEqual(["Loreen", name]);
+    });
+
+    it("numbers the wanted name when the whole pool is taken", async () => {
+        const update = givenTransactionSees(roomWith({
+            players: [player("a", "Loreen"), player("b", "Netta"), player("c", "Lordi"), player("d", "Loreen 2")],
+        }));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Loreen 3");
+        expect(update).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns the existing name for a player who is already in, without writing", async () => {
+        const update = givenTransactionSees(roomWith({ players: [player("p-2", "Netta")], started: true }));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Netta");
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("answers null for a room that doesn't exist", async () => {
+        const update = givenTransactionSees(null);
+
+        await expect(joinRoomWithFreeName("ZZZZ", "p-2", POOL, "Loreen")).resolves.toBeNull();
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("answers null once the game has started", async () => {
+        const update = givenTransactionSees(roomWith({ started: true }));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBeNull();
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("throws, with the rejection as the cause, when the room is full", async () => {
+        const players = Array.from({ length: MAX_PLAYERS }, (_, i) => player(`p-${i}`, `Name ${i}`));
+        givenTransactionSees(roomWith({ players }));
+
+        const error = await joinRoomWithFreeName("ABCD", "p-new", POOL, "Loreen").catch((e: unknown) => e) as Error;
+
+        expect(error.message).toBe(`Failed to join room: The room is full (${MAX_PLAYERS} players)`);
+        expect(error.cause).toBeInstanceOf(JoinRejected);
+        expect((error.cause as JoinRejected).reason).toBe("full");
+    });
+
+    it("reads the room again when another join won the race, and takes the next free name", async () => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        const update = vi.fn();
+        const rooms = [roomWith(), roomWith({ players: [player("host-1", "Martin"), player("p-3", "Loreen")] })];
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                const room = rooms.shift()!;
+                const result = await updateFunction({ get: async () => snapshotOf(room), update });
+                if (rooms.length > 0) throw denied; // the first attempt loses the race
+                return result;
+            },
+        );
+        mocks.getDoc.mockResolvedValue(snapshotOf(rooms[1]));
+
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen");
+
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(2);
+        expect(["Netta", "Lordi"]).toContain(name);
+    });
+
+    const deniedAfterSeeing = (seen: Room, latest: Room | null) => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                await updateFunction({ get: async () => snapshotOf(seen), update: vi.fn() });
+                throw denied;
+            },
+        );
+        mocks.getDoc.mockResolvedValue(snapshotOf(latest));
+    };
+
+    it("answers null when the host started the game between the read and the commit", async () => {
+        deniedAfterSeeing(roomWith(), roomWith({ started: true }));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBeNull();
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws the full-room answer when the room filled between the read and the commit", async () => {
+        const players = Array.from({ length: MAX_PLAYERS }, (_, i) => player(`q-${i}`, `Name ${i}`));
+        deniedAfterSeeing(roomWith(), roomWith({ players }));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
+            `Failed to join room: The room is full (${MAX_PLAYERS} players)`,
+        );
+    });
+
+    it("keeps the name of a player who turns out to be in already", async () => {
+        deniedAfterSeeing(roomWith(), roomWith({ players: [player("p-2", "Netta")] }));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Netta");
+    });
+
+    it("answers null when the room has been deleted meanwhile", async () => {
+        deniedAfterSeeing(roomWith(), null);
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBeNull();
+    });
+
+    it("retries when one player joined and another left, the count staying the same", async () => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        const seen = roomWith({ players: [player("host-1", "Martin"), player("p-3", "Netta")] });
+        const latest = roomWith({ players: [player("host-1", "Martin"), player("p-4", "Lordi")] });
+        const rooms = [seen, latest];
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                const room = rooms.shift()!;
+                const result = await updateFunction({ get: async () => snapshotOf(room), update: vi.fn() });
+                if (rooms.length > 0) throw denied;
+                return result;
+            },
+        );
+        mocks.getDoc.mockResolvedValue(snapshotOf(latest));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Loreen");
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it("reports a rules failure when the same players are in", async () => {
+        deniedAfterSeeing(roomWith(), roomWith());
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
+            "Failed to join room: Security rules prevented access",
+        );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("gives up after MAX_PLAYERS + 8 attempts of losing the race", async () => {
+        // Every attempt sees one player and is refused, while the room then has two.
+        deniedAfterSeeing(roomWith(), roomWith({ players: [player("host-1", "Martin"), player("p-3", "Netta")] }));
+        vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => { fn(); return 0; }) as never);
+
+        await expect(joinRoomWithFreeName("ABCD", "p-x", POOL, "Loreen")).rejects.toThrow(
+            "Failed to join room: Security rules prevented access",
+        );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(MAX_PLAYERS + 8);
+    });
+
+    it.each(["aborted", "failed-precondition"])("runs again after %s contention when someone else joined", async (code) => {
+        const contended = Object.assign(new Error("Too much contention"), { code });
+        const rooms = [roomWith(), roomWith({ players: [player("host-1", "Martin"), player("p-3", "Loreen")] })];
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                const room = rooms.shift()!;
+                const result = await updateFunction({ get: async () => snapshotOf(room), update: vi.fn() });
+                if (rooms.length > 0) throw contended;
+                return result;
+            },
+        );
+        mocks.getDoc.mockResolvedValue(snapshotOf(rooms[1]));
+
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen");
+
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(2);
+        expect(name).not.toBe("Loreen");
+    });
+
+    it("picks the wanted name from the pool when none is given", async () => {
+        givenTransactionSees(roomWith());
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL);
+        expect(POOL).toContain(name);
+    });
+
+    it("reports a refusal at once when nobody else joined", async () => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        const room = roomWith();
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                await updateFunction({ get: async () => snapshotOf(room), update: vi.fn() });
+                throw denied;
+            },
+        );
+        mocks.getDoc.mockResolvedValue(snapshotOf(room));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
+            "Failed to join room: Security rules prevented access",
+        );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a refusal at once when the room can't be read again", async () => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                await updateFunction({ get: async () => snapshotOf(roomWith()), update: vi.fn() });
+                throw denied;
+            },
+        );
+        mocks.getDoc.mockRejectedValue(new Error("offline"));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
+            "Failed to join room: Security rules prevented access",
+        );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("surfaces a rules rejection as a join failure", async () => {
+        mocks.runTransaction.mockRejectedValue(
+            Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
+        );
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
+            "Failed to join room: Security rules prevented access",
+        );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -854,6 +1091,7 @@ describe("when Firebase never initialized", () => {
             "Firebase not initialized",
         );
         await expect(joinRoom("ABCD", "p-2", "Ida")).rejects.toThrow("Firebase not initialized");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", ["Ida"], "Ida")).rejects.toThrow("Firebase not initialized");
         await expect(setRoomDifficulty("ABCD", "easy")).rejects.toThrow(
             "Firebase not initialized",
         );

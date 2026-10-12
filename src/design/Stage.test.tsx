@@ -92,6 +92,27 @@ describe("Stage", () => {
     add.mockRestore();
   });
 
+  it("paints no ball and no spots where the screen declares --esc-ball: none", () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
+    const fillRect = vi.fn();
+    const ctx = new Proxy({ fillRect } as Record<string, unknown>, {
+      get: (target, key: string) => target[key] ?? vi.fn(),
+      set: () => true,
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((kind: string) => kind === "2d" ? ctx : null) as never);
+    // The screen's explicit flag (stage.css, `.calm-noball`), not a measured 0.
+    const real = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation(((el: Element) => {
+      const style = real(el);
+      return new Proxy(style, { get: (t, k) => (k === "getPropertyValue" ? (n: string) => (n === "--esc-ball" ? " none" : t.getPropertyValue(n)) : Reflect.get(t, k)) });
+    }) as never);
+
+    renderWithProviders(<Stage />);
+    expect(fillRect).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
   it("hangs the ball with no wire on any screen", () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
@@ -101,6 +122,8 @@ describe("Stage", () => {
       set: () => true,
     });
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((kind: string) => kind === "2d" ? ctx : null) as never);
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(96);
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(56);
     // The old wire: a 2px strip down the stage's middle from its top edge.
     const wires = () => fillRect.mock.calls.filter(([x, y, w]) => x === 199 && y === 0 && w === 2);
 

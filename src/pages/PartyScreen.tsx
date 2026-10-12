@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toDataURL } from "qrcode";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -6,6 +6,7 @@ import { PartyError, PartyNotFound } from "../components/PartyStates";
 import { Ground, Pane, Row } from "../design";
 import { usePartyData } from "../hooks/usePartyData";
 import { predictionLeaderboard, roomStandings } from "../utils/partyModel";
+import { withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, partyLink, predictionsFor } from "../utils/partyResults";
 import "./party-calm.css";
 
@@ -37,6 +38,8 @@ const PartyScreen = () => {
         };
     }, [link]);
 
+    const all = useMemo(() => withDistinctNames(ballots ?? []), [ballots]);
+
     const back = <CalmLink onClick={() => navigate(code ? `/party/${code}` : "/party")}>Back to my phone view</CalmLink>;
 
     if (party === undefined) {
@@ -55,7 +58,6 @@ const PartyScreen = () => {
         );
     }
 
-    const all = ballots ?? [];
     const standings = roomStandings(all, actIdsOf(party), party.template.categories, partyBonusList(party));
     const byId = new Map(party.acts.map(act => [act.id, act]));
     const leaderboard = party.showNames && hasResults(party) ? predictionLeaderboard(all, predictionsFor(party, all)).slice(0, 3) : [];
@@ -80,7 +82,7 @@ const PartyScreen = () => {
                 !error && <CalmNote role="status">Counting the ratings…</CalmNote>
             ) : (
                 <>
-                    <CalmNote aria-live="polite">{all.length === 1 ? "1 guest is rating." : `${all.length} guests are rating.`}</CalmNote>
+                    <CalmNote aria-live="polite">{all.length === 1 ? "1 guest at the party." : `${all.length} guests at the party.`}</CalmNote>
 
                     <h2 className="esc-section">The room's standings</h2>
                     <Ground>

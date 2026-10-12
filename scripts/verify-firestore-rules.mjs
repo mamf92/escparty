@@ -139,6 +139,54 @@ report(
   }`,
 );
 
+// 2c. joinRoomWithFreeName's write: a transaction that reads the room and
+// writes the list back with one more player. Ten clients join at the same
+// moment, all wanting the name "Same"; each picks the first free "Same",
+// "Same 2", ... in its transaction. Firestore does not retry the losers
+// itself: the join rule compares the list's size with the room's at commit
+// time, so a transaction built on a stale read is refused with
+// permission-denied. The client (joinRoomWithFreeName, and this copy of it)
+// reads again and retries when the room's players changed, so every guest
+// must land, each under its own name.
+// (Ten joiners, not more: firestore.rules' allPlayersValid hits the
+// 1000-expression limit at the 13th player, so the room stops at 12.)
+const txJoiners = freshRoom("TXJ");
+await createRoom(txJoiners.roomRef, txJoiners.roomCode);
+const txJoinOnce = (clientDb, id) =>
+  runTransaction(clientDb, async (transaction) => {
+    const ref = doc(clientDb, "rooms", txJoiners.roomCode);
+    const room = (await transaction.get(ref)).data();
+    const taken = new Set(room.players.map((p) => p.name));
+    let name = "Same";
+    for (let n = 2; taken.has(name); n += 1) name = `Same ${n}`;
+    transaction.update(ref, { players: [...room.players, { id, name, score: 0, joinedAt: Timestamp.now() }] });
+  });
+const txJoinFrom = async (clientDb, id) => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await txJoinOnce(clientDb, id);
+    } catch (e) {
+      if (e.code !== "permission-denied" || attempt >= 40) throw e;
+      await new Promise((resolve) => setTimeout(resolve, Math.random() * 150));
+    }
+  }
+};
+const txClients = Array.from({ length: 10 }, (_, i) => `tx-${i}`).map((name) => {
+  const clientDb = getFirestore(initializeApp({ projectId: "demo-escparty" }, name));
+  connectFirestoreEmulator(clientDb, "127.0.0.1", 8080);
+  return clientDb;
+});
+await expectAllowed("ten guests join by transaction at the same moment", () =>
+  Promise.all(txClients.map((clientDb, i) => txJoinFrom(clientDb, `t-${i}`)))
+);
+const txPlayers = (await getDoc(txJoiners.roomRef)).data().players;
+report("every transactional join is in the room", "10", String(txPlayers.length - 1));
+report(
+  "no two transactional joiners share a name",
+  String(txPlayers.length),
+  String(new Set(txPlayers.map((p) => p.name)).size),
+);
+
 // 3. Malicious: append a new "player" that's missing a required field. Sized
 // to exactly oldCount + 1 so this write actually reaches allPlayersValid via
 // isAddingPlayer's exact-size-match branch, rather than getting denied on a

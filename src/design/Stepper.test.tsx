@@ -19,7 +19,7 @@ describe("Stepper", () => {
         expect(spin()).not.toHaveAttribute("aria-valuenow");
         expect(spin()).toHaveAttribute("aria-valuetext", "Not rated");
         // The visible text is hidden from screen readers; aria-valuetext says it.
-        expect(spin()).toHaveTextContent("–");
+        expect(spin()).toHaveTextContent("?");
         expect(spin().querySelector("[aria-hidden='true']")).not.toBeNull();
     });
 

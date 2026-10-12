@@ -1,10 +1,11 @@
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { NamePicker } from "../components/NamePicker";
 import PartyHostTools from "../components/PartyHostTools";
 import { PartyError, PartyNotFound } from "../components/PartyStates";
-import { Control, Field, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } from "../design";
+import { Control, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } from "../design";
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
 import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import { usePartyData } from "../hooks/usePartyData";
@@ -18,7 +19,8 @@ import {
     type Bonuses,
     type Ratings,
 } from "../utils/partyModel";
-import { randomPartyName } from "../utils/partyNames";
+import { prefersReducedMotion } from "../utils/motion";
+import { availablePartyNames, withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
@@ -52,6 +54,16 @@ const PartyRoom = () => {
     const isHost = !!party && !!identity && identity.guestId === party.hostId;
     const tabKeys = isHost ? HOST_TABS : GUEST_TABS;
     const tabs = useRovingTabs(tabKeys, tab, setTab);
+    // Names with a number where two guests share one, worked out once for every list.
+    const distinct = useMemo(() => (ballots ? withDistinctNames(ballots) : undefined), [ballots]);
+    // "See your ranking" moves to the Ranking tab, and focus goes with it.
+    const focusRanking = useRef(false);
+    const rankingTabId = tabs.tab("ranking").id;
+    useEffect(() => {
+        if (tab !== "ranking" || !focusRanking.current) return;
+        focusRanking.current = false;
+        document.getElementById(rankingTabId)?.focus();
+    }, [tab, rankingTabId]);
 
     // The brand asks only once this tab is in a party that exists.
     useLeaveGuard(party && identity ? {
@@ -76,7 +88,20 @@ const PartyRoom = () => {
         );
     }
     if (!identity) {
-        return <JoinParty party={party} onJoin={next => { savePartyIdentity(party.code, next); setIdentity(next); }} footer={back} />;
+        return (
+            <JoinParty
+                party={party}
+                ballots={ballots}
+                error={error}
+                onRetry={retry}
+                onJoin={next => {
+                    // useOwnBallot writes the empty ballot (which claims the name) once it sees none for this guest.
+                    savePartyIdentity(party.code, next);
+                    setIdentity(next);
+                }}
+                footer={back}
+            />
+        );
     }
 
     const updateIdentity = (change: Partial<PartyIdentity>) => {
@@ -87,9 +112,9 @@ const PartyRoom = () => {
 
     return (
         <CalmPage
-            className="calm-compact"
+            className="calm-compact calm-noball"
             title={party.title}
-            subtitle={`Party ${party.code} · you're ${identity.name}`}
+            subtitle={`Party ${party.code} · you're ${distinct?.find(ballot => ballot.guestId === identity.guestId)?.name ?? identity.name}`}
             footer={
                 <>
                     <CalmLink onClick={() => navigate(`/party/${party.code}/screen`)}>Open the big screen</CalmLink>
@@ -115,12 +140,16 @@ const PartyRoom = () => {
                         onMove={index => updateIdentity({ actId: party.acts[index].id })}
                         onRate={own.rate}
                         onBonus={own.toggleBonus}
+                        onDone={() => {
+                            focusRanking.current = true;
+                            setTab("ranking");
+                        }}
                     />
                 )}
                 {tab === "ranking" && <MyRanking party={party} ballot={{ guestId: identity.guestId, name: identity.name, ...own.ballot }} />}
-                {tab === "room" && (ballots === undefined
+                {tab === "room" && (distinct === undefined
                     ? !error && <CalmNote role="status">Counting the ratings…</CalmNote>
-                    : <TheRoom party={party} ballots={ballots} me={identity.guestId} />)}
+                    : <TheRoom party={party} ballots={distinct} me={identity.guestId} />)}
                 {tab === "host" && isHost && <PartyHostTools party={party} ballots={ballots ?? []} />}
 
                 {tab !== "host" && (party.revealed || isHost) && (
@@ -138,39 +167,47 @@ const PartyRoom = () => {
     );
 };
 
-const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity: PartyIdentity) => void; footer: ReactNode }) => {
-    const nameId = useId();
-    const [name, setName] = useState(randomPartyName);
-    const [tried, setTried] = useState(false);
-    const missing = tried && !name.trim();
-    // A form, so Enter in the name field joins.
-    const join = (event: FormEvent) => {
-        event.preventDefault();
-        setTried(true);
-        if (!name.trim()) return;
-        onJoin({ guestId: uuidv4(), name: name.trim(), isHost: false });
-    };
+const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
+    party: Party;
+    /** Everyone already in the party, whose names are taken; undefined until they arrive. */
+    ballots: Ballot[] | undefined;
+    /** A listener errored: nobody joins until the taken names can be read. */
+    error: string | null;
+    onRetry: () => void;
+    onJoin: (identity: PartyIdentity) => void;
+    footer: ReactNode;
+}) => {
+    const [name, setName] = useState<string | null>(null);
+    const [spinning, setSpinning] = useState(false);
+    const checking = ballots === undefined && !error;
+    // Any listener error stops joining, even with ballots on screen: they may be stale.
+    // The names nobody has yet.
+    const names = useMemo(() => availablePartyNames((ballots ?? []).map(ballot => ballot.name), withDistinctNames(ballots ?? []).map(ballot => ballot.name)), [ballots]);
+    // A landed name that a ballots update takes before this guest joins is let go.
+    const blocked = !!error;
+    const landed = name !== null && names.includes(name) ? name : null;
+    const justTaken = name !== null && landed === null ? name : null;
     return (
         <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
-            <form onSubmit={join} noValidate>
-                <Ground>
-                    <Pane>
-                        <div>
-                            <label className="calm-label" htmlFor={nameId}>Your name at the party</label>
-                            <Field
-                                id={nameId}
-                                value={name}
-                                maxLength={40}
-                                aria-invalid={missing}
-                                aria-describedby={missing ? `${nameId}-problem` : undefined}
-                                onChange={event => setName(event.target.value)}
-                            />
-                            {missing && <CalmNote id={`${nameId}-problem`} role="alert">Give yourself a name.</CalmNote>}
-                        </div>
-                        <Control type="submit" elevation="high">Join the party</Control>
-                    </Pane>
-                </Ground>
-            </form>
+            {blocked && error !== null ? <PartyError error={error} onRetry={onRetry} /> : (
+                <>
+                    <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
+                    <NamePicker value={landed} onChange={setName} onSpinningChange={setSpinning} names={names} disabled={checking} />
+                </>
+            )}
+            {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
+            {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
+            <Ground>
+                <Pane>
+                    <Control
+                        elevation="high"
+                        disabled={landed === null || spinning || checking || blocked}
+                        onClick={() => landed !== null && onJoin({ guestId: uuidv4(), name: landed, isHost: false })}
+                    >
+                        Join the party
+                    </Control>
+                </Pane>
+            </Ground>
             <CalmNote role="status">
                 {party.showNames
                     ? "At the end, the awards name who rated most alike and most differently."
@@ -180,15 +217,37 @@ const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity:
     );
 };
 
-const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
+const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus, onDone }: {
     party: Party;
     ballot: { ratings: Ratings; bonuses: Bonuses };
     actIndex: number;
     onMove: (index: number) => void;
     onRate: (actId: string, categoryId: string, value: number) => void;
     onBonus: (actId: string, bonusId: string) => void;
+    /** Called from "See your ranking" on the last act. */
+    onDone: () => void;
 }) => {
     const jumpId = useId();
+    const header = useRef<HTMLSpanElement>(null);
+    // After Previous/Next the pressed button may be gone (first and last act): focus the act header instead of losing it to the page.
+    const moved = useRef(false);
+    useEffect(() => {
+        if (!moved.current) return;
+        moved.current = false;
+        header.current?.focus({ preventScroll: true });
+    }, [actIndex]);
+    const move = (index: number) => {
+        moved.current = true;
+        onMove(index);
+    };
+    const bonusHeading = useRef<HTMLHeadingElement>(null);
+    const lastAct = actIndex === party.acts.length - 1;
+    const toBonuses = () => {
+        const heading = bonusHeading.current;
+        if (!heading) return;
+        heading.scrollIntoView?.({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+        heading.focus({ preventScroll: true });
+    };
     const act = party.acts[actIndex];
     const bonuses = partyBonusList(party);
     const score = actScore(ballot.ratings[act.id], ballot.bonuses[act.id], party.template.categories, bonuses);
@@ -199,7 +258,7 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
                 <Pane>
                     <Row>
                         <span className="calm-row">
-                            <span>{act.flag} {act.country}</span>
+                            <span ref={header} tabIndex={-1}>{act.flag} {act.country}</span>
                             <span className="calm-sub">{actIndex + 1} of {party.acts.length}</span>
                         </span>
                         <span className="calm-sub">{act.artist} · {act.song}</span>
@@ -224,9 +283,27 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
                 </Sheet>
             </Ground>
 
+            <Ground>
+                <Pane className="party-actnav">
+                    {actIndex > 0
+                        ? <Control onClick={() => move(actIndex - 1)}>Previous act</Control>
+                        : <span className="party-actnav-gap" aria-hidden="true" />}
+                    {bonuses.length > 0
+                        ? <Control onClick={toBonuses}>Bonus points <span aria-hidden="true">↓</span></Control>
+                        : <span className="party-actnav-gap" aria-hidden="true" />}
+                    {lastAct
+                        ? <Control elevation="high" onClick={onDone}>See your ranking</Control>
+                        : <Control elevation="high" onClick={() => move(actIndex + 1)}>Next act</Control>}
+                </Pane>
+            </Ground>
+
+            <CalmNote role="status">
+                {score === null ? `You haven't rated ${act.country} yet.` : `Your score for ${act.country}: ${formatScore(score)}`}
+            </CalmNote>
+
             {bonuses.length > 0 && (
                 <>
-                    <h2 className="esc-section">Party bonuses</h2>
+                    <h2 className="esc-section" ref={bonusHeading} tabIndex={-1}>Party bonuses</h2>
                     <Ground>
                         <Pane>
                             {bonuses.map(bonus => (
@@ -242,16 +319,6 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
                 </>
             )}
 
-            <CalmNote role="status">
-                {score === null ? `You haven't rated ${act.country} yet.` : `Your score for ${act.country}: ${formatScore(score)}`}
-            </CalmNote>
-
-            <Ground>
-                <Pane layout="split">
-                    <Control disabled={actIndex === 0} onClick={() => onMove(actIndex - 1)}>Previous act</Control>
-                    <Control elevation="high" disabled={actIndex === party.acts.length - 1} onClick={() => onMove(actIndex + 1)}>Next act</Control>
-                </Pane>
-            </Ground>
             <Ground>
                 <Pane>
                     <div>
@@ -319,6 +386,7 @@ const MyRanking = ({ party, ballot }: { party: Party; ballot: Ballot }) => {
     );
 };
 
+/** `ballots` already have `withDistinctNames` applied. */
 const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: string }) => {
     const standings = roomStandings(ballots, actIdsOf(party), party.template.categories, partyBonusList(party));
     const byId = new Map(party.acts.map(act => [act.id, act]));
@@ -327,7 +395,7 @@ const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: 
 
     return (
         <>
-            <CalmNote aria-live="polite">{ballots.length === 1 ? "1 guest is rating." : `${ballots.length} guests are rating.`}</CalmNote>
+            <CalmNote aria-live="polite">{ballots.length === 1 ? "1 guest at the party." : `${ballots.length} guests at the party.`}</CalmNote>
             <Ground>
                 {standings.length === 0 ? (
                     <Pane>

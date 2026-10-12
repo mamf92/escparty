@@ -15,11 +15,11 @@ generously and so on, each named after a moment in Eurovision history.
 
 | Route | Page | What |
 | --- | --- | --- |
-| `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
+| `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a quiz" and "Host a scoreboard" are `ChoiceCard`s in a two-column `ChoiceGrid` (the same dark tiles as the setup picks and quiz cards); "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
 | `/party` | `PartyHome.tsx` | Host, join with a code, open a big screen, or go back to the last party |
-| `/party/new` | `PartySetup.tsx` | Five steps, one big question each, nothing preselected (local step state, no routes): the show; the rating sheet (premade, or your own categories with a Continue); extras (party bonuses and whether awards name names, two yes/no pairs on one screen with a Continue); your name, spun on the `NamePicker` reel from `partyNames.ts` (no free text); a summary and the black "Start the party". Back keeps the answers |
+| `/party/new` | `PartySetup.tsx` | Five steps, one big question each, nothing preselected (local step state, no routes): the show (one `ChoiceCard` per show in a one-column radio `ChoiceGrid`: date, name, acts and how many go through); the rating sheet (`ChoiceCard`s, two to a row: category count, the categories, blurb; premade, or your own categories with a Continue); bonus points (a list of switches for the premade bonuses, all off to begin with, plus one of the host's own with a name and 1 to 5 points, and a Continue); your name, spun on the `NamePicker` reel from `partyNames.ts` (no free text); a summary and the black "Start the party". Back keeps the answers |
 | `/join/:code` | `JoinParty.tsx` | A join link, what the green room's "Show QR code" encodes (`joinLink` in `src/utils/joinCode.ts`): fills the code in and looks it up once, like typing it |
-| `/party/:code` | `PartyRoom.tsx` | Join (a name), then tabs: Rate, Ranking, Room, and Host (`PartyHostTools.tsx`) for the host |
+| `/party/:code` | `PartyRoom.tsx` | Join (spin the `NamePicker` reel for a name nobody has taken; no free text), then tabs: Rate, Ranking, Room, and Host (`PartyHostTools.tsx`) for the host |
 | `/party/:code/screen` | `PartyScreen.tsx` | The TV: QR code, the code, the room's standings, closest guests. Outside the phone frame |
 | `/party/:code/awards` | `PartyAwards.tsx` | One award at a time, then who came closest. Only after the host opens them (the host can preview) |
 
@@ -43,6 +43,24 @@ while that fails, and merged once with the server's copy when it arrives
 save that was still waiting. Ballots are tidied as they're read
 (`toBallot` drops non-number ratings and non-list bonuses), since the
 rules only check their outline.
+
+Names are unique in a party, and anonymous Eurovision participant names
+(`partyNames.ts`). The join reel offers `PARTY_NAMES` minus the names of the
+party's ballots (every name again if all are taken). A name is claimed the
+moment a guest joins (and the host's when the party is created): their
+ballot is written at once, empty, so the next guest sees it taken;
+`useOwnBallot` also writes it if the ballots arrive without one. Two guests
+can still take one name at the same instant (separate documents, and the
+rules can't see across them). Nobody is renamed for that: the lists tell
+them apart at display time (`distinctNames`), the bare name going to the
+guest with the lowest guest ID (stable, so names never swap as people rate) and the other
+getting "Loreen 2", and a guest's own "you're ..." subtitle uses the same
+name (`PartyRoom` computes `withDistinctNames` once for the subtitle and the Room tab). On the join reel a landed name that a ballots
+update takes before Join is let go ("X was just taken. Spin again."), and
+the reel is off while the ballots haven't loaded, and if the ballots (or party) listener errors first, the join screen shows `PartyError` with "Try again" instead of the reel and Join stays off, so nobody joins without the taken names being known (`useOwnBallot` therefore always has the server copy to merge with). `distinctNames` and `availablePartyNames` share `firstFreeNumbered` (`freeName.ts`). A template whose `bonuses` is present but unusable means no bonuses; only an absent list (older parties) falls back to the premade five. Older parties may
+still hold duplicates, so lists of guests (the room's closeness list, the
+big screen, the awards) show `withDistinctNames`: a repeat gets " 2", " 3" in
+guest-ID order.
 
 When the host loads a new lineup, places and qualifier ticks of acts that
 left go in the same write, and the places left are renumbered;
@@ -83,8 +101,15 @@ lineup" from `contests/`.
   staging, crowd-pleaser), Douze Points (one 1-12 score), or up to six
   custom categories, each 1-5, 1-10 or 1-12.
 - **An act's score** is the mean of its rated categories, each scaled to
-  0-10, plus any party bonuses ticked (sung in their own language +2, wind
-  machine +1, key change +1, pyro +1, a grandma on stage +2).
+  0-10, plus any party bonuses ticked. The host switches on the ones that
+  count at setup, from the premade `PARTY_BONUSES` (sung in their own
+  language +2, wind machine +1, key change +1, pyro +1, a grandma on stage
+  +2) and optionally one of their own (id `own`, a name up to 30 characters,
+  1 to 5 points; `bonusProblems` checks it). The chosen list is
+  `template.bonuses`, and `partyBonusList` (`partyResults.ts`) is the one
+  place that reads it: with `bonuses` false it is empty, and a party from
+  before the list existed (no `template.bonuses`) offers all five premade
+  ones.
 - **The room's standings** average each act over the guests who rated it.
 - **Closeness to a final's result** (#86): only acts with a real place
   count, and only the ones the guest rated: both the guest's scores and
@@ -112,8 +137,11 @@ left out rather than faked.
 
 ## Privacy (#89)
 
-The host picks at setup whether the awards name names (`showNames`). With
-names off, awards say "one of you" or "two of you", except that each guest
+The awards name names for every new party: the setup no longer asks, since
+guests' names are already the anonymous Eurovision participants from the
+reel, and it writes `showNames: true`. The field stays on the party, and
+the code for `showNames: false` stays, for parties made while the host
+could choose. With names off, awards say "one of you" or "two of you", except that each guest
 is told when one is theirs, and the closeness table shows only their own
 place. The TV never shows anyone's own ratings; it names the closest
 guests only when names are on.
@@ -135,8 +163,12 @@ collection):
 {
   code, hostId, title, contestId, kind: "semi" | "final", qualifiers,
   acts: Act[],                    // 1-40
-  template: { id, name, blurb, categories: { id, label, max }[] },  // 1-6 categories
-  bonuses: boolean, showNames: boolean,
+  template: {
+    id, name, blurb, categories: { id, label, max }[],              // 1-6 categories
+    bonuses?: { id, label, points }[],                              // the host's chosen bonuses, 1-8, points 1-5
+  },
+  bonuses: boolean,               // whether any bonus is on (template.bonuses is non-empty)
+  showNames: boolean,             // true for new parties; older ones may be false
   results: { places?: { [actId]: place }, qualifiers?: actId[] },
   revealed: boolean,
   createdAt: serverTimestamp, expireAt: Timestamp  // createdAt + 30 days
@@ -147,6 +179,12 @@ collection):
 (`expireAt` 30 days after the guest's last change).
 One document per guest, written whole by that guest only, so no two
 clients ever write the same document.
+
+`template.bonuses` sits inside the template because the rules fix a party's
+top-level keys and check only `template.categories`, so the bonus list
+needs no rules change. Anyone with the code could write it, so
+`listenToParty` tidies it with `sanitiseBonuses` (drops entries that aren't
+`{ id, label <= 30, points 1-5 }` and repeated ids).
 
 Rules (`firestore.rules`, verify cases 5i): a party is created with exactly
 those keys, an empty result, not revealed, and an `expireAt` 29-31 days

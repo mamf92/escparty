@@ -18,7 +18,8 @@ import {
     type Prediction,
 } from "./partyModel";
 
-export const partyBonusList = (party: Pick<Party, "bonuses">): BonusCategory[] => (party.bonuses ? PARTY_BONUSES : []);
+export const partyBonusList = (party: Pick<Party, "bonuses"> & { template: Pick<Party["template"], "bonuses"> }): BonusCategory[] =>
+    party.bonuses ? party.template.bonuses ?? PARTY_BONUSES : [];
 
 export const actIdsOf = (party: Pick<Party, "acts">) => party.acts.map(act => act.id);
 

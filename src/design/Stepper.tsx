@@ -110,7 +110,7 @@ export const Stepper = ({ label, value, min = 1, max, onChange, className }: Ste
             >
                 {/* aria-valuetext says it; the visible text is for eyes only. */}
                 <span aria-hidden="true">
-                    {value === undefined ? "–" : <>{value}<span className="calm-sub">/{max}</span></>}
+                    {value === undefined ? "?" : <>{value}<span className="calm-sub">/{max}</span></>}
                 </span>
             </div>
             <Control

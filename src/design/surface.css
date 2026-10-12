@@ -146,7 +146,7 @@
   The tile: a choice (a toggle, a radio, a tab, an option) or a row of
   information, a dark tile on the stage, set in white.
 */
-.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], .is-static) {
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], [role="switch"], .esc-choice-card, .is-static) {
   --esc-ink: var(--esc-stage-ink);
   --esc-ink-muted: var(--esc-stage-ink-muted);
   --esc-correct: var(--esc-stage-correct);
@@ -157,11 +157,11 @@
   box-shadow: var(--esc-tile-edge);
 }
 
-.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):hover:where(:not(:disabled)) {
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], [role="switch"], .esc-choice-card):hover:where(:not(:disabled)) {
   background: var(--esc-tile-hover);
 }
 
-.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"]):active:where(:not(:disabled)) {
+.esc-app .lycra:is([aria-pressed], [role="radio"], [role="tab"], [role="option"], [role="checkbox"], [role="switch"], .esc-choice-card):active:where(:not(:disabled)) {
   box-shadow: var(--esc-tile-press);
 }
 
@@ -479,8 +479,8 @@
 }
 
 .esc-app .calm-sheet th {
-  width: 38%;
-  padding: 0 var(--esc-space-2) 0 0;
+  width: 45%;
+  padding: 0 var(--esc-space-1) 0 0;
   text-align: left;
   font-weight: inherit;
 }
@@ -493,8 +493,10 @@
   width: 100%;
   height: 100%;
   justify-content: center;
-  padding: var(--esc-space-2) var(--esc-space-3);
-  overflow-wrap: anywhere;
+  padding: var(--esc-space-2);
+  /* A label breaks between words; inside one only if that word alone overflows. */
+  overflow-wrap: break-word;
+  hyphens: manual;
 }
 
 /* A stepper (Stepper.tsx): big minus, the value, big plus. One focus stop. */

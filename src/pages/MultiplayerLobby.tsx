@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
+import { createRoom, joinRoom, joinRoomWithFreeName, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
 import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -10,32 +10,6 @@ import { Control, Field, Ground, Loader, Pane } from "../design";
 const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
 ];
-
-// Helper function to find a unique player name
-const getUniquePlayerName = async (roomCode: string, namesList: string[]): Promise<string> => {
-  // Get the current room data
-  const room = await getRoom(roomCode);
-
-  if (!room) {
-    // If room doesn't exist, any name is fine
-    return namesList[Math.floor(Math.random() * namesList.length)];
-  }
-
-  // Get all names currently in use
-  const usedNames = room.players.map(player => player.name);
-
-  // Filter out names that are already used
-  const availableNames = namesList.filter(name => !usedNames.includes(name));
-
-  if (availableNames.length === 0) {
-    // If all names are taken, add a number suffix to a random name
-    const baseName = namesList[Math.floor(Math.random() * namesList.length)];
-    return `${baseName} #${Math.floor(Math.random() * 1000)}`;
-  }
-
-  // Return a random available name
-  return availableNames[Math.floor(Math.random() * availableNames.length)];
-};
 
 type Step = "choose" | "host" | "join";
 
@@ -239,16 +213,23 @@ const MultiplayerLobby = () => {
     try {
       const before = rejoin === true ? rejoinAs : null;
       const playerId = before ? before.id : uuidv4();
-      const randomName = before ? before.name : await getUniquePlayerName(code, ESC_WINNERS);
+      // A rejoin keeps its name. A fresh join asks for a likely-free name,
+      // and the room has the last word: it joins in a transaction and
+      // answers with the name this player really got, which differs when
+      // someone took the wanted one at the same moment.
+      let playerName: string | null;
+      if (before) {
+        playerName = (await joinRoom(code, playerId, before.name)) ? before.name : null;
+      } else {
+        // joinRoomWithFreeName picks a free name inside its transaction.
+        playerName = await joinRoomWithFreeName(code, playerId, ESC_WINNERS);
+      }
 
-      // Join the room in Firestore
-      const joined = await joinRoom(code, playerId, randomName);
-
-      if (joined) {
+      if (playerName !== null) {
         // Saved even if the page was left meanwhile: the player is in the
         // room now, and this device can only rejoin as them with it (#65).
         localStorage.setItem("playerId", playerId);
-        localStorage.setItem("playerName", randomName);
+        localStorage.setItem("playerName", playerName);
         localStorage.setItem("gameCode", code);
 
         if (stale()) return;

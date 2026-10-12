@@ -24,6 +24,12 @@ export interface RatingTemplate {
     name: string;
     blurb: string;
     categories: RatingCategory[];
+    /**
+     * The party bonuses the host switched on (#81). Lives in the template
+     * because the rules check a party's top-level keys exactly. A party
+     * from before this field offers all of PARTY_BONUSES.
+     */
+    bonuses?: BonusCategory[];
 }
 
 export const SCALE_CHOICES = [5, 10, 12] as const;
@@ -73,6 +79,44 @@ export const PARTY_BONUSES: BonusCategory[] = [
     { id: "pyro", label: "Pyro", points: 1 },
     { id: "grandma", label: "Would make grandma cry", points: 2 },
 ];
+
+/** The host's own bonus: its id, name length and the points it may add. */
+export const OWN_BONUS_ID = "own";
+export const BONUS_LIMITS = { maxLabel: 30, minPoints: 1, maxPoints: 5, maxCount: 8 } as const;
+
+/** What's wrong with the host's own bonus, as sentences (empty when fine). */
+export const bonusProblems = (bonus: { label: string; points: number }): string[] => {
+    const problems: string[] = [];
+    const label = bonus.label.trim();
+    if (!label) problems.push("Name your bonus.");
+    else if (label.length > BONUS_LIMITS.maxLabel) problems.push(`Keep the bonus name under ${BONUS_LIMITS.maxLabel} characters.`);
+    if (!Number.isInteger(bonus.points) || bonus.points < BONUS_LIMITS.minPoints || bonus.points > BONUS_LIMITS.maxPoints) {
+        problems.push(`Give it ${BONUS_LIMITS.minPoints} to ${BONUS_LIMITS.maxPoints} points.`);
+    }
+    return problems;
+};
+
+/**
+ * A template's bonus list as it comes from Firestore: anyone can write
+ * one, so entries that aren't `{ id, label, points }` with a short label
+ * and 1-5 points are dropped, as are repeated ids. Undefined when there is
+ * no list at all (an older party: all the premade bonuses apply).
+ */
+export const sanitiseBonuses = (value: unknown): BonusCategory[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const seen = new Set<string>();
+    const kept: BonusCategory[] = [];
+    for (const entry of value as Partial<BonusCategory>[]) {
+        if (kept.length >= BONUS_LIMITS.maxCount) break;
+        if (!entry || typeof entry.id !== "string" || typeof entry.label !== "string" || typeof entry.points !== "number") continue;
+        const label = entry.label.trim();
+        if (!entry.id || seen.has(entry.id)) continue;
+        if (bonusProblems({ label, points: entry.points }).length > 0) continue;
+        seen.add(entry.id);
+        kept.push({ id: entry.id, label, points: entry.points });
+    }
+    return kept;
+};
 
 /** One guest's ratings: act id -> category id -> 1..max. */
 export type Ratings = Record<string, Record<string, number>>;

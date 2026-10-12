@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Control, Pane, Row } from "../design";
+import { prefersReducedMotion } from "../utils/motion";
 import { PARTY_NAMES } from "../utils/partyNames";
 
 const SWIPE_STEP_PX = 36;
 const WHEEL_GAP_MS = 120;
 
-const prefersReducedMotion = () =>
-    typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** `index` wrapped into 0..count-1, also for negative numbers. */
+const wrapIndex = (index: number, count: number) => ((index % count) + count) % count;
 
 /**
  * A slot-machine style name picker (#208): the Eurovision participant names
@@ -18,33 +19,43 @@ const prefersReducedMotion = () =>
  * `value` is the landed name (or null); `onChange` hears every landing, but
  * not the names that tick past while it spins.
  */
-export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NAMES, label = "Your name" }: {
+export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NAMES, label = "Your name", disabled = false }: {
     value: string | null;
     onChange: (name: string) => void;
     /** Told when a spin starts and ends, so a Continue beside the reel can wait for it. */
     onSpinningChange?: (spinning: boolean) => void;
     names?: readonly string[];
     label?: string;
+    /** The reel and its buttons are off (e.g. while the offered names are still being worked out). */
+    disabled?: boolean;
 }) => {
-    const count = names.length;
-    const landed = value === null ? -1 : names.indexOf(value);
-    // While it spins the reel shows names that are not the answer yet.
+    // While it spins the reel shows names that are not the answer yet, from a
+    // snapshot of the list taken at spin start, so a list that shrinks
+    // underneath it (someone else took a name) can't move the reel.
     const [spinning, setSpinning] = useState<number | null>(null);
+    const [frozen, setFrozen] = useState<readonly string[] | null>(null);
+    const [noneLeft, setNoneLeft] = useState(false);
+    const latestNames = useRef(names);
+    useEffect(() => { latestNames.current = names; });
+    const list = spinning !== null && frozen ? frozen : names;
+    const count = list.length;
+    const landed = value === null ? -1 : names.indexOf(value);
     const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const reel = useRef<HTMLDivElement>(null);
     const drag = useRef({ y: 0, active: false });
     const lastWheel = useRef(0);
     const isSpinning = spinning !== null;
+    const off = isSpinning || disabled;
     const shown = isSpinning ? spinning : landed;
 
     useEffect(() => () => clearTimeout(timer.current), []);
 
-    const wrap = (index: number) => ((index % count) + count) % count;
+    const wrap = (index: number) => wrapIndex(index, count);
 
     useEffect(() => { onSpinningChange?.(isSpinning); }, [isSpinning, onSpinningChange]);
 
     const step = (delta: number) => {
-        if (isSpinning) return;
+        if (off) return;
         const from = landed < 0 ? (delta > 0 ? -1 : 0) : landed;
         onChange(names[wrap(from + delta)]);
     };
@@ -53,21 +64,33 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     useEffect(() => { stepRef.current = step; });
 
     const spin = () => {
-        if (isSpinning) return;
+        if (off) return;
+        setNoneLeft(false);
         // Always a different name from the one already landed on.
+        const spun = names;
         const end = landed < 0 ? Math.floor(Math.random() * count) : wrap(landed + 1 + Math.floor(Math.random() * (count - 1)));
         if (prefersReducedMotion()) {
             onChange(names[end]);
             return;
         }
         const total = 16 + Math.floor(Math.random() * count);
+        setFrozen(spun);
         const tick = (done: number, at: number) => {
             if (done >= total) {
                 setSpinning(null);
-                onChange(names[wrap(at)]);
+                setFrozen(null);
+                // If the landed name was taken meanwhile, land on the nearest one still offered.
+                const here = wrapIndex(at, spun.length);
+                const offered = latestNames.current;
+                const nearest = Array.from({ length: spun.length }, (_, offset) => spun[wrapIndex(here + offset, spun.length)])
+                    .find(candidate => offered.includes(candidate));
+                // None of the spun names is offered any more: take the first one that is.
+                const landedOn = nearest ?? offered[0];
+                if (landedOn !== undefined) onChange(landedOn);
+                else setNoneLeft(true);
                 return;
             }
-            setSpinning(wrap(at));
+            setSpinning(wrapIndex(at, spun.length));
             // Slows down towards the end, like a reel running out of spin.
             timer.current = setTimeout(() => tick(done + 1, at + 1), 50 + (done / total) ** 2 * 260);
         };
@@ -95,8 +118,8 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
             ArrowRight: () => step(1),
             ArrowUp: () => step(-1),
             ArrowLeft: () => step(-1),
-            Home: () => !isSpinning && onChange(names[0]),
-            End: () => !isSpinning && onChange(names[count - 1]),
+            Home: () => !off && onChange(names[0]),
+            End: () => !off && onChange(names[count - 1]),
         };
         const move = moves[event.key];
         if (!move) return;
@@ -118,7 +141,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     const endDrag = () => { drag.current.active = false; };
 
     // Before the first landing the reel rests at the top of the list.
-    const edge = (offset: number) => (shown < 0 ? names[offset < 0 ? count - 1 : 0] : names[wrap(shown + offset)]);
+    const edge = (offset: number) => (shown < 0 ? list[offset < 0 ? count - 1 : 0] : list[wrap(shown + offset)]);
 
     return (
         <div className="party-picker">
@@ -129,6 +152,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 tabIndex={0}
                 aria-label={label}
                 aria-busy={isSpinning}
+                aria-disabled={disabled || undefined}
                 aria-valuemin={1}
                 aria-valuemax={count}
                 aria-valuenow={landed >= 0 && !isSpinning ? landed + 1 : undefined}
@@ -140,18 +164,18 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 onPointerCancel={endDrag}
             >
                 <Row className="party-reel-edge" aria-hidden="true">{edge(-1)}</Row>
-                <Row className="party-reel-name esc-pick" elevation="high" aria-hidden="true">{shown < 0 ? "?" : names[shown]}</Row>
+                <Row className="party-reel-name esc-pick" elevation="high" aria-hidden="true">{shown < 0 ? "?" : list[shown]}</Row>
                 <Row className="party-reel-edge" aria-hidden="true">{edge(1)}</Row>
             </div>
             <p className="esc-note" role="status">
-                {isSpinning ? "Spinning…" : value !== null ? `You're ${value}.` : "Spin the reel, or swipe, scroll or use the arrow keys."}
+                {isSpinning ? "Spinning…" : noneLeft ? "No names left. Try again in a moment." : value !== null ? `You're ${value}.` : "Spin the reel, or swipe, scroll or use the arrow keys."}
             </p>
             <Pane layout="split">
-                <Control onClick={() => step(-1)} disabled={isSpinning}>Previous name</Control>
-                <Control onClick={() => step(1)} disabled={isSpinning}>Next name</Control>
+                <Control onClick={() => step(-1)} disabled={off}>Previous name</Control>
+                <Control onClick={() => step(1)} disabled={off}>Next name</Control>
             </Pane>
             <Pane>
-                <Control onClick={spin} disabled={isSpinning}>{value === null ? "Spin for a name" : "Spin again"}</Control>
+                <Control onClick={spin} disabled={off}>{value === null ? "Spin for a name" : "Spin again"}</Control>
             </Pane>
         </div>
     );

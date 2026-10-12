@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Party } from "./partyFirestore";
-import type { Ballot } from "./partyModel";
+import { PARTY_BONUSES, type Ballot } from "./partyModel";
 import {
     actIdsOf,
     awardWinners,
@@ -31,6 +31,14 @@ describe("partyResults", () => {
         expect(actIdsOf(party())).toEqual(["se", "no", "fi", "dk"]);
         expect(partyBonusList(party())).toEqual([]);
         expect(partyBonusList(party({ bonuses: true })).length).toBeGreaterThan(0);
+    });
+
+    it("offers the chosen bonuses, or all the premade ones for an older party", () => {
+        const wind = { id: "wind", label: "Wind machine", points: 1 };
+        const template = { ...party().template, bonuses: [wind] };
+        expect(partyBonusList(party({ bonuses: true, template }))).toEqual([wind]);
+        expect(partyBonusList(party({ bonuses: false, template }))).toEqual([]);
+        expect(partyBonusList(party({ bonuses: true }))).toEqual(PARTY_BONUSES);
     });
 
     it("knows when there's a result", () => {

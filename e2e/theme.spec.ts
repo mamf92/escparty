@@ -79,7 +79,8 @@ const measure = (page: Page) => page.evaluate((marksSource) => {
     }
 
     // An action and a choice at rest, and a chosen one if the screen has one.
-    const choice = "[aria-pressed], [role='radio'], [role='tab'], [role='option'], [role='checkbox']";
+    // A ChoiceCard is a tile by design, even as a plain button (the Host screen's menu of what to start).
+    const choice = "[aria-pressed], [role='radio'], [role='tab'], [role='option'], [role='checkbox'], [role='switch'], .esc-choice-card";
     const atRest = [...document.querySelectorAll<HTMLElement>("button.lycra")]
         .filter(el => inGround(el) && !el.matches(".is-chosen, .is-selected, .is-high, .is-low, .is-marked, :disabled, :hover"));
     const action = atRest.find(el => !el.matches(choice));
@@ -145,16 +146,15 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await judge(host, "party-home");
 
     // Setup is one question per screen: measure each kind (a list of shows,
-    // the extras' yes/no pairs, the name reel) and the summary.
+    // the bonus switches, the name reel) and the summary.
     await host.goto("/#/party/new");
     await expect(host.getByRole("heading", { name: "Which show?" })).toBeVisible();
     await judge(host, "party-setup-show");
     await host.getByRole("radio", { name: /Semi-final 1/ }).click();
     await host.getByRole("radio", { name: /Jury/ }).click();
-    await expect(host.getByRole("heading", { name: "Any extras?" })).toBeVisible();
-    await judge(host, "party-setup-extras");
-    await host.getByRole("radio", { name: "Yes" }).first().click();
-    await host.getByRole("radio", { name: "Yes" }).nth(1).click();
+    await expect(host.getByRole("heading", { name: "Add bonus points?" })).toBeVisible();
+    await judge(host, "party-setup-bonuses");
+    await host.getByRole("switch", { name: /Wind machine/ }).click();
     await host.getByRole("button", { name: "Continue" }).click();
     await expect(host.getByRole("spinbutton", { name: "Your name" })).toBeVisible();
     await judge(host, "party-setup-name");
@@ -167,7 +167,7 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await guest.goto(`/#/party/${code}`);
     await expect(guest.getByRole("button", { name: "Join the party" })).toBeVisible();
     await judge(guest, "party-join");
-    await joinParty(guest, code, "John");
+    await joinParty(guest, code, "Netta");
 
     // Rate three acts on each phone, so every screen has something to show.
     await rateActs(host, [10, 6, 2]);

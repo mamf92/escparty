@@ -17,7 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { contestById, type Act, type Contest } from "../data/contests2027";
-import type { Ballot, Bonuses, RatingTemplate, Ratings } from "./partyModel";
+import { sanitiseBonuses, type Ballot, type Bonuses, type RatingTemplate, type Ratings } from "./partyModel";
 import { resultsFor } from "./partyResults";
 import { generateRoomCode } from "./roomsFirestore";
 
@@ -134,9 +134,22 @@ export const createParty = async (party: NewParty): Promise<string> => {
 export const listenToParty = (code: string, onParty: (party: Party | null) => void, onError?: (error: Error) => void) =>
     onSnapshot(
         doc(requireDb(), "parties", code),
-        snapshot => onParty(snapshot.exists() ? (snapshot.data() as Party) : null),
+        snapshot => onParty(snapshot.exists() ? toParty(snapshot.data() as Party) : null),
         error => onError?.(error),
     );
+
+/**
+ * A party as it comes from Firestore. The rules only check a template's
+ * categories, so its bonus list is tidied here (`sanitiseBonuses`): a list
+ * that is present but unusable becomes none; only an absent list (an older
+ * party) leaves the premade bonuses to `partyBonusList`.
+ */
+const toParty = (party: Party): Party => {
+    if (!isRecord(party.template) || !("bonuses" in party.template)) return party;
+    const { bonuses, ...rest } = party.template;
+    // A list the host chose but that isn't usable means no bonuses, not the premade five.
+    return { ...party, template: { ...rest, bonuses: sanitiseBonuses(bonuses) ?? [] } };
+};
 
 /** Follow every guest's ballot in a party. */
 export const listenToBallots = (code: string, onBallots: (ballots: Ballot[]) => void, onError?: (error: Error) => void) =>

@@ -101,6 +101,18 @@ describe("createParty", () => {
         vi.mocked(Date.now).mockRestore();
     });
 
+    it("writes the chosen bonuses inside the template, leaving the top-level keys as they were", async () => {
+        mocks.generateRoomCode.mockReturnValueOnce("ABBA");
+        mocks.getDoc.mockResolvedValueOnce(snapshot(null));
+        const bonuses = [{ id: "wind", label: "Wind machine", points: 1 }];
+        await createParty({ ...party, template: { ...party.template, bonuses } });
+        const [, written] = mocks.setDoc.mock.calls[0];
+        expect(written.template.bonuses).toEqual(bonuses);
+        expect(Object.keys(written).sort()).toEqual(
+            ["acts", "bonuses", "code", "contestId", "createdAt", "expireAt", "hostId", "kind", "qualifiers", "results", "revealed", "showNames", "template", "title"],
+        );
+    });
+
     it("tries another code when one is taken between the check and the write", async () => {
         mocks.generateRoomCode.mockReturnValueOnce("ABBA").mockReturnValueOnce("LORD");
         mocks.getDoc.mockResolvedValue(snapshot(null));
@@ -137,6 +149,25 @@ describe("listeners", () => {
         expect(onError).toHaveBeenCalledWith(new Error("denied"));
         listenToParty("ABBA", onParty);
         mocks.onSnapshot.mock.calls[1][2](new Error("quiet"));
+    });
+
+    it("keep a party's chosen bonuses, tidied, and leave an older party alone", () => {
+        const onParty = vi.fn();
+        listenToParty("ABBA", onParty);
+        const next = mocks.onSnapshot.mock.calls[0][1];
+        const base = { id: "douze", name: "Douze", blurb: "", categories: [] };
+        next(snapshot({ code: "ABBA", template: { ...base, bonuses: [{ id: "own", label: " Glitter ", points: 3 }, { id: "bad", label: "", points: 2 }] } }));
+        next(snapshot({ code: "ABBA", template: { ...base, bonuses: "all" } }));
+        next(snapshot({ code: "ABBA", template: { ...base, bonuses: [{ id: "bad", label: "", points: 2 }] } }));
+        next(snapshot({ code: "ABBA", template: base }));
+        expect(onParty.mock.calls).toEqual([
+            [{ code: "ABBA", template: { ...base, bonuses: [{ id: "own", label: "Glitter", points: 3 }] } }],
+            // Present but unusable: none, not the premade five.
+            [{ code: "ABBA", template: { ...base, bonuses: [] } }],
+            [{ code: "ABBA", template: { ...base, bonuses: [] } }],
+            // Absent (an older party): left for the premade fallback.
+            [{ code: "ABBA", template: base }],
+        ]);
     });
 
     it("follow the ballots, tidying bad fields", () => {

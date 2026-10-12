@@ -6,7 +6,7 @@ export const answerOptions = (page: Page) =>
 
 /**
  * Host a scoreboard party for Semi-final 1 with the given sheet (the jury's
- * by default), answering yes to both extras; returns its code. Setup is one
+ * by default), switching the wind machine bonus on; returns its code. Setup is one
  * question per screen and the name is picked from the reel, so it steps the
  * reel to `name`.
  */
@@ -17,8 +17,7 @@ export const hostParty = async (page: Page, name: string, sheet: RegExp = /Jury/
     await page.goto("/#/party/new");
     await page.getByRole("radio", { name: /Semi-final 1/ }).click();
     await page.getByRole("radio", { name: sheet }).click();
-    await page.getByRole("radio", { name: "Yes" }).first().click();
-    await page.getByRole("radio", { name: "Yes" }).nth(1).click();
+    await page.getByRole("switch", { name: /Wind machine/ }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     for (let tries = 0; tries < 60; tries++) {
         await page.getByRole("button", { name: "Next name" }).click();
@@ -31,10 +30,19 @@ export const hostParty = async (page: Page, name: string, sheet: RegExp = /Jury/
     return page.url().split("/").pop()!;
 };
 
-/** Join a party by its link, as `name`. */
+/**
+ * Join a party by its link, as `name`: a participant name from the reel,
+ * which is stepped to until it lands there (a name someone has taken is not
+ * on it, so `name` must be free).
+ */
 export const joinParty = async (page: Page, code: string, name: string) => {
     await page.goto(`/#/party/${code}`);
-    await page.getByLabel("Your name at the party").fill(name);
+    await expect(page.getByRole("spinbutton", { name: "Your name" })).toBeVisible();
+    for (let tries = 0; tries < 60; tries++) {
+        await page.getByRole("button", { name: "Next name" }).click();
+        if (await page.getByText(`You're ${name}.`).isVisible()) break;
+    }
+    await expect(page.getByText(`You're ${name}.`)).toBeVisible();
     await page.getByRole("button", { name: "Join the party" }).click();
     await expect(page.getByText(`Party ${code} · you're ${name}`)).toBeVisible();
 };
