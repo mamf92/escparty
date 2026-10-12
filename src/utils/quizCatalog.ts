@@ -12,9 +12,10 @@
  */
 import { QUIZ_TEMPLATES, quizTemplate, type QuizTemplate } from "../data/quizTemplates";
 import { loadQuizData, type QuizDifficulty, type QuizQuestion } from "./QuizDataProvider";
-import { customQuizId, fetchCustomQuiz, isCustomQuizKey, knownCustomTitle } from "./customQuizzes";
+import { customQuizId, customQuizKey, fetchCustomQuiz, isCustomQuizKey, knownCustomTitle, type MyQuiz } from "./customQuizzes";
 import { setRoomDifficulty } from "./roomsFirestore";
-import { DEFAULT_BREAK_EVERY, toPlayable, type AnyQuestion, type BankQuestion, type BreakEvery } from "./quizModel";
+import { QUESTION_SLOT_MS } from "./quizTiming";
+import { DEFAULT_BREAK_EVERY, isBreakAfter, toPlayable, type AnyQuestion, type BankQuestion, type BreakEvery } from "./quizModel";
 
 export const CLASSIC_KEYS: QuizDifficulty[] = ["easy", "medium", "hard"];
 const TEMPLATE_PREFIX = "t-";
@@ -100,28 +101,101 @@ export const loadQuiz = async (key: string): Promise<LoadedQuiz> => {
     return { questions, breakEvery: template.breakEvery, classic: false };
 };
 
-/**
- * Every premade quiz a host or solo player can pick, classic sets first.
- * `questionCount` is null for the classic sets, which load their questions
- * at play time.
- */
-export const QUIZ_CHOICES: { key: string; title: string; tagline: string; questionCount: number | null; breakEvery: BreakEvery }[] = [
-    { key: "easy", title: CLASSIC_TITLES.easy, tagline: "You know who Loreen is.", questionCount: null, breakEvery: DEFAULT_BREAK_EVERY },
-    { key: "medium", title: CLASSIC_TITLES.medium, tagline: "You know the year Alexander Rybak won.", questionCount: null, breakEvery: DEFAULT_BREAK_EVERY },
-    { key: "hard", title: CLASSIC_TITLES.hard, tagline: "You know where Dana International won.", questionCount: null, breakEvery: DEFAULT_BREAK_EVERY },
+/** Each classic set's question count (the JSON files in src/data hold this many; quizCatalog.test.ts checks). */
+export const CLASSIC_QUESTION_COUNT = 10;
+
+export interface QuizChoice {
+    key: string;
+    title: string;
+    /** One sentence on what the quiz covers. */
+    tagline: string;
+    level: QuizDifficulty;
+    questionCount: number;
+    breakEvery: BreakEvery;
+}
+
+/** Every premade quiz a host or solo player can pick, classic sets first. */
+export const QUIZ_CHOICES: QuizChoice[] = [
+    { key: "easy", title: CLASSIC_TITLES.easy, tagline: "Ten classics for anyone who knows who Loreen is.", level: "easy", questionCount: CLASSIC_QUESTION_COUNT, breakEvery: DEFAULT_BREAK_EVERY },
+    { key: "medium", title: CLASSIC_TITLES.medium, tagline: "Ten classics for anyone who knows the year Alexander Rybak won.", level: "medium", questionCount: CLASSIC_QUESTION_COUNT, breakEvery: DEFAULT_BREAK_EVERY },
+    { key: "hard", title: CLASSIC_TITLES.hard, tagline: "Ten classics for anyone who knows where Dana International won.", level: "hard", questionCount: CLASSIC_QUESTION_COUNT, breakEvery: DEFAULT_BREAK_EVERY },
     ...QUIZ_TEMPLATES.map(template => ({
         key: templateKey(template),
         title: template.title,
         tagline: template.tagline,
+        level: template.level,
         questionCount: template.questionIds.length,
         breakEvery: template.breakEvery,
     })),
 ];
 
+/** Time a mid-quiz scoreboard break adds to a room's quiz. */
+const BREAK_MS = 30_000;
+
+/**
+ * About how many minutes a quiz takes in a room: each question's slot plus
+ * a half minute for every mid-quiz break, rounded up to whole minutes.
+ * `breakEvery` 0 means no breaks.
+ */
+export const quizMinutes = (questionCount: number, breakEvery: number): number => {
+    let breaks = 0;
+    for (let index = 0; index < questionCount; index++) {
+        if (isBreakAfter(index, questionCount, breakEvery)) breaks++;
+    }
+    return Math.max(1, Math.ceil((questionCount * QUESTION_SLOT_MS + breaks * BREAK_MS) / 60_000));
+};
+
+/** What a quiz card shows. `level` is null for a quiz built on this device. */
+export interface QuizCardInfo {
+    key: string;
+    title: string;
+    level: QuizDifficulty | null;
+    questionCount: number;
+    minutes: number;
+    description: string;
+}
+
+const LEVEL_WORDS = { easy: "Easy", medium: "Medium", hard: "Hard" } as const;
+
+/** The card's tag: the quiz's level, or "Your quiz" for a quiz built on this device. */
+export const quizLevelWord = (quiz: QuizCardInfo): string => (quiz.level ? LEVEL_WORDS[quiz.level] : "Your quiz");
+
+/**
+ * How long a quiz is, short enough for a card two to a row: shown as
+ * "10 Qs · ca. 3 min", spoken as "10 questions, about 3 minutes".
+ */
+export const quizLength = (quiz: QuizCardInfo): { shown: string; spoken: string } => ({
+    shown: `${quiz.questionCount} ${quiz.questionCount === 1 ? "Q" : "Qs"} · ca. ${quiz.minutes} min`,
+    spoken: `${quiz.questionCount} ${quiz.questionCount === 1 ? "question" : "questions"}, about ${quiz.minutes} ${quiz.minutes === 1 ? "minute" : "minutes"}`,
+});
+
+/**
+ * The cards for every quiz this device can pick, in one order for the
+ * library and the green room: the device's own quizzes first, then the
+ * premade ones.
+ */
+export const quizCardsFor = (myQuizzes: Pick<MyQuiz, "id" | "title" | "questionCount">[]): QuizCardInfo[] => [
+    ...myQuizzes.map(quiz => ({
+        key: customQuizKey(quiz.id),
+        title: quiz.title,
+        level: null,
+        questionCount: quiz.questionCount,
+        minutes: quizMinutes(quiz.questionCount, DEFAULT_BREAK_EVERY),
+        description: "Built by you on this device.",
+    })),
+    ...QUIZ_CHOICES.map(choice => ({
+        key: choice.key,
+        title: choice.title,
+        level: choice.level,
+        questionCount: choice.questionCount,
+        minutes: quizMinutes(choice.questionCount, choice.breakEvery),
+        description: choice.tagline,
+    })),
+];
+
 /**
  * How often a key's mid-quiz break comes, for a room about to play it.
- * Rejects when a custom quiz can't be read or is gone: a room's quiz and
- * break setting are one-shot, so guessing would lock in the wrong one.
+ * Rejects when a custom quiz can't be read or is gone: guessing would put the wrong break setting on the room.
  */
 export const quizBreakEvery = async (key: string): Promise<BreakEvery> => {
     if (isCustomQuizKey(key)) {

@@ -316,9 +316,14 @@ its own bundle), or `c-` followed by a 20-character document id (a saved
 quiz, #77). The same `isQuizKey` check applies when a room is created with
 the field. The field is still called `difficulty` so rooms and the
 exported API don't change. The quiz's `breakEvery` may ride along in the
-same one-shot write (`setRoomDifficulty(code, key, breakEvery)`, which
+same write (`setRoomDifficulty(code, key, breakEvery)`, which
 throws `QuizPickRefused` when the rules refuse it, so the lobby can tell
-a refusal from a failure worth retrying), and
+a refusal from a failure worth retrying). The pick can be repeated while
+`started == false` so the host can change a wrong pick from the green
+room (only these two keys, each still validated); once the game starts it
+is frozen. Without auth that is the same trust level as `setPlayerReady`
+and `removePlayer`: anyone with the room code could already set the quiz
+first, and can now also change it before the start. And
 `isAdvancingPhase` puts the mid-quiz break where it says
 (`isBreakBefore`, the same arithmetic as `phaseAfterQuestion`). Covered by
 cases 5d-5g and the break-setting walks in case 12 of

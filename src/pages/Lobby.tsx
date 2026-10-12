@@ -1,11 +1,15 @@
+import styled from "styled-components";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { Control, Ground, Pane, Row } from "../design";
+import { Badge, Control, Ground, Pane, Row } from "../design";
+import { ConfirmLeave } from "../components/ConfirmLeave";
+import { QrFullScreen } from "../components/QrFullScreen";
 import { listenToRoom, QuizPickRefused, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
-import { QUIZ_CHOICES, setRoomQuiz } from "../utils/quizCatalog";
-import { customQuizKey, listMyQuizzes } from "../utils/customQuizzes";
+import { quizCardsFor, setRoomQuiz } from "../utils/quizCatalog";
+import { QuizCardGrid } from "../components/QuizCard";
+import { listMyQuizzes } from "../utils/customQuizzes";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { roomGuests, startGate } from "../utils/lobbyGate";
 import { useLeaveGuard } from "../hooks/useLeaveGuard";
@@ -23,6 +27,22 @@ const readIdentity = (): Identity | null => {
     return gameCode && playerId && playerName ? { gameCode, playerId, playerName } : null;
 };
 
+/** The code badge and the QR button side by side, wrapping at a narrow width. */
+const CodeRow = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--esc-space-3);
+`;
+
+/** The room's quiz, with the host's small "Change" beside it. */
+const QuizRow = styled(Pane)`
+    &&& {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+`;
+
 /**
  * The waiting room before a multiplayer quiz, the green room (#65). Guests
  * say when they're ready; the host picks the quiz, can take out a player
@@ -38,13 +58,20 @@ const Lobby = () => {
     // A second tap in the same render can't see `busy` yet.
     const inFlight = useRef(false);
     const [pickError, setPickError] = useState<string | null>(null);
-    // The rules refused the last quiz pick; said only while the room still
-    // has no quiz (another tab may have picked one first).
+    // The rules refused the last quiz pick; said only while the picker shows.
     const [pickRefused, setPickRefused] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
+    // The host is changing the quiz: the picker is back, with a way to keep the current one.
+    const [changing, setChanging] = useState(false);
+    // The host is asked before leaving a room that hasn't started; the QR code can fill the screen.
+    const [askingLeave, setAskingLeave] = useState(false);
+    const [showingQr, setShowingQr] = useState(false);
+    const qrButton = useRef<HTMLButtonElement>(null);
+    const leaveLink = useRef<HTMLButtonElement>(null);
     const roomQuizTitle = useQuizTitle(room?.difficulty);
     // This device's saved quizzes, offered alongside the premade ones.
     const [myQuizzes] = useState(listMyQuizzes);
+    const quizCards = quizCardsFor(myQuizzes);
 
     useEffect(() => {
         if (!identity) {
@@ -100,11 +127,14 @@ const Lobby = () => {
     // The brand asks while this tab is in the room, and leaves it the same
     // way as the footer link, so a guest doesn't linger in the start gate.
     const inRoom = !!identity && !!room && room.players.some(p => p.id === identity.playerId);
+    const hostWaiting = inRoom && room.hostId === identity.playerId && !room.started;
     useLeaveGuard(inRoom ? {
-        message: "Go back to ESCParty? You'll leave the waiting room.",
+        message: hostWaiting
+            ? "Go back to ESCParty? You're the host. If you leave, this game can't start, and everyone waiting will need a new code."
+            : "Go back to ESCParty? You'll leave the waiting room.",
         onLeave: () => void leaveRoom("/"),
     } : null);
-    const leave = <CalmLink type="button" onClick={() => void leaveRoom()}>Leave the waiting room</CalmLink>;
+    const leave = <CalmLink ref={leaveLink} type="button" onClick={() => void leaveRoom()}>Leave the waiting room</CalmLink>;
     /** The footer's way back from a waiting room this tab isn't in. */
     const backToMultiplayer = <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Back to join or host</CalmLink>;
     /** The way out of a waiting room that can't go on. */
@@ -163,12 +193,12 @@ const Lobby = () => {
     const guests = roomGuests(room);
     const gate = startGate(room);
     const amReady = ready.includes(playerId);
+    const canChange = isHost && !room.started && !!room.difficulty;
     const chosen = isHost ? guests.find(p => p.id === selected) : undefined;
 
     /**
      * One write at a time; a failure leaves a note and the page usable,
-     * unless `onError` handles it. (The quiz pick is one-shot in the rules,
-     * so a double tap's second write would be denied.)
+     * unless `onError` handles it. (A double tap must not write twice.)
      */
     const run = async (what: string, write: () => Promise<void>, onError?: (err: unknown) => void) => {
         if (inFlight.current) return;
@@ -187,21 +217,29 @@ const Lobby = () => {
         }
     };
 
-    // The room's `difficulty` names the quiz (quizCatalog.ts). A pick the
-    // rules refuse wrote nothing: either another tab already picked (the
-    // snapshot then shows that quiz and the picker goes) or the rules won't
-    // take this quiz (its key or break setting), so the host picks another.
-    // Anything else (the quiz couldn't be read, the network) can be retried.
-    const handleSelectQuiz = (quizKey: string) => run("set the quiz", async () => {
-        setPickRefused(false);
-        await setRoomQuiz(gameCode, quizKey);
-    }, (err) => {
-        if (err instanceof QuizPickRefused) {
-            setPickRefused(true);
-        } else {
-            setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+    // The room's `difficulty` names the quiz (quizCatalog.ts), and the host
+    // may change it until the game starts. A pick the rules refuse wrote
+    // nothing: the rules won't take this quiz (its key or break setting) or
+    // the game has started, so the host picks another. Anything else (the
+    // quiz couldn't be read, the network) can be retried. Picking the quiz
+    // the room already has writes nothing and just closes the picker.
+    const handleSelectQuiz = (quizKey: string) => {
+        if (changing && quizKey === room.difficulty) {
+            setChanging(false);
+            return;
         }
-    });
+        return run("set the quiz", async () => {
+            setPickRefused(false);
+            await setRoomQuiz(gameCode, quizKey);
+            setChanging(false);
+        }, (err) => {
+            if (err instanceof QuizPickRefused) {
+                setPickRefused(true);
+            } else {
+                setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+            }
+        });
+    };
 
     const status = (id: string) => {
         if (id === room.hostId) return "Host";
@@ -255,35 +293,66 @@ const Lobby = () => {
     return (
         <CalmPage
             title="The green room"
-            subtitle={<>Game code <strong className="esc-selectable">{gameCode}</strong> · you are {me.name}</>}
-            footer={leave}
+            subtitle={`You are ${me.name}`}
+            footer={isHost && !room.started ? (
+                askingLeave ? (
+                    <ConfirmLeave
+                        prompt="You're the host. If you leave, this game can't start, and everyone waiting will need a new code."
+                        stayLabel="Stay here"
+                        leaveLabel="Leave the room"
+                        onLeave={() => void leaveRoom()}
+                        onStay={() => { setAskingLeave(false); setTimeout(() => leaveLink.current?.focus()); }}
+                    />
+                ) : (
+                    <CalmLink ref={leaveLink} type="button" onClick={() => setAskingLeave(true)}>Leave the waiting room</CalmLink>
+                )
+            ) : leave}
             actions={actions}
         >
-            {isHost && !room.difficulty ? (
+            <CodeRow>
+                <Badge label="Game code" value={gameCode} spell selectable />
+                <Control ref={qrButton} onClick={() => setShowingQr(true)}>Show QR code</Control>
+            </CodeRow>
+            {showingQr && (
+                <QrFullScreen
+                    code={gameCode}
+                    onClose={() => { setShowingQr(false); setTimeout(() => qrButton.current?.focus()); }}
+                />
+            )}
+
+            {isHost && !room.started && (!room.difficulty || changing) ? (
                 <>
                     <h2 className="esc-section" id="lobby-pick-quiz">Pick a quiz</h2>
-                    <Ground>
-                        <Pane role="group" aria-labelledby="lobby-pick-quiz">
-                            {myQuizzes.map(quiz => (
-                                <Control key={quiz.id} disabled={busy} onClick={() => handleSelectQuiz(customQuizKey(quiz.id))}>
-                                    {quiz.title}
+                    <QuizCardGrid
+                        labelledBy="lobby-pick-quiz"
+                        quizzes={quizCards}
+                        picked={room.difficulty ?? null}
+                        onPick={handleSelectQuiz}
+                        disabled={busy}
+                    />
+                    {room.difficulty && (
+                        <Ground>
+                            <Pane>
+                                <Control disabled={busy} onClick={() => setChanging(false)}>
+                                    Keep {roomQuizTitle}
                                 </Control>
-                            ))}
-                            {QUIZ_CHOICES.map(choice => (
-                                <Control key={choice.key} disabled={busy} onClick={() => handleSelectQuiz(choice.key)}>
-                                    {choice.title}
-                                </Control>
-                            ))}
-                        </Pane>
-                    </Ground>
+                            </Pane>
+                        </Ground>
+                    )}
                 </>
             ) : (
                 <>
                     <h2 className="esc-section">The quiz</h2>
                     <Ground>
-                        <Pane>
-                            <Row>{room.difficulty ? roomQuizTitle : "The host is picking…"}</Row>
-                        </Pane>
+                        <QuizRow>
+                            {/* Polite: guests hear when the host changes the quiz. */}
+                            <Row aria-live="polite">{room.difficulty ? roomQuizTitle : "The host is picking…"}</Row>
+                            {canChange && (
+                                <Control disabled={busy} aria-label="Change the quiz" onClick={() => setChanging(true)}>
+                                    Change
+                                </Control>
+                            )}
+                        </QuizRow>
                     </Ground>
                 </>
             )}
@@ -334,7 +403,7 @@ const Lobby = () => {
                 </>
             )}
 
-            {pickRefused && !room.difficulty && <CalmNote role="alert">This room won't take that quiz. Pick another one.</CalmNote>}
+            {pickRefused && (!room.difficulty || changing) && <CalmNote role="alert">This room won't take that quiz. Pick another one.</CalmNote>}
             {pickError && <CalmNote role="alert">{pickError}</CalmNote>}
         </CalmPage>
     );

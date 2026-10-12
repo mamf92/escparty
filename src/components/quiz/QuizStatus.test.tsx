@@ -8,7 +8,7 @@ describe("QuizStatus", () => {
   it("names the question, with the points so far", () => {
     renderWithProviders(<QuizStatus {...base} />);
     expect(screen.getByText("Question 3 of 10")).toBeInTheDocument();
-    expect(screen.getByText("Points so far: 1240")).toBeInTheDocument();
+    expect(screen.getByText("Points 1240")).toBeInTheDocument();
   });
 
   it("shows the clock big in a timer named with the real seconds while the question is open", () => {

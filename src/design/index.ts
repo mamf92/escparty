@@ -3,6 +3,8 @@ export { useDesignTheme } from "./useDesignTheme";
 export { ThemeSwitch } from "./ThemeSwitch";
 export { Stage } from "./Stage";
 export { Ground, Pane, Control, Row, Field } from "./Surface";
+export { ChoiceCard, ChoiceGrid } from "./ChoiceCard";
+export { Badge } from "./Badge";
 export { Stepper } from "./Stepper";
 export { Sheet, SheetRow } from "./Sheet";
 export { Loader } from "./Loader";

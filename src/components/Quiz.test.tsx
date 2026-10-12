@@ -123,9 +123,9 @@ describe("Quiz answer selection (#22)", () => {
     renderQuiz({ multiplayer: false, score: 500 });
 
     await screen.findByRole("button", { name: "Sweden" });
-    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 500");
+    expect(screen.getByText(/^Points \d/)).toHaveTextContent("Points 500");
     await user.click(screen.getByRole("button", { name: "Sweden" }));
-    const total = Number(/(\d+)$/.exec(screen.getByText(/^Points so far:/).textContent ?? "")?.[1]);
+    const total = Number(/(\d+)$/.exec(screen.getByText(/^Points \d/).textContent ?? "")?.[1]);
     expect(total).toBeGreaterThan(500);
   });
 
@@ -140,7 +140,7 @@ describe("Quiz answer selection (#22)", () => {
       fireEvent.click(sweden);
     });
     expect(screen.getByRole("status")).toHaveTextContent("Nope! The answer was Sweden.");
-    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 0");
+    expect(screen.getByText(/^Points \d/)).toHaveTextContent("Points 0");
   });
 
   it("keeps a keyboard player's focus on the question once answering disables the answers", async () => {
@@ -321,7 +321,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
       // Nothing is written to the room yet, and the badge is unchanged.
       await new Promise(resolve => setTimeout(resolve, 20));
       expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
-      expect(screen.getByText("Points so far: 500")).toBeInTheDocument();
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
 
       // Answering closes: the verdict, the markers and the new total.
       closeAnswering();
@@ -331,7 +331,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
       expect(screen.queryByText("Answer locked in")).not.toBeInTheDocument();
       expect(screen.queryByRole("timer")).not.toBeInTheDocument();
       expect(screen.getByText(/^Results in \d+s$/)).toBeInTheDocument();
-      const total = Number(/(\d+)$/.exec(screen.getByText(/^Points so far:/).textContent ?? "")?.[1]);
+      const total = Number(/(\d+)$/.exec(screen.getByText(/^Points \d/).textContent ?? "")?.[1]);
       expect(total).toBeGreaterThan(500);
     });
 
@@ -347,7 +347,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
       closeAnswering();
       await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Nope! The answer was Sweden."));
       expect(markers()).toHaveLength(2);
-      expect(screen.getByText("Points so far: 0")).toBeInTheDocument();
+      expect(screen.getByText("Points 0")).toBeInTheDocument();
     });
 
     it("shows a refresh while answering is still open as locked in, then reveals it", async () => {
@@ -387,11 +387,11 @@ describe("Quiz multiplayer score writes (#131)", () => {
       renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
 
       await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
-      expect(screen.getByText("Points so far: 500")).toBeInTheDocument();
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
 
       closeAnswering();
       await vi.waitFor(() => {
-        const total = Number(/(\d+)$/.exec(screen.getByText(/^Points so far:/).textContent ?? "")?.[1]);
+        const total = Number(/(\d+)$/.exec(screen.getByText(/^Points \d/).textContent ?? "")?.[1]);
         expect(total).toBeGreaterThan(500);
       });
     });
@@ -410,7 +410,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
       expect(await screen.findByText("Answer locked in")).toBeInTheDocument();
       await new Promise(resolve => setTimeout(resolve, 20));
       expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
-      expect(screen.getByText("Points so far: 0")).toBeInTheDocument();
+      expect(screen.getByText("Points 0")).toBeInTheDocument();
 
       closeAnswering();
       await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
@@ -439,7 +439,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
       await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Nope!"));
       await new Promise(resolve => setTimeout(resolve, 20));
       expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
-      expect(screen.getByText("Points so far: 500")).toBeInTheDocument();
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
     });
 
     it("shows a failed write's alert only after the reveal, and keeps the badge at what the room holds", async () => {
@@ -453,7 +453,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
 
       closeAnswering();
       expect(await screen.findByRole("alert")).toBeInTheDocument();
-      expect(screen.getByText("Points so far: 500")).toBeInTheDocument();
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
     });
   });
 
@@ -513,7 +513,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
     closeAnswering();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("isn't being saved to this room");
-    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 500");
+    expect(screen.getByText(/^Points \d/)).toHaveTextContent("Points 500");
     expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBeNull();
   });
 

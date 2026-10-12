@@ -1,6 +1,6 @@
 import { countdownLabel } from "../../utils/quizTiming";
 import { CalmNote } from "../CalmPage";
-import { PointsBadge } from "./PointsBadge";
+import { Badge } from "../../design";
 import { VerdictBurst } from "./VerdictBurst";
 
 /**
@@ -49,7 +49,7 @@ export const QuizStatus = ({ questionNumber, questionCount, score, timeLeft, set
     <div className="quiz-head">
       <div className="quiz-head-row">
         <p className="quiz-count">Question {questionNumber} of {questionCount}</p>
-        <PointsBadge points={score} />
+        <Badge className="quiz-points-badge" label="Points" value={score} />
       </div>
       {/* One slot for the clock and then the verdict, so the question below
           doesn't move when one replaces the other. */}

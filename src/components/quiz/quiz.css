@@ -53,29 +53,18 @@
 }
 
 /* The points so far: a dark tile pill, the value big in the display font. */
-.quiz-points-badge {
-  display: inline-flex;
+/* The shared Badge (src/design), laid out on one line so the head stays short. */
+.esc-app .quiz-points-badge {
+  flex-direction: row;
   align-items: baseline;
   gap: var(--esc-space-2);
+  min-height: 0;
   padding: var(--esc-space-1) var(--esc-space-4);
-  border-radius: 999px;
-  background: var(--esc-tile);
-  box-shadow: var(--esc-tile-edge);
-  color: var(--esc-stage-ink);
-  text-shadow: none;
   white-space: nowrap;
 }
 
-.quiz-points-label {
-  font-size: var(--esc-text-sub);
-  line-height: 1.3;
-  color: var(--esc-stage-ink-muted);
-}
-
-.quiz-points-value {
-  font-family: var(--esc-font-display);
+.esc-app .quiz-points-badge .esc-badge-value {
   font-size: var(--esc-text-heading);
-  line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
 
