@@ -166,7 +166,7 @@ test("the scoreboard party screens follow the surface rules", async ({ browser }
     await guest.goto(`/#/party/${code}`);
     await expect(guest.getByRole("button", { name: "Join the party" })).toBeVisible();
     await judge(guest, "party-join");
-    await joinParty(guest, code, "John");
+    await joinParty(guest, code, "Netta");
 
     // Rate three acts on each phone, so every screen has something to show.
     await rateActs(host, [10, 6, 2]);

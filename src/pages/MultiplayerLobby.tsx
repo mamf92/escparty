@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
+import { createRoom, joinRoom, joinRoomWithFreeName, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
 import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -239,16 +239,27 @@ const MultiplayerLobby = () => {
     try {
       const before = rejoin === true ? rejoinAs : null;
       const playerId = before ? before.id : uuidv4();
-      const randomName = before ? before.name : await getUniquePlayerName(code, ESC_WINNERS);
-
-      // Join the room in Firestore
-      const joined = await joinRoom(code, playerId, randomName);
+      // A rejoin keeps its name. A fresh join asks for a likely-free name,
+      // and the room has the last word: it joins in a transaction and
+      // answers with the name this player really got, which differs when
+      // someone took the wanted one at the same moment.
+      let playerName: string;
+      let joined: boolean;
+      if (before) {
+        playerName = before.name;
+        joined = await joinRoom(code, playerId, playerName);
+      } else {
+        const wanted = await getUniquePlayerName(code, ESC_WINNERS);
+        const given = await joinRoomWithFreeName(code, playerId, wanted, ESC_WINNERS);
+        playerName = given ?? wanted;
+        joined = given !== null;
+      }
 
       if (joined) {
         // Saved even if the page was left meanwhile: the player is in the
         // room now, and this device can only rejoin as them with it (#65).
         localStorage.setItem("playerId", playerId);
-        localStorage.setItem("playerName", randomName);
+        localStorage.setItem("playerName", playerName);
         localStorage.setItem("gameCode", code);
 
         if (stale()) return;

@@ -10,8 +10,8 @@ React 19 + Vite + TypeScript, styled-components for styling, react-router
 Pages deploy that every existing link now depends on).
 Backend is Firebase Firestore via the client SDK: state syncs through
 `onSnapshot` listeners, there are no WebSockets, and the only Firestore
-transactions are `updatePlayerScore`, `advanceQuestion` and
-`resumeAfterMidQuiz` — everything else is a plain read/write (see
+transactions are `updatePlayerScore`, `advanceQuestion`,
+`resumeAfterMidQuiz` and `joinRoomWithFreeName` — everything else is a plain read/write (see
 `docs/agent/firestore-data-model.md`).
 
 ## Commands
@@ -114,8 +114,8 @@ rules, ask before making it rather than guessing.
   timed signal like the old `continueReady` flag (#63): clients react to the
   room's state, which a slow client can't miss.
 - Writes several clients make at once must not be a plain read-modify-write.
-  `updatePlayerScore`, `advanceQuestion` and `resumeAfterMidQuiz` are
-  transactions and `markPlayerAtMidQuiz` is an `arrayUnion` — all players
+  `updatePlayerScore`, `advanceQuestion`, `resumeAfterMidQuiz` and
+  `joinRoomWithFreeName` are transactions and `markPlayerAtMidQuiz` is an `arrayUnion` — all players
   reach the mid-quiz break on the same snapshot (#62), and the old
   read-modify-write there dropped player IDs. Don't revert any of them to a
   `getDoc`/`updateDoc` pair.

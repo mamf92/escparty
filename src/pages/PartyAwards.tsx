@@ -5,6 +5,7 @@ import { PartyError, PartyNotFound } from "../components/PartyStates";
 import { Control, Ground, Pane, Row } from "../design";
 import { usePartyData } from "../hooks/usePartyData";
 import { predictionLeaderboard } from "../utils/partyModel";
+import { withDistinctNames } from "../utils/partyNames";
 import { awardWinners, awardsFor, hasResults, ordinal, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity } from "../utils/partySession";
 
@@ -51,8 +52,10 @@ const PartyAwards = () => {
     }
 
     const awards = awardsFor(party, ballots);
-    const names = new Map(ballots.map(ballot => [ballot.guestId, ballot.name]));
-    const leaderboard = hasResults(party) ? predictionLeaderboard(ballots, predictionsFor(party, ballots)) : [];
+    // Two guests with one name (older parties) are told apart by a number.
+    const named = withDistinctNames(ballots);
+    const names = new Map(named.map(ballot => [ballot.guestId, ballot.name]));
+    const leaderboard = hasResults(party) ? predictionLeaderboard(named, predictionsFor(party, ballots)) : [];
     // One page per award, then the closeness table when there's a result.
     const pages = awards.length + (leaderboard.length > 0 ? 1 : 0);
     const page = Math.min(index, Math.max(pages - 1, 0));

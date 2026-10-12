@@ -1,14 +1,15 @@
-import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
+import { NamePicker } from "../components/NamePicker";
 import PartyHostTools from "../components/PartyHostTools";
 import { PartyError, PartyNotFound } from "../components/PartyStates";
-import { Control, Field, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } from "../design";
+import { Control, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } from "../design";
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
 import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import { usePartyData } from "../hooks/usePartyData";
-import type { Party } from "../utils/partyFirestore";
+import { saveBallot, type Party } from "../utils/partyFirestore";
 import {
     actScore,
     ballotScores,
@@ -18,7 +19,7 @@ import {
     type Bonuses,
     type Ratings,
 } from "../utils/partyModel";
-import { randomPartyName } from "../utils/partyNames";
+import { availablePartyNames, freePartyName, nameClash, withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
@@ -53,6 +54,23 @@ const PartyRoom = () => {
     const tabKeys = isHost ? HOST_TABS : GUEST_TABS;
     const tabs = useRovingTabs(tabKeys, tab, setTab);
 
+    // Two guests can take one name at the same moment (their ballots are
+    // separate documents). The one whose guest ID sorts last gives it up,
+    // once per name, for a free one; the ballot is rewritten by useOwnBallot.
+    const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null);
+    const settledName = useRef<string | null>(null);
+    useEffect(() => {
+        if (!code || !identity || !ballots || settledName.current === identity.name) return;
+        if (!nameClash(ballots, identity)) return;
+        settledName.current = identity.name;
+        const next = { ...identity, name: freePartyName(ballots.map(ballot => ballot.name)) };
+        savePartyIdentity(code, next);
+        // The server's ballots are the outside system this reacts to.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIdentity(next);
+        setRenamed({ from: identity.name, to: next.name });
+    }, [ballots, identity, code]);
+
     // The brand asks only once this tab is in a party that exists.
     useLeaveGuard(party && identity ? {
         message: "Go back to ESCParty? You'll leave the party's rating room. Your ratings are saved.",
@@ -76,7 +94,20 @@ const PartyRoom = () => {
         );
     }
     if (!identity) {
-        return <JoinParty party={party} onJoin={next => { savePartyIdentity(party.code, next); setIdentity(next); }} footer={back} />;
+        return (
+            <JoinParty
+                party={party}
+                ballots={ballots}
+                onJoin={next => {
+                    savePartyIdentity(party.code, next);
+                    setIdentity(next);
+                    // Claim the name at once: an empty ballot, so the next guest sees it taken.
+                    saveBallot(party.code, { guestId: next.guestId, name: next.name, ratings: {}, bonuses: {} })
+                        .catch(failure => console.error("Couldn't claim the name yet, will retry:", failure));
+                }}
+                footer={back}
+            />
+        );
     }
 
     const updateIdentity = (change: Partial<PartyIdentity>) => {
@@ -105,6 +136,7 @@ const PartyRoom = () => {
                 </Pane>
             </Ground>
             {error && <PartyError error={error} onRetry={retry} />}
+            {renamed && <CalmNote role="status">Someone took {renamed.from} at the same moment, so you&apos;re {renamed.to} tonight.</CalmNote>}
 
             <div className="party-stack" {...tabs.panel}>
                 {tab === "rate" && (
@@ -139,39 +171,38 @@ const PartyRoom = () => {
     );
 };
 
-const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity: PartyIdentity) => void; footer: ReactNode }) => {
-    const nameId = useId();
-    const [name, setName] = useState(randomPartyName);
-    const [tried, setTried] = useState(false);
-    const missing = tried && !name.trim();
-    // A form, so Enter in the name field joins.
-    const join = (event: FormEvent) => {
-        event.preventDefault();
-        setTried(true);
-        if (!name.trim()) return;
-        onJoin({ guestId: uuidv4(), name: name.trim(), isHost: false });
-    };
+const JoinParty = ({ party, ballots, onJoin, footer }: {
+    party: Party;
+    /** Everyone already in the party, whose names are taken; undefined until they arrive. */
+    ballots: Ballot[] | undefined;
+    onJoin: (identity: PartyIdentity) => void;
+    footer: ReactNode;
+}) => {
+    const [name, setName] = useState<string | null>(null);
+    const [spinning, setSpinning] = useState(false);
+    // The names nobody has yet; the one landed on stays on the reel even if
+    // someone takes it meanwhile (the clash is settled once in the party).
+    const taken = (ballots ?? []).map(ballot => ballot.name);
+    const takenKey = taken.join("\n");
+    const names = useMemo(() => {
+        const free = availablePartyNames(takenKey ? takenKey.split("\n") : []);
+        return name !== null && !free.includes(name) ? [...free, name] : free;
+    }, [takenKey, name]);
     return (
         <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
-            <form onSubmit={join} noValidate>
-                <Ground>
-                    <Pane>
-                        <div>
-                            <label className="calm-label" htmlFor={nameId}>Your name at the party</label>
-                            <Field
-                                id={nameId}
-                                value={name}
-                                maxLength={40}
-                                aria-invalid={missing}
-                                aria-describedby={missing ? `${nameId}-problem` : undefined}
-                                onChange={event => setName(event.target.value)}
-                            />
-                            {missing && <CalmNote id={`${nameId}-problem`} role="alert">Give yourself a name.</CalmNote>}
-                        </div>
-                        <Control type="submit" elevation="high">Join the party</Control>
-                    </Pane>
-                </Ground>
-            </form>
+            <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
+            <NamePicker value={name} onChange={setName} onSpinningChange={setSpinning} names={names} />
+            <Ground>
+                <Pane>
+                    <Control
+                        elevation="high"
+                        disabled={name === null || spinning}
+                        onClick={() => name !== null && onJoin({ guestId: uuidv4(), name, isHost: false })}
+                    >
+                        Join the party
+                    </Control>
+                </Pane>
+            </Ground>
             <CalmNote role="status">
                 {party.showNames
                     ? "At the end, the awards name who rated most alike and most differently."
@@ -339,7 +370,9 @@ const MyRanking = ({ party, ballot }: { party: Party; ballot: Ballot }) => {
     );
 };
 
-const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: string }) => {
+const TheRoom = ({ party, ballots: raw, me }: { party: Party; ballots: Ballot[]; me: string }) => {
+    // Two guests with one name are told apart by a number in the lists.
+    const ballots = withDistinctNames(raw);
     const standings = roomStandings(ballots, actIdsOf(party), party.template.categories, partyBonusList(party));
     const byId = new Map(party.acts.map(act => [act.id, act]));
     const leaderboard = hasResults(party) ? predictionLeaderboard(ballots, predictionsFor(party, ballots)) : [];
@@ -347,7 +380,7 @@ const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: 
 
     return (
         <>
-            <CalmNote aria-live="polite">{ballots.length === 1 ? "1 guest is rating." : `${ballots.length} guests are rating.`}</CalmNote>
+            <CalmNote aria-live="polite">{ballots.length === 1 ? "1 guest at the party." : `${ballots.length} guests at the party.`}</CalmNote>
             <Ground>
                 {standings.length === 0 ? (
                     <Pane>

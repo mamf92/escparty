@@ -15,7 +15,7 @@ test("Join a party opens a scoreboard party from its code", async ({ browser }) 
     await guest.getByRole("button", { name: "Join a party" }).click();
     await guest.getByLabel("Party code").pressSequentially(code.toLowerCase());
     await expect(guest).toHaveURL(new RegExp(`#/party/${code}$`));
-    await expect(guest.getByLabel("Your name at the party")).toBeVisible();
+    await expect(guest.getByRole("spinbutton", { name: "Your name" })).toBeVisible();
 });
 
 test("Join a party joins a quiz room from its code", async ({ browser }) => {

@@ -7,11 +7,12 @@ import { PARTY_BONUSES } from "../utils/partyModel";
 import { PARTY_NAMES } from "../utils/partyNames";
 import { readPartyIdentity } from "../utils/partySession";
 
-const mocks = vi.hoisted(() => ({ createParty: vi.fn(), fetchContest: vi.fn() }));
+const mocks = vi.hoisted(() => ({ createParty: vi.fn(), fetchContest: vi.fn(), saveBallot: vi.fn() }));
 vi.mock("../utils/partyFirestore", async (importOriginal) => ({
     ...(await importOriginal<typeof import("../utils/partyFirestore")>()),
     createParty: mocks.createParty,
     fetchContest: mocks.fetchContest,
+    saveBallot: mocks.saveBallot,
 }));
 
 const ShowLocation = () => <p>at {useLocation().pathname}</p>;
@@ -56,6 +57,7 @@ describe("PartySetup", () => {
         vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
         mocks.fetchContest.mockImplementation(async (id: string) => CONTESTS_2027.find(contest => contest.id === id));
         mocks.createParty.mockResolvedValue("ABBA");
+        mocks.saveBallot.mockResolvedValue(undefined);
     });
 
     it("asks one big question at a time, with nothing picked", () => {
@@ -203,6 +205,8 @@ describe("PartySetup", () => {
         expect(party.template.id).toBe("jury");
         expect(party.template.bonuses).toEqual([{ id: "wind", label: "Wind machine", points: 1 }]);
         expect(readPartyIdentity("ABBA")).toEqual({ guestId: party.hostId, name: PARTY_NAMES[0], isHost: true });
+        // The host's name is claimed at once, with an empty ballot.
+        expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", { guestId: party.hostId, name: PARTY_NAMES[0], ratings: {}, bonuses: {} });
     });
 
     it("sets up a semi with our own categories and no bonuses", async () => {

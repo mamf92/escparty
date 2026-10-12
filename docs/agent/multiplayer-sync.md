@@ -11,7 +11,9 @@ Why this runs on Firestore listeners and not WebSockets:
 ## The flow, page by page
 
 1. **`MultiplayerLobby.tsx`** — host creates a room (`createRoom`, generates
-   a 4-letter code) or a player joins one (`joinRoom`). Both paths write
+   a 4-letter code) or a player joins one (`joinRoomWithFreeName` for a fresh join, which
+   picks a name nobody in the room has inside a transaction and returns it;
+   `joinRoom` for a rejoin under the stored name). Both paths write
    `playerId`, `playerName`, `gameCode` and `isHost` to `localStorage`, then
    navigate to `/lobby`. Whether the host only observes is stored on the
    room (`Room.hostIsObserver`) and nowhere else. It is reached from Home's
