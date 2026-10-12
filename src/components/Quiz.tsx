@@ -8,7 +8,7 @@ import { DEFAULT_BREAK_EVERY, isBreakAfter } from "../utils/quizModel";
 import { bestKnownScore, calculateQuestionScore, calculateTimeBonus } from "../utils/quizScoring";
 import { LEGACY_ROOM_MESSAGE, isObserverHost, observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { MultiplayerSession, readMultiplayerGame } from "../utils/multiplayerSession";
-import { MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, SOLO_VERDICT_MS, phaseAfterQuestion, questionClock, startedAtMillis } from "../utils/quizTiming";
+import { MID_QUIZ_EVERY, QUESTION_MS, QUESTION_SLOT_MS, SOLO_VERDICT_MS, phaseAfterQuestion, playerSpreadMs, questionClock, startedAtMillis } from "../utils/quizTiming";
 import { ScoreEntry, readScoreHistory } from "../utils/scoreHistory";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { Control, Ground, Loader, Pane } from "../design";
@@ -338,7 +338,7 @@ const Quiz = () => {
 
   const advanceGraceMs = playerId && playerId === advanceLeaderId
     ? 0
-    : 1500 + ([...(playerId ?? "")].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 1000);
+    : 1500 + playerSpreadMs(playerId);
 
   // A right answer's points, held back until answering closes: writing them
   // at the tap would let the room's snapshot (the scoreboards, a neighbour's
@@ -354,14 +354,6 @@ const Quiz = () => {
     // can resolve after a later one was answered.
     const current = Number(sessionStorage.getItem(answeredKey) ?? -1);
     if (index > current) sessionStorage.setItem(answeredKey, String(index));
-  };
-  // Take a mark back after a write that failed for good, so the player can
-  // answer again after a refresh. Only the mark this answer made.
-  const forgetAnswered = (index: number, previous: number) => {
-    if (!sharedClock || !answeredKey) return;
-    if (Number(sessionStorage.getItem(answeredKey) ?? -1) !== index) return;
-    if (previous < 0) sessionStorage.removeItem(answeredKey);
-    else sessionStorage.setItem(answeredKey, String(previous));
   };
   const answeredIndex = answeredKey ? Number(sessionStorage.getItem(answeredKey) ?? -1) : -1;
 
@@ -595,22 +587,30 @@ const Quiz = () => {
     moveToNextQuestionRef.current = moveToNextQuestion;
   });
 
+  // This page's own pending answer, in case sessionStorage can't hold it.
+  const pendingMemoryRef = useRef<PendingScore | null>(null);
   // The held-back points of a right answer, written once answering has
   // closed. A failed write is retried a couple of times, since nothing else
   // would repair it: the room (and every scoreboard built from it) would
   // keep the lower score. One that fails for good takes the points (and the
   // answered mark) back, so the screen only shows what the room has.
-  const flushPendingScore = async ({ index, points }: PendingScore) => {
+  const flushPendingScore = async ({ index, points }: PendingScore, delayMs = 0) => {
     if (!roomCode || !playerId) return;
-    const markedBefore = index - 1;
+    // Taken off the stored pending entry before writing: a reload while the
+    // write is in flight must not write the same points a second time.
+    if (pendingMemoryRef.current?.index === index) pendingMemoryRef.current = null;
+    try {
+      if (pendingKey && readPendingScore(pendingKey)?.index === index) sessionStorage.removeItem(pendingKey);
+    } catch { /* nothing to clear */ }
     let roomHeld = Math.max(score, storedScore); // what the room is known to hold
     let scoreToSave = roomHeld + points;
+    // The badge counts the points at the reveal; only the write waits.
     setScore(scoreToSave);
+    if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
     const failedForGood = (message: string) => {
       setScoreSyncError(message);
       setPointsLostAt(index);
       setScore(roomHeld);
-      forgetAnswered(index, markedBefore);
     };
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -724,8 +724,6 @@ const Quiz = () => {
   // pending entry. Keeps the entry until the write is settled.
   const flushPendingRef = useRef(flushPendingScore);
   const flushedRef = useRef<string | null>(null);
-  // This page's own pending answer, in case sessionStorage can't hold it.
-  const pendingMemoryRef = useRef<PendingScore | null>(null);
   useLayoutEffect(() => {
     flushPendingRef.current = flushPendingScore;
   });
@@ -742,15 +740,7 @@ const Quiz = () => {
     // Every right answer in the room is written at the same moment, each a
     // transaction on the one room document: spread them over a second, per
     // player (well inside the feedback window), so they don't all contend.
-    const spreadMs = [...playerId].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 1000;
-    setTimeout(() => {
-      void flushPendingRef.current(pending).finally(() => {
-        if (pendingMemoryRef.current?.index === pending.index) pendingMemoryRef.current = null;
-        try {
-          if (pendingKey && readPendingScore(pendingKey)?.index === pending.index) sessionStorage.removeItem(pendingKey);
-        } catch { /* nothing to clear */ }
-      });
-    }, spreadMs);
+    void flushPendingRef.current(pending, playerSpreadMs(playerId));
   }, [isMultiplayer, room, roomCode, playerId, pendingKey, currentQuestionIndex, revealed]);
   // While locked in, the clock keeps counting what is left of answering time
   // (`timeLeft` has moved on to the slot's remaining seconds by then).
@@ -774,7 +764,13 @@ const Quiz = () => {
   }, [isSubmitted, currentQuestionIndex]);
 
   // A player who picked "Leave the quiz" and confirmed it.
-  const leaveQuiz = () => navigate("/");
+  // Points held back for the reveal are written on the way out, so leaving
+  // right after a tap doesn't lose them.
+  const leaveQuiz = () => {
+    const pending = readPendingScore(pendingKey) ?? pendingMemoryRef.current;
+    if (pending && sharedClock) void flushPendingScore(pending);
+    navigate("/");
+  };
   // The brand asks before ending a quiz that is running.
   useLeaveGuard(loading || error || legacyRoom ? null : {
     message: isMultiplayer

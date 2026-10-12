@@ -502,7 +502,17 @@ describe("Quiz multiplayer score writes (#131)", () => {
     await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
   });
 
-  it("takes the points and the answered mark back when the room refuses the write", async () => {
+  it("clears the held-back points before writing them, so a reload mid-write can't add them twice", async () => {
+    const { closeAnswering } = givenRoom();
+    mocks.updatePlayerScore.mockReturnValue(new Promise(() => { })); // still in flight
+    await answerCorrectly();
+    expect(sessionStorage.getItem("pendingScore:ABCD")).not.toBeNull();
+    closeAnswering();
+    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+    expect(sessionStorage.getItem("pendingScore:ABCD")).toBeNull();
+  });
+
+  it("takes the points back when the room refuses the write", async () => {
     const { closeAnswering } = givenRoom();
     mocks.updatePlayerScore.mockRejectedValue(
       new ScoreWriteRejected("unknown-player", "Failed to update score: Room ABCD has no player ghost"),
@@ -514,7 +524,8 @@ describe("Quiz multiplayer score writes (#131)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("isn't being saved to this room");
     expect(screen.getByText(/^Points \d/)).toHaveTextContent("Points 500");
-    expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBeNull();
+    // The question had closed by the time of the write, so it stays answered.
+    expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBe("0");
   });
 
   it("tells the player once when the room doesn't know them, without retrying", async () => {

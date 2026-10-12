@@ -260,10 +260,6 @@ const MidQuizScoreboard = () => {
     <CalmLink type="button" onClick={() => navigate("/")}>End the quiz and go back to ESCParty</CalmLink>
   );
 
-  // The score as a badge, for a player in either mode (the final results'
-  // proud row); the host of a multiplayer game only passes through.
-  const showScore = !gameData.multiplayer || !isHost || players.some(p => p.id === gameData.playerId);
-
   const actions = (
     <>
       {canContinue ? (
@@ -283,16 +279,15 @@ const MidQuizScoreboard = () => {
 
   return (
     <CalmPage title={TITLE} actions={actions} footer={leave}>
-      {showScore && (
-        <Ground>
-          <Pane>
-            <Row elevation="high">
-              <span className="calm-label">Your score so far</span>
-              <span className="esc-hero-number">{points(myScore)}</span>
-            </Row>
-          </Pane>
-        </Ground>
-      )}
+      {/* The score, big, as on the final results' proud row. */}
+      <Ground>
+        <Pane>
+          <Row elevation="high">
+            <span className="calm-label">Your score so far</span>
+            <span className="esc-hero-number">{points(myScore)}</span>
+          </Row>
+        </Pane>
+      </Ground>
       {gameData.multiplayer && (players.length > 0 || scoresLoaded ? (
         <Standings
           players={players}

@@ -21,6 +21,13 @@ export const RESULTS_GRACE_MS = 30_000;
 export const RESULTS_WAIT_FALLBACK_MS = 60_000;
 
 /**
+ * A steady per-player offset under a second, from the player's ID, for
+ * spreading writes every client would otherwise make at the same moment.
+ */
+export const playerSpreadMs = (playerId: string | null | undefined): number =>
+    [...(playerId ?? "")].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 1000;
+
+/**
  * A mid-quiz scoreboard break follows every Nth question, unless the room
  * says otherwise (`Room.breakEvery`, where 0 means never).
  */

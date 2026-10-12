@@ -52,7 +52,6 @@
   color: var(--esc-ink);
 }
 
-/* The points so far: a dark tile pill, the value big in the display font. */
 /* The shared Badge (src/design), laid out on one line so the head stays short. */
 .esc-app .quiz-points-badge {
   flex-direction: row;

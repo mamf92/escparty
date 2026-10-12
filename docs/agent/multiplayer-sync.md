@@ -50,7 +50,7 @@ Why this runs on Firestore listeners and not WebSockets:
    (`questionClock(...).answeringOpen` false, `QUESTION_MS` after
    `phaseStartedAt`), so no one can read it off a neighbour's screen; it then
    shows during the `FEEDBACK_MS` window. `Quiz.tsx` keeps this as
-   `answeringOpen`, set from the same 100ms tick; solo reveals at once.
+   `answeringOpen` (`timeLeftMs > 0`, from the same 100ms tick); solo reveals at once.
    **A room score is written when answering closes, not at the tap**: a
    right answer's points are held as `pendingScore:<room>` (`{index, points}`
    in sessionStorage) and written with `updatePlayerScore` once the question
@@ -58,7 +58,13 @@ Why this runs on Firestore listeners and not WebSockets:
    view, another device on the same room) can't give away that an answer
    was right before the verdict shows. A refresh in between keeps the entry
    and the reloaded page writes it after answering closes; a leftover for an
-   earlier question is flushed too. Wrong answers and timeouts write
+   earlier question is flushed too. The entry is cleared as the write
+   starts, so a reload mid-write can't add the points twice; each player's
+   write waits a steady offset under a second (`playerSpreadMs`) so the
+   room's transactions don't all land at once; leaving the quiz writes a
+   held-back answer on the way out. The trade-off: a phone locked between
+   the tap and the reveal writes when it wakes, which on the last question
+   only counts within `RESULTS_GRACE_MS`. Wrong answers and timeouts write
    nothing, and a write that fails for good (with its `scoreSyncError`
    alert) therefore also only shows after the reveal. When the
    room's phase becomes `mid-scoreboard` or `results`, every player
