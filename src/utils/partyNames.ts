@@ -1,4 +1,4 @@
-import { freeNames, nameKey, pickFreeName } from "./freeName";
+import { firstFreeNumbered, freeNames, nameKey } from "./freeName";
 
 /**
  * The Eurovision legends a guest becomes at a scoreboard party, so the
@@ -14,8 +14,6 @@ export const PARTY_NAMES = [
     "Duncan", "Kalush", "Jamala", "Måns", "Carola", "Bobbysocks", "Secret Garden",
 ];
 
-export const randomPartyName = (): string => PARTY_NAMES[Math.floor(Math.random() * PARTY_NAMES.length)];
-
 /**
  * The participant names nobody has taken. When every name is taken, each
  * name's first free numbered variant (" 2", " 3"...), so a newcomer is never
@@ -23,8 +21,9 @@ export const randomPartyName = (): string => PARTY_NAMES[Math.floor(Math.random(
  */
 export const availablePartyNames = (takenNames: readonly string[]): string[] => {
     const free = freeNames(takenNames, PARTY_NAMES);
-    // With no free name in the pool, pickFreeName numbers the wanted one.
-    return free.length > 0 ? free : PARTY_NAMES.map(name => pickFreeName(name, takenNames, []));
+    if (free.length > 0) return free;
+    const takenKeys = new Set(takenNames.map(nameKey));
+    return PARTY_NAMES.map(name => firstFreeNumbered(name, takenKeys));
 };
 
 /**
@@ -49,10 +48,9 @@ export const distinctNames = (
             result.set(id, name);
             continue;
         }
-        let n = 2;
-        while (used.has(nameKey(`${name} ${n}`))) n += 1;
-        used.add(nameKey(`${name} ${n}`));
-        result.set(id, `${name} ${n}`);
+        const numbered = firstFreeNumbered(name, used);
+        used.add(nameKey(numbered));
+        result.set(id, numbered);
     }
     return result;
 };

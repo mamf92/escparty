@@ -57,7 +57,7 @@ guest with the lowest guest ID (stable, so names never swap as people rate) and 
 getting "Loreen 2", and a guest's own "you're ..." subtitle uses the same
 name (`PartyRoom` computes `withDistinctNames` once for the subtitle and the Room tab). On the join reel a landed name that a ballots
 update takes before Join is let go ("X was just taken. Spin again."), and
-the reel is off while the ballots haven't loaded. Older parties may
+the reel is off while the ballots haven't loaded, and if the ballots (or party) listener errors first, the join screen shows `PartyError` with "Try again" instead of the reel and Join stays off, so nobody joins without the taken names being known (`useOwnBallot` therefore always has the server copy to merge with). `distinctNames` and `availablePartyNames` share `firstFreeNumbered` (`freeName.ts`). A template whose `bonuses` is present but unusable means no bonuses; only an absent list (older parties) falls back to the premade five. Older parties may
 still hold duplicates, so lists of guests (the room's closeness list, the
 big screen, the awards) show `withDistinctNames`: a repeat gets " 2", " 3" in
 guest-ID order.

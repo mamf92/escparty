@@ -164,7 +164,18 @@ describe("NamePicker", () => {
         expect(left).toContain(onChange.mock.calls[0][0]);
     });
 
-    it("lands on nothing when every name is gone by the time it stops", () => {
+    it("lands on the first current name when none of the spun names is offered any more", () => {
+        reducedMotion(false);
+        vi.useFakeTimers();
+        const onChange = vi.fn();
+        const { rerender } = render(<NamePicker names={NAMES} value={null} onChange={onChange} />);
+        fireEvent.click(screen.getByRole("button", { name: "Spin for a name" }));
+        rerender(<NamePicker names={["Loreen 2", "Nemo 2"]} value={null} onChange={onChange} />);
+        act(() => { vi.runAllTimers(); });
+        expect(onChange).toHaveBeenCalledExactlyOnceWith("Loreen 2");
+    });
+
+    it("says so when no name is left at all by the time it stops, and clears that on the next spin", () => {
         reducedMotion(false);
         vi.useFakeTimers();
         const onChange = vi.fn();
@@ -173,5 +184,9 @@ describe("NamePicker", () => {
         rerender(<NamePicker names={[]} value={null} onChange={onChange} />);
         act(() => { vi.runAllTimers(); });
         expect(onChange).not.toHaveBeenCalled();
+        expect(screen.getByRole("status")).toHaveTextContent("No names left. Try again in a moment.");
+        rerender(<NamePicker names={NAMES} value={null} onChange={onChange} />);
+        fireEvent.click(screen.getByRole("button", { name: "Spin for a name" }));
+        expect(screen.getByRole("status")).toHaveTextContent("Spinning…");
     });
 });

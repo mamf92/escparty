@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Control, Pane, Row } from "../design";
+import { prefersReducedMotion } from "../utils/motion";
 import { PARTY_NAMES } from "../utils/partyNames";
 
 const SWIPE_STEP_PX = 36;
@@ -7,9 +8,6 @@ const WHEEL_GAP_MS = 120;
 
 /** `index` wrapped into 0..count-1, also for negative numbers. */
 const wrapIndex = (index: number, count: number) => ((index % count) + count) % count;
-
-const prefersReducedMotion = () =>
-    typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * A slot-machine style name picker (#208): the Eurovision participant names
@@ -36,6 +34,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     // underneath it (someone else took a name) can't move the reel.
     const [spinning, setSpinning] = useState<number | null>(null);
     const [frozen, setFrozen] = useState<readonly string[] | null>(null);
+    const [noneLeft, setNoneLeft] = useState(false);
     const latestNames = useRef(names);
     useEffect(() => { latestNames.current = names; });
     const list = spinning !== null && frozen ? frozen : names;
@@ -66,6 +65,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
 
     const spin = () => {
         if (off) return;
+        setNoneLeft(false);
         // Always a different name from the one already landed on.
         const spun = names;
         const end = landed < 0 ? Math.floor(Math.random() * count) : wrap(landed + 1 + Math.floor(Math.random() * (count - 1)));
@@ -81,13 +81,13 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 setFrozen(null);
                 // If the landed name was taken meanwhile, land on the nearest one still offered.
                 const here = wrapIndex(at, spun.length);
-                for (let offset = 0; offset < spun.length; offset += 1) {
-                    const candidate = spun[wrapIndex(here + offset, spun.length)];
-                    if (latestNames.current.includes(candidate)) {
-                        onChange(candidate);
-                        break;
-                    }
-                }
+                const offered = latestNames.current;
+                const nearest = Array.from({ length: spun.length }, (_, offset) => spun[wrapIndex(here + offset, spun.length)])
+                    .find(candidate => offered.includes(candidate));
+                // None of the spun names is offered any more: take the first one that is.
+                const landedOn = nearest ?? offered[0];
+                if (landedOn !== undefined) onChange(landedOn);
+                else setNoneLeft(true);
                 return;
             }
             setSpinning(wrapIndex(at, spun.length));
@@ -168,7 +168,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 <Row className="party-reel-edge" aria-hidden="true">{edge(1)}</Row>
             </div>
             <p className="esc-note" role="status">
-                {isSpinning ? "Spinning…" : value !== null ? `You're ${value}.` : "Spin the reel, or swipe, scroll or use the arrow keys."}
+                {isSpinning ? "Spinning…" : noneLeft ? "No names left. Try again in a moment." : value !== null ? `You're ${value}.` : "Spin the reel, or swipe, scroll or use the arrow keys."}
             </p>
             <Pane layout="split">
                 <Control onClick={() => step(-1)} disabled={off}>Previous name</Control>

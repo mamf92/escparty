@@ -140,13 +140,15 @@ export const listenToParty = (code: string, onParty: (party: Party | null) => vo
 
 /**
  * A party as it comes from Firestore. The rules only check a template's
- * categories, so its bonus list is tidied here (`sanitiseBonuses`).
+ * categories, so its bonus list is tidied here (`sanitiseBonuses`): a list
+ * that is present but unusable becomes none; only an absent list (an older
+ * party) leaves the premade bonuses to `partyBonusList`.
  */
 const toParty = (party: Party): Party => {
     if (!isRecord(party.template) || !("bonuses" in party.template)) return party;
     const { bonuses, ...rest } = party.template;
-    const clean = sanitiseBonuses(bonuses);
-    return { ...party, template: clean ? { ...rest, bonuses: clean } : rest };
+    // A list the host chose but that isn't usable means no bonuses, not the premade five.
+    return { ...party, template: { ...rest, bonuses: sanitiseBonuses(bonuses) ?? [] } };
 };
 
 /** Follow every guest's ballot in a party. */

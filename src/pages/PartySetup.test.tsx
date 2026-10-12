@@ -86,7 +86,7 @@ describe("PartySetup", () => {
         for (const card of cards) expect(card).toHaveClass("esc-choice-card");
     });
 
-    it("moves focus with the arrow keys without picking or moving on, one tab stop", async () => {
+    it("checks the next show with the arrow keys without moving on, and Enter then moves on", async () => {
         const user = userEvent.setup();
         renderSetup();
         const cards = screen.getAllByRole("radio");
@@ -95,12 +95,13 @@ describe("PartySetup", () => {
         await user.keyboard("{ArrowDown}");
         step(1);
         expect(cards[1]).toHaveFocus();
-        for (const card of cards) expect(card).toHaveAttribute("aria-checked", "false");
+        expect(cards.map(card => card.getAttribute("aria-checked"))).toEqual(["false", "true", "false"]);
+        expect(cards.map(card => card.tabIndex)).toEqual([-1, 0, -1]);
         await user.keyboard("{Enter}");
         step(2);
     });
 
-    it("moves focus between the sheet cards without picking or moving on", async () => {
+    it("checks the next sheet card with the arrow keys without moving on", async () => {
         const user = userEvent.setup();
         renderSetup();
         await user.click(screen.getByRole("radio", { name: /Grand final/ }));
@@ -109,7 +110,7 @@ describe("PartySetup", () => {
         await user.keyboard("{ArrowDown}");
         step(2);
         expect(cards[1]).toHaveFocus();
-        for (const card of cards) expect(card).toHaveAttribute("aria-checked", "false");
+        expect(cards.map(card => card.getAttribute("aria-checked"))).toEqual(["false", "true", ...cards.slice(2).map(() => "false")]);
     });
 
     it("shows the sheets as cards with a category count, list and blurb", async () => {

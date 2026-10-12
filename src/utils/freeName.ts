@@ -18,7 +18,12 @@ export const pickFreeName = (wanted: string, taken: readonly string[], pool: rea
     if (!takenKeys.has(nameKey(wanted))) return wanted;
     const free = freeNames(taken, pool);
     if (free.length > 0) return free[Math.floor(Math.random() * free.length)];
+    return firstFreeNumbered(wanted, takenKeys);
+};
+
+/** `name` numbered " 2", " 3"... with the first number whose key is not in `takenKeys` (`nameKey`s). */
+export const firstFreeNumbered = (name: string, takenKeys: ReadonlySet<string>): string => {
     let n = 2;
-    while (takenKeys.has(nameKey(`${wanted} ${n}`))) n += 1;
-    return `${wanted} ${n}`;
+    while (takenKeys.has(nameKey(`${name} ${n}`))) n += 1;
+    return `${name} ${n}`;
 };

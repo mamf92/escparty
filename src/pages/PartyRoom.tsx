@@ -19,6 +19,7 @@ import {
     type Bonuses,
     type Ratings,
 } from "../utils/partyModel";
+import { prefersReducedMotion } from "../utils/motion";
 import { availablePartyNames, withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
@@ -46,11 +47,7 @@ const PartyRoom = () => {
     const code = useParams().code?.toUpperCase();
     const { party, ballots, error, retry } = usePartyData(code);
     const [identity, setIdentity] = useState<PartyIdentity | null>(() => (code ? readPartyIdentity(code) : null));
-    // A guest who joined on this page has a brand-new id, so with the ballots
-    // listener down there is no server copy to lose: their empty ballot (the
-    // name claim) can be written anyway. Anyone else waits for the real copy.
-    const [joinedHere, setJoinedHere] = useState(false);
-    const own = useOwnBallot(code, identity, ballots, !!error && joinedHere);
+    const own = useOwnBallot(code, identity, ballots);
     const [tab, setTab] = useState<Tab>("rate");
     // Before the early returns, as hooks must be; the host's tab only once
     // the party and who you are are known.
@@ -95,11 +92,11 @@ const PartyRoom = () => {
             <JoinParty
                 party={party}
                 ballots={ballots}
-                ballotsFailed={!!error}
+                error={error}
+                onRetry={retry}
                 onJoin={next => {
                     // useOwnBallot writes the empty ballot (which claims the name) once it sees none for this guest.
                     savePartyIdentity(party.code, next);
-                    setJoinedHere(true);
                     setIdentity(next);
                 }}
                 footer={back}
@@ -170,34 +167,40 @@ const PartyRoom = () => {
     );
 };
 
-const JoinParty = ({ party, ballots, ballotsFailed, onJoin, footer }: {
+const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
     party: Party;
     /** Everyone already in the party, whose names are taken; undefined until they arrive. */
     ballots: Ballot[] | undefined;
-    /** The ballots listener errored: join anyway, with every name on the reel. */
-    ballotsFailed: boolean;
+    /** A listener errored: nobody joins until the taken names can be read. */
+    error: string | null;
+    onRetry: () => void;
     onJoin: (identity: PartyIdentity) => void;
     footer: ReactNode;
 }) => {
     const [name, setName] = useState<string | null>(null);
     const [spinning, setSpinning] = useState(false);
-    const checking = ballots === undefined && !ballotsFailed;
-    // The names nobody has yet (every name if the ballots can't be read).
+    const checking = ballots === undefined && !error;
+    // The names nobody has yet.
     const names = useMemo(() => availablePartyNames((ballots ?? []).map(ballot => ballot.name)), [ballots]);
     // A landed name that a ballots update takes before this guest joins is let go.
+    const blocked = ballots === undefined && !!error;
     const landed = name !== null && names.includes(name) ? name : null;
     const justTaken = name !== null && landed === null ? name : null;
     return (
         <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
-            <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
-            <NamePicker value={landed} onChange={setName} onSpinningChange={setSpinning} names={names} disabled={checking} />
+            {blocked && error !== null ? <PartyError error={error} onRetry={onRetry} /> : (
+                <>
+                    <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
+                    <NamePicker value={landed} onChange={setName} onSpinningChange={setSpinning} names={names} disabled={checking} />
+                </>
+            )}
             {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
             {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
             <Ground>
                 <Pane>
                     <Control
                         elevation="high"
-                        disabled={landed === null || spinning || checking}
+                        disabled={landed === null || spinning || checking || blocked}
                         onClick={() => landed !== null && onJoin({ guestId: uuidv4(), name: landed, isHost: false })}
                     >
                         Join the party
@@ -241,8 +244,7 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus, onDone }: {
     const toBonuses = () => {
         const heading = bonusHeading.current;
         if (!heading) return;
-        const still = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        heading.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "start" });
+        heading.scrollIntoView?.({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
         heading.focus({ preventScroll: true });
     };
     const act = party.acts[actIndex];

@@ -92,13 +92,18 @@ describe("PartyRoom", () => {
         expect(screen.getByText("Checking which names are taken…")).toHaveAttribute("role", "status");
     });
 
-    it("lets a guest join with every name when the ballots can't be listened to", async () => {
+    it("shows the error and a retry instead of the reel when the ballots can't be listened to, and keeps Join off", async () => {
         const user = userEvent.setup();
-        mocks.data = { party: makeParty(), ballots: undefined, error: "The party couldn't be reached.", retry: vi.fn() };
+        const retry = vi.fn();
+        mocks.data = { party: makeParty(), ballots: undefined, error: "The party couldn't be reached.", retry };
         renderRoom();
-        await user.click(screen.getByRole("button", { name: "Next name" }));
-        expect(screen.getByRole("button", { name: "Join the party" })).toBeEnabled();
+        expect(screen.getByRole("alert")).toHaveTextContent("The party couldn't be reached.");
+        expect(screen.queryByRole("button", { name: "Next name" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeDisabled();
         expect(screen.queryByText("Checking which names are taken…")).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Try again" }));
+        expect(retry).toHaveBeenCalledOnce();
     });
 
     it("turns the reel off too until the taken names have arrived", () => {

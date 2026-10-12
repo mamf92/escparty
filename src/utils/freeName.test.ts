@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { freeNames, nameKey, pickFreeName } from "./freeName";
+import { firstFreeNumbered, freeNames, nameKey, pickFreeName } from "./freeName";
 
 const POOL = ["Loreen", "Netta", "Lordi"];
 
@@ -38,5 +38,12 @@ describe("pickFreeName", () => {
 
     it("numbers the wanted name when it is not in an empty pool", () => {
         expect(pickFreeName("Ida", ["Ida"], [])).toBe("Ida 2");
+    });
+});
+
+describe("firstFreeNumbered", () => {
+    it("starts at 2 and skips the numbers whose keys are taken", () => {
+        expect(firstFreeNumbered("Loreen", new Set())).toBe("Loreen 2");
+        expect(firstFreeNumbered("Loreen", new Set(["loreen 2", "loreen 3"]))).toBe("Loreen 4");
     });
 });

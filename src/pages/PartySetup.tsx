@@ -194,7 +194,7 @@ const PartySetup = () => {
                         title={entry.title.split(" · ").pop()}
                         meta={`${entry.acts.length} acts · ${entry.kind === "semi" ? `${entry.qualifiers} go through` : "every act ranked"}`}
                         onClick={() => pickContest(entry.id)}
-                        onKeyDown={event => radioGroupKeys(event, index, CONTESTS_2027.length, null)}
+                        onKeyDown={event => radioGroupKeys(event, index, CONTESTS_2027.length, next => setContestId(CONTESTS_2027[next].id))}
                     />
                 ))}
             </ChoiceGrid>
@@ -225,7 +225,7 @@ const PartySetup = () => {
                             meta={option.categories.length === 1 ? scaleLabel(option.categories[0].max) : option.categories.map(category => category.label).join(" · ") || undefined}
                             sub={option.blurb}
                             onClick={() => pickSheet(option.id)}
-                            onKeyDown={event => radioGroupKeys(event, index, sheetOptions.length, null)}
+                            onKeyDown={event => radioGroupKeys(event, index, sheetOptions.length, next => { setTemplateId(sheetOptions[next].id); setTried(false); })}
                         />
                     ))}
                 </ChoiceGrid>

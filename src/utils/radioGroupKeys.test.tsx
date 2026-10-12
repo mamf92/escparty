@@ -38,21 +38,6 @@ describe("radioGroupKeys", () => {
     expect(radios[to]).toHaveFocus();
   });
 
-  it("only moves focus, picking nothing, when there is no pick callback", () => {
-    render(
-      <div role="radiogroup" aria-label="Acts">
-        {["Abba", "Lordi"].map((name, index) => (
-          <button key={name} role="radio" aria-checked={false} onKeyDown={event => radioGroupKeys(event, index, 2, null)}>{name}</button>
-        ))}
-      </div>,
-    );
-    const radios = screen.getAllByRole("radio");
-    radios[0].focus();
-    expect(fireEvent.keyDown(radios[0], { key: "ArrowDown" })).toBe(false);
-    expect(radios[1]).toHaveFocus();
-    expect(radios[1]).toHaveAttribute("aria-checked", "false");
-  });
-
   it("leaves other keys alone", () => {
     const pick = vi.fn();
     render(<Group picked={0} pick={pick} />);

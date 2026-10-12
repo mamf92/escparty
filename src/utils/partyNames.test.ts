@@ -3,15 +3,8 @@ import {
     PARTY_NAMES,
     availablePartyNames,
     distinctNames,
-    randomPartyName,
     withDistinctNames,
 } from "./partyNames";
-
-describe("randomPartyName", () => {
-    it("is one of the participant names", () => {
-        expect(PARTY_NAMES).toContain(randomPartyName());
-    });
-});
 
 describe("availablePartyNames", () => {
     it("leaves out the taken names, ignoring case and edge spaces", () => {

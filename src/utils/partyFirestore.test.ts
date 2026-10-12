@@ -158,10 +158,14 @@ describe("listeners", () => {
         const base = { id: "douze", name: "Douze", blurb: "", categories: [] };
         next(snapshot({ code: "ABBA", template: { ...base, bonuses: [{ id: "own", label: " Glitter ", points: 3 }, { id: "bad", label: "", points: 2 }] } }));
         next(snapshot({ code: "ABBA", template: { ...base, bonuses: "all" } }));
+        next(snapshot({ code: "ABBA", template: { ...base, bonuses: [{ id: "bad", label: "", points: 2 }] } }));
         next(snapshot({ code: "ABBA", template: base }));
         expect(onParty.mock.calls).toEqual([
             [{ code: "ABBA", template: { ...base, bonuses: [{ id: "own", label: "Glitter", points: 3 }] } }],
-            [{ code: "ABBA", template: base }],
+            // Present but unusable: none, not the premade five.
+            [{ code: "ABBA", template: { ...base, bonuses: [] } }],
+            [{ code: "ABBA", template: { ...base, bonuses: [] } }],
+            // Absent (an older party): left for the premade fallback.
             [{ code: "ABBA", template: base }],
         ]);
     });

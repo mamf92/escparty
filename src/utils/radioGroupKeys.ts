@@ -4,8 +4,9 @@ import type { KeyboardEvent } from "react";
  * Arrow keys for a radio group built from buttons (`role="radio"` inside a
  * `role="radiogroup"`), as the ARIA pattern has it: Up/Left and Down/Right
  * move to the previous and next radio (wrapping), Home and End to the first
- * and last, and moving picks (pass `null` for `pick` to only move focus, for
- * a group where picking has a side effect such as advancing a step). Pair it with a roving tab stop, so only the
+ * and last, and moving picks (checks the radio, so `aria-checked` and the roving tab stop
+ * follow). A group where picking has a side effect such as advancing a step
+ * should keep that in its click handler, not in `pick`. Pair it with a roving tab stop, so only the
  * picked radio (or the first, when none is) has `tabIndex={0}`:
  * `radioTabIndex(index, pickedIndex)`.
  */
@@ -13,7 +14,7 @@ export const radioGroupKeys = (
     event: KeyboardEvent<HTMLElement>,
     index: number,
     count: number,
-    pick: ((index: number) => void) | null,
+    pick: (index: number) => void,
 ) => {
     // Alt+Arrow is the browser's Back and Forward, Ctrl/Meta+Home and End
     // scroll the page: leave them to the browser.
@@ -38,7 +39,7 @@ export const radioGroupKeys = (
             return;
     }
     event.preventDefault();
-    pick?.(next);
+    pick(next);
     const group = event.currentTarget.closest('[role="radiogroup"]');
     group?.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
 };
