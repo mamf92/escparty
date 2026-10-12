@@ -36,6 +36,13 @@ const CodeRow = styled.div`
     gap: var(--esc-space-3);
 `;
 
+/** The room's quiz, with the host's small "Change" beside it. */
+const QuizRow = styled(Pane)`
+    &&& {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+`;
+
 /**
  * The waiting room before a multiplayer quiz, the green room (#65). Guests
  * say when they're ready; the host picks the quiz, can take out a player
@@ -51,10 +58,11 @@ const Lobby = () => {
     // A second tap in the same render can't see `busy` yet.
     const inFlight = useRef(false);
     const [pickError, setPickError] = useState<string | null>(null);
-    // The rules refused the last quiz pick; said only while the room still
-    // has no quiz (another tab may have picked one first).
+    // The rules refused the last quiz pick; said only while the picker shows.
     const [pickRefused, setPickRefused] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
+    // The host is changing the quiz: the picker is back, with a way to keep the current one.
+    const [changing, setChanging] = useState(false);
     // The host is asked before leaving a room that hasn't started; the QR code can fill the screen.
     const [askingLeave, setAskingLeave] = useState(false);
     const [showingQr, setShowingQr] = useState(false);
@@ -185,12 +193,12 @@ const Lobby = () => {
     const guests = roomGuests(room);
     const gate = startGate(room);
     const amReady = ready.includes(playerId);
+    const canChange = isHost && !room.started && !!room.difficulty;
     const chosen = isHost ? guests.find(p => p.id === selected) : undefined;
 
     /**
      * One write at a time; a failure leaves a note and the page usable,
-     * unless `onError` handles it. (The quiz pick is one-shot in the rules,
-     * so a double tap's second write would be denied.)
+     * unless `onError` handles it. (A double tap must not write twice.)
      */
     const run = async (what: string, write: () => Promise<void>, onError?: (err: unknown) => void) => {
         if (inFlight.current) return;
@@ -209,21 +217,29 @@ const Lobby = () => {
         }
     };
 
-    // The room's `difficulty` names the quiz (quizCatalog.ts). A pick the
-    // rules refuse wrote nothing: either another tab already picked (the
-    // snapshot then shows that quiz and the picker goes) or the rules won't
-    // take this quiz (its key or break setting), so the host picks another.
-    // Anything else (the quiz couldn't be read, the network) can be retried.
-    const handleSelectQuiz = (quizKey: string) => run("set the quiz", async () => {
-        setPickRefused(false);
-        await setRoomQuiz(gameCode, quizKey);
-    }, (err) => {
-        if (err instanceof QuizPickRefused) {
-            setPickRefused(true);
-        } else {
-            setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+    // The room's `difficulty` names the quiz (quizCatalog.ts), and the host
+    // may change it until the game starts. A pick the rules refuse wrote
+    // nothing: the rules won't take this quiz (its key or break setting) or
+    // the game has started, so the host picks another. Anything else (the
+    // quiz couldn't be read, the network) can be retried. Picking the quiz
+    // the room already has writes nothing and just closes the picker.
+    const handleSelectQuiz = (quizKey: string) => {
+        if (changing && quizKey === room.difficulty) {
+            setChanging(false);
+            return;
         }
-    });
+        return run("set the quiz", async () => {
+            setPickRefused(false);
+            await setRoomQuiz(gameCode, quizKey);
+            setChanging(false);
+        }, (err) => {
+            if (err instanceof QuizPickRefused) {
+                setPickRefused(true);
+            } else {
+                setPickError("That quiz couldn't be loaded. Check your connection, or pick another.");
+            }
+        });
+    };
 
     const status = (id: string) => {
         if (id === room.hostId) return "Host";
@@ -304,18 +320,39 @@ const Lobby = () => {
                 />
             )}
 
-            {isHost && !room.difficulty ? (
+            {isHost && !room.started && (!room.difficulty || changing) ? (
                 <>
                     <h2 className="esc-section" id="lobby-pick-quiz">Pick a quiz</h2>
-                    <QuizCardGrid labelledBy="lobby-pick-quiz" quizzes={quizCards} picked={null} onPick={handleSelectQuiz} disabled={busy} />
+                    <QuizCardGrid
+                        labelledBy="lobby-pick-quiz"
+                        quizzes={quizCards}
+                        picked={room.difficulty ?? null}
+                        onPick={handleSelectQuiz}
+                        disabled={busy}
+                    />
+                    {room.difficulty && (
+                        <Ground>
+                            <Pane>
+                                <Control disabled={busy} onClick={() => setChanging(false)}>
+                                    Keep {roomQuizTitle}
+                                </Control>
+                            </Pane>
+                        </Ground>
+                    )}
                 </>
             ) : (
                 <>
                     <h2 className="esc-section">The quiz</h2>
                     <Ground>
-                        <Pane>
-                            <Row>{room.difficulty ? roomQuizTitle : "The host is picking…"}</Row>
-                        </Pane>
+                        <QuizRow>
+                            {/* Polite: guests hear when the host changes the quiz. */}
+                            <Row aria-live="polite">{room.difficulty ? roomQuizTitle : "The host is picking…"}</Row>
+                            {canChange && (
+                                <Control disabled={busy} aria-label="Change the quiz" onClick={() => setChanging(true)}>
+                                    Change
+                                </Control>
+                            )}
+                        </QuizRow>
                     </Ground>
                 </>
             )}
@@ -366,7 +403,7 @@ const Lobby = () => {
                 </>
             )}
 
-            {pickRefused && !room.difficulty && <CalmNote role="alert">This room won't take that quiz. Pick another one.</CalmNote>}
+            {pickRefused && (!room.difficulty || changing) && <CalmNote role="alert">This room won't take that quiz. Pick another one.</CalmNote>}
             {pickError && <CalmNote role="alert">{pickError}</CalmNote>}
         </CalmPage>
     );

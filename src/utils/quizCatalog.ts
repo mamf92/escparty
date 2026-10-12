@@ -195,8 +195,7 @@ export const quizCardsFor = (myQuizzes: Pick<MyQuiz, "id" | "title" | "questionC
 
 /**
  * How often a key's mid-quiz break comes, for a room about to play it.
- * Rejects when a custom quiz can't be read or is gone: a room's quiz and
- * break setting are one-shot, so guessing would lock in the wrong one.
+ * Rejects when a custom quiz can't be read or is gone: guessing would put the wrong break setting on the room.
  */
 export const quizBreakEvery = async (key: string): Promise<BreakEvery> => {
     if (isCustomQuizKey(key)) {

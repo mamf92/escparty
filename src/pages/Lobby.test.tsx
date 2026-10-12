@@ -376,4 +376,75 @@ describe("Lobby", () => {
     expect(within(screen.getByRole("radiogroup", { name: "Pick a quiz" })).getByRole("radio", { name: /Classic: Easy/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Pick a quiz" })).toBeInTheDocument();
   });
+
+  describe("changing the quiz", () => {
+    it("shows Change to the host before the start, and not to a guest", () => {
+      as("host", "Martin");
+      renderLobby();
+      act(() => mocks.onRoom(room({ difficulty: "easy" })));
+      expect(screen.getByRole("button", { name: "Change the quiz" })).toBeInTheDocument();
+      expect(screen.getByText("Classic: Easy")).toBeInTheDocument();
+    });
+
+    it("hides Change from a guest, who sees the title update", () => {
+      as("p2", "Loreen");
+      renderLobby();
+      act(() => mocks.onRoom(room({ difficulty: "easy" })));
+      expect(screen.queryByRole("button", { name: "Change the quiz" })).not.toBeInTheDocument();
+      act(() => mocks.onRoom(room({ difficulty: "hard" })));
+      expect(screen.getByText("Classic: Hard")).toBeInTheDocument();
+    });
+
+    it("hides Change once the game has started", () => {
+      as("host", "Martin");
+      renderLobby();
+      act(() => mocks.onRoom(room({ difficulty: "easy", started: true, phase: "question" })));
+      expect(screen.queryByRole("button", { name: "Change the quiz" })).not.toBeInTheDocument();
+    });
+
+    it("brings the picker back and writes another quiz", async () => {
+      const user = userEvent.setup();
+      as("host", "Martin");
+      mocks.setRoomQuiz.mockResolvedValue(undefined);
+      renderLobby();
+      act(() => mocks.onRoom(room({ difficulty: "easy" })));
+      await user.click(screen.getByRole("button", { name: "Change the quiz" }));
+      expect(screen.getByRole("radiogroup", { name: "Pick a quiz" })).toBeInTheDocument();
+      await user.click(screen.getByRole("radio", { name: /Classic: Hard/ }));
+      expect(mocks.setRoomQuiz).toHaveBeenCalledWith("ABBA", "hard");
+      // The picker closes; the title follows the room's snapshot.
+      expect(screen.queryByRole("radiogroup", { name: "Pick a quiz" })).not.toBeInTheDocument();
+      act(() => mocks.onRoom(room({ difficulty: "hard" })));
+      expect(screen.getByText("Classic: Hard")).toBeInTheDocument();
+    });
+
+    it("keeps the current quiz without writing, or when the same one is picked", async () => {
+      const user = userEvent.setup();
+      as("host", "Martin");
+      renderLobby();
+      act(() => mocks.onRoom(room({ difficulty: "easy" })));
+      await user.click(screen.getByRole("button", { name: "Change the quiz" }));
+      // The current quiz shows as picked.
+      expect(screen.getByRole("radio", { name: /Classic: Easy/ })).toHaveAttribute("aria-checked", "true");
+      await user.click(screen.getByRole("button", { name: "Keep Classic: Easy" }));
+      expect(screen.queryByRole("radiogroup", { name: "Pick a quiz" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Change the quiz" }));
+      await user.click(screen.getByRole("radio", { name: /Classic: Easy/ }));
+      expect(screen.queryByRole("radiogroup", { name: "Pick a quiz" })).not.toBeInTheDocument();
+      expect(mocks.setRoomQuiz).not.toHaveBeenCalled();
+    });
+
+    it("says when the rules refuse the new quiz and keeps the picker", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const user = userEvent.setup();
+      as("host", "Martin");
+      mocks.setRoomQuiz.mockRejectedValueOnce(new mocks.QuizPickRefused("denied"));
+      renderLobby();
+      act(() => mocks.onRoom(room({ difficulty: "easy" })));
+      await user.click(screen.getByRole("button", { name: "Change the quiz" }));
+      await user.click(screen.getByRole("radio", { name: /Classic: Hard/ }));
+      expect(screen.getByRole("alert")).toHaveTextContent("This room won't take that quiz");
+      expect(screen.getByRole("radiogroup", { name: "Pick a quiz" })).toBeInTheDocument();
+    });
+  });
 });
