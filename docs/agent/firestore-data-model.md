@@ -83,9 +83,13 @@ The lifecycle:
 ## Joining and player names
 
 `addPlayerToRoom` treats a player as already in the room only by ID
-(`joinRoom` goes through it). The join screen draws a name nobody in the
-room has yet; two guests joining at the same instant can still end up with
-the same name, which is cosmetic: their IDs and scores stay separate.
+(`joinRoom` goes through it, and rejoins use it: they keep their name). A
+fresh join from the join screen goes through `joinRoomWithFreeName`
+instead: the same refusals, but the room is read and the player appended in
+one transaction, so the name is picked from what the room holds at that
+moment (the wanted name if free, else a random free one from the pool, else
+the wanted name numbered) and two guests joining at the same instant never
+share one. It returns the name the player got, which the join screen stores.
 A host can start the game (or the room can fill up) between a join's check
 and its write; the rules then refuse the join, and `addPlayerToRoom`
 re-reads the room to say why, as a `JoinRejected` with a `reason`
@@ -132,7 +136,8 @@ back or outside the results (verify case 14b).
   and `removePlayerFromRoom` use `arrayUnion`/`arrayRemove` —
   concurrent joins, and every player reaching the mid-quiz break on the same
   snapshot (#62), can't clobber each other. `advanceQuestion` and
-  `resumeAfterMidQuiz` are transactions (see above). `updatePlayerScore` runs inside a `runTransaction` —
+  `resumeAfterMidQuiz` are transactions (see above), and so is
+  `joinRoomWithFreeName` (with its own retry, below). `updatePlayerScore` runs inside a `runTransaction` —
   Firestore retries it on a conflicting concurrent write, so two
   near-simultaneous score updates for the same player (e.g. an answer's
   write and a time's-up repair write in `Quiz.tsx` near a question's
@@ -143,9 +148,13 @@ back or outside the results (verify case 14b).
   the new value with the old one (like the join rule's "exactly one more
   player"), a transaction built on a stale read is refused with
   `permission-denied` and is not retried. That is why joins stay an
-  `arrayUnion`. Score writes are fine, because their rule only checks the
-  list's size and shape. `scripts/verify-firestore-rules.mjs` cases 2b and
-  6c run simultaneous joins, a join racing the start, and simultaneous
+  `arrayUnion`, except where a join must see the other names:
+  `joinRoomWithFreeName` is a transaction that Firestore does not retry
+  when it loses a race (permission-denied), so it reads the room and tries
+  again itself, up to `JOIN_ATTEMPTS` times. Score writes are fine, because
+  their rule only checks the list's size and shape. `scripts/verify-firestore-rules.mjs` cases 2b, 2c and
+  6c run simultaneous joins (2c: transactional ones, all landing under
+  distinct names), a join racing the start, and simultaneous
   scores from separate clients against the emulator.
 - **Don't add a manual read-modify-write.** `markPlayerAtMidQuiz` used to
   be one (`getDoc` then `updateDoc` with a recomputed array); once #62 put

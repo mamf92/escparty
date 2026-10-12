@@ -200,7 +200,36 @@ export const getRoom = async (roomCode: string): Promise<Room | null> => {
 };
 
 /**
+ * Throws JoinRejected when the room says no to this player; returns true when
+ * the player is already in it. Shared by the append in addPlayerToRoom and the
+ * transaction in joinRoomWithFreeName, so both refuse the same way.
+ */
+const joinVerdict = (room: Room | null | undefined, playerId: string): boolean => {
+    if (!room) {
+        throw new JoinRejected("not-found", "Room not found");
+    }
+    // Only the same ID is the same player. Matching on the name too
+    // skipped a second guest who drew the same name, leaving their ID
+    // out of the room, so every score they sent was lost (#131). A
+    // player already in the room is in, started or not.
+    if (room.players.some(p => p.id === playerId)) {
+        return true;
+    }
+    if (room.started) {
+        throw new JoinRejected("started", "Game has already started");
+    }
+    if (room.players.length >= MAX_PLAYERS) {
+        throw new JoinRejected("full", `The room is full (${MAX_PLAYERS} players)`);
+    }
+    return false;
+};
+
+/**
  * Add a player to a room
+ *
+ * The name is taken as given: arrayUnion appends server-side, so two guests
+ * joining at once both land, but they could share a name. Fresh joins that
+ * need a unique name use joinRoomWithFreeName instead.
  */
 export const addPlayerToRoom = async (roomCode: string, playerId: string, playerName: string): Promise<void> => {
     if (!checkFirebaseInitialization()) {
@@ -208,30 +237,7 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
     }
 
     const currentRoom = await getRoom(roomCode);
-    // Throws JoinRejected when the room says no; returns true when the
-    // player is already in it.
-    const alreadyIn = (room: Room | null) => {
-        if (!room) {
-            throw new JoinRejected("not-found", "Room not found");
-        }
-        // Only the same ID is the same player. Matching on the name too
-        // skipped a second guest who drew the same name, leaving their ID
-        // out of the room, so every score they sent was lost (#131). The
-        // join screen already draws a name nobody in the room has; two
-        // guests joining at the same instant can still share one, which
-        // only costs a duplicate name on the scoreboard, not a score. A
-        // player already in the room is in, started or not.
-        if (room.players.some(p => p.id === playerId)) {
-            return true;
-        }
-        if (room.started) {
-            throw new JoinRejected("started", "Game has already started");
-        }
-        if (room.players.length >= MAX_PLAYERS) {
-            throw new JoinRejected("full", `The room is full (${MAX_PLAYERS} players)`);
-        }
-        return false;
-    };
+    const alreadyIn = (room: Room | null) => joinVerdict(room, playerId);
     if (alreadyIn(currentRoom)) {
         return;
     }
@@ -618,20 +624,101 @@ export const joinRoom = async (roomCode: string, playerId: string, playerName: s
         await addPlayerToRoom(roomCode, playerId, playerName);
         return true;
     } catch (error) {
-        // A code that doesn't exist, or a game that's already on, is an
-        // answer rather than a failure.
-        if (error instanceof JoinRejected && error.reason !== "full") {
-            return false;
+        return joinFailure(error);
+    }
+};
+
+/** What joinRoom and joinRoomWithFreeName do with a failed join: false for an answer, a throw for a failure. */
+const joinFailure = (error: unknown): false => {
+    // A code that doesn't exist, or a game that's already on, is an
+    // answer rather than a failure.
+    if (error instanceof JoinRejected && error.reason !== "full") {
+        return false;
+    }
+
+    const err = error as { code?: string; message: string };
+    console.error("Error joining room:", error);
+
+    if (err.code === 'permission-denied' || err.message.includes('Security rules')) {
+        throw new Error("Failed to join room: Security rules prevented access", { cause: error });
+    }
+
+    throw new Error(`Failed to join room: ${err.message}`, { cause: error });
+};
+
+/** How often joinRoomWithFreeName reads the room and tries again after losing a race to another join. */
+const JOIN_ATTEMPTS = 12;
+
+/**
+ * Join a room under a name nobody in it has. The room is read and the player
+ * appended in one transaction, and a join that loses a race is run again
+ * from a fresh read (see the loop), so guests joining at the same moment
+ * serialize and each sees the names already taken. If `wantedName` is free it is used; otherwise a random unused name
+ * from `namePool`, else the wanted name with " 2", " 3" and so on. A player
+ * already in the room (the same ID) keeps their name.
+ *
+ * @returns the name the player has in the room, or null when the code
+ * doesn't exist or the game has started (as joinRoom's false). Throws for a
+ * full room or a failure, as joinRoom does.
+ */
+export const joinRoomWithFreeName = async (
+    roomCode: string,
+    playerId: string,
+    wantedName: string,
+    namePool: readonly string[],
+): Promise<string | null> => {
+    if (!checkFirebaseInitialization()) {
+        throw new Error("Firebase not initialized");
+    }
+
+    const roomRef = doc(db, "rooms", roomCode);
+    const attemptJoin = () => runTransaction(db, async (transaction) => {
+        const roomDoc = await transaction.get(roomRef);
+        const room = roomDoc.exists() ? (roomDoc.data() as Room) : null;
+        if (joinVerdict(room, playerId)) {
+            return room!.players.find(p => p.id === playerId)!.name;
         }
 
-        const err = error as { code?: string; message: string };
-        console.error("Error joining room:", error);
-
-        if (err.code === 'permission-denied' || err.message.includes('Security rules')) {
-            throw new Error("Failed to join room: Security rules prevented access", { cause: error });
+        const taken = new Set(room!.players.map(p => p.name));
+        let name = wantedName;
+        if (taken.has(name)) {
+            const free = namePool.filter(candidate => !taken.has(candidate));
+            if (free.length > 0) {
+                name = free[Math.floor(Math.random() * free.length)];
+            } else {
+                let n = 2;
+                while (taken.has(`${wantedName} ${n}`)) n += 1;
+                name = `${wantedName} ${n}`;
+            }
         }
 
-        throw new Error(`Failed to join room: ${err.message}`, { cause: error });
+        transaction.update(roomRef, {
+            players: [
+                ...room!.players,
+                { id: playerId, name, score: 0, joinedAt: Timestamp.now() },
+            ],
+        });
+        return name;
+    });
+
+    try {
+        for (let attempt = 1; ; attempt += 1) {
+            try {
+                return await attemptJoin();
+            } catch (error) {
+                // The join rule wants "exactly one more player" than the
+                // room has at commit time, so a transaction that lost a race
+                // to another join is refused with permission-denied instead
+                // of being retried by Firestore. Read again and decide again:
+                // a join that raced the start or a full room is then refused
+                // by joinVerdict, and every other race has a winner per round.
+                if ((error as { code?: string }).code !== "permission-denied" || attempt >= JOIN_ATTEMPTS) throw error;
+                await new Promise(resolve => setTimeout(resolve, Math.random() * 150));
+            }
+        }
+    } catch (error) {
+        joinFailure(error); // throws unless it is an answer, not a failure
+        return null;
     }
 };
 

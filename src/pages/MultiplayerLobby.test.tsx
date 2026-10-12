@@ -3,7 +3,7 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import { act, fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent, waitFor } from "../test/test-utils";
 import MultiplayerLobby from "./MultiplayerLobby";
-import { createRoom, getRoom, joinRoom, JoinRejected, setRoomDifficulty } from "../utils/roomsFirestore";
+import { createRoom, getRoom, joinRoom, joinRoomWithFreeName, JoinRejected, setRoomDifficulty } from "../utils/roomsFirestore";
 
 vi.mock("../utils/roomsFirestore", () => ({
   JoinRejected: class JoinRejected extends Error {
@@ -14,6 +14,7 @@ vi.mock("../utils/roomsFirestore", () => ({
   createRoom: vi.fn(async () => undefined),
   setRoomDifficulty: vi.fn(async () => undefined),
   joinRoom: vi.fn(async () => true),
+  joinRoomWithFreeName: vi.fn(async (_code: string, _id: string, wanted: string) => wanted),
   getRoom: vi.fn(async () => null),
   generateRoomCode: () => "ABBA",
 }));
@@ -120,22 +121,32 @@ describe("MultiplayerLobby", () => {
     expect(field).toHaveValue("AB");
     expect(field).toHaveAttribute("aria-invalid", "true");
     expect(field).toHaveAccessibleDescription("A game code is four letters, like ABBA.");
-    expect(joinRoom).not.toHaveBeenCalled();
+    expect(joinRoomWithFreeName).not.toHaveBeenCalled();
   });
 
   it("joins with Enter", async () => {
     const user = userEvent.setup();
     renderLobby();
     await typeCode(user, "abba{Enter}");
-    expect(joinRoom).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String));
+    expect(joinRoomWithFreeName).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String), expect.any(Array));
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+  });
+
+  it("uses the name the room hands back, not the one it asked for", async () => {
+    const user = userEvent.setup();
+    vi.mocked(joinRoomWithFreeName).mockResolvedValueOnce("Netta 🐔");
+    renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+    expect(localStorage.getItem("playerName")).toBe("Netta 🐔");
   });
 
   it("tells a guest when the game is full, without an alert", async () => {
     const user = userEvent.setup();
     const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.mocked(joinRoom).mockRejectedValueOnce(new Error("Failed to join room: The room is full (32 players)", {
+    vi.mocked(joinRoomWithFreeName).mockRejectedValueOnce(new Error("Failed to join room: The room is full (32 players)", {
       cause: new JoinRejected("full", "The room is full (32 players)"),
     }));
     renderLobby();
@@ -148,7 +159,7 @@ describe("MultiplayerLobby", () => {
 
   it("says when no game has the code", async () => {
     const user = userEvent.setup();
-    vi.mocked(joinRoom).mockResolvedValueOnce(false);
+    vi.mocked(joinRoomWithFreeName).mockResolvedValueOnce(null);
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
@@ -157,7 +168,7 @@ describe("MultiplayerLobby", () => {
 
   it("says when the game has already started", async () => {
     const user = userEvent.setup();
-    vi.mocked(joinRoom).mockResolvedValueOnce(false);
+    vi.mocked(joinRoomWithFreeName).mockResolvedValueOnce(null);
     vi.mocked(getRoom).mockResolvedValue({ code: "ABBA", players: [] } as never);
     renderLobby();
     await typeCode(user, "ABBA");
@@ -310,15 +321,17 @@ describe("MultiplayerLobby", () => {
 
   it("remembers who joined when the page is left mid-join", async () => {
     const user = userEvent.setup();
-    let finish = (_: boolean) => {};
-    vi.mocked(joinRoom).mockImplementationOnce(() => new Promise<boolean>(resolve => { finish = resolve; }));
+    let finish = (_: string | null) => {};
+    vi.mocked(joinRoomWithFreeName).mockImplementationOnce(() => new Promise<string | null>(resolve => { finish = resolve; }));
     const { unmount } = renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
-    await vi.waitFor(() => expect(joinRoom).toHaveBeenCalled());
-    const [, id, name] = vi.mocked(joinRoom).mock.calls[0];
+    await vi.waitFor(() => expect(joinRoomWithFreeName).toHaveBeenCalled());
+    const [, id, wanted] = vi.mocked(joinRoomWithFreeName).mock.calls[0];
+    // The room may hand back another name than the one asked for.
+    const name = `${wanted} 2`;
     unmount();
-    await act(async () => finish(true));
+    await act(async () => finish(name));
     expect(localStorage.getItem("gameCode")).toBe("ABBA");
     expect(localStorage.getItem("playerId")).toBe(id);
     expect(localStorage.getItem("playerName")).toBe(name);
@@ -333,7 +346,7 @@ describe("MultiplayerLobby", () => {
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
     await user.click(button("Join as someone new"));
-    expect(vi.mocked(joinRoom).mock.calls[0][1]).not.toBe("p-loreen");
+    expect(vi.mocked(joinRoomWithFreeName).mock.calls[0][1]).not.toBe("p-loreen");
     expect(localStorage.getItem("playerId")).not.toBe("p-loreen");
   });
 
@@ -345,7 +358,7 @@ describe("MultiplayerLobby", () => {
     renderLobby();
     await typeCode(user, "EFGH");
     await user.click(button("Join the game"));
-    const [code, id] = vi.mocked(joinRoom).mock.calls[0];
+    const [code, id] = vi.mocked(joinRoomWithFreeName).mock.calls[0];
     expect(code).toBe("EFGH");
     expect(id).not.toBe("p-loreen");
     expect(localStorage.getItem("gameCode")).toBe("EFGH");
@@ -362,8 +375,8 @@ describe("MultiplayerLobby", () => {
     renderLobby({ joinCode: "ABBA" });
     expect(screen.getByLabelText("Game code")).toHaveValue("ABBA");
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
-    expect(joinRoom).toHaveBeenCalledTimes(1);
-    expect(joinRoom).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String));
+    expect(joinRoomWithFreeName).toHaveBeenCalledTimes(1);
+    expect(joinRoomWithFreeName).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String), expect.any(Array));
   });
 
   it("offers the rejoin choice for a code from the Join screen this device was in", async () => {
@@ -372,12 +385,12 @@ describe("MultiplayerLobby", () => {
     localStorage.setItem("playerName", "Loreen");
     renderLobby({ joinCode: "ABBA" });
     expect(await screen.findByRole("button", { name: "Rejoin as Loreen" })).toBeInTheDocument();
-    expect(joinRoom).not.toHaveBeenCalled();
+    expect(joinRoomWithFreeName).not.toHaveBeenCalled();
   });
 
   it("ignores a code from the router that isn't four letters", () => {
     renderLobby({ joinCode: "nope!" });
     expect(button(/^Join a game/)).toBeInTheDocument();
-    expect(joinRoom).not.toHaveBeenCalled();
+    expect(joinRoomWithFreeName).not.toHaveBeenCalled();
   });
 });
