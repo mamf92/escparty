@@ -19,10 +19,10 @@ const same = (a: { ratings: Ratings; bonuses: Bonuses }, b: { ratings: Ratings; 
  * copy means a reload in between loses nothing. When the server's copy
  * first arrives the two are merged, so ratings from before a reload and
  * ratings that never reached the server both survive. If the ballots
- * listener failed, no server copy is known, and the device's ballot (empty
- * for a new guest, which claims the name) is written once.
+ * listener failed for a guest who just joined (a new id, so nothing on the
+ * server to lose), their empty ballot, which claims the name, is written once.
  */
-export const useOwnBallot = (code: string | undefined, identity: PartyIdentity | null, serverBallots: Ballot[] | undefined, ballotsFailed = false) => {
+export const useOwnBallot = (code: string | undefined, identity: PartyIdentity | null, serverBallots: Ballot[] | undefined, /** Only for a guest who just joined; see above. */ ballotsFailed = false) => {
     const [ballot, setBallot] = useState<{ ratings: Ratings; bonuses: Bonuses }>(() => {
         const stored = code ? readStoredBallot(code) : null;
         return { ratings: stored?.ratings ?? {}, bonuses: stored?.bonuses ?? {} };

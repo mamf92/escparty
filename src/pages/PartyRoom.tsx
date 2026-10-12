@@ -46,7 +46,11 @@ const PartyRoom = () => {
     const code = useParams().code?.toUpperCase();
     const { party, ballots, error, retry } = usePartyData(code);
     const [identity, setIdentity] = useState<PartyIdentity | null>(() => (code ? readPartyIdentity(code) : null));
-    const own = useOwnBallot(code, identity, ballots, !!error);
+    // A guest who joined on this page has a brand-new id, so with the ballots
+    // listener down there is no server copy to lose: their empty ballot (the
+    // name claim) can be written anyway. Anyone else waits for the real copy.
+    const [joinedHere, setJoinedHere] = useState(false);
+    const own = useOwnBallot(code, identity, ballots, !!error && joinedHere);
     const [tab, setTab] = useState<Tab>("rate");
     // Before the early returns, as hooks must be; the host's tab only once
     // the party and who you are are known.
@@ -95,6 +99,7 @@ const PartyRoom = () => {
                 onJoin={next => {
                     // useOwnBallot writes the empty ballot (which claims the name) once it sees none for this guest.
                     savePartyIdentity(party.code, next);
+                    setJoinedHere(true);
                     setIdentity(next);
                 }}
                 footer={back}
