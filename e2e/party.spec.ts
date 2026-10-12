@@ -16,7 +16,7 @@ test("a host and two guests rate a semi and get their awards", async ({ browser 
 
     const code = await hostParty(host, "Loreen", /Douze Points/);
 
-    await joinParty(john, code, "John");
+    await joinParty(john, code, "Netta");
     await joinParty(lordi, code, "Lordi");
 
     await rateActs(host, [12, 8, 4, 1]);
@@ -25,7 +25,7 @@ test("a host and two guests rate a semi and get their awards", async ({ browser 
 
     // Every rating reached Firestore: all four acts have three on another phone.
     await john.getByRole("tab", { name: "Room" }).click();
-    await expect(john.getByText("3 guests are rating.")).toBeVisible();
+    await expect(john.getByText("3 guests at the party.")).toBeVisible();
     const standings = john.getByRole("list", { name: "The room's standings" }).getByRole("listitem");
     await expect(standings).toHaveCount(4);
     await expect(standings.filter({ hasText: "3 ratings" })).toHaveCount(4);
@@ -39,7 +39,7 @@ test("a host and two guests rate a semi and get their awards", async ({ browser 
 
     await john.getByRole("button", { name: "See the awards" }).click();
     await expect(john.getByText("The Jedward Twins")).toBeVisible();
-    await expect(john.getByText(/^(Loreen & John|John & Loreen) \(that's you!\)$/)).toBeVisible();
+    await expect(john.getByText(/^(Loreen & Netta|Netta & Loreen) \(that's you!\)$/)).toBeVisible();
 
     // The last page is the closeness table: everyone called the qualifier.
     // The last award's Next is named for the table it goes to.

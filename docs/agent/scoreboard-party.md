@@ -18,7 +18,7 @@ generously and so on, each named after a moment in Eurovision history.
 | `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
 | `/party` | `PartyHome.tsx` | Host, join with a code, open a big screen, or go back to the last party |
 | `/party/new` | `PartySetup.tsx` | Five steps, one big question each, nothing preselected (local step state, no routes): the show; the rating sheet (premade, or your own categories with a Continue); extras (party bonuses and whether awards name names, two yes/no pairs on one screen with a Continue); your name, spun on the `NamePicker` reel from `partyNames.ts` (no free text); a summary and the black "Start the party". Back keeps the answers |
-| `/party/:code` | `PartyRoom.tsx` | Join (a name), then tabs: Rate, Ranking, Room, and Host (`PartyHostTools.tsx`) for the host |
+| `/party/:code` | `PartyRoom.tsx` | Join (spin the `NamePicker` reel for a name nobody has taken; no free text), then tabs: Rate, Ranking, Room, and Host (`PartyHostTools.tsx`) for the host |
 | `/party/:code/screen` | `PartyScreen.tsx` | The TV: QR code, the code, the room's standings, closest guests. Outside the phone frame |
 | `/party/:code/awards` | `PartyAwards.tsx` | One award at a time, then who came closest. Only after the host opens them (the host can preview) |
 
@@ -42,6 +42,21 @@ while that fails, and merged once with the server's copy when it arrives
 save that was still waiting. Ballots are tidied as they're read
 (`toBallot` drops non-number ratings and non-list bonuses), since the
 rules only check their outline.
+
+Names are unique in a party, and anonymous Eurovision participant names
+(`partyNames.ts`). The join reel offers `PARTY_NAMES` minus the names of the
+party's ballots (every name again if all are taken). A name is claimed the
+moment a guest joins (and the host's when the party is created): their
+ballot is written at once, empty, so the next guest sees it taken;
+`useOwnBallot` also writes it if the ballots arrive without one. Two guests
+can still take one name at the same instant (separate documents, and the
+rules can't see across them). That heals itself: `nameClash` is true for
+the guest whose ID sorts last, whose `PartyRoom` then takes a free name
+(`freePartyName`; a number suffix if none), saves the identity, has
+`useOwnBallot` rewrite the ballot, and says so in a note. Older parties may
+still hold duplicates, so lists of guests (the room's closeness list, the
+big screen, the awards) show `withDistinctNames`: a repeat gets " 2", " 3" in
+guest-ID order.
 
 When the host loads a new lineup, places and qualifier ticks of acts that
 left go in the same write, and the places left are renumbered;

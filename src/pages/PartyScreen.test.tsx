@@ -34,7 +34,7 @@ describe("PartyScreen", () => {
         expect(await screen.findByRole("img", { name: "QR code to join party ABBA" })).toHaveAttribute("src", "data:image/png;base64,QR");
         expect(mocks.toDataURL.mock.calls[0][0]).toMatch(/#\/party\/ABBA$/);
         expect(screen.getByText("Party code").nextSibling).toHaveTextContent("ABBA");
-        expect(screen.getByText("2 guests are rating.")).toBeInTheDocument();
+        expect(screen.getByText("2 guests at the party.")).toBeInTheDocument();
     });
 
     it("lists the room's standings with the real result, never a guest's own", async () => {
@@ -44,7 +44,7 @@ describe("PartyScreen", () => {
         expect(within(standings).getAllByRole("listitem").map(item => item.textContent)).toEqual([
             "1st 🇸🇪 Sweden10", "2nd 🇳🇴 Norway5Really 1st", "3rd 🇫🇮 Finland0.8",
         ]);
-        expect(screen.getByText("1 guest is rating.")).toBeInTheDocument();
+        expect(screen.getByText("1 guest at the party.")).toBeInTheDocument();
         expect(screen.queryByText(/Jedward/)).not.toBeInTheDocument();
         expect(screen.getByRole("alert")).toHaveTextContent("offline");
         await screen.findByRole("img");
@@ -55,7 +55,7 @@ describe("PartyScreen", () => {
         renderScreen();
         expect(screen.getByRole("status")).toHaveTextContent("Counting the ratings…");
         expect(screen.queryByText(/No ratings yet/)).not.toBeInTheDocument();
-        expect(screen.queryByText(/guests are rating/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/guests at the party/)).not.toBeInTheDocument();
         await screen.findByRole("img");
     });
 
@@ -64,7 +64,7 @@ describe("PartyScreen", () => {
         renderScreen();
         expect(screen.getByText(/^No ratings yet/)).toHaveClass("is-static");
         expect(screen.queryByRole("list")).not.toBeInTheDocument();
-        expect(screen.getByText("0 guests are rating.")).toHaveAttribute("aria-live", "polite");
+        expect(screen.getByText("0 guests at the party.")).toHaveAttribute("aria-live", "polite");
         // The QR code shrinks to fit a phone instead of spilling out of its row.
         expect(await screen.findByRole("img")).toHaveClass("party-qr");
     });

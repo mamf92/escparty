@@ -966,6 +966,7 @@ describe("when Firebase never initialized", () => {
             "Firebase not initialized",
         );
         await expect(joinRoom("ABCD", "p-2", "Ida")).rejects.toThrow("Firebase not initialized");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", "Ida", ["Ida"])).rejects.toThrow("Firebase not initialized");
         await expect(setRoomDifficulty("ABCD", "easy")).rejects.toThrow(
             "Firebase not initialized",
         );

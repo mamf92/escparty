@@ -31,10 +31,19 @@ export const hostParty = async (page: Page, name: string, sheet: RegExp = /Jury/
     return page.url().split("/").pop()!;
 };
 
-/** Join a party by its link, as `name`. */
+/**
+ * Join a party by its link, as `name`: a participant name from the reel,
+ * which is stepped to until it lands there (a name someone has taken is not
+ * on it, so `name` must be free).
+ */
 export const joinParty = async (page: Page, code: string, name: string) => {
     await page.goto(`/#/party/${code}`);
-    await page.getByLabel("Your name at the party").fill(name);
+    await expect(page.getByRole("spinbutton", { name: "Your name" })).toBeVisible();
+    for (let tries = 0; tries < 60; tries++) {
+        await page.getByRole("button", { name: "Next name" }).click();
+        if (await page.getByText(`You're ${name}.`).isVisible()) break;
+    }
+    await expect(page.getByText(`You're ${name}.`)).toBeVisible();
     await page.getByRole("button", { name: "Join the party" }).click();
     await expect(page.getByText(`Party ${code} · you're ${name}`)).toBeVisible();
 };

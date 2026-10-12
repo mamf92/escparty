@@ -4,6 +4,7 @@ import { renderWithProviders, screen, userEvent, within } from "../test/test-uti
 import PartyRoom from "./PartyRoom";
 import { makeBallot, makeParty } from "../test/partyFixtures";
 import type { PartyData } from "../hooks/usePartyData";
+import { PARTY_NAMES } from "../utils/partyNames";
 import { readPartyIdentity, savePartyIdentity } from "../utils/partySession";
 
 const mocks = vi.hoisted(() => ({ data: {} as PartyData, saveBallot: vi.fn() }));
@@ -33,6 +34,7 @@ describe("PartyRoom", () => {
         vi.clearAllMocks();
         localStorage.clear();
         mocks.saveBallot.mockResolvedValue(undefined);
+        vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
         mocks.data = { party: makeParty(), ballots: [], error: null, retry: vi.fn() };
     });
 
@@ -57,21 +59,84 @@ describe("PartyRoom", () => {
         renderRoom();
         await userEvent.setup().click(screen.getByRole("tab", { name: "Room" }));
         expect(screen.getByText(/^No ratings yet/)).toHaveClass("is-static");
-        expect(screen.getByText("0 guests are rating.")).toHaveAttribute("aria-live", "polite");
+        expect(screen.getByText("0 guests at the party.")).toHaveAttribute("aria-live", "polite");
     });
 
-    it("lets a new guest join with a name", async () => {
+    it("lets a new guest join by landing on a name on the reel, and claims it at once", async () => {
         const user = userEvent.setup();
         renderRoom();
         expect(screen.getByText(/the awards name who rated most alike/)).toBeInTheDocument();
-        await user.clear(screen.getByLabelText("Your name at the party"));
+        expect(screen.queryByLabelText("Your name at the party")).not.toBeInTheDocument();
+        // Nothing is picked until the reel has landed.
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeDisabled();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
         await user.click(screen.getByRole("button", { name: "Join the party" }));
-        expect(screen.getByRole("alert")).toHaveTextContent("Give yourself a name.");
-        expect(screen.getByLabelText("Your name at the party")).toHaveAccessibleDescription("Give yourself a name.");
-        // Enter in the field joins.
-        await user.type(screen.getByLabelText("Your name at the party"), "Lordi{Enter}");
-        expect(screen.getByText("Party ABBA · you're Lordi")).toBeInTheDocument();
-        expect(readPartyIdentity("ABBA")).toMatchObject({ name: "Lordi", isHost: false });
+        expect(screen.getByText(`Party ABBA · you're ${PARTY_NAMES[0]}`)).toBeInTheDocument();
+        expect(readPartyIdentity("ABBA")).toMatchObject({ name: PARTY_NAMES[0], isHost: false });
+        expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", {
+            guestId: readPartyIdentity("ABBA")!.guestId,
+            name: PARTY_NAMES[0],
+            ratings: {},
+            bonuses: {},
+        });
+    });
+
+    it("offers only the names nobody at the party has", async () => {
+        const user = userEvent.setup();
+        mocks.data = {
+            party: makeParty(),
+            ballots: [makeBallot("g9", PARTY_NAMES[0].toUpperCase(), []), makeBallot("g8", ` ${PARTY_NAMES[1]} `, [])],
+            error: null,
+            retry: vi.fn(),
+        };
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.getByText(`You're ${PARTY_NAMES[2]}.`)).toBeInTheDocument();
+    });
+
+    it("gives up the name when someone with an earlier guest ID took it at the same moment", () => {
+        savePartyIdentity("ABBA", { guestId: "g2", name: "Jedward", isHost: false });
+        mocks.data = {
+            party: makeParty(),
+            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [])],
+            error: null,
+            retry: vi.fn(),
+        };
+        renderRoom();
+        const now = readPartyIdentity("ABBA")!;
+        expect(now.name).not.toBe("Jedward");
+        expect(PARTY_NAMES).toContain(now.name);
+        expect(screen.getByText(`Someone took Jedward at the same moment, so you're ${now.name} tonight.`)).toHaveAttribute("role", "status");
+        expect(screen.getByText(`Party ABBA · you're ${now.name}`)).toBeInTheDocument();
+    });
+
+    it("keeps its name when the other guest's ID sorts after", () => {
+        savePartyIdentity("ABBA", { guestId: "g1", name: "Jedward", isHost: false });
+        mocks.data = {
+            party: makeParty(),
+            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [])],
+            error: null,
+            retry: vi.fn(),
+        };
+        renderRoom();
+        expect(readPartyIdentity("ABBA")!.name).toBe("Jedward");
+        expect(screen.queryByText(/at the same moment/)).not.toBeInTheDocument();
+    });
+
+    it("tells two guests with one name apart in the room's lists", async () => {
+        const user = userEvent.setup();
+        savePartyIdentity("ABBA", { guestId: "g1", name: "Lordi", isHost: false });
+        mocks.data = {
+            party: makeParty({ results: { places: { se: 1, no: 2, fi: 3, ie: 4 } } }),
+            ballots: [makeBallot("g1", "Lordi", [12, 10, 8, 6]), makeBallot("g3", "Netta", [6, 8, 10, 12]), makeBallot("g2", "Lordi", [8, 12, 6, 10])],
+            error: null,
+            retry: vi.fn(),
+        };
+        renderRoom();
+        await user.click(screen.getByRole("tab", { name: "Room" }));
+        const list = screen.getByRole("list", { name: "Closest to the real result" });
+        expect(within(list).getByText(/Lordi$/)).toBeInTheDocument();
+        expect(within(list).getByText(/Lordi 2$/)).toBeInTheDocument();
     });
 
     it("warns about anonymous awards on joining", () => {
@@ -188,7 +253,7 @@ describe("PartyRoom", () => {
         mocks.data = { party: makeParty(), ballots: [ballots[0]], error: "The party couldn't be reached. Check your connection.", retry: vi.fn() };
         const { unmount } = renderRoom();
         await user.click(screen.getByRole("tab", { name: "Room" }));
-        expect(screen.getByText("1 guest is rating.")).toBeInTheDocument();
+        expect(screen.getByText("1 guest at the party.")).toBeInTheDocument();
         expect(screen.queryByText(/No ratings yet/)).not.toBeInTheDocument();
         expect(screen.getByText(/couldn't be reached/)).toBeInTheDocument();
         expect(screen.getAllByText("1 rating")).toHaveLength(2);
@@ -197,7 +262,7 @@ describe("PartyRoom", () => {
         mocks.data = { party: makeParty({ results: { places: { no: 1, se: 2 } } }), ballots, error: null, retry: vi.fn() };
         renderRoom();
         await user.click(screen.getByRole("tab", { name: "Room" }));
-        expect(screen.getByText("2 guests are rating.")).toBeInTheDocument();
+        expect(screen.getByText("2 guests at the party.")).toBeInTheDocument();
         const board = screen.getByRole("list", { name: "Closest to the real result" });
         const rows = within(board).getAllByRole("listitem");
         expect(rows.map(item => item.textContent)).toEqual(["1st Lordi24", "2nd Jedward16That's you"]);
@@ -263,5 +328,5 @@ it("says when the room has no ratings yet", async () => {
     renderRoom();
     await userEvent.setup().click(screen.getByRole("tab", { name: "Room" }));
     expect(screen.getByText(/No ratings yet/)).toBeInTheDocument();
-    expect(screen.getByText("0 guests are rating.")).toBeInTheDocument();
+    expect(screen.getByText("0 guests at the party.")).toBeInTheDocument();
 });

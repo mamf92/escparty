@@ -5,7 +5,7 @@ import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { NamePicker } from "../components/NamePicker";
 import { Control, Field, Ground, Pane, Row } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
-import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
+import { PARTY_LIFETIME_DAYS, createParty, fetchContest, saveBallot } from "../utils/partyFirestore";
 import {
     CATEGORY_LIMITS,
     PARTY_BONUSES,
@@ -127,6 +127,9 @@ const PartySetup = () => {
                 showNames,
             });
             savePartyIdentity(code, { guestId: hostId, name, isHost: true });
+            // Claim the host's name at once: an empty ballot, so the first guest sees it taken.
+            await saveBallot(code, { guestId: hostId, name, ratings: {}, bonuses: {} })
+                .catch(failure => console.error("Couldn't claim the host's name yet, will retry:", failure));
             navigate(`/party/${code}`);
         } catch (error) {
             console.error("Couldn't create the party:", error);
