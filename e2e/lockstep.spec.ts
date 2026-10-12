@@ -41,7 +41,7 @@ test("host and a throttled guest see the same questions through a break", async 
     await expect(host.getByRole("heading", { name: "The green room" })).toBeVisible();
     const code = await host.evaluate(() => localStorage.getItem("gameCode"));
     expect(code).toMatch(/^[A-Z]{4}$/);
-    await host.getByRole("button", { name: "Nul Points" }).click();
+    await host.getByRole("radio", { name: /Nul Points/ }).click();
 
     // The guest joins with the code and says they're ready.
     await guest.goto("/#/multiplayer");
