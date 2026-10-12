@@ -110,7 +110,9 @@ below.
 `updatePlayerScore`
 throws `ScoreWriteRejected` with a `reason` (`invalid-score`, `no-room`,
 `unknown-player`, `lower-score` with the room's `currentScore`) when the
-room turns a write down, so callers don't parse messages (#131).
+room turns a write down, so callers don't parse messages (#131). The quiz
+calls it when answering closes for a question, not at the tap, so a score in
+the room never reveals a verdict early (see `multiplayer-sync.md`).
 
 On the results (#207) the host reveals the standings a tap at a time:
 `setRevealStep(roomCode, step)` is a plain `updateDoc` of `revealStep`, and

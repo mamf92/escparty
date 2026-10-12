@@ -8,7 +8,7 @@ describe("QuizStatus", () => {
   it("names the question, with the points so far", () => {
     renderWithProviders(<QuizStatus {...base} />);
     expect(screen.getByText("Question 3 of 10")).toBeInTheDocument();
-    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 1240");
+    expect(screen.getByText("Points 1240")).toBeInTheDocument();
   });
 
   it("shows the clock big in a timer named with the real seconds while the question is open", () => {
@@ -47,7 +47,7 @@ describe("QuizStatus", () => {
 
   it.each([
     [{ picked: "Sweden", points: 820, outcome: "answered" }, "Douze points! That's right: +820 points."],
-    [{ picked: "Norway", points: 0, outcome: "answered" }, "Nul points this time. The answer was Sweden."],
+    [{ picked: "Norway", points: 0, outcome: "answered" }, "Better luck next time! The answer was Sweden."],
     [{ picked: null, points: 0, outcome: "timed-out" }, "Time's up. The answer was Sweden."],
     [{ picked: "Sweden", points: 820, outcome: "answered", counted: false }, "That's right, but the points didn't reach the room."],
     [{ picked: null, points: 0, outcome: "restored" }, "This question was already settled when you came back. The answer was Sweden."],
@@ -55,5 +55,22 @@ describe("QuizStatus", () => {
     renderWithProviders(<QuizStatus {...base} settled {...props} />);
     expect(screen.getByRole("status")).toHaveTextContent(text);
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+  });
+
+  it("keeps the clock and says the answer is locked in while the verdict waits for the room", () => {
+    renderWithProviders(<QuizStatus {...base} settled revealed={false} picked="Sweden" points={820} outcome="answered" nextIn="Next question in 9s" />);
+    expect(screen.getByRole("timer")).toHaveAccessibleName("7 seconds left");
+    expect(screen.getByText("Answer locked in")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
+    expect(screen.queryByText(/Next question in/)).not.toBeInTheDocument();
+    expect(document.querySelector(".quiz-burst")).toBeNull();
+  });
+
+  it("swaps the clock for the burst when revealed", () => {
+    const { rerender } = renderWithProviders(<QuizStatus {...base} settled revealed={false} picked="Sweden" points={820} outcome="answered" />);
+    rerender(<QuizStatus {...base} settled revealed picked="Sweden" points={820} outcome="answered" />);
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+    expect(screen.queryByText("Answer locked in")).not.toBeInTheDocument();
+    expect(document.querySelector(".quiz-burst-big")).toHaveTextContent("+820");
   });
 });

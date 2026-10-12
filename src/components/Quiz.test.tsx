@@ -5,6 +5,7 @@ import { act, fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import { loadQuizData, type QuizQuestion } from "../utils/QuizDataProvider";
 import { ScoreWriteRejected, type Room } from "../utils/roomsFirestore";
+import { SOLO_VERDICT_MS } from "../utils/quizTiming";
 import Quiz from "./Quiz";
 
 const QUESTIONS: QuizQuestion[] = [
@@ -103,7 +104,7 @@ describe("Quiz answer selection (#22)", () => {
     expect(marker("Sweden")).toBe("correct");
     expect(marker("Norway")).toBe("wrong");
     expect(marker("Ireland")).toBeUndefined();
-    expect(screen.getByRole("status")).toHaveTextContent("Nul points this time. The answer was Sweden.");
+    expect(screen.getByRole("status")).toHaveTextContent("Nope! The answer was Sweden.");
     for (const button of screen.getByRole("group", { name: "Answers" }).querySelectorAll("button")) expect(button).toBeDisabled();
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
@@ -122,9 +123,9 @@ describe("Quiz answer selection (#22)", () => {
     renderQuiz({ multiplayer: false, score: 500 });
 
     await screen.findByRole("button", { name: "Sweden" });
-    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 500");
+    expect(screen.getByText(/^Points \d/)).toHaveTextContent("Points 500");
     await user.click(screen.getByRole("button", { name: "Sweden" }));
-    const total = Number(/(\d+)$/.exec(screen.getByText(/^Points so far:/).textContent ?? "")?.[1]);
+    const total = Number(/(\d+)$/.exec(screen.getByText(/^Points \d/).textContent ?? "")?.[1]);
     expect(total).toBeGreaterThan(500);
   });
 
@@ -138,8 +139,8 @@ describe("Quiz answer selection (#22)", () => {
       fireEvent.click(norway);
       fireEvent.click(sweden);
     });
-    expect(screen.getByRole("status")).toHaveTextContent("Nul points this time.");
-    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 0");
+    expect(screen.getByRole("status")).toHaveTextContent("Nope! The answer was Sweden.");
+    expect(screen.getByText(/^Points \d/)).toHaveTextContent("Points 0");
   });
 
   it("keeps a keyboard player's focus on the question once answering disables the answers", async () => {
@@ -252,7 +253,9 @@ describe("Quiz unavailable (#171)", () => {
 });
 
 describe("Quiz multiplayer score writes (#131)", () => {
-  const givenRoom = () => {
+  // A room whose question started `startedAgoMs` ago (answering closes at
+  // 10s). `send` hands this client another snapshot of it.
+  const givenRoom = (startedAgoMs = 0) => {
     const room: Room = {
       id: "ABCD",
       hostId: "host",
@@ -262,12 +265,20 @@ describe("Quiz multiplayer score writes (#131)", () => {
       players: [{ id: "host", name: "Loreen", score: 0 }],
       phase: "question",
       currentQuestionIndex: 0,
-      phaseStartedAt: { toMillis: () => Date.now() } as unknown as Room["phaseStartedAt"],
+      phaseStartedAt: { toMillis: () => Date.now() - startedAgoMs } as unknown as Room["phaseStartedAt"],
     };
+    let send: (room: Room) => void = () => { };
     mocks.listenToRoom.mockImplementation((_code: string, callback: (room: Room) => void) => {
+      send = callback;
       callback(room);
       return () => { };
     });
+    // Answering closes for everyone: the room's question started 10.5s ago.
+    const closeAnswering = (index = 0) => {
+      const startedAt = Date.now() - 10_500;
+      act(() => send({ ...room, currentQuestionIndex: index, phaseStartedAt: { toMillis: () => startedAt } as unknown as Room["phaseStartedAt"] }));
+    };
+    return { room, send: (next: Room) => send(next), closeAnswering };
   };
 
   const answerCorrectly = async () => {
@@ -277,15 +288,177 @@ describe("Quiz multiplayer score writes (#131)", () => {
   };
 
   it("says a question settled before a refresh is closed, without claiming it was answered", async () => {
-    givenRoom();
+    givenRoom(11_000);
     sessionStorage.setItem("answeredQuestion:ABCD", "0");
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
     expect(await screen.findByText("This question was already settled when you came back. The answer was Sweden.")).toBeInTheDocument();
     expect(screen.queryByText(/You answered/)).not.toBeInTheDocument();
   });
 
+  describe("locking in and revealing (multiplayer)", () => {
+    const markers = () => document.querySelectorAll(".calm-marker");
+
+    it("locks an answer in without saying right or wrong, until answering closes for everyone", async () => {
+      const { closeAnswering } = givenRoom();
+      mocks.updatePlayerScore.mockResolvedValue(undefined);
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
+
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+
+      // Locked in: the pick is pink and pressed, nothing is marked or said.
+      expect(screen.getByRole("button", { name: "Sweden" })).toHaveClass("is-chosen");
+      expect(screen.getByRole("button", { name: "Sweden" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: "Norway" })).not.toHaveClass("is-chosen");
+      for (const button of screen.getByRole("group", { name: "Answers" }).querySelectorAll("button")) expect(button).toBeDisabled();
+      expect(markers()).toHaveLength(0);
+      expect(screen.getByText("Answer locked in")).toBeInTheDocument();
+      // Screen readers hear it from the status region.
+      expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
+      expect(screen.queryByText(/Douze points/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/ in \d+s$/)).not.toBeInTheDocument();
+      // The countdown carries on, with answering time (not the slot's) left.
+      expect(screen.getByRole("timer")).toHaveAccessibleName(/^(10|9) seconds left$/);
+      // Nothing is written to the room yet, and the badge is unchanged.
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
+
+      // Answering closes: the verdict, the markers and the new total.
+      closeAnswering();
+      await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/^Douze points! That's right: \+\d+ points\.$/));
+      expect(markers()).toHaveLength(1);
+      expect(screen.queryByText("Answer locked in")).not.toBeInTheDocument();
+      expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+      expect(screen.getByText(/^Results in \d+s$/)).toBeInTheDocument();
+      const total = Number(/(\d+)$/.exec(screen.getByText(/^Points \d/).textContent ?? "")?.[1]);
+      expect(total).toBeGreaterThan(500);
+    });
+
+    it("reveals a wrong answer only once answering has closed", async () => {
+      const { closeAnswering } = givenRoom();
+      mocks.updatePlayerScore.mockResolvedValue(undefined);
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Norway" }));
+      expect(markers()).toHaveLength(0);
+      expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
+
+      closeAnswering();
+      await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Nope! The answer was Sweden."));
+      expect(markers()).toHaveLength(2);
+      expect(screen.getByText("Points 0")).toBeInTheDocument();
+    });
+
+    it("shows a refresh while answering is still open as locked in, then reveals it", async () => {
+      const { closeAnswering } = givenRoom(4_000);
+      sessionStorage.setItem("answeredQuestion:ABCD", "0");
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+
+      expect(await screen.findByText("Answer locked in")).toBeInTheDocument();
+      expect(markers()).toHaveLength(0);
+      expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
+
+      closeAnswering();
+      await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("This question was already settled when you came back."));
+      expect(markers()).toHaveLength(1);
+    });
+
+    it("writes the score once answering closes, not at the tap", async () => {
+      const { closeAnswering } = givenRoom();
+      mocks.updatePlayerScore.mockResolvedValue(undefined);
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
+
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
+
+      closeAnswering();
+      await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+      expect(mocks.updatePlayerScore.mock.calls[0][2]).toBeGreaterThan(500);
+      expect(sessionStorage.getItem("pendingScore:ABCD")).toBeNull();
+    });
+
+    it("keeps the badge unchanged until the reveal, then raises it", async () => {
+      const { closeAnswering } = givenRoom();
+      mocks.updatePlayerScore.mockResolvedValue(undefined);
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
+
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
+
+      closeAnswering();
+      await vi.waitFor(() => {
+        const total = Number(/(\d+)$/.exec(screen.getByText(/^Points \d/).textContent ?? "")?.[1]);
+        expect(total).toBeGreaterThan(500);
+      });
+    });
+
+    it("still writes once after the reveal when the page is refreshed between the tap and the reveal", async () => {
+      givenRoom();
+      mocks.updatePlayerScore.mockResolvedValue(undefined);
+      const first = renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+      expect(JSON.parse(sessionStorage.getItem("pendingScore:ABCD") ?? "null")).toMatchObject({ index: 0 });
+      first.unmount();
+
+      // Reloaded with answering still open: locked in, nothing written.
+      const { closeAnswering } = givenRoom(4_000);
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+      expect(await screen.findByText("Answer locked in")).toBeInTheDocument();
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
+      expect(screen.getByText("Points 0")).toBeInTheDocument();
+
+      closeAnswering();
+      await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(sessionStorage.getItem("pendingScore:ABCD")).toBeNull());
+      expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+    });
+
+    it("flushes a leftover answer once the room has moved past its question", async () => {
+      givenRoom(11_000);
+      mocks.updatePlayerScore.mockResolvedValue(undefined);
+      sessionStorage.setItem("answeredQuestion:ABCD", "0");
+      sessionStorage.setItem("pendingScore:ABCD", JSON.stringify({ index: 0, points: 300 }));
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
+
+      await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledWith("ABCD", "host", 800));
+    });
+
+    it("never writes for a wrong answer", async () => {
+      const { closeAnswering } = givenRoom();
+      mocks.updatePlayerScore.mockResolvedValue(undefined);
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
+
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Norway" }));
+      expect(sessionStorage.getItem("pendingScore:ABCD")).toBeNull();
+      closeAnswering();
+      await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Nope!"));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(mocks.updatePlayerScore).not.toHaveBeenCalled();
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
+    });
+
+    it("shows a failed write's alert only after the reveal, and keeps the badge at what the room holds", async () => {
+      const { closeAnswering } = givenRoom();
+      mocks.updatePlayerScore.mockRejectedValue(new ScoreWriteRejected("unknown-player", "no player"));
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host", score: 500 });
+
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+      closeAnswering();
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
+      expect(screen.getByText("Points 500")).toBeInTheDocument();
+    });
+  });
+
   it("scores a double tap once", async () => {
-    givenRoom();
+    const { closeAnswering } = givenRoom();
     mocks.updatePlayerScore.mockResolvedValue(undefined);
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
 
@@ -294,6 +467,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
       fireEvent.click(sweden);
       fireEvent.click(sweden);
     });
+    closeAnswering();
 
     await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
     await new Promise(resolve => setTimeout(resolve, 20));
@@ -312,55 +486,71 @@ describe("Quiz multiplayer score writes (#131)", () => {
     expect(screen.getByRole("button", { name: "Sweden" })).toBeEnabled();
   });
 
-  it("marks the question answered before the score write lands, so a refresh can't score it twice", async () => {
+  it("marks the question answered at the tap, so a refresh can't score it twice", async () => {
     givenRoom();
-    // The write never reports back: the tab is reloaded while it is in flight.
-    mocks.updatePlayerScore.mockReturnValue(new Promise(() => { }));
+    mocks.updatePlayerScore.mockResolvedValue(undefined);
     const first = renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
     await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
     expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBe("0");
     first.unmount();
+    // Back after answering has closed.
+    givenRoom(11_000);
 
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
     expect(await screen.findByText("This question was already settled when you came back. The answer was Sweden.")).toBeInTheDocument();
     for (const button of screen.getByRole("group", { name: "Answers" }).querySelectorAll("button")) expect(button).toBeDisabled();
-    expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1));
   });
 
-  it("takes the points and the answered mark back when the room refuses the write", async () => {
-    givenRoom();
+  it("clears the held-back points before writing them, so a reload mid-write can't add them twice", async () => {
+    const { closeAnswering } = givenRoom();
+    mocks.updatePlayerScore.mockReturnValue(new Promise(() => { })); // still in flight
+    await answerCorrectly();
+    expect(sessionStorage.getItem("pendingScore:ABCD")).not.toBeNull();
+    closeAnswering();
+    await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+    expect(sessionStorage.getItem("pendingScore:ABCD")).toBeNull();
+  });
+
+  it("takes the points back when the room refuses the write", async () => {
+    const { closeAnswering } = givenRoom();
     mocks.updatePlayerScore.mockRejectedValue(
       new ScoreWriteRejected("unknown-player", "Failed to update score: Room ABCD has no player ghost"),
     );
     renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "ghost", score: 500 });
 
     await userEvent.setup().click(await screen.findByRole("button", { name: "Sweden" }));
+    closeAnswering();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("isn't being saved to this room");
-    expect(screen.getByText(/^Points so far:/)).toHaveTextContent("Points so far: 500");
-    expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBeNull();
+    expect(screen.getByText(/^Points \d/)).toHaveTextContent("Points 500");
+    // The question had closed by the time of the write, so it stays answered.
+    expect(sessionStorage.getItem("answeredQuestion:ABCD")).toBe("0");
   });
 
   it("tells the player once when the room doesn't know them, without retrying", async () => {
-    givenRoom();
+    const { closeAnswering } = givenRoom();
     mocks.updatePlayerScore.mockRejectedValue(
       new ScoreWriteRejected("unknown-player", "Failed to update score: Room ABCD has no player ghost"),
     );
 
     await answerCorrectly();
+    closeAnswering();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("isn't being saved to this room");
     expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
   });
 
   it("says once when the game had already finished, without retrying (#142)", async () => {
-    givenRoom();
+    const { closeAnswering } = givenRoom();
     mocks.updatePlayerScore.mockRejectedValue(new ScoreWriteRejected("finished", "Failed to update score: Room ABCD has finished"));
 
     await answerCorrectly();
+    closeAnswering();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The game had already finished");
     expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("That's right, but the points didn't reach the room."));
     // The verdict doesn't promise the points the alert says didn't count.
     expect(screen.getByRole("status")).toHaveTextContent("That's right, but the points didn't reach the room.");
     expect(screen.queryByText(/Douze points/)).not.toBeInTheDocument();
@@ -371,29 +561,14 @@ describe("Quiz multiplayer score writes (#131)", () => {
       ...QUESTIONS,
       { id: 2, question: "Which country won in 1988?", options: ["Switzerland", "UK"], correctAnswer: "Switzerland" },
     ]);
-    let send: (room: Room) => void = () => { };
-    const room: Room = {
-      id: "ABCD",
-      hostId: "host",
-      started: true,
-      difficulty: "easy",
-      createdAt: null as unknown as Room["createdAt"],
-      players: [{ id: "host", name: "Loreen", score: 0 }],
-      phase: "question",
-      currentQuestionIndex: 0,
-      phaseStartedAt: { toMillis: () => Date.now() } as unknown as Room["phaseStartedAt"],
-    };
-    mocks.listenToRoom.mockImplementation((_code: string, callback: (room: Room) => void) => {
-      send = callback;
-      callback(room);
-      return () => { };
-    });
+    const { room, send, closeAnswering } = givenRoom();
     mocks.updatePlayerScore
       .mockRejectedValueOnce(new ScoreWriteRejected("unknown-player", "Failed to update score: no player ghost"))
       // The next write is still in flight when the verdict shows.
       .mockReturnValueOnce(new Promise(() => { }));
 
     await answerCorrectly();
+    closeAnswering();
     expect(await screen.findByText("That's right, but the points didn't reach the room.")).toBeInTheDocument();
 
     // The next question's verdict isn't the last one's refusal.
@@ -401,13 +576,14 @@ describe("Quiz multiplayer score writes (#131)", () => {
     send({ ...room, currentQuestionIndex: 1, phaseStartedAt: { toMillis: () => startedAt } as unknown as Room["phaseStartedAt"] });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Switzerland" }));
+    closeAnswering(1);
     await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(2));
     expect(await screen.findByText(/^Douze points! That's right/)).toBeInTheDocument();
     expect(screen.queryByText(/didn't reach the room/)).not.toBeInTheDocument();
   });
 
   it("adds the answer's points to the room's score when the room already holds more", async () => {
-    givenRoom();
+    const { closeAnswering } = givenRoom();
     mocks.updatePlayerScore
       .mockRejectedValueOnce(
         new ScoreWriteRejected("lower-score", "Failed to update score: Refusing to lower score", 4000),
@@ -415,6 +591,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
       .mockResolvedValueOnce(undefined);
 
     await answerCorrectly();
+    closeAnswering();
 
     await vi.waitFor(() => expect(mocks.updatePlayerScore).toHaveBeenCalledTimes(2));
     const [, , firstScore] = mocks.updatePlayerScore.mock.calls[0];
@@ -431,8 +608,7 @@ describe("Quiz solo clock (#160)", () => {
     ["an empty history", null],
     ["an unreadable history", "{not json"],
   ])("times out an unanswered question, shows the verdict, then saves the run once, from %s", async (_, stored) => {
-    // Only the clock and intervals: React schedules its own work on setTimeout.
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.useFakeTimers();
     try {
       if (stored === null) localStorage.removeItem("quizScores");
       else localStorage.setItem("quizScores", stored);
@@ -446,17 +622,43 @@ describe("Quiz solo clock (#160)", () => {
       await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Which country won in 1974?" })).toBeInTheDocument());
 
       // Ten seconds with no answer: the question locks with its verdict.
-      await vi.advanceTimersByTimeAsync(10_200);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_200); });
       expect(screen.getByRole("status")).toHaveTextContent("Time's up. The answer was Sweden.");
       expect(screen.queryByText("results")).not.toBeInTheDocument();
 
-      // A moment of verdict (1.5 seconds), then the results, saved once.
-      // The verdict's one timer runs in real time (React schedules its own
-      // work on setTimeout, so that stays unfaked) from the deadline fixed
-      // at time's up.
+      // A moment of verdict (SOLO_VERDICT_MS), then the results, saved once.
+      await act(async () => { await vi.advanceTimersByTimeAsync(SOLO_VERDICT_MS - 600); });
       expect(screen.queryByText("results")).not.toBeInTheDocument();
-      expect(await screen.findByText("results", {}, { timeout: 4_000 })).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+      expect(screen.getByText("results")).toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem("quizScores") ?? "[]")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("Quiz solo verdict (#160)", () => {
+  it("shows the verdict for SOLO_VERDICT_MS before the next question", async () => {
+    vi.useFakeTimers();
+    try {
+      renderWithProviders(
+        <Routes>
+          <Route path="/quiz/:difficulty" element={<Quiz />} />
+          <Route path="/results" element={<p>results</p>} />
+        </Routes>,
+        { initialEntries: [{ pathname: "/quiz/easy", state: { multiplayer: false } }] },
+      );
+      await vi.waitFor(() => expect(screen.getByRole("button", { name: "Sweden" })).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: "Sweden" }));
+      expect(screen.getByRole("status")).toHaveTextContent("Douze points!");
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(SOLO_VERDICT_MS - 100); });
+      expect(screen.queryByText("results")).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Douze points!");
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+      expect(screen.getByText("results")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

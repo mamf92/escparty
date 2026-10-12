@@ -126,7 +126,7 @@ export const Loader = ({ children, inline = false }: LoaderProps) => {
     <div className={className}>
       <canvas ref={canvasRef} className="esc-loader-ball" width={SIZE} height={SIZE} aria-hidden="true" />
       <p className="esc-loader-text" aria-hidden="true">{children}</p>
-      <div className="esc-loader-status" role="status" aria-live="polite">{announced}</div>
+      <div className="esc-visually-hidden" role="status" aria-live="polite">{announced}</div>
     </div>
   );
   if (inline) return overlay;

@@ -16,9 +16,9 @@ test("a solo quiz from the home screen to the scoreboard", async ({ page }) => {
         await expect(page.getByRole("timer")).toBeVisible();
         await expect(page.getByText(`Question ${question} of 10`)).toBeVisible();
         const text = await page.getByRole("heading", { level: 2 }).textContent();
-        // Tapping is the answer; the verdict shows a moment, then the next question.
+        // Tapping is the answer; the verdict shows for a few seconds, then the next question.
         await answerOptions(page).first().click();
-        if (question < 10) await expect(page.getByRole("heading", { level: 2 })).not.toHaveText(text ?? "");
+        if (question < 10) await expect(page.getByRole("heading", { level: 2 })).not.toHaveText(text ?? "", { timeout: 10_000 });
     }
 
     await expect(page.getByRole("heading", { name: "Quiz complete" })).toBeVisible();
