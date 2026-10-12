@@ -28,10 +28,16 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     /** The reel and its buttons are off (e.g. while the offered names are still being worked out). */
     disabled?: boolean;
 }) => {
-    const count = names.length;
-    const landed = value === null ? -1 : names.indexOf(value);
-    // While it spins the reel shows names that are not the answer yet.
+    // While it spins the reel shows names that are not the answer yet, from a
+    // snapshot of the list taken at spin start, so a list that shrinks
+    // underneath it (someone else took a name) can't move the reel.
     const [spinning, setSpinning] = useState<number | null>(null);
+    const [frozen, setFrozen] = useState<readonly string[] | null>(null);
+    const latestNames = useRef(names);
+    useEffect(() => { latestNames.current = names; });
+    const list = spinning !== null && frozen ? frozen : names;
+    const count = list.length;
+    const landed = value === null ? -1 : names.indexOf(value);
     const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const reel = useRef<HTMLDivElement>(null);
     const drag = useRef({ y: 0, active: false });
@@ -58,19 +64,30 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     const spin = () => {
         if (off) return;
         // Always a different name from the one already landed on.
+        const spun = names;
         const end = landed < 0 ? Math.floor(Math.random() * count) : wrap(landed + 1 + Math.floor(Math.random() * (count - 1)));
         if (prefersReducedMotion()) {
             onChange(names[end]);
             return;
         }
         const total = 16 + Math.floor(Math.random() * count);
+        setFrozen(spun);
         const tick = (done: number, at: number) => {
             if (done >= total) {
                 setSpinning(null);
-                onChange(names[wrap(at)]);
+                setFrozen(null);
+                // If the landed name was taken meanwhile, land on the nearest one still offered.
+                const here = ((at % spun.length) + spun.length) % spun.length;
+                for (let offset = 0; offset < spun.length; offset += 1) {
+                    const candidate = spun[(here + offset) % spun.length];
+                    if (latestNames.current.includes(candidate)) {
+                        onChange(candidate);
+                        break;
+                    }
+                }
                 return;
             }
-            setSpinning(wrap(at));
+            setSpinning(((at % spun.length) + spun.length) % spun.length);
             // Slows down towards the end, like a reel running out of spin.
             timer.current = setTimeout(() => tick(done + 1, at + 1), 50 + (done / total) ** 2 * 260);
         };
@@ -121,7 +138,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     const endDrag = () => { drag.current.active = false; };
 
     // Before the first landing the reel rests at the top of the list.
-    const edge = (offset: number) => (shown < 0 ? names[offset < 0 ? count - 1 : 0] : names[wrap(shown + offset)]);
+    const edge = (offset: number) => (shown < 0 ? list[offset < 0 ? count - 1 : 0] : list[wrap(shown + offset)]);
 
     return (
         <div className="party-picker">
@@ -144,7 +161,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 onPointerCancel={endDrag}
             >
                 <Row className="party-reel-edge" aria-hidden="true">{edge(-1)}</Row>
-                <Row className="party-reel-name esc-pick" elevation="high" aria-hidden="true">{shown < 0 ? "?" : names[shown]}</Row>
+                <Row className="party-reel-name esc-pick" elevation="high" aria-hidden="true">{shown < 0 ? "?" : list[shown]}</Row>
                 <Row className="party-reel-edge" aria-hidden="true">{edge(1)}</Row>
             </div>
             <p className="esc-note" role="status">

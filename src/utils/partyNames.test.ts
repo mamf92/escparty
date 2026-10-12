@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
     PARTY_NAMES,
-    displayNameOf,
     availablePartyNames,
     distinctNames,
-    freePartyName,
     randomPartyName,
     withDistinctNames,
 } from "./partyNames";
@@ -25,20 +23,6 @@ describe("availablePartyNames", () => {
 
     it("offers every name when all are taken", () => {
         expect(availablePartyNames(PARTY_NAMES)).toEqual(PARTY_NAMES);
-    });
-});
-
-describe("freePartyName", () => {
-    it("picks a name nobody has", () => {
-        const taken = PARTY_NAMES.slice(1);
-        expect(freePartyName(taken)).toBe(PARTY_NAMES[0]);
-    });
-
-    it("numbers a name when all are taken, past numbers already used", () => {
-        expect(PARTY_NAMES).toContain(freePartyName(PARTY_NAMES).replace(/ 2$/, ""));
-        expect(freePartyName(PARTY_NAMES)).toMatch(/ 2$/);
-        const taken = [...PARTY_NAMES, ...PARTY_NAMES.map(name => `${name} 2`)];
-        expect(freePartyName(taken)).toMatch(/ 3$/);
     });
 });
 
@@ -81,46 +65,21 @@ describe("withDistinctNames", () => {
 });
 
 describe("distinctNames, who keeps the bare name", () => {
-    const rated = { a1: { c: 3 } };
-
-    it("goes to a guest with ratings over one without, whatever the guest IDs", () => {
+    it("goes to the lowest guest ID, whatever the order given", () => {
         const names = distinctNames([
+            { id: "b", name: "Lordi" },
             { id: "a", name: "Lordi" },
-            { id: "z", name: "Lordi", ratings: rated },
-        ]);
-        expect(names.get("z")).toBe("Lordi");
-        expect(names.get("a")).toBe("Lordi 2");
-    });
-
-    it("counts a ticked bonus as taking part", () => {
-        const names = distinctNames([
-            { id: "a", name: "Lordi", ratings: {}, bonuses: {} },
-            { id: "z", name: "Lordi", ratings: {}, bonuses: { a1: ["wind"] } },
-        ]);
-        expect(names.get("z")).toBe("Lordi");
-        expect(names.get("a")).toBe("Lordi 2");
-    });
-
-    it("falls back to guest ID order when both or neither have taken part", () => {
-        const names = distinctNames([
-            { id: "b", name: "Lordi", ratings: rated },
-            { id: "a", name: "Lordi", ratings: rated },
         ]);
         expect(names.get("a")).toBe("Lordi");
         expect(names.get("b")).toBe("Lordi 2");
     });
-});
 
-describe("displayNameOf", () => {
-    const ballots = [{ guestId: "a", name: "Lordi" }, { guestId: "b", name: "Lordi" }];
-
-    it("is the numbered name the lists show", () => {
-        expect(displayNameOf(ballots, "a", "Lordi")).toBe("Lordi");
-        expect(displayNameOf(ballots, "b", "Lordi")).toBe("Lordi 2");
-    });
-
-    it("is the fallback while the ballots or the guest's ballot aren't there", () => {
-        expect(displayNameOf(undefined, "b", "Lordi")).toBe("Lordi");
-        expect(displayNameOf(ballots, "c", "Netta")).toBe("Netta");
+    it("doesn't change when a guest rates (ratings play no part)", () => {
+        const before = distinctNames([{ id: "a", name: "Lordi" }, { id: "z", name: "Lordi" }]);
+        const after = distinctNames([
+            { id: "a", name: "Lordi" },
+            { id: "z", name: "Lordi", ratings: { a1: { c: 3 } } } as { id: string; name: string },
+        ]);
+        expect(after).toEqual(before);
     });
 });

@@ -80,26 +80,6 @@ describe("useOwnBallot", () => {
         expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", { guestId: "g1", name: "Jedward", ratings: {}, bonuses: {} });
     });
 
-    it("rewrites the ballot under a new name when the guest has to give theirs up", async () => {
-        const server: Ballot = { guestId: "g1", name: "Jedward", ratings: { se: { points: 3 } }, bonuses: {} };
-        const { rerender } = renderHook(({ identity }) => useOwnBallot("ABBA", identity, [server]), {
-            initialProps: { identity: me },
-        });
-        await act(() => vi.advanceTimersByTimeAsync(1_000));
-        expect(mocks.saveBallot).not.toHaveBeenCalled();
-        rerender({ identity: { ...me, name: "Lordi" } });
-        await act(() => vi.advanceTimersByTimeAsync(0));
-        expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", { guestId: "g1", name: "Lordi", ratings: { se: { points: 3 } }, bonuses: {} });
-    });
-
-    it("saves a server copy that carries the old name after a rename", async () => {
-        const server: Ballot = { guestId: "g1", name: "Jedward", ratings: {}, bonuses: {} };
-        renderHook(() => useOwnBallot("ABBA", { ...me, name: "Lordi" }, [server]));
-        await act(() => vi.advanceTimersByTimeAsync(0));
-        expect(mocks.saveBallot).toHaveBeenCalledTimes(1);
-        expect(mocks.saveBallot.mock.calls[0][1].name).toBe("Lordi");
-    });
-
     it("doesn't save before the guest has joined", async () => {
         const { result, unmount } = renderHook(() => useOwnBallot("ABBA", null, []));
         act(() => result.current.rate("se", "points", 1));

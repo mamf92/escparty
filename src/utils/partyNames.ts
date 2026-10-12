@@ -1,4 +1,4 @@
-import { freeNames, nameKey, pickFreeName } from "./freeName";
+import { freeNames, nameKey } from "./freeName";
 
 /**
  * The Eurovision legends a guest becomes at a scoreboard party, so the
@@ -22,29 +22,18 @@ export const availablePartyNames = (takenNames: readonly string[]): string[] => 
     return free.length > 0 ? free : [...PARTY_NAMES];
 };
 
-/** A random participant name nobody has taken; with all taken, a random one numbered " 2", " 3"... */
-export const freePartyName = (takenNames: readonly string[]): string =>
-    pickFreeName(randomPartyName(), takenNames, PARTY_NAMES);
-
-/** Whether a ballot has any rating or bonus in it (an empty one only claims a name). */
-const hasActivity = (ballot: { ratings?: object; bonuses?: object }): boolean =>
-    Object.keys(ballot.ratings ?? {}).length > 0 || Object.keys(ballot.bonuses ?? {}).length > 0;
-
 /**
  * Names to show for a list of guests: a name shared by several (older
  * parties, or two guests who took it at the same instant) gets " 2", " 3",
  * so a list never has two of the same. The bare name goes to the guest who
- * most plausibly held it first: one with ratings or bonuses beats one
- * without, then guest ID order. A number never lands on a name another
+ * holds the lowest guest ID, so the bare name is stable and never swaps as
+ * people rate. A number never lands on a name another
  * guest really has. Keyed by guest ID.
  */
 export const distinctNames = (
-    entries: readonly { id: string; name: string; ratings?: object; bonuses?: object }[],
+    entries: readonly { id: string; name: string }[],
 ): Map<string, string> => {
-    const sorted = [...entries].sort((a, b) => {
-        const active = Number(hasActivity(b)) - Number(hasActivity(a));
-        return active || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    });
+    const sorted = [...entries].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     const used = new Set(sorted.map(entry => nameKey(entry.name)));
     const seen = new Set<string>();
     const result = new Map<string, string>();
@@ -63,17 +52,10 @@ export const distinctNames = (
     return result;
 };
 
-type NamedBallot = { guestId: string; name: string; ratings?: object; bonuses?: object };
-
-const distinctBallotNames = (ballots: readonly NamedBallot[]) =>
-    distinctNames(ballots.map(ballot => ({ id: ballot.guestId, name: ballot.name, ratings: ballot.ratings, bonuses: ballot.bonuses })));
+type NamedBallot = { guestId: string; name: string };
 
 /** The ballots with `distinctNames` applied to their names. */
 export const withDistinctNames = <T extends NamedBallot>(ballots: readonly T[]): T[] => {
-    const names = distinctBallotNames(ballots);
+    const names = distinctNames(ballots.map(ballot => ({ id: ballot.guestId, name: ballot.name })));
     return ballots.map(ballot => ({ ...ballot, name: names.get(ballot.guestId) ?? ballot.name }));
 };
-
-/** The name the lists show for this guest ("Loreen 2" if a clash numbered them); `fallback` while their ballot isn't in. */
-export const displayNameOf = (ballots: readonly NamedBallot[] | undefined, guestId: string, fallback: string): string =>
-    (ballots && distinctBallotNames(ballots).get(guestId)) ?? fallback;

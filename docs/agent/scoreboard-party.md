@@ -53,9 +53,9 @@ ballot is written at once, empty, so the next guest sees it taken;
 can still take one name at the same instant (separate documents, and the
 rules can't see across them). Nobody is renamed for that: the lists tell
 them apart at display time (`distinctNames`), the bare name going to the
-guest with ratings or bonuses (else the lower guest ID) and the other
+guest with the lowest guest ID (stable, so names never swap as people rate) and the other
 getting "Loreen 2", and a guest's own "you're ..." subtitle uses the same
-name (`displayNameOf`). On the join reel a landed name that a ballots
+name (`PartyRoom` computes `withDistinctNames` once for the subtitle and the Room tab). On the join reel a landed name that a ballots
 update takes before Join is let go ("X was just taken. Spin again."), and
 the reel is off while the ballots haven't loaded. Older parties may
 still hold duplicates, so lists of guests (the room's closeness list, the

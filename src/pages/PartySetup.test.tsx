@@ -86,13 +86,30 @@ describe("PartySetup", () => {
         for (const card of cards) expect(card).toHaveClass("esc-choice-card");
     });
 
-    it("moves the pick with the arrow keys, one tab stop", async () => {
+    it("moves focus with the arrow keys without picking or moving on, one tab stop", async () => {
+        const user = userEvent.setup();
         renderSetup();
         const cards = screen.getAllByRole("radio");
         expect(cards.map(card => card.tabIndex)).toEqual([0, -1, -1]);
         cards[0].focus();
-        await userEvent.setup().keyboard("{ArrowDown}");
+        await user.keyboard("{ArrowDown}");
+        step(1);
+        expect(cards[1]).toHaveFocus();
+        for (const card of cards) expect(card).toHaveAttribute("aria-checked", "false");
+        await user.keyboard("{Enter}");
         step(2);
+    });
+
+    it("moves focus between the sheet cards without picking or moving on", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await user.click(screen.getByRole("radio", { name: /Grand final/ }));
+        const cards = screen.getAllByRole("radio");
+        cards[0].focus();
+        await user.keyboard("{ArrowDown}");
+        step(2);
+        expect(cards[1]).toHaveFocus();
+        for (const card of cards) expect(card).toHaveAttribute("aria-checked", "false");
     });
 
     it("shows the sheets as cards with a category count, list and blurb", async () => {

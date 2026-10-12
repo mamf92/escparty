@@ -146,4 +146,32 @@ describe("NamePicker", () => {
         act(() => { vi.runAllTimers(); });
         expect(onSpinningChange).toHaveBeenLastCalledWith(false);
     });
+
+    it("keeps the reel on the list it started with when the names shrink mid-spin, and lands on one still offered", () => {
+        reducedMotion(false);
+        vi.useFakeTimers();
+        vi.spyOn(Math, "random").mockReturnValue(0);
+        const onChange = vi.fn();
+        const { rerender } = render(<NamePicker names={NAMES} value={null} onChange={onChange} />);
+        fireEvent.click(screen.getByRole("button", { name: "Spin for a name" }));
+        // Everything but the last name is taken while the reel spins.
+        const left = [NAMES[NAMES.length - 1]];
+        rerender(<NamePicker names={left} value={null} onChange={onChange} />);
+        act(() => { vi.advanceTimersByTime(60); });
+        expect(screen.getByText(/./, { selector: ".party-reel-name" }).textContent).not.toBe("undefined");
+        act(() => { vi.runAllTimers(); });
+        expect(onChange).toHaveBeenCalledOnce();
+        expect(left).toContain(onChange.mock.calls[0][0]);
+    });
+
+    it("lands on nothing when every name is gone by the time it stops", () => {
+        reducedMotion(false);
+        vi.useFakeTimers();
+        const onChange = vi.fn();
+        const { rerender } = render(<NamePicker names={NAMES} value={null} onChange={onChange} />);
+        fireEvent.click(screen.getByRole("button", { name: "Spin for a name" }));
+        rerender(<NamePicker names={[]} value={null} onChange={onChange} />);
+        act(() => { vi.runAllTimers(); });
+        expect(onChange).not.toHaveBeenCalled();
+    });
 });

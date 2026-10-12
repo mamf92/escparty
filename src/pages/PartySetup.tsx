@@ -194,7 +194,7 @@ const PartySetup = () => {
                         title={entry.title.replace(/^Burgas 2027 · /, "")}
                         meta={`${entry.acts.length} acts · ${entry.kind === "semi" ? `${entry.qualifiers} go through` : "every act ranked"}`}
                         onClick={() => pickContest(entry.id)}
-                        onKeyDown={event => radioGroupKeys(event, index, CONTESTS_2027.length, next => pickContest(CONTESTS_2027[next].id))}
+                        onKeyDown={event => radioGroupKeys(event, index, CONTESTS_2027.length, null)}
                     />
                 ))}
             </ChoiceGrid>
@@ -225,7 +225,7 @@ const PartySetup = () => {
                             meta={option.id === "douze" ? scaleLabel(12) : option.categories.map(category => category.label).join(" · ") || undefined}
                             sub={option.blurb}
                             onClick={() => pickSheet(option.id)}
-                            onKeyDown={event => radioGroupKeys(event, index, sheetOptions.length, next => pickSheet(sheetOptions[next].id))}
+                            onKeyDown={event => radioGroupKeys(event, index, sheetOptions.length, null)}
                         />
                     ))}
                 </ChoiceGrid>

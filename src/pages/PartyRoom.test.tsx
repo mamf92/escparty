@@ -201,6 +201,8 @@ describe("PartyRoom", () => {
 
         await user.click(screen.getByRole("button", { name: "Next act" }));
         expect(screen.getByRole("spinbutton", { name: "Points for Norway" })).toBeInTheDocument();
+        // Focus stays in the page, on the new act's header.
+        expect(screen.getByText("🇳🇴 Norway")).toHaveFocus();
         expect(readPartyIdentity("ABBA")?.actId).toBe("no");
         await user.selectOptions(screen.getByLabelText("Jump to an act"), "3");
         // The last act's next step moves on to the ranking.
@@ -234,6 +236,7 @@ describe("PartyRoom", () => {
         renderRoom();
         await user.click(screen.getByRole("button", { name: "See your ranking" }));
         expect(screen.getByRole("tab", { name: "Ranking" })).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByRole("tab", { name: "Ranking" })).toHaveFocus();
     });
 
     it("moves between the tabs with the arrow keys, one tab stop for the tablist", async () => {

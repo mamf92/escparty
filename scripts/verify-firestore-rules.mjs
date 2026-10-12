@@ -142,15 +142,14 @@ report(
 // 2c. joinRoomWithFreeName's write: a transaction that reads the room and
 // writes the list back with one more player. Ten clients join at the same
 // moment, all wanting the name "Same"; each picks the first free "Same",
-// "Same 2", ... in its transaction. Firestore retries the losers against
-// the winners' result, so every guest must land, each under its own name.
-// (Not more than ten: with the host that is 11 players, and the emulator's
-// 1000-expression limit on rules stops a room at 12 players, see
-// allPlayersValid, whatever the join.)
-// Firestore doesn't retry these itself: the join rule compares the list's
-// size with the room's at commit time, so a transaction built on a stale
-// read is refused with permission-denied. joinRoomWithFreeName reads and
-// tries again on that, and so does this copy of it.
+// "Same 2", ... in its transaction. Firestore does not retry the losers
+// itself: the join rule compares the list's size with the room's at commit
+// time, so a transaction built on a stale read is refused with
+// permission-denied. The client (joinRoomWithFreeName, and this copy of it)
+// reads again and retries when the room's players changed, so every guest
+// must land, each under its own name.
+// (Ten joiners, not more: firestore.rules' allPlayersValid hits the
+// 1000-expression limit at the 13th player, so the room stops at 12.)
 const txJoiners = freshRoom("TXJ");
 await createRoom(txJoiners.roomRef, txJoiners.roomCode);
 const txJoinOnce = (clientDb, id) =>

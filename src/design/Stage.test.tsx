@@ -92,7 +92,7 @@ describe("Stage", () => {
     add.mockRestore();
   });
 
-  it("paints no ball and no spots where the screen declares a ball size of 0", () => {
+  it("paints no ball and no spots where the screen declares --esc-ball: none", () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
     const fillRect = vi.fn();
@@ -101,8 +101,12 @@ describe("Stage", () => {
       set: () => true,
     });
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((kind: string) => kind === "2d" ? ctx : null) as never);
-    // A measured width of 0 (jsdom measures every box as 0) is a screen with no ball.
-    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(0);
+    // The screen's explicit flag (stage.css, `.calm-noball`), not a measured 0.
+    const real = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation(((el: Element) => {
+      const style = real(el);
+      return new Proxy(style, { get: (t, k) => (k === "getPropertyValue" ? (n: string) => (n === "--esc-ball" ? " none" : t.getPropertyValue(n)) : Reflect.get(t, k)) });
+    }) as never);
 
     renderWithProviders(<Stage />);
     expect(fillRect).not.toHaveBeenCalled();

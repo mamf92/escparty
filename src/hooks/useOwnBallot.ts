@@ -77,17 +77,8 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         setBallot(next);
         if (code) storeBallot(code, next);
         // No ballot yet: write the empty one, which claims the name for the next guest.
-        if (!server || server.name !== identity.name || !same(server, next)) schedule(0);
+        if (!server || !same(server, next)) schedule(0);
     }, [serverBallots, identity, code, schedule]);
-
-    // A guest who had to give their name up (someone took it at the same
-    // moment) has the ballot rewritten under the new one.
-    const savedName = useRef(identity?.name);
-    useEffect(() => {
-        if (!identity || savedName.current === identity.name) return;
-        savedName.current = identity.name;
-        if (merged.current) schedule(0);
-    }, [identity, schedule]);
 
     const change = useCallback((update: (current: { ratings: Ratings; bonuses: Bonuses }) => { ratings: Ratings; bonuses: Bonuses }) => {
         const next = update(latest.current);

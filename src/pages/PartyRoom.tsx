@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -19,7 +19,7 @@ import {
     type Bonuses,
     type Ratings,
 } from "../utils/partyModel";
-import { availablePartyNames, displayNameOf, withDistinctNames } from "../utils/partyNames";
+import { availablePartyNames, withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
@@ -53,6 +53,16 @@ const PartyRoom = () => {
     const isHost = !!party && !!identity && identity.guestId === party.hostId;
     const tabKeys = isHost ? HOST_TABS : GUEST_TABS;
     const tabs = useRovingTabs(tabKeys, tab, setTab);
+    // Names with a number where two guests share one, worked out once for every list.
+    const distinct = useMemo(() => (ballots ? withDistinctNames(ballots) : undefined), [ballots]);
+    // "See your ranking" moves to the Ranking tab, and focus goes with it.
+    const focusRanking = useRef(false);
+    const rankingTabId = tabs.tab("ranking").id;
+    useEffect(() => {
+        if (tab !== "ranking" || !focusRanking.current) return;
+        focusRanking.current = false;
+        document.getElementById(rankingTabId)?.focus();
+    }, [tab, rankingTabId]);
 
     // The brand asks only once this tab is in a party that exists.
     useLeaveGuard(party && identity ? {
@@ -102,7 +112,7 @@ const PartyRoom = () => {
         <CalmPage
             className="calm-compact calm-noball"
             title={party.title}
-            subtitle={`Party ${party.code} · you're ${displayNameOf(ballots, identity.guestId, identity.name)}`}
+            subtitle={`Party ${party.code} · you're ${distinct?.find(ballot => ballot.guestId === identity.guestId)?.name ?? identity.name}`}
             footer={
                 <>
                     <CalmLink onClick={() => navigate(`/party/${party.code}/screen`)}>Open the big screen</CalmLink>
@@ -128,13 +138,16 @@ const PartyRoom = () => {
                         onMove={index => updateIdentity({ actId: party.acts[index].id })}
                         onRate={own.rate}
                         onBonus={own.toggleBonus}
-                        onDone={() => setTab("ranking")}
+                        onDone={() => {
+                            focusRanking.current = true;
+                            setTab("ranking");
+                        }}
                     />
                 )}
                 {tab === "ranking" && <MyRanking party={party} ballot={{ guestId: identity.guestId, name: identity.name, ...own.ballot }} />}
-                {tab === "room" && (ballots === undefined
+                {tab === "room" && (distinct === undefined
                     ? !error && <CalmNote role="status">Counting the ratings…</CalmNote>
-                    : <TheRoom party={party} ballots={ballots} me={identity.guestId} />)}
+                    : <TheRoom party={party} ballots={distinct} me={identity.guestId} />)}
                 {tab === "host" && isHost && <PartyHostTools party={party} ballots={ballots ?? []} />}
 
                 {tab !== "host" && (party.revealed || isHost) && (
@@ -206,6 +219,18 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus, onDone }: {
     onDone: () => void;
 }) => {
     const jumpId = useId();
+    const header = useRef<HTMLSpanElement>(null);
+    // After Previous/Next the pressed button may be gone (first and last act): focus the act header instead of losing it to the page.
+    const moved = useRef(false);
+    useEffect(() => {
+        if (!moved.current) return;
+        moved.current = false;
+        header.current?.focus({ preventScroll: true });
+    }, [actIndex]);
+    const move = (index: number) => {
+        moved.current = true;
+        onMove(index);
+    };
     const bonusHeading = useRef<HTMLHeadingElement>(null);
     const lastAct = actIndex === party.acts.length - 1;
     const toBonuses = () => {
@@ -225,7 +250,7 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus, onDone }: {
                 <Pane>
                     <Row>
                         <span className="calm-row">
-                            <span>{act.flag} {act.country}</span>
+                            <span ref={header} tabIndex={-1}>{act.flag} {act.country}</span>
                             <span className="calm-sub">{actIndex + 1} of {party.acts.length}</span>
                         </span>
                         <span className="calm-sub">{act.artist} · {act.song}</span>
@@ -253,14 +278,14 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus, onDone }: {
             <Ground>
                 <Pane className="party-actnav">
                     {actIndex > 0
-                        ? <Control onClick={() => onMove(actIndex - 1)}>Previous act</Control>
+                        ? <Control onClick={() => move(actIndex - 1)}>Previous act</Control>
                         : <span className="party-actnav-gap" aria-hidden="true" />}
                     {bonuses.length > 0
                         ? <Control onClick={toBonuses}>Bonus points <span aria-hidden="true">↓</span></Control>
                         : <span className="party-actnav-gap" aria-hidden="true" />}
                     {lastAct
                         ? <Control elevation="high" onClick={onDone}>See your ranking</Control>
-                        : <Control elevation="high" onClick={() => onMove(actIndex + 1)}>Next act</Control>}
+                        : <Control elevation="high" onClick={() => move(actIndex + 1)}>Next act</Control>}
                 </Pane>
             </Ground>
 
@@ -353,9 +378,8 @@ const MyRanking = ({ party, ballot }: { party: Party; ballot: Ballot }) => {
     );
 };
 
-const TheRoom = ({ party, ballots: raw, me }: { party: Party; ballots: Ballot[]; me: string }) => {
-    // Two guests with one name are told apart by a number in the lists.
-    const ballots = withDistinctNames(raw);
+/** `ballots` already have `withDistinctNames` applied. */
+const TheRoom = ({ party, ballots, me }: { party: Party; ballots: Ballot[]; me: string }) => {
     const standings = roomStandings(ballots, actIdsOf(party), party.template.categories, partyBonusList(party));
     const byId = new Map(party.acts.map(act => [act.id, act]));
     const leaderboard = hasResults(party) ? predictionLeaderboard(ballots, predictionsFor(party, ballots)) : [];

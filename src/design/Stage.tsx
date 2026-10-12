@@ -32,14 +32,18 @@ import { useDesignTheme } from "./useDesignTheme";
  * The ball's diameter and how far below the stage's top edge it hangs,
  * measured from `.esc-stage-ball`, which tokens.css and stage.css size
  * (`--esc-ball-size`, `--esc-ball-hang`): the same values the page
- * header leaves room for. 96px under 56px where it can't be measured.
+ * header leaves room for. 96px under 56px where it can't be measured; `--esc-ball: none` is
+ * a screen with no ball at all.
  */
 type BallBox = { size: number; hang: number };
 const measureBall = (box: HTMLElement | null): BallBox => {
+  // A screen with no ball (`calm-noball`, see stage.css) says so with `--esc-ball: none`.
+  if (box && typeof getComputedStyle === "function" && getComputedStyle(box).getPropertyValue("--esc-ball").trim() === "none") {
+    return { size: 0, hang: 0 };
+  }
   const size = box ? box.offsetWidth : Number.NaN;
-  if (!Number.isFinite(size)) return { size: 96, hang: 56 };
-  // A screen with no ball (`calm-noball`, see stage.css) sizes it to a real 0.
-  if (size <= 0) return { size: 0, hang: 0 };
+  // Not laid out (no box, or a width of 0): the usual ball.
+  if (!Number.isFinite(size) || size <= 0) return { size: 96, hang: 56 };
   return { size, hang: box!.offsetTop };
 };
 /** The longest step the ball turns in one frame, so it never jumps after a hidden tab. */
