@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, waitFor, within } from "../test/test-utils";
 import PartyRoom from "./PartyRoom";
 import { makeBallot, makeParty } from "../test/partyFixtures";
 import type { PartyData } from "../hooks/usePartyData";
@@ -62,7 +62,7 @@ describe("PartyRoom", () => {
         expect(screen.getByText("0 guests at the party.")).toHaveAttribute("aria-live", "polite");
     });
 
-    it("lets a new guest join by landing on a name on the reel, and claims it at once", async () => {
+    it("lets a new guest join by landing on a name on the reel, and claims it", async () => {
         const user = userEvent.setup();
         renderRoom();
         expect(screen.getByText(/the awards name who rated most alike/)).toBeInTheDocument();
@@ -73,12 +73,68 @@ describe("PartyRoom", () => {
         await user.click(screen.getByRole("button", { name: "Join the party" }));
         expect(screen.getByText(`Party ABBA · you're ${PARTY_NAMES[0]}`)).toBeInTheDocument();
         expect(readPartyIdentity("ABBA")).toMatchObject({ name: PARTY_NAMES[0], isHost: false });
-        expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", {
+        // useOwnBallot writes the empty ballot once the identity is set and none is on the server.
+        await waitFor(() => expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", {
             guestId: readPartyIdentity("ABBA")!.guestId,
             name: PARTY_NAMES[0],
             ratings: {},
             bonuses: {},
-        });
+        }));
+        expect(mocks.saveBallot).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps Join off, with a note, until the taken names have arrived", async () => {
+        const user = userEvent.setup();
+        mocks.data = { party: makeParty(), ballots: undefined, error: null, retry: vi.fn() };
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeDisabled();
+        expect(screen.getByText("Checking which names are taken…")).toHaveAttribute("role", "status");
+    });
+
+    it("lets a guest join with every name when the ballots can't be listened to", async () => {
+        const user = userEvent.setup();
+        mocks.data = { party: makeParty(), ballots: undefined, error: "The party couldn't be reached.", retry: vi.fn() };
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeEnabled();
+        expect(screen.queryByText("Checking which names are taken…")).not.toBeInTheDocument();
+    });
+
+    it("keeps its name against a newcomer when it has ratings, even with a later guest ID", () => {
+        savePartyIdentity("ABBA", { guestId: "g2", name: "Jedward", isHost: false });
+        mocks.data = {
+            party: makeParty(),
+            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [3])],
+            error: null,
+            retry: vi.fn(),
+        };
+        renderRoom();
+        expect(readPartyIdentity("ABBA")!.name).toBe("Jedward");
+    });
+
+    it("gives up the name to a rated guest even with an earlier guest ID", () => {
+        savePartyIdentity("ABBA", { guestId: "g1", name: "Jedward", isHost: false });
+        mocks.data = {
+            party: makeParty(),
+            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [3])],
+            error: null,
+            retry: vi.fn(),
+        };
+        renderRoom();
+        expect(readPartyIdentity("ABBA")!.name).not.toBe("Jedward");
+    });
+
+    it("never renames a guest who typed their own name in an older party", () => {
+        savePartyIdentity("ABBA", { guestId: "g2", name: "Grandma", isHost: false });
+        mocks.data = {
+            party: makeParty(),
+            ballots: [makeBallot("g1", "Grandma", [4]), makeBallot("g2", "Grandma", [])],
+            error: null,
+            retry: vi.fn(),
+        };
+        renderRoom();
+        expect(readPartyIdentity("ABBA")!.name).toBe("Grandma");
     });
 
     it("offers only the names nobody at the party has", async () => {

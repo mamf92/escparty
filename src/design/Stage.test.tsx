@@ -101,13 +101,8 @@ describe("Stage", () => {
       set: () => true,
     });
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((kind: string) => kind === "2d" ? ctx : null) as never);
-    const real = window.getComputedStyle.bind(window);
-    vi.spyOn(window, "getComputedStyle").mockImplementation(((el: Element) => {
-      const style = real(el);
-      return el.classList.contains("esc-stage-ball")
-        ? ({ getPropertyValue: (name: string) => (name === "--esc-ball-size" ? "0px" : style.getPropertyValue(name)) } as CSSStyleDeclaration)
-        : style;
-    }) as never);
+    // A measured width of 0 (jsdom measures every box as 0) is a screen with no ball.
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(0);
 
     renderWithProviders(<Stage />);
     expect(fillRect).not.toHaveBeenCalled();
@@ -123,6 +118,8 @@ describe("Stage", () => {
       set: () => true,
     });
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((kind: string) => kind === "2d" ? ctx : null) as never);
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(96);
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(56);
     // The old wire: a 2px strip down the stage's middle from its top edge.
     const wires = () => fillRect.mock.calls.filter(([x, y, w]) => x === 199 && y === 0 && w === 2);
 

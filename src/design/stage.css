@@ -99,12 +99,6 @@
   --esc-stage-clearance: var(--esc-space-3);
 }
 
-@supports (width: 1cqw) {
-  .esc-app:has(.calm-page.calm-noball) {
-    --esc-ball-size: 0px;
-  }
-}
-
 .esc-app .calm-compact .esc-title {
   font-size: var(--esc-text-heading);
 }

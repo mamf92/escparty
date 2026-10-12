@@ -36,10 +36,11 @@ import { useDesignTheme } from "./useDesignTheme";
  */
 type BallBox = { size: number; hang: number };
 const measureBall = (box: HTMLElement | null): BallBox => {
-  // A screen with no ball (`calm-noball`, see stage.css) declares a size of 0.
-  const declared = box ? getComputedStyle(box).getPropertyValue("--esc-ball-size").trim() : "";
-  if (declared !== "" && parseFloat(declared) === 0) return { size: 0, hang: 0 };
-  return { size: box?.offsetWidth || 96, hang: box?.offsetTop || 56 };
+  const size = box ? box.offsetWidth : Number.NaN;
+  if (!Number.isFinite(size)) return { size: 96, hang: 56 };
+  // A screen with no ball (`calm-noball`, see stage.css) sizes it to a real 0.
+  if (size <= 0) return { size: 0, hang: 0 };
+  return { size, hang: box!.offsetTop };
 };
 /** The longest step the ball turns in one frame, so it never jumps after a hidden tab. */
 export const MAX_STEP = 0.1;

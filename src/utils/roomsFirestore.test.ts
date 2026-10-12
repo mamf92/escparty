@@ -502,6 +502,7 @@ describe("joinRoomWithFreeName", () => {
                 return result;
             },
         );
+        mocks.getDoc.mockResolvedValue(snapshotOf(rooms[1]));
 
         const name = await joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL);
 
@@ -510,19 +511,62 @@ describe("joinRoomWithFreeName", () => {
     });
 
     it("gives up after repeatedly losing the race", async () => {
-        mocks.runTransaction.mockRejectedValue(
-            Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        let joined = 0;
+        // Every attempt sees one more player than the last, and is refused.
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                const players = Array.from({ length: joined + 1 }, (_, i) => player(`p-${i}`, `Name ${i}`));
+                await updateFunction({ get: async () => snapshotOf(roomWith({ players })), update: vi.fn() });
+                joined += 1;
+                mocks.getDoc.mockResolvedValue(snapshotOf(roomWith({
+                    players: Array.from({ length: joined + 1 }, (_, i) => player(`p-${i}`, `Name ${i}`)),
+                })));
+                throw denied;
+            },
         );
         vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => { fn(); return 0; }) as never);
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+        await expect(joinRoomWithFreeName("ABCD", "p-x", "Loreen", POOL)).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
         expect(mocks.runTransaction.mock.calls.length).toBeGreaterThan(1);
     });
 
+    it("reports a refusal at once when nobody else joined", async () => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        const room = roomWith();
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                await updateFunction({ get: async () => snapshotOf(room), update: vi.fn() });
+                throw denied;
+            },
+        );
+        mocks.getDoc.mockResolvedValue(snapshotOf(room));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+            "Failed to join room: Security rules prevented access",
+        );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a refusal at once when the room can't be read again", async () => {
+        const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                await updateFunction({ get: async () => snapshotOf(roomWith()), update: vi.fn() });
+                throw denied;
+            },
+        );
+        mocks.getDoc.mockRejectedValue(new Error("offline"));
+
+        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+            "Failed to join room: Security rules prevented access",
+        );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
+    });
+
     it("surfaces a rules rejection as a join failure", async () => {
-        vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => { fn(); return 0; }) as never);
         mocks.runTransaction.mockRejectedValue(
             Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
         );
@@ -530,6 +574,7 @@ describe("joinRoomWithFreeName", () => {
         await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
     });
 });
 

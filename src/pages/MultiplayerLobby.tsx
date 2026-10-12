@@ -11,32 +11,6 @@ const ESC_WINNERS = [
   "Loreen 🇸🇪", "Måneskin 🇮🇹", "Conchita Wurst 🕊️", "Alexander Rybak 🎻", "ABBA 🇸🇪", "Duncan Laurence 🎹", "Netta 🐔", "Dana International 🏳️‍🌈", "Céline Dion 🇨🇭", "Johnny Logan 🇮🇪", "Ruslana 🔥", "Lena 🇩🇪", "Lordi 👹", "Eleni Foureira 🔥", "Helena Paparizou 🇬🇷", "Marija Šerifović 🌈", "Emmelie de Forest 🎤", "Verka Serduchka 🌟", "Mahmood 🇮🇹", "Käärijä 💚", "Chanel 💃", "Barbara Pravi 🇫🇷", "Cornelia Jakobs 🌌", "Salvador Sobral 🕊️", "Noa Kirel 🦄", "Teya & Salena 🧪", "KEiiNO 🐺", "Benjamin Ingrosso 💫", "Subwoolfer 🚀", "Daði Freyr 🧔", "Rosa Linn 🧵", "Marco Mengoni 🎙️", "Gjon's Tears 😢", "Alessandra 👑", "Sam Ryder 🚀", "Go_A 🌿", "S10 🌧️", "Sergey Lazarev 💎", "Stefania 🐎", "Il Volo 🎶"
 ];
 
-// Helper function to find a unique player name
-const getUniquePlayerName = async (roomCode: string, namesList: string[]): Promise<string> => {
-  // Get the current room data
-  const room = await getRoom(roomCode);
-
-  if (!room) {
-    // If room doesn't exist, any name is fine
-    return namesList[Math.floor(Math.random() * namesList.length)];
-  }
-
-  // Get all names currently in use
-  const usedNames = room.players.map(player => player.name);
-
-  // Filter out names that are already used
-  const availableNames = namesList.filter(name => !usedNames.includes(name));
-
-  if (availableNames.length === 0) {
-    // If all names are taken, add a number suffix to a random name
-    const baseName = namesList[Math.floor(Math.random() * namesList.length)];
-    return `${baseName} #${Math.floor(Math.random() * 1000)}`;
-  }
-
-  // Return a random available name
-  return availableNames[Math.floor(Math.random() * availableNames.length)];
-};
-
 type Step = "choose" | "host" | "join";
 
 const NOT_FOUND_NOTE = "No game has that code. Check the four letters with the host and try again.";
@@ -249,7 +223,8 @@ const MultiplayerLobby = () => {
         playerName = before.name;
         joined = await joinRoom(code, playerId, playerName);
       } else {
-        const wanted = await getUniquePlayerName(code, ESC_WINNERS);
+        // joinRoomWithFreeName picks a free name inside its transaction.
+        const wanted = ESC_WINNERS[Math.floor(Math.random() * ESC_WINNERS.length)];
         const given = await joinRoomWithFreeName(code, playerId, wanted, ESC_WINNERS);
         playerName = given ?? wanted;
         joined = given !== null;

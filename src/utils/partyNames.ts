@@ -35,29 +35,52 @@ export const freePartyName = (takenNames: readonly string[]): string => {
     return `${base} ${n}`;
 };
 
+/** Whether a ballot has any rating in it (an empty one only claims a name). */
+export const hasRatings = (ratings: object | undefined): boolean => !!ratings && Object.keys(ratings).length > 0;
+
 /**
- * Whether this guest has to give their name up: another guest's ballot has
- * the same name (case and edge spaces ignored) and a guest ID that sorts
- * before this one's. Of two guests who took a name at the same moment,
- * exactly one is told to move, and both can work it out alone.
+ * Whether this guest has to give their name up. Only a guest who just
+ * joined (no ratings yet) with a name from the reel yields, and only to a
+ * ballot of the same name (case and edge spaces ignored) that has ratings,
+ * or has none either and a guest ID that sorts before this one's. So of two
+ * guests who took a name at the same moment exactly one moves (both can
+ * work it out alone), and nobody who has been rating, or who typed their
+ * own name in an older party, ever loses a name to a newcomer. Leftover
+ * clashes are numbered at display time (`distinctNames`).
  */
-export const nameClash = (ballots: readonly { guestId: string; name: string }[], me: { guestId: string; name: string }): boolean =>
-    ballots.some(ballot => ballot.guestId !== me.guestId && nameKey(ballot.name) === nameKey(me.name) && ballot.guestId < me.guestId);
+export const nameClash = (
+    ballots: readonly { guestId: string; name: string; ratings?: object }[],
+    me: { guestId: string; name: string; ratings?: object },
+): boolean => {
+    if (hasRatings(me.ratings)) return false;
+    if (!PARTY_NAMES.some(name => nameKey(name) === nameKey(me.name))) return false;
+    return ballots.some(ballot => ballot.guestId !== me.guestId
+        && nameKey(ballot.name) === nameKey(me.name)
+        && (hasRatings(ballot.ratings) || ballot.guestId < me.guestId));
+};
 
 /**
  * Names to show for a list of guests: a name shared by several (older
  * parties, or a clash not yet settled) gets " 2", " 3" in guest ID order,
- * so a list never has two of the same. Keyed by guest ID.
+ * so a list never has two of the same. A number never lands on a name
+ * another guest really has. Keyed by guest ID.
  */
 export const distinctNames = (entries: readonly { id: string; name: string }[]): Map<string, string> => {
     const sorted = [...entries].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    const seen = new Map<string, number>();
+    const used = new Set(sorted.map(entry => nameKey(entry.name)));
+    const seen = new Set<string>();
     const result = new Map<string, string>();
     for (const { id, name } of sorted) {
         const key = nameKey(name);
-        const count = (seen.get(key) ?? 0) + 1;
-        seen.set(key, count);
-        result.set(id, count === 1 ? name : `${name} ${count}`);
+        if (!seen.has(key)) {
+            seen.add(key);
+            result.set(id, name);
+            continue;
+        }
+        let n = 2;
+        while (used.has(nameKey(`${name} ${n}`))) n += 1;
+        used.add(nameKey(`${name} ${n}`));
+        result.set(id, `${name} ${n}`);
     }
     return result;
 };

@@ -18,7 +18,12 @@ vi.mock("../utils/partyFirestore", async (importOriginal) => ({
 const ShowLocation = () => <p>at {useLocation().pathname}</p>;
 const SystemBack = () => {
     const navigate = useNavigate();
-    return <button onClick={() => navigate(-1)}>System back</button>;
+    return (
+        <>
+            <button onClick={() => navigate(-1)}>System back</button>
+            <button onClick={() => navigate(1)}>System forward</button>
+        </>
+    );
 };
 const renderSetup = () =>
     renderWithProviders(
@@ -155,6 +160,19 @@ describe("PartySetup", () => {
         ]);
     });
 
+    it("won't show the summary by going forward while the own bonus has no name", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await reachStart(user);
+        await user.click(screen.getByRole("button", { name: "System back" }));
+        await user.click(screen.getByRole("button", { name: "System back" }));
+        step(3);
+        await user.click(screen.getByRole("switch", { name: /Add your own/ }));
+        await user.click(screen.getByRole("button", { name: "System forward" }));
+        step(3);
+        expect(screen.queryByRole("button", { name: "Start the party" })).not.toBeInTheDocument();
+    });
+
     it("ignores the own bonus's fields while it's off", async () => {
         const user = userEvent.setup();
         renderSetup();
@@ -205,8 +223,8 @@ describe("PartySetup", () => {
         expect(party.template.id).toBe("jury");
         expect(party.template.bonuses).toEqual([{ id: "wind", label: "Wind machine", points: 1 }]);
         expect(readPartyIdentity("ABBA")).toEqual({ guestId: party.hostId, name: PARTY_NAMES[0], isHost: true });
-        // The host's name is claimed at once, with an empty ballot.
-        expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", { guestId: party.hostId, name: PARTY_NAMES[0], ratings: {}, bonuses: {} });
+        // The host's empty ballot is written by the room when it opens, not here.
+        expect(mocks.saveBallot).not.toHaveBeenCalled();
     });
 
     it("sets up a semi with our own categories and no bonuses", async () => {

@@ -9,7 +9,7 @@ import { Control, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } f
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
 import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import { usePartyData } from "../hooks/usePartyData";
-import { saveBallot, type Party } from "../utils/partyFirestore";
+import type { Party } from "../utils/partyFirestore";
 import {
     actScore,
     ballotScores,
@@ -19,7 +19,7 @@ import {
     type Bonuses,
     type Ratings,
 } from "../utils/partyModel";
-import { availablePartyNames, freePartyName, nameClash, withDistinctNames } from "../utils/partyNames";
+import { availablePartyNames, freePartyName, hasRatings, nameClash, withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
@@ -61,7 +61,10 @@ const PartyRoom = () => {
     const settledName = useRef<string | null>(null);
     useEffect(() => {
         if (!code || !identity || !ballots || settledName.current === identity.name) return;
-        if (!nameClash(ballots, identity)) return;
+        // Ratings on the server or on this device both mean this guest has been here a while.
+        const serverRatings = ballots.find(ballot => ballot.guestId === identity.guestId)?.ratings;
+        const ratings = hasRatings(serverRatings) ? serverRatings : own.ballot.ratings;
+        if (!nameClash(ballots, { ...identity, ratings })) return;
         settledName.current = identity.name;
         const next = { ...identity, name: freePartyName(ballots.map(ballot => ballot.name)) };
         savePartyIdentity(code, next);
@@ -69,7 +72,7 @@ const PartyRoom = () => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setIdentity(next);
         setRenamed({ from: identity.name, to: next.name });
-    }, [ballots, identity, code]);
+    }, [ballots, identity, code, own.ballot.ratings]);
 
     // The brand asks only once this tab is in a party that exists.
     useLeaveGuard(party && identity ? {
@@ -98,12 +101,11 @@ const PartyRoom = () => {
             <JoinParty
                 party={party}
                 ballots={ballots}
+                ballotsFailed={!!error}
                 onJoin={next => {
+                    // useOwnBallot writes the empty ballot (which claims the name) once it sees none for this guest.
                     savePartyIdentity(party.code, next);
                     setIdentity(next);
-                    // Claim the name at once: an empty ballot, so the next guest sees it taken.
-                    saveBallot(party.code, { guestId: next.guestId, name: next.name, ratings: {}, bonuses: {} })
-                        .catch(failure => console.error("Couldn't claim the name yet, will retry:", failure));
                 }}
                 footer={back}
             />
@@ -171,10 +173,12 @@ const PartyRoom = () => {
     );
 };
 
-const JoinParty = ({ party, ballots, onJoin, footer }: {
+const JoinParty = ({ party, ballots, ballotsFailed, onJoin, footer }: {
     party: Party;
     /** Everyone already in the party, whose names are taken; undefined until they arrive. */
     ballots: Ballot[] | undefined;
+    /** The ballots listener errored: join anyway, with every name on the reel. */
+    ballotsFailed: boolean;
     onJoin: (identity: PartyIdentity) => void;
     footer: ReactNode;
 }) => {
@@ -182,6 +186,7 @@ const JoinParty = ({ party, ballots, onJoin, footer }: {
     const [spinning, setSpinning] = useState(false);
     // The names nobody has yet; the one landed on stays on the reel even if
     // someone takes it meanwhile (the clash is settled once in the party).
+    const checking = ballots === undefined && !ballotsFailed;
     const taken = (ballots ?? []).map(ballot => ballot.name);
     const takenKey = taken.join("\n");
     const names = useMemo(() => {
@@ -192,11 +197,12 @@ const JoinParty = ({ party, ballots, onJoin, footer }: {
         <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
             <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
             <NamePicker value={name} onChange={setName} onSpinningChange={setSpinning} names={names} />
+            {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
             <Ground>
                 <Pane>
                     <Control
                         elevation="high"
-                        disabled={name === null || spinning}
+                        disabled={name === null || spinning || checking}
                         onClick={() => name !== null && onJoin({ guestId: uuidv4(), name, isHost: false })}
                     >
                         Join the party

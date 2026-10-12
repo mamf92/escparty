@@ -43,15 +43,29 @@ describe("freePartyName", () => {
 });
 
 describe("nameClash", () => {
-    const me = { guestId: "b", name: "Lordi" };
+    const me = { guestId: "b", name: "Lordi", ratings: {} };
+    const rated = { a1: { c: 3 } };
 
-    it("is true when an earlier guest ID has the name, in any case", () => {
-        expect(nameClash([{ guestId: "a", name: " lordi " }], me)).toBe(true);
+    it("is true when an earlier guest ID with no ratings has the name, in any case", () => {
+        expect(nameClash([{ guestId: "a", name: " lordi ", ratings: {} }], me)).toBe(true);
     });
 
     it("is false when the other guest's ID sorts after, so exactly one gives up", () => {
-        expect(nameClash([{ guestId: "c", name: "Lordi" }], me)).toBe(false);
+        expect(nameClash([{ guestId: "c", name: "Lordi", ratings: {} }], me)).toBe(false);
         expect(nameClash([{ guestId: "b", name: "Lordi" }, { guestId: "a", name: "Netta" }], me)).toBe(false);
+    });
+
+    it("yields to a rated ballot whatever the guest IDs", () => {
+        expect(nameClash([{ guestId: "c", name: "Lordi", ratings: rated }], me)).toBe(true);
+    });
+
+    it("never yields once rating, even to an earlier ID", () => {
+        expect(nameClash([{ guestId: "a", name: "Lordi", ratings: rated }], { ...me, ratings: rated })).toBe(false);
+    });
+
+    it("never yields a name that is not from the reel", () => {
+        const own = { guestId: "b", name: "Grandma", ratings: {} };
+        expect(nameClash([{ guestId: "a", name: "Grandma", ratings: rated }], own)).toBe(false);
     });
 });
 
@@ -67,6 +81,19 @@ describe("distinctNames", () => {
         expect(names.get("b")).toBe("lordi 2");
         expect(names.get("c")).toBe("Lordi 3");
         expect(names.get("d")).toBe("Netta");
+    });
+});
+
+describe("distinctNames suffixes", () => {
+    it("skips a number another guest really has", () => {
+        const names = distinctNames([
+            { id: "a", name: "Loreen" },
+            { id: "b", name: "Loreen" },
+            { id: "c", name: "Loreen 2" },
+        ]);
+        expect(names.get("a")).toBe("Loreen");
+        expect(names.get("b")).toBe("Loreen 3");
+        expect(names.get("c")).toBe("Loreen 2");
     });
 });
 

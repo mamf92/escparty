@@ -5,7 +5,7 @@ import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { NamePicker } from "../components/NamePicker";
 import { Control, Field, Ground, Pane, Row } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
-import { PARTY_LIFETIME_DAYS, createParty, fetchContest, saveBallot } from "../utils/partyFirestore";
+import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
 import {
     BONUS_LIMITS,
     CATEGORY_LIMITS,
@@ -99,6 +99,7 @@ const PartySetup = () => {
     const reached = contestId === null ? 1
         : templateId === null || sheetProblems.length > 0 ? 2
         : !bonusesDone ? 3
+        : ownProblems.length > 0 ? 3
         : name === null ? 4
         : LAST;
     const step = Math.min(Math.max(Math.trunc(Number(params.get("step"))) || 1, 1), reached);
@@ -146,9 +147,7 @@ const PartySetup = () => {
                 showNames: true,
             });
             savePartyIdentity(code, { guestId: hostId, name, isHost: true });
-            // Claim the host's name at once: an empty ballot, so the first guest sees it taken.
-            await saveBallot(code, { guestId: hostId, name, ratings: {}, bonuses: {} })
-                .catch(failure => console.error("Couldn't claim the host's name yet, will retry:", failure));
+            // PartyRoom's useOwnBallot writes the host's empty ballot (the name claim) when it opens.
             navigate(`/party/${code}`);
         } catch (error) {
             console.error("Couldn't create the party:", error);

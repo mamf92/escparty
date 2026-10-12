@@ -672,9 +672,12 @@ export const joinRoomWithFreeName = async (
     }
 
     const roomRef = doc(db, "rooms", roomCode);
+    // How many players the latest attempt's transaction saw.
+    let seenPlayers: number | null = null;
     const attemptJoin = () => runTransaction(db, async (transaction) => {
         const roomDoc = await transaction.get(roomRef);
         const room = roomDoc.exists() ? (roomDoc.data() as Room) : null;
+        seenPlayers = room ? room.players.length : null;
         if (joinVerdict(room, playerId)) {
             return room!.players.find(p => p.id === playerId)!.name;
         }
@@ -712,7 +715,12 @@ export const joinRoomWithFreeName = async (
                 // of being retried by Firestore. Read again and decide again:
                 // a join that raced the start or a full room is then refused
                 // by joinVerdict, and every other race has a winner per round.
+                // A refusal that is no lost race (the room has the players
+                // the attempt saw, or can't be read) is the rules saying no
+                // and is reported at once.
                 if ((error as { code?: string }).code !== "permission-denied" || attempt >= JOIN_ATTEMPTS) throw error;
+                const latest = await getRoom(roomCode).catch(() => null);
+                if (!latest || seenPlayers === null || latest.players.length === seenPlayers) throw error;
                 await new Promise(resolve => setTimeout(resolve, Math.random() * 150));
             }
         }
