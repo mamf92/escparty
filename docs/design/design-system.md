@@ -50,7 +50,7 @@ same stage, with a disco ball hanging over it.
 
 | Material | Looks like | Means | Markup |
 | --- | --- | --- | --- |
-| **Stage** | Dark pink (`--esc-bg`), brightest under the ball | The background of every screen | `MobileFrame`, the big screen |
+| **Stage** | Berry pink (`--esc-bg`), brightest under the ball and light enough at its foot that a dark tile stands off it | The background of every screen | `MobileFrame`, the big screen |
 | **Card** | White, rounded 28px, a deep soft lift; dark ink | A form: anything holding a field | Automatic for a `Pane` with a `Field`; `<Pane className="is-card">` on purpose |
 | **Button** | White, lifted; dark ink, bold | An action | `<Control>` |
 | **Next step** | Black, in the display font, white ink | The one thing to do next on this screen | `<Control elevation="high">` |
@@ -83,7 +83,7 @@ land. Never set a text colour on a page.
 | | Calm | Sparkle |
 | --- | --- | --- |
 | Role | Default, accessible, the landing state | Opt-in party stage |
-| Stage | The dark pink gradient | Pink sequins (a WebGL shader), dimmed behind the content |
+| Stage | The berry pink gradient | Bright pink sequins (a WebGL shader) that set the dark tiles off |
 | Disco ball | Hangs still on every screen with no wire, in muted pinks; soft spots on the stage | White and light pink, turning slowly clockwise; brighter square spots in rows sweep the stage **right to left** with the ball |
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
 | Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wide soft glow that dims the sequins right behind each line |

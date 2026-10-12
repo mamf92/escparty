@@ -65,7 +65,7 @@ void main(){
       if(length(d)<.64 && -j>best){best=-j; bid=vec2(i,j); bd=d; found=1.;}
     }
   }
-  vec3 col=vec3(.14,.0,.08);
+  vec3 col=vec3(.34,.02,.2);
   if(found>.5){
     float k=h(bid); float rr=length(bd);
     vec2 tilt=(vec2(h(bid+1.7),h(bid+5.3))-.5)*.8+.22*vec2(sin(t*.8+k*6.28),cos(t*.65+k*9.1));
@@ -81,8 +81,9 @@ void main(){
     col*=mix(.6,1.,smoothstep(.04,.1,rr));
   }
   col=col/(1.+col*.4);
-  // Dimmed to a backdrop; stage text keeps its outline over a bright sequin.
-  gl_FragColor=vec4(pow(col,vec3(.95))*.62,1.);
+  // Bright enough to sparkle and to set the dark tiles off; stage text keeps
+  // its outline over a bright sequin.
+  gl_FragColor=vec4(pow(col,vec3(.9))*1.05,1.);
 }`;
 
 type Sequins = {
