@@ -14,7 +14,7 @@ vi.mock("../utils/roomsFirestore", () => ({
   createRoom: vi.fn(async () => undefined),
   setRoomDifficulty: vi.fn(async () => undefined),
   joinRoom: vi.fn(async () => true),
-  joinRoomWithFreeName: vi.fn(async (_code: string, _id: string, wanted: string) => wanted),
+  joinRoomWithFreeName: vi.fn(async (_code: string, _id: string, pool: readonly string[]) => pool[0]),
   getRoom: vi.fn(async () => null),
   generateRoomCode: () => "ABBA",
 }));
@@ -128,7 +128,7 @@ describe("MultiplayerLobby", () => {
     const user = userEvent.setup();
     renderLobby();
     await typeCode(user, "abba{Enter}");
-    expect(joinRoomWithFreeName).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String), expect.any(Array));
+    expect(joinRoomWithFreeName).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(Array));
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
   });
 
@@ -327,9 +327,9 @@ describe("MultiplayerLobby", () => {
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
     await vi.waitFor(() => expect(joinRoomWithFreeName).toHaveBeenCalled());
-    const [, id, wanted] = vi.mocked(joinRoomWithFreeName).mock.calls[0];
-    // The room may hand back another name than the one asked for.
-    const name = `${wanted} 2`;
+    const [, id] = vi.mocked(joinRoomWithFreeName).mock.calls[0];
+    // The room picks the name.
+    const name = "Loreen 2";
     unmount();
     await act(async () => finish(name));
     expect(localStorage.getItem("gameCode")).toBe("ABBA");
@@ -376,7 +376,7 @@ describe("MultiplayerLobby", () => {
     expect(screen.getByLabelText("Game code")).toHaveValue("ABBA");
     expect(await screen.findByText("at /lobby")).toBeInTheDocument();
     expect(joinRoomWithFreeName).toHaveBeenCalledTimes(1);
-    expect(joinRoomWithFreeName).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(String), expect.any(Array));
+    expect(joinRoomWithFreeName).toHaveBeenCalledWith("ABBA", expect.any(String), expect.any(Array));
   });
 
   it("offers the rejoin choice for a code from the Join screen this device was in", async () => {

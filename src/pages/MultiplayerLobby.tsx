@@ -217,20 +217,15 @@ const MultiplayerLobby = () => {
       // and the room has the last word: it joins in a transaction and
       // answers with the name this player really got, which differs when
       // someone took the wanted one at the same moment.
-      let playerName: string;
-      let joined: boolean;
+      let playerName: string | null;
       if (before) {
-        playerName = before.name;
-        joined = await joinRoom(code, playerId, playerName);
+        playerName = (await joinRoom(code, playerId, before.name)) ? before.name : null;
       } else {
         // joinRoomWithFreeName picks a free name inside its transaction.
-        const wanted = ESC_WINNERS[Math.floor(Math.random() * ESC_WINNERS.length)];
-        const given = await joinRoomWithFreeName(code, playerId, wanted, ESC_WINNERS);
-        playerName = given ?? wanted;
-        joined = given !== null;
+        playerName = await joinRoomWithFreeName(code, playerId, ESC_WINNERS);
       }
 
-      if (joined) {
+      if (playerName !== null) {
         // Saved even if the page was left meanwhile: the player is in the
         // room now, and this device can only rejoin as them with it (#65).
         localStorage.setItem("playerId", playerId);

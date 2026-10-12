@@ -1,4 +1,4 @@
-import { freeNames, nameKey } from "./freeName";
+import { freeNames, nameKey, pickFreeName } from "./freeName";
 
 /**
  * The Eurovision legends a guest becomes at a scoreboard party, so the
@@ -16,10 +16,15 @@ export const PARTY_NAMES = [
 
 export const randomPartyName = (): string => PARTY_NAMES[Math.floor(Math.random() * PARTY_NAMES.length)];
 
-/** The participant names nobody has taken; every name if all are taken (a suffix sorts that out later). */
+/**
+ * The participant names nobody has taken. When every name is taken, each
+ * name's first free numbered variant (" 2", " 3"...), so a newcomer is never
+ * offered a name a guest already has.
+ */
 export const availablePartyNames = (takenNames: readonly string[]): string[] => {
     const free = freeNames(takenNames, PARTY_NAMES);
-    return free.length > 0 ? free : [...PARTY_NAMES];
+    // With no free name in the pool, pickFreeName numbers the wanted one.
+    return free.length > 0 ? free : PARTY_NAMES.map(name => pickFreeName(name, takenNames, []));
 };
 
 /**

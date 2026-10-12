@@ -7,6 +7,7 @@ export type SaveState = "saved" | "saving" | "offline";
 
 const SAVE_DELAY_MS = 400;
 const RETRY_MS = 5_000;
+const NO_BALLOTS: Ballot[] = [];
 
 const same = (a: { ratings: Ratings; bonuses: Bonuses }, b: { ratings: Ratings; bonuses: Bonuses }) =>
     JSON.stringify(a.ratings) === JSON.stringify(b.ratings) && JSON.stringify(a.bonuses) === JSON.stringify(b.bonuses);
@@ -17,9 +18,11 @@ const same = (a: { ratings: Ratings; bonuses: Bonuses }, b: { ratings: Ratings; 
  * (offline, a sleeping phone) is retried until it lands, and the device
  * copy means a reload in between loses nothing. When the server's copy
  * first arrives the two are merged, so ratings from before a reload and
- * ratings that never reached the server both survive.
+ * ratings that never reached the server both survive. If the ballots
+ * listener failed, no server copy is known, and the device's ballot (empty
+ * for a new guest, which claims the name) is written once.
  */
-export const useOwnBallot = (code: string | undefined, identity: PartyIdentity | null, serverBallots: Ballot[] | undefined) => {
+export const useOwnBallot = (code: string | undefined, identity: PartyIdentity | null, serverBallots: Ballot[] | undefined, ballotsFailed = false) => {
     const [ballot, setBallot] = useState<{ ratings: Ratings; bonuses: Bonuses }>(() => {
         const stored = code ? readStoredBallot(code) : null;
         return { ratings: stored?.ratings ?? {}, bonuses: stored?.bonuses ?? {} };
@@ -67,18 +70,20 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         void saveNow.current(true);
     }, []);
 
-    // Merge with the server's copy once, when it first arrives.
+    // Merge with the server's copy once, when it first arrives (or, when the
+    // listener failed, as if it had arrived with none of this guest's).
+    const known = serverBallots ?? (ballotsFailed ? NO_BALLOTS : undefined);
     useEffect(() => {
-        if (merged.current || !serverBallots || !identity) return;
+        if (merged.current || !known || !identity) return;
         merged.current = true;
-        const server = serverBallots.find(entry => entry.guestId === identity.guestId) ?? null;
+        const server = known.find(entry => entry.guestId === identity.guestId) ?? null;
         const next = mergeBallots(server, latest.current);
         latest.current = next;
         setBallot(next);
         if (code) storeBallot(code, next);
         // No ballot yet: write the empty one, which claims the name for the next guest.
         if (!server || !same(server, next)) schedule(0);
-    }, [serverBallots, identity, code, schedule]);
+    }, [known, identity, code, schedule]);
 
     const change = useCallback((update: (current: { ratings: Ratings; bonuses: Bonuses }) => { ratings: Ratings; bonuses: Bonuses }) => {
         const next = update(latest.current);

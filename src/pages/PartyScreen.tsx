@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toDataURL } from "qrcode";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -38,6 +38,8 @@ const PartyScreen = () => {
         };
     }, [link]);
 
+    const all = useMemo(() => withDistinctNames(ballots ?? []), [ballots]);
+
     const back = <CalmLink onClick={() => navigate(code ? `/party/${code}` : "/party")}>Back to my phone view</CalmLink>;
 
     if (party === undefined) {
@@ -56,7 +58,6 @@ const PartyScreen = () => {
         );
     }
 
-    const all = withDistinctNames(ballots ?? []);
     const standings = roomStandings(all, actIdsOf(party), party.template.categories, partyBonusList(party));
     const byId = new Map(party.acts.map(act => [act.id, act]));
     const leaderboard = party.showNames && hasResults(party) ? predictionLeaderboard(all, predictionsFor(party, all)).slice(0, 3) : [];

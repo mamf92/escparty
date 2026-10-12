@@ -428,7 +428,7 @@ describe("joinRoomWithFreeName", () => {
     it("joins in a transaction under the wanted name when it is free", async () => {
         const update = givenTransactionSees(roomWith());
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBe("Loreen");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Loreen");
 
         expect(mocks.updateDoc).not.toHaveBeenCalled();
         expect(update).toHaveBeenCalledWith(refFor("ABCD"), {
@@ -442,7 +442,7 @@ describe("joinRoomWithFreeName", () => {
     it("gives another name from the pool when the wanted one is taken", async () => {
         const update = givenTransactionSees(roomWith({ players: [player("host-1", "Loreen")] }));
 
-        const name = await joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL);
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen");
 
         expect(["Netta", "Lordi"]).toContain(name);
         const written = update.mock.calls[0][1].players as Player[];
@@ -454,28 +454,28 @@ describe("joinRoomWithFreeName", () => {
             players: [player("a", "Loreen"), player("b", "Netta"), player("c", "Lordi"), player("d", "Loreen 2")],
         }));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBe("Loreen 3");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Loreen 3");
         expect(update).toHaveBeenCalledTimes(1);
     });
 
     it("returns the existing name for a player who is already in, without writing", async () => {
         const update = givenTransactionSees(roomWith({ players: [player("p-2", "Netta")], started: true }));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBe("Netta");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Netta");
         expect(update).not.toHaveBeenCalled();
     });
 
     it("answers null for a room that doesn't exist", async () => {
         const update = givenTransactionSees(null);
 
-        await expect(joinRoomWithFreeName("ZZZZ", "p-2", "Loreen", POOL)).resolves.toBeNull();
+        await expect(joinRoomWithFreeName("ZZZZ", "p-2", POOL, "Loreen")).resolves.toBeNull();
         expect(update).not.toHaveBeenCalled();
     });
 
     it("answers null once the game has started", async () => {
         const update = givenTransactionSees(roomWith({ started: true }));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBeNull();
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBeNull();
         expect(update).not.toHaveBeenCalled();
     });
 
@@ -483,7 +483,7 @@ describe("joinRoomWithFreeName", () => {
         const players = Array.from({ length: MAX_PLAYERS }, (_, i) => player(`p-${i}`, `Name ${i}`));
         givenTransactionSees(roomWith({ players }));
 
-        const error = await joinRoomWithFreeName("ABCD", "p-new", "Loreen", POOL).catch((e: unknown) => e) as Error;
+        const error = await joinRoomWithFreeName("ABCD", "p-new", POOL, "Loreen").catch((e: unknown) => e) as Error;
 
         expect(error.message).toBe(`Failed to join room: The room is full (${MAX_PLAYERS} players)`);
         expect(error.cause).toBeInstanceOf(JoinRejected);
@@ -504,7 +504,7 @@ describe("joinRoomWithFreeName", () => {
         );
         mocks.getDoc.mockResolvedValue(snapshotOf(rooms[1]));
 
-        const name = await joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL);
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen");
 
         expect(mocks.runTransaction).toHaveBeenCalledTimes(2);
         expect(["Netta", "Lordi"]).toContain(name);
@@ -524,7 +524,7 @@ describe("joinRoomWithFreeName", () => {
     it("answers null when the host started the game between the read and the commit", async () => {
         deniedAfterSeeing(roomWith(), roomWith({ started: true }));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBeNull();
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBeNull();
         expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
     });
 
@@ -532,7 +532,7 @@ describe("joinRoomWithFreeName", () => {
         const players = Array.from({ length: MAX_PLAYERS }, (_, i) => player(`q-${i}`, `Name ${i}`));
         deniedAfterSeeing(roomWith(), roomWith({ players }));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
             `Failed to join room: The room is full (${MAX_PLAYERS} players)`,
         );
     });
@@ -540,13 +540,13 @@ describe("joinRoomWithFreeName", () => {
     it("keeps the name of a player who turns out to be in already", async () => {
         deniedAfterSeeing(roomWith(), roomWith({ players: [player("p-2", "Netta")] }));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBe("Netta");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Netta");
     });
 
     it("answers null when the room has been deleted meanwhile", async () => {
         deniedAfterSeeing(roomWith(), null);
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBeNull();
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBeNull();
     });
 
     it("retries when one player joined and another left, the count staying the same", async () => {
@@ -564,14 +564,14 @@ describe("joinRoomWithFreeName", () => {
         );
         mocks.getDoc.mockResolvedValue(snapshotOf(latest));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).resolves.toBe("Loreen");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).resolves.toBe("Loreen");
         expect(mocks.runTransaction).toHaveBeenCalledTimes(2);
     });
 
     it("reports a rules failure when the same players are in", async () => {
         deniedAfterSeeing(roomWith(), roomWith());
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
         expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
@@ -582,10 +582,35 @@ describe("joinRoomWithFreeName", () => {
         deniedAfterSeeing(roomWith(), roomWith({ players: [player("host-1", "Martin"), player("p-3", "Netta")] }));
         vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => { fn(); return 0; }) as never);
 
-        await expect(joinRoomWithFreeName("ABCD", "p-x", "Loreen", POOL)).rejects.toThrow(
+        await expect(joinRoomWithFreeName("ABCD", "p-x", POOL, "Loreen")).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
         expect(mocks.runTransaction).toHaveBeenCalledTimes(MAX_PLAYERS + 8);
+    });
+
+    it.each(["aborted", "failed-precondition"])("runs again after %s contention when someone else joined", async (code) => {
+        const contended = Object.assign(new Error("Too much contention"), { code });
+        const rooms = [roomWith(), roomWith({ players: [player("host-1", "Martin"), player("p-3", "Loreen")] })];
+        mocks.runTransaction.mockImplementation(
+            async (_db: unknown, updateFunction: (transaction: FakeTransaction) => Promise<unknown>) => {
+                const room = rooms.shift()!;
+                const result = await updateFunction({ get: async () => snapshotOf(room), update: vi.fn() });
+                if (rooms.length > 0) throw contended;
+                return result;
+            },
+        );
+        mocks.getDoc.mockResolvedValue(snapshotOf(rooms[1]));
+
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen");
+
+        expect(mocks.runTransaction).toHaveBeenCalledTimes(2);
+        expect(name).not.toBe("Loreen");
+    });
+
+    it("picks the wanted name from the pool when none is given", async () => {
+        givenTransactionSees(roomWith());
+        const name = await joinRoomWithFreeName("ABCD", "p-2", POOL);
+        expect(POOL).toContain(name);
     });
 
     it("reports a refusal at once when nobody else joined", async () => {
@@ -599,7 +624,7 @@ describe("joinRoomWithFreeName", () => {
         );
         mocks.getDoc.mockResolvedValue(snapshotOf(room));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
         expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
@@ -615,7 +640,7 @@ describe("joinRoomWithFreeName", () => {
         );
         mocks.getDoc.mockRejectedValue(new Error("offline"));
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
         expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
@@ -626,7 +651,7 @@ describe("joinRoomWithFreeName", () => {
             Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" }),
         );
 
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Loreen", POOL)).rejects.toThrow(
+        await expect(joinRoomWithFreeName("ABCD", "p-2", POOL, "Loreen")).rejects.toThrow(
             "Failed to join room: Security rules prevented access",
         );
         expect(mocks.runTransaction).toHaveBeenCalledTimes(1);
@@ -1066,7 +1091,7 @@ describe("when Firebase never initialized", () => {
             "Firebase not initialized",
         );
         await expect(joinRoom("ABCD", "p-2", "Ida")).rejects.toThrow("Firebase not initialized");
-        await expect(joinRoomWithFreeName("ABCD", "p-2", "Ida", ["Ida"])).rejects.toThrow("Firebase not initialized");
+        await expect(joinRoomWithFreeName("ABCD", "p-2", ["Ida"], "Ida")).rejects.toThrow("Firebase not initialized");
         await expect(setRoomDifficulty("ABCD", "easy")).rejects.toThrow(
             "Firebase not initialized",
         );

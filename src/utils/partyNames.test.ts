@@ -21,8 +21,11 @@ describe("availablePartyNames", () => {
         expect(free).toHaveLength(PARTY_NAMES.length - 2);
     });
 
-    it("offers every name when all are taken", () => {
-        expect(availablePartyNames(PARTY_NAMES)).toEqual(PARTY_NAMES);
+    it("offers each name's first free numbered variant when all are taken", () => {
+        expect(availablePartyNames(PARTY_NAMES)).toEqual(PARTY_NAMES.map(name => `${name} 2`));
+        const names = availablePartyNames([...PARTY_NAMES, "loreen 2"]);
+        expect(names[0]).toBe("Loreen 3");
+        expect(names[1]).toBe("Käärijä 2");
     });
 });
 

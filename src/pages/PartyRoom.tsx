@@ -46,7 +46,7 @@ const PartyRoom = () => {
     const code = useParams().code?.toUpperCase();
     const { party, ballots, error, retry } = usePartyData(code);
     const [identity, setIdentity] = useState<PartyIdentity | null>(() => (code ? readPartyIdentity(code) : null));
-    const own = useOwnBallot(code, identity, ballots);
+    const own = useOwnBallot(code, identity, ballots, !!error);
     const [tab, setTab] = useState<Tab>("rate");
     // Before the early returns, as hooks must be; the host's tab only once
     // the party and who you are are known.

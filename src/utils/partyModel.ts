@@ -110,7 +110,7 @@ export const sanitiseBonuses = (value: unknown): BonusCategory[] | undefined => 
         if (kept.length >= BONUS_LIMITS.maxCount) break;
         if (!entry || typeof entry.id !== "string" || typeof entry.label !== "string" || typeof entry.points !== "number") continue;
         const label = entry.label.trim();
-        if (!entry.id || seen.has(entry.id) || !label || label.length > BONUS_LIMITS.maxLabel) continue;
+        if (!entry.id || seen.has(entry.id)) continue;
         if (bonusProblems({ label, points: entry.points }).length > 0) continue;
         seen.add(entry.id);
         kept.push({ id: entry.id, label, points: entry.points });

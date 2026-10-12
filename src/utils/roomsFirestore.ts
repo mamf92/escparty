@@ -654,7 +654,7 @@ const JOIN_ATTEMPTS = MAX_PLAYERS + 8;
  * Join a room under a name nobody in it has. The room is read and the player
  * appended in one transaction, and a join that loses a race is run again
  * from a fresh read (see the loop), so guests joining at the same moment
- * serialize and each sees the names already taken. If `wantedName` is free it is used; otherwise a random unused name
+ * serialize and each sees the names already taken. If `wantedName` (a random pick from `namePool` when left out) is free it is used; otherwise a random unused name
  * from `namePool`, else the wanted name with " 2", " 3" and so on. A player
  * already in the room (the same ID) keeps their name.
  *
@@ -665,8 +665,8 @@ const JOIN_ATTEMPTS = MAX_PLAYERS + 8;
 export const joinRoomWithFreeName = async (
     roomCode: string,
     playerId: string,
-    wantedName: string,
     namePool: readonly string[],
+    wantedName: string = namePool[Math.floor(Math.random() * namePool.length)],
 ): Promise<string | null> => {
     if (!checkFirebaseInitialization()) {
         throw new Error("Firebase not initialized");
@@ -708,7 +708,11 @@ export const joinRoomWithFreeName = async (
                 // A refusal that is no lost race (the room has the same players
                 // the attempt saw, or can't be read) is the rules saying no
                 // and is reported at once.
-                if ((error as { code?: string }).code !== "permission-denied" || attempt >= JOIN_ATTEMPTS) throw error;
+                // Contention that outlasts the SDK's own transaction retries
+                // (aborted, failed-precondition) is a lost race as well.
+                const code = (error as { code?: string }).code;
+                const lostRace = code === "permission-denied" || code === "aborted" || code === "failed-precondition";
+                if (!lostRace || attempt >= JOIN_ATTEMPTS) throw error;
                 const latest = await getRoom(roomCode).catch(() => undefined);
                 const seen = seenPlayers as Set<string> | null; // set by the attempt above
                 if (latest === undefined || seen === null) throw error;

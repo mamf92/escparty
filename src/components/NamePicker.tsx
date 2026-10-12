@@ -5,6 +5,9 @@ import { PARTY_NAMES } from "../utils/partyNames";
 const SWIPE_STEP_PX = 36;
 const WHEEL_GAP_MS = 120;
 
+/** `index` wrapped into 0..count-1, also for negative numbers. */
+const wrapIndex = (index: number, count: number) => ((index % count) + count) % count;
+
 const prefersReducedMotion = () =>
     typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -48,7 +51,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
 
     useEffect(() => () => clearTimeout(timer.current), []);
 
-    const wrap = (index: number) => ((index % count) + count) % count;
+    const wrap = (index: number) => wrapIndex(index, count);
 
     useEffect(() => { onSpinningChange?.(isSpinning); }, [isSpinning, onSpinningChange]);
 
@@ -77,9 +80,9 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 setSpinning(null);
                 setFrozen(null);
                 // If the landed name was taken meanwhile, land on the nearest one still offered.
-                const here = ((at % spun.length) + spun.length) % spun.length;
+                const here = wrapIndex(at, spun.length);
                 for (let offset = 0; offset < spun.length; offset += 1) {
-                    const candidate = spun[(here + offset) % spun.length];
+                    const candidate = spun[wrapIndex(here + offset, spun.length)];
                     if (latestNames.current.includes(candidate)) {
                         onChange(candidate);
                         break;
@@ -87,7 +90,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 }
                 return;
             }
-            setSpinning(((at % spun.length) + spun.length) % spun.length);
+            setSpinning(wrapIndex(at, spun.length));
             // Slows down towards the end, like a reel running out of spin.
             timer.current = setTimeout(() => tick(done + 1, at + 1), 50 + (done / total) ** 2 * 260);
         };

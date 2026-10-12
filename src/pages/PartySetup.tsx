@@ -191,7 +191,7 @@ const PartySetup = () => {
                         tabIndex={radioTabIndex(index, contestIndex >= 0 ? contestIndex : null)}
                         chosen={contestId === entry.id}
                         tag={new Date(`${entry.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
-                        title={entry.title.replace(/^Burgas 2027 · /, "")}
+                        title={entry.title.split(" · ").pop()}
                         meta={`${entry.acts.length} acts · ${entry.kind === "semi" ? `${entry.qualifiers} go through` : "every act ranked"}`}
                         onClick={() => pickContest(entry.id)}
                         onKeyDown={event => radioGroupKeys(event, index, CONTESTS_2027.length, null)}
@@ -222,7 +222,7 @@ const PartySetup = () => {
                             chosen={templateId === option.id}
                             tag={option.categories.length === 0 ? `Up to ${CATEGORY_LIMITS.max}` : `${option.categories.length} ${option.categories.length === 1 ? "category" : "categories"}`}
                             title={option.name}
-                            meta={option.id === "douze" ? scaleLabel(12) : option.categories.map(category => category.label).join(" · ") || undefined}
+                            meta={option.categories.length === 1 ? scaleLabel(option.categories[0].max) : option.categories.map(category => category.label).join(" · ") || undefined}
                             sub={option.blurb}
                             onClick={() => pickSheet(option.id)}
                             onKeyDown={event => radioGroupKeys(event, index, sheetOptions.length, null)}
