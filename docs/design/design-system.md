@@ -55,6 +55,7 @@ same stage, with a disco ball hanging over it.
 | **Button** | White, lifted; dark ink, bold | An action | `<Control>` |
 | **Next step** | Black, in the display font, white ink | The one thing to do next on this screen | `<Control elevation="high">` |
 | **Tile** | Solid-reading dark wine (`--esc-tile`, 90% opaque), lighter and pinker than the black next step, white ink | A choice (toggle, radio, tab, option, checkbox), or a row of information | A `Control` with `aria-pressed` or a choice `role`; `<Row>` |
+| **Badge** | A dark tile with a large display-font value | A code or number to read from afar | `<Badge>` |
 | **Proud row** | A white row among the tiles | First place, your own row, the right answer | `<Row elevation="high">` |
 | **Sunk** | A darker, pressed tile | The bottom of a ladder, a wrong pick | `elevation="low"` |
 | **Chosen** | Hot pink (`--esc-accent`), white ink, pressed in | What is picked | `chosen` → `.is-chosen` + `aria-pressed` |
@@ -249,6 +250,14 @@ list pane. Its elevation carries rank: `"high"` is the white proud row
 (first place, your own row), `"rest"` the default tile, `"low"` a sunk
 tile (the bottom). A row may be `is-chosen` only to show the viewer's own
 pick, in the accent.
+
+**Badge** (`<Badge label="Game code" value="ABBA" />`, `.esc-badge`).
+A number or code worth reading from across the room: a dark tile like a
+Row, the optional label small above, the value large in the display font.
+Information, not a control: no pointer, hover, press or tab stop. A
+screen reader hears one line ("Game code A B B A", spelled out with
+`spell`); `selectable` lets the value be copied. Reuse it for big numbers
+(points, a score at a break).
 
 **Field** (`<Field>`, `.lycra-field`). A blush well pressed into a white
 card (its pane becomes the card). Always has a visible `.calm-label`, in

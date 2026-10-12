@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanCode, codeFromScan, findGame } from "./joinCode";
+import { cleanCode, codeFromScan, findGame, joinLink } from "./joinCode";
 import { getRoom, type Room } from "./roomsFirestore";
 import { partyExists } from "./partyFirestore";
 
@@ -62,5 +62,13 @@ describe("findGame", () => {
     expect(await findGame("ABBA")).toBe("party");
     localStorage.setItem("gameCode", "ABBA");
     expect(await findGame("ABBA")).toBe("quiz");
+  });
+});
+
+describe("joinLink", () => {
+  it("is this site's hash route for the code, and scans back to it", () => {
+    const link = joinLink("ABBA");
+    expect(link).toBe(`${window.location.origin}${window.location.pathname}#/join/ABBA`);
+    expect(codeFromScan(link)).toBe("ABBA");
   });
 });

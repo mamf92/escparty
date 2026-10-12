@@ -1,7 +1,10 @@
+import styled from "styled-components";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { Control, Ground, Pane, Row } from "../design";
+import { Badge, Control, Ground, Pane, Row } from "../design";
+import { ConfirmLeave } from "../components/ConfirmLeave";
+import { QrFullScreen } from "../components/QrFullScreen";
 import { listenToRoom, QuizPickRefused, removePlayerFromRoom, Room, setPlayerReady, startGame } from "../utils/roomsFirestore";
 import { observerRouteState, playingPlayers, shouldObserve } from "../utils/roomRoles";
 import { quizCardsFor, setRoomQuiz } from "../utils/quizCatalog";
@@ -24,6 +27,15 @@ const readIdentity = (): Identity | null => {
     return gameCode && playerId && playerName ? { gameCode, playerId, playerName } : null;
 };
 
+/** The code badge and the QR button side by side, wrapping at a narrow width. */
+const CodeRow = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--esc-space-3);
+`;
+
 /**
  * The waiting room before a multiplayer quiz, the green room (#65). Guests
  * say when they're ready; the host picks the quiz, can take out a player
@@ -43,6 +55,11 @@ const Lobby = () => {
     // has no quiz (another tab may have picked one first).
     const [pickRefused, setPickRefused] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
+    // The host is asked before leaving a room that hasn't started; the QR code can fill the screen.
+    const [askingLeave, setAskingLeave] = useState(false);
+    const [showingQr, setShowingQr] = useState(false);
+    const qrButton = useRef<HTMLButtonElement>(null);
+    const leaveLink = useRef<HTMLButtonElement>(null);
     const roomQuizTitle = useQuizTitle(room?.difficulty);
     // This device's saved quizzes, offered alongside the premade ones.
     const [myQuizzes] = useState(listMyQuizzes);
@@ -102,11 +119,14 @@ const Lobby = () => {
     // The brand asks while this tab is in the room, and leaves it the same
     // way as the footer link, so a guest doesn't linger in the start gate.
     const inRoom = !!identity && !!room && room.players.some(p => p.id === identity.playerId);
+    const hostWaiting = inRoom && room.hostId === identity.playerId && !room.started;
     useLeaveGuard(inRoom ? {
-        message: "Go back to ESCParty? You'll leave the waiting room.",
+        message: hostWaiting
+            ? "Go back to ESCParty? You're the host. If you leave, this game can't start, and everyone waiting will need a new code."
+            : "Go back to ESCParty? You'll leave the waiting room.",
         onLeave: () => void leaveRoom("/"),
     } : null);
-    const leave = <CalmLink type="button" onClick={() => void leaveRoom()}>Leave the waiting room</CalmLink>;
+    const leave = <CalmLink ref={leaveLink} type="button" onClick={() => void leaveRoom()}>Leave the waiting room</CalmLink>;
     /** The footer's way back from a waiting room this tab isn't in. */
     const backToMultiplayer = <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Back to join or host</CalmLink>;
     /** The way out of a waiting room that can't go on. */
@@ -257,10 +277,33 @@ const Lobby = () => {
     return (
         <CalmPage
             title="The green room"
-            subtitle={<>Game code <strong className="esc-selectable">{gameCode}</strong> · you are {me.name}</>}
-            footer={leave}
+            subtitle={`You are ${me.name}`}
+            footer={isHost && !room.started ? (
+                askingLeave ? (
+                    <ConfirmLeave
+                        prompt="You're the host. If you leave, this game can't start, and everyone waiting will need a new code."
+                        stayLabel="Stay here"
+                        leaveLabel="Leave the room"
+                        onLeave={() => void leaveRoom()}
+                        onStay={() => { setAskingLeave(false); setTimeout(() => leaveLink.current?.focus()); }}
+                    />
+                ) : (
+                    <CalmLink ref={leaveLink} type="button" onClick={() => setAskingLeave(true)}>Leave the waiting room</CalmLink>
+                )
+            ) : leave}
             actions={actions}
         >
+            <CodeRow>
+                <Badge label="Game code" value={gameCode} spell selectable />
+                <Control ref={qrButton} onClick={() => setShowingQr(true)}>Show QR code</Control>
+            </CodeRow>
+            {showingQr && (
+                <QrFullScreen
+                    code={gameCode}
+                    onClose={() => { setShowingQr(false); setTimeout(() => qrButton.current?.focus()); }}
+                />
+            )}
+
             {isHost && !room.difficulty ? (
                 <>
                     <h2 className="esc-section" id="lobby-pick-quiz">Pick a quiz</h2>
