@@ -23,7 +23,7 @@ and opens the quiz library), and the scoreboard party's `PartyHome.tsx`
 (`/party`), `PartySetup.tsx` (`/party/new`), `PartyRoom.tsx`
 (`/party/:code`), `PartyScreen.tsx` (`/party/:code/screen`) and
 `PartyAwards.tsx` (`/party/:code/awards`); see
-`docs/agent/scoreboard-party.md`. Routed from `src/App.tsx`, wrapped in
+`docs/agent/scoreboard-party.md`. `/join/:code` (also `JoinParty.tsx`) is the link the green room's QR code carries. Routed from `src/App.tsx`, wrapped in
 `MobileFrame` (see below) except the standalone `/fabric-ui` demo route and
 the party's big screen, which fills the window for a TV.
 

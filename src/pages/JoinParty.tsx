@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { QrScanner } from "../components/QrScanner";
 import { Control, Field, Ground, Loader, Pane } from "../design";
@@ -18,8 +18,9 @@ const OFFLINE = "We couldn't check that code. Check your connection and try agai
  */
 const JoinParty = () => {
   const navigate = useNavigate();
+  const linked = cleanCode(useParams().code ?? "");
   const codeId = useId();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(() => (CODE_PATTERN.test(linked) ? linked : ""));
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -49,6 +50,16 @@ const JoinParty = () => {
       if (mine === lookup.current) setChecking(false);
     }
   };
+
+  // A join link (`#/join/ABBA`, what the green room's QR code carries) comes
+  // with the code filled in, and looks it up as soon as the page is up. The
+  // lookup is cancelled with the page, so StrictMode's remount starts its own.
+  useEffect(() => {
+    if (!CODE_PATTERN.test(linked)) return;
+    const timer = setTimeout(() => void join(linked));
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const typed = (value: string) => {
     const next = cleanCode(value);

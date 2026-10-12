@@ -11,12 +11,16 @@
  * tagline); `questionBank.test.ts` checks the ids exist.
  */
 import type { BreakEvery } from "../utils/quizModel";
+import type { QuizDifficulty } from "../utils/QuizDataProvider";
 
 export interface QuizTemplate {
     /** Lowercase letters, digits and dashes: it's part of the room's quiz key. */
     id: string;
     title: string;
+    /** One sentence on what the quiz covers; never gives an answer away. */
     tagline: string;
+    /** The mean difficulty of its questions, rounded (questionBank.test.ts keeps it honest). */
+    level: QuizDifficulty;
     breakEvery: BreakEvery;
     questionIds: string[];
 }
@@ -25,7 +29,8 @@ export const QUIZ_TEMPLATES: QuizTemplate[] = [
     {
         id: "road-to-burgas",
         title: "Road to Burgas",
-        tagline: "The 2020s so far. A warm-up for next May.",
+        tagline: "The 2020s so far, as a warm-up lap for next May.",
+        level: "medium",
         breakEvery: 5,
         questionIds: [
             "w-e-02", "w-e-16", "w-e-01", "w-m-07", "w-e-22",
@@ -36,7 +41,8 @@ export const QUIZ_TEMPLATES: QuizTemplate[] = [
     {
         id: "nordic-nights",
         title: "Nordic Nights",
-        tagline: "Melodi Grand Prix, Melodifestivalen and a lot of nul points.",
+        tagline: "Melodi Grand Prix, Melodifestivalen and a few nul points from the north.",
+        level: "medium",
         breakEvery: 5,
         // classic-30 (Finland's first winning song) is left out: classic-20 gives it away.
         questionIds: [
@@ -48,7 +54,8 @@ export const QUIZ_TEMPLATES: QuizTemplate[] = [
     {
         id: "winners-circle",
         title: "Winners' Circle",
-        tagline: "Seventy years of winners, from the first to the latest.",
+        tagline: "Seventy years of winners, from the very first to the latest.",
+        level: "medium",
         breakEvery: 5,
         questionIds: [
             "w-h-01", "classic-2", "w-h-02", "classic-16", "w-h-08",
@@ -61,6 +68,7 @@ export const QUIZ_TEMPLATES: QuizTemplate[] = [
         id: "nul-points",
         title: "Nul Points",
         tagline: "Records, rules and glorious last places.",
+        level: "medium",
         breakEvery: 4,
         questionIds: [
             // classic-14 comes before w-m-16, whose "Norwegian singer" would give it away.
@@ -72,7 +80,8 @@ export const QUIZ_TEMPLATES: QuizTemplate[] = [
     {
         id: "wind-machine",
         title: "Wind Machine",
-        tagline: "Costumes, key changes, grannies and a turkey.",
+        tagline: "Costumes, key changes, grannies and a turkey: the show around the songs.",
+        level: "easy",
         breakEvery: 0,
         questionIds: [
             "w-e-12", "w-m-20", "w-e-15", "w-m-10", "w-e-19",
@@ -84,6 +93,7 @@ export const QUIZ_TEMPLATES: QuizTemplate[] = [
         id: "quick-fire",
         title: "Quick Fire",
         tagline: "Ten easy ones, for when the show's about to start.",
+        level: "easy",
         breakEvery: 0,
         questionIds: [
             "w-e-10", "classic-2", "w-e-06", "classic-9", "w-e-12",

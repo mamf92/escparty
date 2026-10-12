@@ -34,8 +34,8 @@ describe("SelectDifficulty", () => {
   it("names each difficulty by its title and describes it with the library's tagline", () => {
     renderPage();
     const easy = screen.getByRole("button", { name: "Easy" });
-    expect(easy).toHaveAccessibleDescription("You know who Loreen is.");
-    expect(screen.getByRole("button", { name: "Hard" })).toHaveAccessibleDescription("You know where Dana International won.");
+    expect(easy).toHaveAccessibleDescription(/knows who Loreen is/);
+    expect(screen.getByRole("button", { name: "Hard" })).toHaveAccessibleDescription(/knows where Dana International won/);
   });
 
   it("starts a classic quiz single-player", async () => {

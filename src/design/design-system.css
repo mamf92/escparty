@@ -4,5 +4,6 @@
 */
 @import "./tokens.css";
 @import "./surface.css";
+@import "./choice.css";
 @import "./base.css";
 @import "./stage.css";
