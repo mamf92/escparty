@@ -1,7 +1,7 @@
 import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, waitFor, within } from "../test/test-utils";
 import Lobby from "./Lobby";
 import MobileFrame from "../components/MobileFrame";
 import type { Room } from "../utils/roomsFirestore";
@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   onRoom: (_room: unknown) => {},
   QuizPickRefused: class QuizPickRefused extends Error {},
 }));
+vi.mock("qrcode", () => ({ toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,AAAA") }));
 vi.mock("../utils/roomsFirestore", () => ({
   listenToRoom: mocks.listenToRoom,
   startGame: mocks.startGame,
@@ -237,9 +238,67 @@ describe("Lobby", () => {
     as("host", "Martin");
     renderLobby();
     act(() => mocks.onRoom(room()));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Leave the waiting room" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Leave the waiting room" }));
+    await user.click(screen.getByRole("button", { name: "Leave the room" }));
     expect(mocks.removePlayerFromRoom).not.toHaveBeenCalled();
     expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
+  it("asks the host before leaving, and Stay keeps them in the room", async () => {
+    const user = userEvent.setup();
+    as("host", "Martin");
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    await user.click(screen.getByRole("button", { name: "Leave the waiting room" }));
+    expect(screen.getByText(/everyone waiting will need a new code/)).toBeInTheDocument();
+    expect(screen.queryByText(/at \/multiplayer/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Stay here" }));
+    expect(screen.getByRole("button", { name: "Leave the waiting room" })).toBeInTheDocument();
+    expect(screen.queryByText(/everyone waiting/)).not.toBeInTheDocument();
+  });
+
+  it("leaves when the host confirms", async () => {
+    const user = userEvent.setup();
+    as("host", "Martin");
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    await user.click(screen.getByRole("button", { name: "Leave the waiting room" }));
+    await user.click(screen.getByRole("button", { name: "Leave the room" }));
+    expect(mocks.removePlayerFromRoom).not.toHaveBeenCalled();
+    expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
+  });
+
+  it("doesn't ask a guest, and warns the host through the brand", async () => {
+    const user = userEvent.setup();
+    as("host", "Martin");
+    renderWithProviders(
+      <MobileFrame>
+        <Routes>
+          <Route path="/lobby" element={<Lobby />} />
+          <Route path="*" element={<ShowLocation />} />
+        </Routes>
+      </MobileFrame>,
+      { initialEntries: ["/lobby"] },
+    );
+    act(() => mocks.onRoom(room()));
+    await user.click(screen.getByRole("link", { name: "ESCParty" }));
+    expect(screen.getByText(/You're the host. If you leave, this game can't start/)).toBeInTheDocument();
+  });
+
+  it("shows the game code as a badge and opens the QR code full screen", async () => {
+    const user = userEvent.setup();
+    as("p2", "Loreen");
+    renderLobby();
+    act(() => mocks.onRoom(room()));
+    expect(screen.getByText("Game code A B B A")).toBeInTheDocument();
+    expect(screen.getByText("You are Loreen")).toBeInTheDocument();
+    const show = screen.getByRole("button", { name: "Show QR code" });
+    await user.click(show);
+    expect(screen.getByRole("dialog", { name: "Scan to join" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(show).toHaveFocus());
   });
 
   it("tells a player the host took them out", async () => {

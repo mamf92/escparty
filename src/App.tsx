@@ -102,6 +102,7 @@ const App = () => {
             <Route path="/" element={<Home />} />
             <Route path="/host" element={<HostParty />} />
             <Route path="/join" element={<JoinParty />} />
+            <Route path="/join/:code" element={<JoinParty />} />
             <Route path="/select-difficulty" element={<SelectDifficulty />} />
             <Route path="/quizzes" element={<QuizLibrary />} />
             <Route path="/quizzes/new" element={<QuizBuilder />} />

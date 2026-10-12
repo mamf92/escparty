@@ -142,4 +142,27 @@ describe("JoinParty", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Back to party ABBA" }));
     expect(screen.getByText(/at \/party\/ABBA/)).toBeInTheDocument();
   });
+
+  it("looks up the code in a join link once, and fills it in", async () => {
+    vi.mocked(findGame).mockResolvedValue("quiz");
+    renderWithProviders(
+      <Routes>
+        <Route path="/join/:code" element={<JoinParty />} />
+        <Route path="*" element={<ShowLocation />} />
+      </Routes>,
+      { initialEntries: ["/join/abba"] },
+    );
+    expect(await screen.findByText(/^at \/multiplayer.*ABBA/)).toBeInTheDocument();
+    expect(findGame).toHaveBeenCalledTimes(1);
+    expect(findGame).toHaveBeenCalledWith("ABBA");
+  });
+
+  it("ignores a join link whose code isn't four letters", () => {
+    renderWithProviders(
+      <Routes><Route path="/join/:code" element={<JoinParty />} /></Routes>,
+      { initialEntries: ["/join/ab1"] },
+    );
+    expect(findGame).not.toHaveBeenCalled();
+    expect(field()).toHaveValue("");
+  });
 });
