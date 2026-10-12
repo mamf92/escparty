@@ -36,6 +36,13 @@ const CodeRow = styled.div`
     gap: var(--esc-space-3);
 `;
 
+/** The room's quiz, with the host's small "Change" beside it. */
+const QuizRow = styled(Pane)`
+    &&& {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+`;
+
 /**
  * The waiting room before a multiplayer quiz, the green room (#65). Guests
  * say when they're ready; the host picks the quiz, can take out a player
@@ -337,7 +344,7 @@ const Lobby = () => {
                 <>
                     <h2 className="esc-section">The quiz</h2>
                     <Ground>
-                        <Pane layout={canChange ? "split" : undefined}>
+                        <QuizRow>
                             {/* Polite: guests hear when the host changes the quiz. */}
                             <Row aria-live="polite">{room.difficulty ? roomQuizTitle : "The host is picking…"}</Row>
                             {canChange && (
@@ -345,7 +352,7 @@ const Lobby = () => {
                                     Change
                                 </Control>
                             )}
-                        </Pane>
+                        </QuizRow>
                     </Ground>
                 </>
             )}
