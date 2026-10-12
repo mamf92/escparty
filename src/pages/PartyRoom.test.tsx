@@ -87,7 +87,9 @@ describe("PartyRoom", () => {
         renderRoom();
         expect(screen.getByText("🇸🇪 Sweden")).toBeInTheDocument();
         expect(screen.getByText("You haven't rated Sweden yet.")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Previous act" })).toBeDisabled();
+        // On the first act there is nothing before it: no button, not a disabled one.
+        expect(screen.queryByRole("button", { name: "Previous act" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Bonus points" })).toBeInTheDocument();
 
         const points = screen.getByRole("spinbutton", { name: "Points for Sweden" });
         expect(points).toHaveAttribute("aria-valuetext", "Not rated");
@@ -108,10 +110,37 @@ describe("PartyRoom", () => {
         expect(screen.getByRole("spinbutton", { name: "Points for Norway" })).toBeInTheDocument();
         expect(readPartyIdentity("ABBA")?.actId).toBe("no");
         await user.selectOptions(screen.getByLabelText("Jump to an act"), "3");
-        expect(screen.getByRole("button", { name: "Next act" })).toBeDisabled();
+        // The last act's next step moves on to the ranking.
+        expect(screen.queryByRole("button", { name: "Next act" })).not.toBeInTheDocument();
         expect(screen.getByRole("option", { name: "1. Sweden ✓" })).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Previous act" }));
         expect(screen.getByRole("spinbutton", { name: "Points for Finland" })).toBeInTheDocument();
+    });
+
+    it("scrolls to the party bonuses from the bonus points button", async () => {
+        const user = userEvent.setup();
+        savePartyIdentity("ABBA", guest);
+        mocks.data = { party: makeParty({ bonuses: true }), ballots: [], error: null, retry: vi.fn() };
+        const scroll = vi.fn();
+        HTMLElement.prototype.scrollIntoView = scroll;
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "Bonus points" }));
+        expect(scroll).toHaveBeenCalled();
+        expect(screen.getByRole("heading", { name: "Party bonuses" })).toHaveFocus();
+    });
+
+    it("has no bonus points button when the party has no bonuses", () => {
+        savePartyIdentity("ABBA", guest);
+        renderRoom();
+        expect(screen.queryByRole("button", { name: "Bonus points" })).not.toBeInTheDocument();
+    });
+
+    it("ends on See your ranking, which opens the ranking tab", async () => {
+        const user = userEvent.setup();
+        savePartyIdentity("ABBA", { ...guest, actId: "ie" });
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "See your ranking" }));
+        expect(screen.getByRole("tab", { name: "Ranking" })).toHaveAttribute("aria-selected", "true");
     });
 
     it("moves between the tabs with the arrow keys, one tab stop for the tablist", async () => {
