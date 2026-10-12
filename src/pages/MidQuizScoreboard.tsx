@@ -9,7 +9,7 @@ import { readStoredGame } from "../utils/multiplayerSession";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Standings } from "../components/Standings";
 import { points } from "../utils/finale";
-import { Control, Ground, Pane } from "../design";
+import { Control, Ground, Pane, Row } from "../design";
 
 const TITLE = "Scoreboard break";
 
@@ -260,8 +260,40 @@ const MidQuizScoreboard = () => {
     <CalmLink type="button" onClick={() => navigate("/")}>End the quiz and go back to ESCParty</CalmLink>
   );
 
+  // The score as a badge, for a player in either mode (the final results'
+  // proud row); the host of a multiplayer game only passes through.
+  const showScore = !gameData.multiplayer || !isHost || players.some(p => p.id === gameData.playerId);
+
+  const actions = canContinue ? (
+    <>
+      <Ground>
+        <Pane>
+          <Control elevation="high" onClick={continueQuiz} disabled={resuming}>
+            {resuming ? "Continuing…" : "Continue the quiz"}
+          </Control>
+        </Pane>
+      </Ground>
+      {resumeError && <CalmNote role="alert">{resumeError}</CalmNote>}
+    </>
+  ) : (
+    <>
+      <CalmNote role="status">Waiting for the host to continue…</CalmNote>
+      {resumeError && <CalmNote role="alert">{resumeError}</CalmNote>}
+    </>
+  );
+
   return (
-    <CalmPage title={TITLE} subtitle={`You have ${points(myScore)} so far.`} footer={leave}>
+    <CalmPage title={TITLE} actions={actions} footer={leave}>
+      {showScore && (
+        <Ground>
+          <Pane>
+            <Row elevation="high">
+              <span className="calm-label">Your score so far</span>
+              <span className="esc-hero-number">{points(myScore)}</span>
+            </Row>
+          </Pane>
+        </Ground>
+      )}
       {gameData.multiplayer && (players.length > 0 || scoresLoaded ? (
         <Standings
           players={players}
@@ -276,19 +308,6 @@ const MidQuizScoreboard = () => {
       {!gameData.multiplayer && gameData.totalQuestions > 0 && (
         <CalmNote>Catch your breath: question {nextQuestion} of {gameData.totalQuestions} is up next.</CalmNote>
       )}
-
-      {canContinue ? (
-        <Ground>
-          <Pane>
-            <Control elevation="high" onClick={continueQuiz} disabled={resuming}>
-              {resuming ? "Continuing…" : "Continue the quiz"}
-            </Control>
-          </Pane>
-        </Ground>
-      ) : (
-        <CalmNote role="status">Waiting for the host to continue…</CalmNote>
-      )}
-      {resumeError && <CalmNote role="alert">{resumeError}</CalmNote>}
     </CalmPage>
   );
 };

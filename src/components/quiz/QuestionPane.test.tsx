@@ -75,4 +75,20 @@ describe("QuestionPane", () => {
       expect(marker).toHaveAttribute("aria-hidden", "true");
     }
   });
+
+  it("shows a locked-in pick hot pink and marks nothing until revealed", () => {
+    const { container, rerender } = renderPane({ picked: "Norway", settled: true, revealed: false });
+    expect(container.querySelector(".calm-marker")).toBeNull();
+    expect(screen.getByRole("button", { name: "Norway" })).toHaveClass("is-chosen");
+    expect(screen.getByRole("button", { name: "Norway" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Sweden" })).not.toHaveClass("is-chosen");
+    for (const button of screen.getAllByRole("button")) expect(button).toBeDisabled();
+
+    rerender(
+      <QuestionPane question="Which country won in 1974?" options={OPTIONS} picked="Norway" correctAnswer="Sweden" settled revealed onPick={() => { }} />,
+    );
+    expect(markerOf("Sweden")).toBe("correct");
+    expect(markerOf("Norway")).toBe("wrong");
+    expect(screen.getByRole("button", { name: "Norway" })).not.toHaveClass("is-chosen");
+  });
 });

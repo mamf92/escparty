@@ -43,7 +43,14 @@ Why this runs on Firestore listeners and not WebSockets:
    `Room.phaseStartedAt`, so all screens show the same question, and a tab
    that was backgrounded or reloaded jumps straight to the room's current
    question and time. When a question's slot is over, any client ends it
-   with `advanceQuestion` (one write lands, the rest are no-ops). When the
+   with `advanceQuestion` (one write lands, the rest are no-ops). A tap
+   locks the answer in (and scores and writes it at once), but the verdict
+   (right/wrong markers, the "+N" burst, the points badge including this
+   answer) is held back until answering has closed for everyone
+   (`questionClock(...).answeringOpen` false, `QUESTION_MS` after
+   `phaseStartedAt`), so no one can read it off a neighbour's screen; it then
+   shows during the `FEEDBACK_MS` window. `Quiz.tsx` keeps this as
+   `answeringOpen`, set from the same 100ms tick; solo reveals at once. When the
    room's phase becomes `mid-scoreboard` or `results`, every player
    navigates there. An observer host doesn't play: Lobby (or, failing that,
    the quiz page or the break screen) sends it to `/host-observer`, where it stays for the whole

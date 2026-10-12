@@ -48,6 +48,11 @@ const Quiz = () => {
   const [timeLeft, setTimeLeft] = useState(QUESTION_MS / 1000);
   const [timeLeftMs, setTimeLeftMs] = useState(QUESTION_MS); // More precise millisecond timer for scoring
   const [showFeedback, setShowFeedback] = useState(false);
+  // In a room: whether answers are still accepted, from the shared tick. An
+  // answer is locked in at once but its verdict waits until this is false
+  // (everyone has had the same time), so no one can read it off a
+  // neighbour's screen. Alone, the verdict shows straight away.
+  const [answeringOpen, setAnsweringOpen] = useState(true);
   // How the current question was settled, once it is: said by QuizStatus.
   const [outcome, setOutcome] = useState<QuizOutcome | null>(null);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
@@ -369,6 +374,7 @@ const Quiz = () => {
       setCurrentQuestionPoints(0);
       setTimeLeft(QUESTION_MS / 1000);
       setTimeLeftMs(QUESTION_MS);
+      setAnsweringOpen(true); // the new question's tick sets the real value
     }
   }, [sharedClock, room?.phase, room?.currentQuestionIndex, currentQuestionIndex]);
 
@@ -401,6 +407,7 @@ const Quiz = () => {
       const now = Date.now();
       const clock = questionClock(startMs, now);
       setTimeLeftMs(clock.timeLeftMs);
+      setAnsweringOpen(clock.answeringOpen);
 
       if (clock.answeringOpen && !isSubmittedRef.current) {
         setTimeLeft(Math.ceil(clock.timeLeftMs / 1000));
@@ -679,6 +686,16 @@ const Quiz = () => {
     // A room without the setting breaks every MID_QUIZ_EVERY, as advanceQuestion does.
     sharedClock ? room?.breakEvery ?? MID_QUIZ_EVERY : breakEvery,
   ).phase;
+  // Whether the settled question's verdict may show: always alone, and in a
+  // room once answering has closed for everyone.
+  const revealed = !sharedClock || !answeringOpen;
+  // The points shown: until the verdict is revealed, without this answer's
+  // (`score` already holds them from the moment of the tap).
+  const pendingPoints = revealed || pointsLostAt === currentQuestionIndex ? 0 : currentQuestionPoints;
+  const shownScore = Math.max(0, score - pendingPoints);
+  // While locked in, the clock keeps counting what is left of answering time
+  // (`timeLeft` has moved on to the slot's remaining seconds by then).
+  const clockSeconds = isSubmitted && !revealed ? Math.max(1, Math.ceil(timeLeftMs / 1000)) : timeLeft;
   const nextLabel = nextPhase === "results" ? "Results"
     : nextPhase === "mid-scoreboard" ? "Scoreboard"
     : "Next question";
@@ -741,10 +758,11 @@ const Quiz = () => {
       <QuizStatus
         questionNumber={currentQuestionIndex + 1}
         questionCount={questions.length}
-        score={score}
+        score={shownScore}
         nextIn={sharedClock ? `${nextLabel} in ${timeLeft}s` : undefined}
-        timeLeft={timeLeft}
+        timeLeft={clockSeconds}
         settled={isSubmitted}
+        revealed={revealed}
         picked={selectedAnswer}
         correctAnswer={currentQuestion.correctAnswer}
         points={currentQuestionPoints}
@@ -758,6 +776,7 @@ const Quiz = () => {
         picked={selectedAnswer}
         correctAnswer={currentQuestion.correctAnswer}
         settled={isSubmitted}
+        revealed={revealed}
         onPick={answer => { void submitAnswer(answer); }}
         headingRef={questionHeadingRef}
       />

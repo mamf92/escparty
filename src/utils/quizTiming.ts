@@ -8,8 +8,9 @@ import { DEFAULT_BREAK_EVERY, isBreakAfter } from "./quizModel";
 export const QUESTION_MS = 10_000; // time to answer
 export const FEEDBACK_MS = 5_000; // in a room: answer feedback before the next question
 // Solo: how long the verdict shows before the next question (the room sets
-// the pace in multiplayer, with FEEDBACK_MS).
-export const SOLO_VERDICT_MS = 1_500;
+// the pace in multiplayer, with FEEDBACK_MS). Long enough to see the right
+// answer, the points burst and the new total.
+export const SOLO_VERDICT_MS = 3_500;
 export const QUESTION_SLOT_MS = QUESTION_MS + FEEDBACK_MS;
 // How long after a room reaches the results a late score write still
 // counts (#142): enough for the last answer's write and Quiz.tsx's retries.

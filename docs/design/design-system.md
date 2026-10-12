@@ -88,7 +88,7 @@ land. Never set a text colour on a page.
 | Light | Fixed, from the top left | The pointer (or a finger) is the lamp |
 | Stage text | A solid dark outline (the halo), for the spots of light behind it | The same, with a wide soft glow that dims the sequins right behind each line |
 | Materials, sizes, states, copy | Identical | Identical |
-| Motion | The press only | The ball turns and the sequins shimmer, **only** when the system allows motion; with reduced motion it is one still frame |
+| Motion | The press only | The ball turns and the sequins shimmer, **only** when the system allows motion; with reduced motion it is one still frame. The quiz verdict also pops (right) or shakes (wrong) |
 
 The stage is `<Stage />` (`src/design/Stage.tsx`), rendered once by
 `MobileFrame` and the big screen. It paints the ball and spots on a 2D
@@ -407,6 +407,11 @@ controls live in the host's own tab or pane, never mixed into a guest's.
 - **Motion:** nothing moves position, ever: a press is a shadow change.
   `prefers-reduced-motion: reduce` stops the ball, the sequins and every
   transition, and the stage follows the setting live. Sparkle without motion is still Sparkle: one still frame.
+  The one exception to "nothing moves position": the quiz verdict
+  (`VerdictBurst`) pops when the answer is right and shakes when it is
+  wrong, **only** in Sparkle and **only** under `prefers-reduced-motion:
+  no-preference` (`quiz.css`, `html[data-theme="sparkle"]`). Calm and
+  reduced motion show the same big verdict, still.
 - **More contrast:** with `prefers-contrast: more` every control and field
   gets an edge in its own ink (dark on white, white on a tile) and notes
   turn full ink.
