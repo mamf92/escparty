@@ -35,10 +35,12 @@ import { useDesignTheme } from "./useDesignTheme";
  * header leaves room for. 96px under 56px where it can't be measured.
  */
 type BallBox = { size: number; hang: number };
-const measureBall = (box: HTMLElement | null): BallBox => ({
-  size: box?.offsetWidth || 96,
-  hang: box?.offsetTop || 56,
-});
+const measureBall = (box: HTMLElement | null): BallBox => {
+  // A screen with no ball (`calm-noball`, see stage.css) declares a size of 0.
+  const declared = box ? getComputedStyle(box).getPropertyValue("--esc-ball-size").trim() : "";
+  if (declared !== "" && parseFloat(declared) === 0) return { size: 0, hang: 0 };
+  return { size: box?.offsetWidth || 96, hang: box?.offsetTop || 56 };
+};
 /** The longest step the ball turns in one frame, so it never jumps after a hidden tab. */
 export const MAX_STEP = 0.1;
 /** Frames a second while turning: enough for a slow ball. */
@@ -268,6 +270,8 @@ const paintLights = (canvas: HTMLCanvasElement, ball: BallBox, sparkle: boolean,
   const look = sparkle ? SPARKLE_BALL : CALM_BALL;
   const lamp = lampDirection(lampX, lampY);
   const { size, hang: top } = ball;
+  // A ball-less screen draws no ball and no spots: only Sparkle's sequins remain.
+  if (size <= 0) return;
   const left = (width - size) / 2;
   const centreY = top + size / 2;
 

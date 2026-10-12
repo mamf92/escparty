@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -87,7 +87,7 @@ const PartyRoom = () => {
 
     return (
         <CalmPage
-            className="calm-compact"
+            className="calm-compact calm-noball"
             title={party.title}
             subtitle={`Party ${party.code} · you're ${identity.name}`}
             footer={
@@ -115,6 +115,7 @@ const PartyRoom = () => {
                         onMove={index => updateIdentity({ actId: party.acts[index].id })}
                         onRate={own.rate}
                         onBonus={own.toggleBonus}
+                        onDone={() => setTab("ranking")}
                     />
                 )}
                 {tab === "ranking" && <MyRanking party={party} ballot={{ guestId: identity.guestId, name: identity.name, ...own.ballot }} />}
@@ -180,15 +181,26 @@ const JoinParty = ({ party, onJoin, footer }: { party: Party; onJoin: (identity:
     );
 };
 
-const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
+const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus, onDone }: {
     party: Party;
     ballot: { ratings: Ratings; bonuses: Bonuses };
     actIndex: number;
     onMove: (index: number) => void;
     onRate: (actId: string, categoryId: string, value: number) => void;
     onBonus: (actId: string, bonusId: string) => void;
+    /** Called from "See your ranking" on the last act. */
+    onDone: () => void;
 }) => {
     const jumpId = useId();
+    const bonusHeading = useRef<HTMLHeadingElement>(null);
+    const lastAct = actIndex === party.acts.length - 1;
+    const toBonuses = () => {
+        const heading = bonusHeading.current;
+        if (!heading) return;
+        const still = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        heading.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "start" });
+        heading.focus({ preventScroll: true });
+    };
     const act = party.acts[actIndex];
     const bonuses = partyBonusList(party);
     const score = actScore(ballot.ratings[act.id], ballot.bonuses[act.id], party.template.categories, bonuses);
@@ -224,9 +236,27 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
                 </Sheet>
             </Ground>
 
+            <Ground>
+                <Pane className="party-actnav">
+                    {actIndex > 0
+                        ? <Control onClick={() => onMove(actIndex - 1)}>Previous act</Control>
+                        : <span className="party-actnav-gap" aria-hidden="true" />}
+                    {bonuses.length > 0
+                        ? <Control onClick={toBonuses}>Bonus points <span aria-hidden="true">↓</span></Control>
+                        : <span className="party-actnav-gap" aria-hidden="true" />}
+                    {lastAct
+                        ? <Control elevation="high" onClick={onDone}>See your ranking</Control>
+                        : <Control elevation="high" onClick={() => onMove(actIndex + 1)}>Next act</Control>}
+                </Pane>
+            </Ground>
+
+            <CalmNote role="status">
+                {score === null ? `You haven't rated ${act.country} yet.` : `Your score for ${act.country}: ${formatScore(score)}`}
+            </CalmNote>
+
             {bonuses.length > 0 && (
                 <>
-                    <h2 className="esc-section">Party bonuses</h2>
+                    <h2 className="esc-section" id={`${jumpId}-bonuses`} ref={bonusHeading} tabIndex={-1}>Party bonuses</h2>
                     <Ground>
                         <Pane>
                             {bonuses.map(bonus => (
@@ -242,16 +272,6 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus }: {
                 </>
             )}
 
-            <CalmNote role="status">
-                {score === null ? `You haven't rated ${act.country} yet.` : `Your score for ${act.country}: ${formatScore(score)}`}
-            </CalmNote>
-
-            <Ground>
-                <Pane layout="split">
-                    <Control disabled={actIndex === 0} onClick={() => onMove(actIndex - 1)}>Previous act</Control>
-                    <Control elevation="high" disabled={actIndex === party.acts.length - 1} onClick={() => onMove(actIndex + 1)}>Next act</Control>
-                </Pane>
-            </Ground>
             <Ground>
                 <Pane>
                     <div>

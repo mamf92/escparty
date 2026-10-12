@@ -92,6 +92,28 @@ describe("Stage", () => {
     add.mockRestore();
   });
 
+  it("paints no ball and no spots where the screen declares a ball size of 0", () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
+    const fillRect = vi.fn();
+    const ctx = new Proxy({ fillRect } as Record<string, unknown>, {
+      get: (target, key: string) => target[key] ?? vi.fn(),
+      set: () => true,
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((kind: string) => kind === "2d" ? ctx : null) as never);
+    const real = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation(((el: Element) => {
+      const style = real(el);
+      return el.classList.contains("esc-stage-ball")
+        ? ({ getPropertyValue: (name: string) => (name === "--esc-ball-size" ? "0px" : style.getPropertyValue(name)) } as CSSStyleDeclaration)
+        : style;
+    }) as never);
+
+    renderWithProviders(<Stage />);
+    expect(fillRect).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
   it("hangs the ball with no wire on any screen", () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);

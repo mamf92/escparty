@@ -479,8 +479,8 @@
 }
 
 .esc-app .calm-sheet th {
-  width: 38%;
-  padding: 0 var(--esc-space-2) 0 0;
+  width: 45%;
+  padding: 0 var(--esc-space-1) 0 0;
   text-align: left;
   font-weight: inherit;
 }
@@ -493,8 +493,11 @@
   width: 100%;
   height: 100%;
   justify-content: center;
-  padding: var(--esc-space-2) var(--esc-space-3);
-  overflow-wrap: anywhere;
+  padding: var(--esc-space-2);
+  /* A label only ever breaks between words, never inside one. */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
 }
 
 /* A stepper (Stepper.tsx): big minus, the value, big plus. One focus stop. */

@@ -87,6 +87,24 @@
   }
 }
 
+/*
+  `calm-noball` (on CalmPage) hides the disco ball and its spots for a screen
+  that needs the room: a size of 0 is read by Stage.tsx, which then paints
+  neither, and the header's clearance shrinks to a small gap. Sparkle's
+  sequins and Calm's gradient stay.
+*/
+.esc-app:has(.calm-page.calm-noball) {
+  --esc-ball-size: 0px;
+  --esc-ball-hang: 0px;
+  --esc-stage-clearance: var(--esc-space-3);
+}
+
+@supports (width: 1cqw) {
+  .esc-app:has(.calm-page.calm-noball) {
+    --esc-ball-size: 0px;
+  }
+}
+
 .esc-app .calm-compact .esc-title {
   font-size: var(--esc-text-heading);
 }

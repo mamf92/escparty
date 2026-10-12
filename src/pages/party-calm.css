@@ -62,3 +62,23 @@
   align-items: center;
   justify-content: center;
 }
+
+/* The rating nav under the sheet: previous act, bonus points, next act. A
+   missing side keeps its place, so the others don't jump between acts. */
+.esc-app .lycra-pane.party-actnav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--esc-space-2);
+  align-items: stretch;
+}
+
+.esc-app .party-actnav .lycra {
+  padding-inline: var(--esc-space-2);
+  text-align: center;
+  overflow-wrap: normal;
+  hyphens: manual;
+}
+
+.party-actnav-gap {
+  display: block;
+}
