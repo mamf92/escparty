@@ -18,13 +18,15 @@ const prefersReducedMotion = () =>
  * `value` is the landed name (or null); `onChange` hears every landing, but
  * not the names that tick past while it spins.
  */
-export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NAMES, label = "Your name" }: {
+export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NAMES, label = "Your name", disabled = false }: {
     value: string | null;
     onChange: (name: string) => void;
     /** Told when a spin starts and ends, so a Continue beside the reel can wait for it. */
     onSpinningChange?: (spinning: boolean) => void;
     names?: readonly string[];
     label?: string;
+    /** The reel and its buttons are off (e.g. while the offered names are still being worked out). */
+    disabled?: boolean;
 }) => {
     const count = names.length;
     const landed = value === null ? -1 : names.indexOf(value);
@@ -35,6 +37,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     const drag = useRef({ y: 0, active: false });
     const lastWheel = useRef(0);
     const isSpinning = spinning !== null;
+    const off = isSpinning || disabled;
     const shown = isSpinning ? spinning : landed;
 
     useEffect(() => () => clearTimeout(timer.current), []);
@@ -44,7 +47,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     useEffect(() => { onSpinningChange?.(isSpinning); }, [isSpinning, onSpinningChange]);
 
     const step = (delta: number) => {
-        if (isSpinning) return;
+        if (off) return;
         const from = landed < 0 ? (delta > 0 ? -1 : 0) : landed;
         onChange(names[wrap(from + delta)]);
     };
@@ -53,7 +56,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
     useEffect(() => { stepRef.current = step; });
 
     const spin = () => {
-        if (isSpinning) return;
+        if (off) return;
         // Always a different name from the one already landed on.
         const end = landed < 0 ? Math.floor(Math.random() * count) : wrap(landed + 1 + Math.floor(Math.random() * (count - 1)));
         if (prefersReducedMotion()) {
@@ -95,8 +98,8 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
             ArrowRight: () => step(1),
             ArrowUp: () => step(-1),
             ArrowLeft: () => step(-1),
-            Home: () => !isSpinning && onChange(names[0]),
-            End: () => !isSpinning && onChange(names[count - 1]),
+            Home: () => !off && onChange(names[0]),
+            End: () => !off && onChange(names[count - 1]),
         };
         const move = moves[event.key];
         if (!move) return;
@@ -129,6 +132,7 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 tabIndex={0}
                 aria-label={label}
                 aria-busy={isSpinning}
+                aria-disabled={disabled || undefined}
                 aria-valuemin={1}
                 aria-valuemax={count}
                 aria-valuenow={landed >= 0 && !isSpinning ? landed + 1 : undefined}
@@ -147,11 +151,11 @@ export const NamePicker = ({ value, onChange, onSpinningChange, names = PARTY_NA
                 {isSpinning ? "Spinning…" : value !== null ? `You're ${value}.` : "Spin the reel, or swipe, scroll or use the arrow keys."}
             </p>
             <Pane layout="split">
-                <Control onClick={() => step(-1)} disabled={isSpinning}>Previous name</Control>
-                <Control onClick={() => step(1)} disabled={isSpinning}>Next name</Control>
+                <Control onClick={() => step(-1)} disabled={off}>Previous name</Control>
+                <Control onClick={() => step(1)} disabled={off}>Next name</Control>
             </Pane>
             <Pane>
-                <Control onClick={spin} disabled={isSpinning}>{value === null ? "Spin for a name" : "Spin again"}</Control>
+                <Control onClick={spin} disabled={off}>{value === null ? "Spin for a name" : "Spin again"}</Control>
             </Pane>
         </div>
     );

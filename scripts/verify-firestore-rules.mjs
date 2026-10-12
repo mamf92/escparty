@@ -140,10 +140,13 @@ report(
 );
 
 // 2c. joinRoomWithFreeName's write: a transaction that reads the room and
-// writes the list back with one more player. Five clients join at the same
+// writes the list back with one more player. Ten clients join at the same
 // moment, all wanting the name "Same"; each picks the first free "Same",
 // "Same 2", ... in its transaction. Firestore retries the losers against
 // the winners' result, so every guest must land, each under its own name.
+// (Not more than ten: with the host that is 11 players, and the emulator's
+// 1000-expression limit on rules stops a room at 12 players, see
+// allPlayersValid, whatever the join.)
 // Firestore doesn't retry these itself: the join rule compares the list's
 // size with the room's at commit time, so a transaction built on a stale
 // read is refused with permission-denied. joinRoomWithFreeName reads and
@@ -164,21 +167,21 @@ const txJoinFrom = async (clientDb, id) => {
     try {
       return await txJoinOnce(clientDb, id);
     } catch (e) {
-      if (e.code !== "permission-denied" || attempt >= 12) throw e;
+      if (e.code !== "permission-denied" || attempt >= 40) throw e;
       await new Promise((resolve) => setTimeout(resolve, Math.random() * 150));
     }
   }
 };
-const txClients = ["tx-a", "tx-b", "tx-c", "tx-d", "tx-e"].map((name) => {
+const txClients = Array.from({ length: 10 }, (_, i) => `tx-${i}`).map((name) => {
   const clientDb = getFirestore(initializeApp({ projectId: "demo-escparty" }, name));
   connectFirestoreEmulator(clientDb, "127.0.0.1", 8080);
   return clientDb;
 });
-await expectAllowed("five guests join by transaction at the same moment", () =>
+await expectAllowed("ten guests join by transaction at the same moment", () =>
   Promise.all(txClients.map((clientDb, i) => txJoinFrom(clientDb, `t-${i}`)))
 );
 const txPlayers = (await getDoc(txJoiners.roomRef)).data().players;
-report("every transactional join is in the room", "5", String(txPlayers.length - 1));
+report("every transactional join is in the room", "10", String(txPlayers.length - 1));
 report(
   "no two transactional joiners share a name",
   String(txPlayers.length),

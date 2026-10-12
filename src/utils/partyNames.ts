@@ -1,3 +1,5 @@
+import { freeNames, nameKey, pickFreeName } from "./freeName";
+
 /**
  * The Eurovision legends a guest becomes at a scoreboard party, so the
  * awards read like a Eurovision night. Guests pick one on the name reel
@@ -14,59 +16,35 @@ export const PARTY_NAMES = [
 
 export const randomPartyName = (): string => PARTY_NAMES[Math.floor(Math.random() * PARTY_NAMES.length)];
 
-/** A name as compared for "the same": trimmed, any case. */
-const nameKey = (name: string): string => name.trim().toLowerCase();
-
 /** The participant names nobody has taken; every name if all are taken (a suffix sorts that out later). */
 export const availablePartyNames = (takenNames: readonly string[]): string[] => {
-    const taken = new Set(takenNames.map(nameKey));
-    const free = PARTY_NAMES.filter(name => !taken.has(nameKey(name)));
+    const free = freeNames(takenNames, PARTY_NAMES);
     return free.length > 0 ? free : [...PARTY_NAMES];
 };
 
 /** A random participant name nobody has taken; with all taken, a random one numbered " 2", " 3"... */
-export const freePartyName = (takenNames: readonly string[]): string => {
-    const taken = new Set(takenNames.map(nameKey));
-    const free = PARTY_NAMES.filter(name => !taken.has(nameKey(name)));
-    if (free.length > 0) return free[Math.floor(Math.random() * free.length)];
-    const base = randomPartyName();
-    let n = 2;
-    while (taken.has(nameKey(`${base} ${n}`))) n += 1;
-    return `${base} ${n}`;
-};
+export const freePartyName = (takenNames: readonly string[]): string =>
+    pickFreeName(randomPartyName(), takenNames, PARTY_NAMES);
 
-/** Whether a ballot has any rating in it (an empty one only claims a name). */
-export const hasRatings = (ratings: object | undefined): boolean => !!ratings && Object.keys(ratings).length > 0;
-
-/**
- * Whether this guest has to give their name up. Only a guest who just
- * joined (no ratings yet) with a name from the reel yields, and only to a
- * ballot of the same name (case and edge spaces ignored) that has ratings,
- * or has none either and a guest ID that sorts before this one's. So of two
- * guests who took a name at the same moment exactly one moves (both can
- * work it out alone), and nobody who has been rating, or who typed their
- * own name in an older party, ever loses a name to a newcomer. Leftover
- * clashes are numbered at display time (`distinctNames`).
- */
-export const nameClash = (
-    ballots: readonly { guestId: string; name: string; ratings?: object }[],
-    me: { guestId: string; name: string; ratings?: object },
-): boolean => {
-    if (hasRatings(me.ratings)) return false;
-    if (!PARTY_NAMES.some(name => nameKey(name) === nameKey(me.name))) return false;
-    return ballots.some(ballot => ballot.guestId !== me.guestId
-        && nameKey(ballot.name) === nameKey(me.name)
-        && (hasRatings(ballot.ratings) || ballot.guestId < me.guestId));
-};
+/** Whether a ballot has any rating or bonus in it (an empty one only claims a name). */
+const hasActivity = (ballot: { ratings?: object; bonuses?: object }): boolean =>
+    Object.keys(ballot.ratings ?? {}).length > 0 || Object.keys(ballot.bonuses ?? {}).length > 0;
 
 /**
  * Names to show for a list of guests: a name shared by several (older
- * parties, or a clash not yet settled) gets " 2", " 3" in guest ID order,
- * so a list never has two of the same. A number never lands on a name
- * another guest really has. Keyed by guest ID.
+ * parties, or two guests who took it at the same instant) gets " 2", " 3",
+ * so a list never has two of the same. The bare name goes to the guest who
+ * most plausibly held it first: one with ratings or bonuses beats one
+ * without, then guest ID order. A number never lands on a name another
+ * guest really has. Keyed by guest ID.
  */
-export const distinctNames = (entries: readonly { id: string; name: string }[]): Map<string, string> => {
-    const sorted = [...entries].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+export const distinctNames = (
+    entries: readonly { id: string; name: string; ratings?: object; bonuses?: object }[],
+): Map<string, string> => {
+    const sorted = [...entries].sort((a, b) => {
+        const active = Number(hasActivity(b)) - Number(hasActivity(a));
+        return active || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
     const used = new Set(sorted.map(entry => nameKey(entry.name)));
     const seen = new Set<string>();
     const result = new Map<string, string>();
@@ -85,8 +63,17 @@ export const distinctNames = (entries: readonly { id: string; name: string }[]):
     return result;
 };
 
+type NamedBallot = { guestId: string; name: string; ratings?: object; bonuses?: object };
+
+const distinctBallotNames = (ballots: readonly NamedBallot[]) =>
+    distinctNames(ballots.map(ballot => ({ id: ballot.guestId, name: ballot.name, ratings: ballot.ratings, bonuses: ballot.bonuses })));
+
 /** The ballots with `distinctNames` applied to their names. */
-export const withDistinctNames = <T extends { guestId: string; name: string }>(ballots: readonly T[]): T[] => {
-    const names = distinctNames(ballots.map(ballot => ({ id: ballot.guestId, name: ballot.name })));
+export const withDistinctNames = <T extends NamedBallot>(ballots: readonly T[]): T[] => {
+    const names = distinctBallotNames(ballots);
     return ballots.map(ballot => ({ ...ballot, name: names.get(ballot.guestId) ?? ballot.name }));
 };
+
+/** The name the lists show for this guest ("Loreen 2" if a clash numbered them); `fallback` while their ballot isn't in. */
+export const displayNameOf = (ballots: readonly NamedBallot[] | undefined, guestId: string, fallback: string): string =>
+    (ballots && distinctBallotNames(ballots).get(guestId)) ?? fallback;

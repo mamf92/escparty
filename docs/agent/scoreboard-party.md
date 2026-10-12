@@ -51,10 +51,13 @@ moment a guest joins (and the host's when the party is created): their
 ballot is written at once, empty, so the next guest sees it taken;
 `useOwnBallot` also writes it if the ballots arrive without one. Two guests
 can still take one name at the same instant (separate documents, and the
-rules can't see across them). That heals itself: `nameClash` is true for
-the guest whose ID sorts last, whose `PartyRoom` then takes a free name
-(`freePartyName`; a number suffix if none), saves the identity, has
-`useOwnBallot` rewrite the ballot, and says so in a note. Older parties may
+rules can't see across them). Nobody is renamed for that: the lists tell
+them apart at display time (`distinctNames`), the bare name going to the
+guest with ratings or bonuses (else the lower guest ID) and the other
+getting "Loreen 2", and a guest's own "you're ..." subtitle uses the same
+name (`displayNameOf`). On the join reel a landed name that a ballots
+update takes before Join is let go ("X was just taken. Spin again."), and
+the reel is off while the ballots haven't loaded. Older parties may
 still hold duplicates, so lists of guests (the room's closeness list, the
 big screen, the awards) show `withDistinctNames`: a repeat gets " 2", " 3" in
 guest-ID order.

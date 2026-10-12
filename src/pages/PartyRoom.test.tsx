@@ -101,40 +101,41 @@ describe("PartyRoom", () => {
         expect(screen.queryByText("Checking which names are taken…")).not.toBeInTheDocument();
     });
 
-    it("keeps its name against a newcomer when it has ratings, even with a later guest ID", () => {
+    it("turns the reel off too until the taken names have arrived", () => {
+        mocks.data = { party: makeParty(), ballots: undefined, error: null, retry: vi.fn() };
+        renderRoom();
+        for (const name of ["Previous name", "Next name", "Spin for a name"]) {
+            expect(screen.getByRole("button", { name })).toBeDisabled();
+        }
+    });
+
+    it("lets go of a landed name that a ballots update takes, and says so", async () => {
+        const user = userEvent.setup();
+        mocks.data = { party: makeParty(), ballots: [], error: null, retry: vi.fn() };
+        const view = renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeEnabled();
+        mocks.data = { ...mocks.data, ballots: [makeBallot("g9", PARTY_NAMES[0], [])] };
+        view.rerender(<Routes><Route path="/party/:code" element={<PartyRoom />} /></Routes>);
+        expect(screen.getByText(`${PARTY_NAMES[0]} was just taken. Spin again.`)).toHaveAttribute("role", "status");
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeDisabled();
+        expect(screen.queryByText(`You're ${PARTY_NAMES[0]}.`)).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.getByText(`You're ${PARTY_NAMES[1]}.`)).toBeInTheDocument();
+        expect(screen.queryByText(/was just taken/)).not.toBeInTheDocument();
+    });
+
+    it("shows a guest the same numbered name the lists give them", () => {
         savePartyIdentity("ABBA", { guestId: "g2", name: "Jedward", isHost: false });
         mocks.data = {
             party: makeParty(),
-            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [3])],
+            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [])],
             error: null,
             retry: vi.fn(),
         };
         renderRoom();
+        expect(screen.getByText("Party ABBA · you're Jedward 2")).toBeInTheDocument();
         expect(readPartyIdentity("ABBA")!.name).toBe("Jedward");
-    });
-
-    it("gives up the name to a rated guest even with an earlier guest ID", () => {
-        savePartyIdentity("ABBA", { guestId: "g1", name: "Jedward", isHost: false });
-        mocks.data = {
-            party: makeParty(),
-            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [3])],
-            error: null,
-            retry: vi.fn(),
-        };
-        renderRoom();
-        expect(readPartyIdentity("ABBA")!.name).not.toBe("Jedward");
-    });
-
-    it("never renames a guest who typed their own name in an older party", () => {
-        savePartyIdentity("ABBA", { guestId: "g2", name: "Grandma", isHost: false });
-        mocks.data = {
-            party: makeParty(),
-            ballots: [makeBallot("g1", "Grandma", [4]), makeBallot("g2", "Grandma", [])],
-            error: null,
-            retry: vi.fn(),
-        };
-        renderRoom();
-        expect(readPartyIdentity("ABBA")!.name).toBe("Grandma");
     });
 
     it("offers only the names nobody at the party has", async () => {
@@ -148,35 +149,6 @@ describe("PartyRoom", () => {
         renderRoom();
         await user.click(screen.getByRole("button", { name: "Next name" }));
         expect(screen.getByText(`You're ${PARTY_NAMES[2]}.`)).toBeInTheDocument();
-    });
-
-    it("gives up the name when someone with an earlier guest ID took it at the same moment", () => {
-        savePartyIdentity("ABBA", { guestId: "g2", name: "Jedward", isHost: false });
-        mocks.data = {
-            party: makeParty(),
-            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [])],
-            error: null,
-            retry: vi.fn(),
-        };
-        renderRoom();
-        const now = readPartyIdentity("ABBA")!;
-        expect(now.name).not.toBe("Jedward");
-        expect(PARTY_NAMES).toContain(now.name);
-        expect(screen.getByText(`Someone took Jedward at the same moment, so you're ${now.name} tonight.`)).toHaveAttribute("role", "status");
-        expect(screen.getByText(`Party ABBA · you're ${now.name}`)).toBeInTheDocument();
-    });
-
-    it("keeps its name when the other guest's ID sorts after", () => {
-        savePartyIdentity("ABBA", { guestId: "g1", name: "Jedward", isHost: false });
-        mocks.data = {
-            party: makeParty(),
-            ballots: [makeBallot("g1", "Jedward", []), makeBallot("g2", "Jedward", [])],
-            error: null,
-            retry: vi.fn(),
-        };
-        renderRoom();
-        expect(readPartyIdentity("ABBA")!.name).toBe("Jedward");
-        expect(screen.queryByText(/at the same moment/)).not.toBeInTheDocument();
     });
 
     it("tells two guests with one name apart in the room's lists", async () => {

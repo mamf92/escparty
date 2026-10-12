@@ -99,8 +99,7 @@ const PartySetup = () => {
     // reload or a pasted link starts over at the first unanswered question).
     const reached = contestId === null ? 1
         : templateId === null || sheetProblems.length > 0 ? 2
-        : !bonusesDone ? 3
-        : ownProblems.length > 0 ? 3
+        : !bonusesDone || ownProblems.length > 0 ? 3
         : name === null ? 4
         : LAST;
     const step = Math.min(Math.max(Math.trunc(Number(params.get("step"))) || 1, 1), reached);

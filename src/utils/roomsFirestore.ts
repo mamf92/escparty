@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { MID_QUIZ_EVERY, RESULTS_GRACE_MS, phaseAfterQuestion, startedAtMillis } from "./quizTiming";
+import { pickFreeName } from "./freeName";
 
 // Define room and player interfaces
 export interface Player {
@@ -237,8 +238,7 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
     }
 
     const currentRoom = await getRoom(roomCode);
-    const alreadyIn = (room: Room | null) => joinVerdict(room, playerId);
-    if (alreadyIn(currentRoom)) {
+    if (joinVerdict(currentRoom, playerId)) {
         return;
     }
 
@@ -266,7 +266,7 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
             } catch {
                 latest = undefined; // Can't tell; report the refusal itself.
             }
-            if (latest !== undefined && alreadyIn(latest)) {
+            if (latest !== undefined && joinVerdict(latest, playerId)) {
                 return;
             }
             console.error("Error adding player to room:", error);
@@ -647,7 +647,7 @@ const joinFailure = (error: unknown): false => {
 };
 
 /** How often joinRoomWithFreeName reads the room and tries again after losing a race to another join. */
-const JOIN_ATTEMPTS = 12;
+const JOIN_ATTEMPTS = MAX_PLAYERS + 8;
 
 /**
  * Join a room under a name nobody in it has. The room is read and the player
@@ -682,18 +682,7 @@ export const joinRoomWithFreeName = async (
             return room!.players.find(p => p.id === playerId)!.name;
         }
 
-        const taken = new Set(room!.players.map(p => p.name));
-        let name = wantedName;
-        if (taken.has(name)) {
-            const free = namePool.filter(candidate => !taken.has(candidate));
-            if (free.length > 0) {
-                name = free[Math.floor(Math.random() * free.length)];
-            } else {
-                let n = 2;
-                while (taken.has(`${wantedName} ${n}`)) n += 1;
-                name = `${wantedName} ${n}`;
-            }
-        }
+        const name = pickFreeName(wantedName, room!.players.map(p => p.name), namePool);
 
         transaction.update(roomRef, {
             players: [
@@ -719,8 +708,13 @@ export const joinRoomWithFreeName = async (
                 // the attempt saw, or can't be read) is the rules saying no
                 // and is reported at once.
                 if ((error as { code?: string }).code !== "permission-denied" || attempt >= JOIN_ATTEMPTS) throw error;
-                const latest = await getRoom(roomCode).catch(() => null);
-                if (!latest || seenPlayers === null || latest.players.length === seenPlayers) throw error;
+                const latest = await getRoom(roomCode).catch(() => undefined);
+                if (latest === undefined || seenPlayers === null) throw error;
+                // The same verdict as before any join: a game that started
+                // or a room that filled meanwhile is an answer, not a rules
+                // failure, and a player who is in already keeps their name.
+                if (joinVerdict(latest, playerId)) return latest!.players.find(p => p.id === playerId)!.name;
+                if (latest!.players.length === seenPlayers) throw error;
                 await new Promise(resolve => setTimeout(resolve, Math.random() * 150));
             }
         }

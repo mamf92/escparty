@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
     PARTY_NAMES,
+    displayNameOf,
     availablePartyNames,
     distinctNames,
     freePartyName,
-    nameClash,
     randomPartyName,
     withDistinctNames,
 } from "./partyNames";
@@ -39,33 +39,6 @@ describe("freePartyName", () => {
         expect(freePartyName(PARTY_NAMES)).toMatch(/ 2$/);
         const taken = [...PARTY_NAMES, ...PARTY_NAMES.map(name => `${name} 2`)];
         expect(freePartyName(taken)).toMatch(/ 3$/);
-    });
-});
-
-describe("nameClash", () => {
-    const me = { guestId: "b", name: "Lordi", ratings: {} };
-    const rated = { a1: { c: 3 } };
-
-    it("is true when an earlier guest ID with no ratings has the name, in any case", () => {
-        expect(nameClash([{ guestId: "a", name: " lordi ", ratings: {} }], me)).toBe(true);
-    });
-
-    it("is false when the other guest's ID sorts after, so exactly one gives up", () => {
-        expect(nameClash([{ guestId: "c", name: "Lordi", ratings: {} }], me)).toBe(false);
-        expect(nameClash([{ guestId: "b", name: "Lordi" }, { guestId: "a", name: "Netta" }], me)).toBe(false);
-    });
-
-    it("yields to a rated ballot whatever the guest IDs", () => {
-        expect(nameClash([{ guestId: "c", name: "Lordi", ratings: rated }], me)).toBe(true);
-    });
-
-    it("never yields once rating, even to an earlier ID", () => {
-        expect(nameClash([{ guestId: "a", name: "Lordi", ratings: rated }], { ...me, ratings: rated })).toBe(false);
-    });
-
-    it("never yields a name that is not from the reel", () => {
-        const own = { guestId: "b", name: "Grandma", ratings: {} };
-        expect(nameClash([{ guestId: "a", name: "Grandma", ratings: rated }], own)).toBe(false);
     });
 });
 
@@ -104,5 +77,50 @@ describe("withDistinctNames", () => {
             { guestId: "b", name: "Lordi 2", n: 1 },
             { guestId: "a", name: "Lordi", n: 2 },
         ]);
+    });
+});
+
+describe("distinctNames, who keeps the bare name", () => {
+    const rated = { a1: { c: 3 } };
+
+    it("goes to a guest with ratings over one without, whatever the guest IDs", () => {
+        const names = distinctNames([
+            { id: "a", name: "Lordi" },
+            { id: "z", name: "Lordi", ratings: rated },
+        ]);
+        expect(names.get("z")).toBe("Lordi");
+        expect(names.get("a")).toBe("Lordi 2");
+    });
+
+    it("counts a ticked bonus as taking part", () => {
+        const names = distinctNames([
+            { id: "a", name: "Lordi", ratings: {}, bonuses: {} },
+            { id: "z", name: "Lordi", ratings: {}, bonuses: { a1: ["wind"] } },
+        ]);
+        expect(names.get("z")).toBe("Lordi");
+        expect(names.get("a")).toBe("Lordi 2");
+    });
+
+    it("falls back to guest ID order when both or neither have taken part", () => {
+        const names = distinctNames([
+            { id: "b", name: "Lordi", ratings: rated },
+            { id: "a", name: "Lordi", ratings: rated },
+        ]);
+        expect(names.get("a")).toBe("Lordi");
+        expect(names.get("b")).toBe("Lordi 2");
+    });
+});
+
+describe("displayNameOf", () => {
+    const ballots = [{ guestId: "a", name: "Lordi" }, { guestId: "b", name: "Lordi" }];
+
+    it("is the numbered name the lists show", () => {
+        expect(displayNameOf(ballots, "a", "Lordi")).toBe("Lordi");
+        expect(displayNameOf(ballots, "b", "Lordi")).toBe("Lordi 2");
+    });
+
+    it("is the fallback while the ballots or the guest's ballot aren't there", () => {
+        expect(displayNameOf(undefined, "b", "Lordi")).toBe("Lordi");
+        expect(displayNameOf(ballots, "c", "Netta")).toBe("Netta");
     });
 });

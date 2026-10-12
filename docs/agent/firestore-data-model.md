@@ -151,7 +151,7 @@ back or outside the results (verify case 14b).
   `arrayUnion`, except where a join must see the other names:
   `joinRoomWithFreeName` is a transaction that Firestore does not retry
   when it loses a race (permission-denied), so it reads the room and tries
-  again itself, up to `JOIN_ATTEMPTS` times. Score writes are fine, because
+  again itself, up to `JOIN_ATTEMPTS` (`MAX_PLAYERS + 8`) times, only while the player count has changed since its read; a start or a full room found on the re-read is answered as such. Score writes are fine, because
   their rule only checks the list's size and shape. `scripts/verify-firestore-rules.mjs` cases 2b, 2c and
   6c run simultaneous joins (2c: transactional ones, all landing under
   distinct names), a join racing the start, and simultaneous

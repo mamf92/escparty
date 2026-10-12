@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -19,7 +19,7 @@ import {
     type Bonuses,
     type Ratings,
 } from "../utils/partyModel";
-import { availablePartyNames, freePartyName, hasRatings, nameClash, withDistinctNames } from "../utils/partyNames";
+import { availablePartyNames, displayNameOf, withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
@@ -53,26 +53,6 @@ const PartyRoom = () => {
     const isHost = !!party && !!identity && identity.guestId === party.hostId;
     const tabKeys = isHost ? HOST_TABS : GUEST_TABS;
     const tabs = useRovingTabs(tabKeys, tab, setTab);
-
-    // Two guests can take one name at the same moment (their ballots are
-    // separate documents). The one whose guest ID sorts last gives it up,
-    // once per name, for a free one; the ballot is rewritten by useOwnBallot.
-    const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null);
-    const settledName = useRef<string | null>(null);
-    useEffect(() => {
-        if (!code || !identity || !ballots || settledName.current === identity.name) return;
-        // Ratings on the server or on this device both mean this guest has been here a while.
-        const serverRatings = ballots.find(ballot => ballot.guestId === identity.guestId)?.ratings;
-        const ratings = hasRatings(serverRatings) ? serverRatings : own.ballot.ratings;
-        if (!nameClash(ballots, { ...identity, ratings })) return;
-        settledName.current = identity.name;
-        const next = { ...identity, name: freePartyName(ballots.map(ballot => ballot.name)) };
-        savePartyIdentity(code, next);
-        // The server's ballots are the outside system this reacts to.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIdentity(next);
-        setRenamed({ from: identity.name, to: next.name });
-    }, [ballots, identity, code, own.ballot.ratings]);
 
     // The brand asks only once this tab is in a party that exists.
     useLeaveGuard(party && identity ? {
@@ -122,7 +102,7 @@ const PartyRoom = () => {
         <CalmPage
             className="calm-compact calm-noball"
             title={party.title}
-            subtitle={`Party ${party.code} · you're ${identity.name}`}
+            subtitle={`Party ${party.code} · you're ${displayNameOf(ballots, identity.guestId, identity.name)}`}
             footer={
                 <>
                     <CalmLink onClick={() => navigate(`/party/${party.code}/screen`)}>Open the big screen</CalmLink>
@@ -138,7 +118,6 @@ const PartyRoom = () => {
                 </Pane>
             </Ground>
             {error && <PartyError error={error} onRetry={retry} />}
-            {renamed && <CalmNote role="status">Someone took {renamed.from} at the same moment, so you&apos;re {renamed.to} tonight.</CalmNote>}
 
             <div className="party-stack" {...tabs.panel}>
                 {tab === "rate" && (
@@ -184,26 +163,24 @@ const JoinParty = ({ party, ballots, ballotsFailed, onJoin, footer }: {
 }) => {
     const [name, setName] = useState<string | null>(null);
     const [spinning, setSpinning] = useState(false);
-    // The names nobody has yet; the one landed on stays on the reel even if
-    // someone takes it meanwhile (the clash is settled once in the party).
     const checking = ballots === undefined && !ballotsFailed;
-    const taken = (ballots ?? []).map(ballot => ballot.name);
-    const takenKey = taken.join("\n");
-    const names = useMemo(() => {
-        const free = availablePartyNames(takenKey ? takenKey.split("\n") : []);
-        return name !== null && !free.includes(name) ? [...free, name] : free;
-    }, [takenKey, name]);
+    // The names nobody has yet (every name if the ballots can't be read).
+    const names = useMemo(() => availablePartyNames((ballots ?? []).map(ballot => ballot.name)), [ballots]);
+    // A landed name that a ballots update takes before this guest joins is let go.
+    const landed = name !== null && names.includes(name) ? name : null;
+    const justTaken = name !== null && landed === null ? name : null;
     return (
         <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
             <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
-            <NamePicker value={name} onChange={setName} onSpinningChange={setSpinning} names={names} />
+            <NamePicker value={landed} onChange={setName} onSpinningChange={setSpinning} names={names} disabled={checking} />
             {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
+            {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
             <Ground>
                 <Pane>
                     <Control
                         elevation="high"
-                        disabled={name === null || spinning || checking}
-                        onClick={() => name !== null && onJoin({ guestId: uuidv4(), name, isHost: false })}
+                        disabled={landed === null || spinning || checking}
+                        onClick={() => landed !== null && onJoin({ guestId: uuidv4(), name: landed, isHost: false })}
                     >
                         Join the party
                     </Control>
@@ -293,7 +270,7 @@ const RateAct = ({ party, ballot, actIndex, onMove, onRate, onBonus, onDone }: {
 
             {bonuses.length > 0 && (
                 <>
-                    <h2 className="esc-section" id={`${jumpId}-bonuses`} ref={bonusHeading} tabIndex={-1}>Party bonuses</h2>
+                    <h2 className="esc-section" ref={bonusHeading} tabIndex={-1}>Party bonuses</h2>
                     <Ground>
                         <Pane>
                             {bonuses.map(bonus => (
