@@ -1,5 +1,7 @@
 import { countdownLabel } from "../../utils/quizTiming";
 import { CalmNote } from "../CalmPage";
+import { Badge } from "../../design";
+import { VerdictBurst } from "./VerdictBurst";
 
 /**
  * How a question was settled, as Quiz.tsx saw it happen: answered by a
@@ -10,24 +12,26 @@ export type QuizOutcome = "answered" | "timed-out" | "restored";
 
 /**
  * The head of the question screen: which question this is, the points so
- * far, and the clock big in the middle; once the question is settled the
- * clock's slot says the verdict in words (the markers' text twin). The
- * clock is a `role="timer"` named with the real seconds, which screen
- * readers read on request rather than every second. The verdict's polite
- * status region is there from the start, empty while the question is open,
- * so the verdict is announced when it arrives.
+ * far in a badge, and the clock big in the middle; once the question is
+ * settled and revealed the clock's slot holds the verdict burst. In a room
+ * an answer is locked in first (`settled` but not `revealed`): the clock
+ * stays, with "Answer locked in" under it, until answering closes for
+ * everyone. The clock is a `role="timer"` named with the real seconds,
+ * which screen readers read on request rather than every second.
  *
  * Presentation only: Quiz.tsx owns the clock and the scoring.
  */
-export const QuizStatus = ({ questionNumber, questionCount, score, timeLeft, settled, picked, correctAnswer, points, outcome, counted = true, nextIn }: {
+export const QuizStatus = ({ questionNumber, questionCount, score, timeLeft, settled, revealed = true, picked, correctAnswer, points, outcome, counted = true, nextIn }: {
   /** 1-based, for "Question 3 of 10". */
   questionNumber: number;
   questionCount: number;
-  /** The player's points so far. */
+  /** The player's points so far, as far as they may be shown. */
   score: number;
-  /** Whole seconds on the question's clock. */
+  /** Whole seconds on the clock: answering time left, while the clock shows. */
   timeLeft: number;
   settled: boolean;
+  /** Whether a settled question's verdict may be shown; false while a room is still answering. */
+  revealed?: boolean;
   picked: string | null;
   correctAnswer: string;
   /** Points this answer scored (0 for a wrong or unanswered question). */
@@ -38,46 +42,40 @@ export const QuizStatus = ({ questionNumber, questionCount, score, timeLeft, set
   counted?: boolean;
   /** What follows and when, where the room sets the pace ("Next question in 4s"). */
   nextIn?: string;
-}) => (
-  <div className="quiz-head">
-    <div className="quiz-head-row">
-      <p className="quiz-count">Question {questionNumber} of {questionCount}</p>
-      <p className="quiz-points">Points so far: <strong>{score}</strong></p>
-    </div>
-    {/* One slot for the clock and then the verdict, so the question below
-        doesn't move when one replaces the other. */}
-    <div className="quiz-slot">
-      {!settled && (
-        <div
-          className="quiz-clock"
-          role="timer"
-          aria-atomic="true"
-          aria-label={timeLeft === 1 ? "1 second left" : `${timeLeft} seconds left`}
-        >
-          <span aria-hidden="true">{countdownLabel(timeLeft)}</span>
-        </div>
-      )}
-      <div role="status">
-        {settled && <CalmNote>{verdict({ picked, correctAnswer, points, outcome, counted })}</CalmNote>}
-      </div>
-      {settled && nextIn && <CalmNote>{nextIn}</CalmNote>}
-    </div>
-  </div>
-);
-
-const verdict = ({ picked, correctAnswer, points, outcome, counted }: {
-  picked: string | null;
-  correctAnswer: string;
-  points: number;
-  outcome: QuizOutcome | null;
-  counted: boolean;
 }) => {
-  if (outcome === "restored") return `This question was already settled when you came back. The answer was ${correctAnswer}.`;
-  if (outcome === "answered") {
-    if (picked === correctAnswer && !counted) return "That's right, but the points didn't reach the room.";
-    return picked === correctAnswer
-      ? `Douze points! That's right: +${points} points.`
-      : `Nul points this time. The answer was ${correctAnswer}.`;
-  }
-  return `Time's up. The answer was ${correctAnswer}.`;
+  const showVerdict = settled && revealed;
+  const locked = settled && !revealed;
+  return (
+    <div className="quiz-head">
+      <div className="quiz-head-row">
+        <p className="quiz-count">Question {questionNumber} of {questionCount}</p>
+        <Badge className="quiz-points-badge" label="Points" value={score} />
+      </div>
+      {/* One slot for the clock and then the verdict, so the question below
+          doesn't move when one replaces the other. */}
+      <div className="quiz-slot">
+        {!showVerdict && (
+          <div
+            className="quiz-clock"
+            role="timer"
+            aria-atomic="true"
+            aria-label={timeLeft === 1 ? "1 second left" : `${timeLeft} seconds left`}
+          >
+            <span aria-hidden="true">{countdownLabel(timeLeft)}</span>
+          </div>
+        )}
+        {locked && <p className="quiz-locked" aria-hidden="true">Answer locked in</p>}
+        <VerdictBurst
+          questionNumber={questionNumber}
+          picked={showVerdict ? picked : null}
+          correctAnswer={correctAnswer}
+          points={points}
+          outcome={showVerdict ? outcome : null}
+          counted={counted}
+          locked={locked}
+        />
+        {showVerdict && nextIn && <CalmNote>{nextIn}</CalmNote>}
+      </div>
+    </div>
+  );
 };

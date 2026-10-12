@@ -30,7 +30,7 @@ export const Badge = ({ label, value, children, spell = false, selectable = fals
     <div className={cx("esc-badge", className)} {...props}>
       {label && <span className="esc-badge-label" aria-hidden="true">{label}</span>}
       <span className={cx("esc-badge-value", selectable && "esc-selectable")} aria-hidden="true">{children ?? text}</span>
-      <span className="esc-badge-spoken">{spoken}</span>
+      <span className="esc-badge-spoken esc-visually-hidden">{spoken}</span>
     </div>
   );
 };

@@ -81,8 +81,8 @@ export class ScoreWriteRejected extends Error {
 }
 
 /**
- * The rules refused a room's quiz pick (it is one-shot, or the key isn't a
- * quiz the rules know), as opposed to a failure that may go through on a
+ * The rules refused a room's quiz pick (the game has started, or the key or
+ * break setting isn't one the rules know), as opposed to a failure that may go through on a
  * retry, such as the network.
  */
 export class QuizPickRefused extends Error {
@@ -279,8 +279,9 @@ export const addPlayerToRoom = async (roomCode: string, playerId: string, player
 
 /**
  * Set which quiz a room plays (its `difficulty`, a quiz key), and optionally
- * how often its mid-quiz break comes. One-shot: firestore.rules refuses a
- * second write, which throws `QuizPickRefused`.
+ * how often its mid-quiz break comes. May be repeated until the game starts
+ * (the host changing the quiz); firestore.rules refuses it after, which
+ * throws `QuizPickRefused`.
  */
 export const setRoomDifficulty = async (roomCode: string, difficulty: string, breakEvery?: number): Promise<void> => {
     console.log(`Setting difficulty for room ${roomCode} to ${difficulty}`);

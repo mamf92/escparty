@@ -241,12 +241,34 @@ await expectAllowed("start game after difficulty set", () =>
   updateDoc(diff2.roomRef, startWrite())
 );
 
-// 5b. Malicious: re-set difficulty after it's already been set once
+// 5b. The host may change the quiz until the game starts (the green room's
+// "Change" button), but not after, and only with the quiz keys alone.
 const diff3 = freshRoom("DIFF3");
 await createRoom(diff3.roomRef, diff3.roomCode);
-await updateDoc(diff3.roomRef, { difficulty: "easy" });
-await expectDenied("re-set difficulty after it's already set", () =>
+await updateDoc(diff3.roomRef, { difficulty: "easy", breakEvery: 5 });
+await expectAllowed("re-pick the quiz before the game starts", () =>
+  updateDoc(diff3.roomRef, { difficulty: "t-nordic-nights", breakEvery: 3 })
+);
+await expectAllowed("re-pick the quiz without a break setting", () =>
   updateDoc(diff3.roomRef, { difficulty: "hard" })
+);
+await expectDenied("re-pick the quiz with an invalid key", () =>
+  updateDoc(diff3.roomRef, { difficulty: "t-Not Valid", breakEvery: 3 })
+);
+await expectDenied("re-pick the quiz with an invalid break setting", () =>
+  updateDoc(diff3.roomRef, { difficulty: "easy", breakEvery: 7 })
+);
+await expectDenied("re-pick the quiz while forging hostId", () =>
+  updateDoc(diff3.roomRef, { difficulty: "easy", hostId: "attacker" })
+);
+await expectDenied("re-pick the quiz while flipping started", () =>
+  updateDoc(diff3.roomRef, { difficulty: "easy", started: true })
+);
+await expectAllowed("start the game after re-picking", () =>
+  updateDoc(diff3.roomRef, startWrite())
+);
+await expectDenied("re-pick the quiz after the game has started", () =>
+  updateDoc(diff3.roomRef, { difficulty: "medium", breakEvery: 5 })
 );
 
 // 5d. Legitimate: a premade quiz as the room's quiz (#72), then start it
@@ -275,7 +297,7 @@ for (const [label, value] of [
 
 // 5f. A room may be created with its quiz already named, but only a real
 // quiz key: creation used to accept any string, leaving the room stuck on a
-// quiz no client can play (difficulty is one-shot).
+// quiz no client can play (the quiz can only be re-picked before the start).
 const preset = freshRoom("PRESET");
 await expectAllowed("create a room with a premade quiz already named", () =>
   setDoc(preset.roomRef, {
@@ -298,7 +320,7 @@ await createRoom(brk.roomRef, brk.roomCode);
 await expectAllowed("set a custom quiz with its break setting", () =>
   updateDoc(brk.roomRef, { difficulty: "c-AbCdEfGhIjKlMnOpQrSt", breakEvery: 4 })
 );
-await expectDenied("change the break setting after the quiz is set", () =>
+await expectAllowed("change the break setting before the game starts", () =>
   updateDoc(brk.roomRef, { breakEvery: 0 })
 );
 const brkBad = freshRoom("BRKBAD");

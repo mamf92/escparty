@@ -68,7 +68,10 @@ describe("MidQuizScoreboard", () => {
   it("lets a single player continue to the next question", async () => {
     renderBreak({ score: 800, currentQuestionIndex: 5, difficulty: "hard", multiplayer: false });
     expect(screen.getByRole("heading", { level: 1, name: "Scoreboard break" })).toBeInTheDocument();
-    expect(screen.getByText("You have 800 points so far.")).toBeInTheDocument();
+    expect(screen.getByText("Your score so far")).toBeInTheDocument();
+    expect(screen.getByText("800 points")).toHaveClass("esc-hero-number");
+    // The next step sits in the actions area, at the thumb.
+    expect(screen.getByRole("button", { name: "Continue the quiz" }).closest(".calm-actions")).not.toBeNull();
     // Single player has no room, so no standings either.
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(mocks.listenToRoom).not.toHaveBeenCalled();
@@ -113,8 +116,10 @@ describe("MidQuizScoreboard", () => {
     expect(rows[0]).toHaveClass("is-high");
     expect(rows[1]).not.toHaveClass("is-high");
     // The room's copy of this player's score wins when it's higher.
-    expect(screen.getByText("You have 700 points so far.")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Waiting for the host to continue…");
+    expect(screen.getByText("700 points", { selector: ".esc-hero-number" })).toBeInTheDocument();
+    const waiting = screen.getByText("Waiting for the host to continue…");
+    expect(waiting).toHaveAttribute("role", "status");
+    expect(waiting.closest(".calm-actions")).not.toBeNull();
     // No Continue for a guest, only the way out, saying what leaving does.
     expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["Leave the game, it goes on without you"]);
     // A playing host's room doesn't need ready marks.

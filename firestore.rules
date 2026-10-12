@@ -90,15 +90,16 @@ service cloud.firestore {
       let data = request.resource.data;
       let existingData = resource.data;
 
-      // Once set, difficulty is a one-shot choice — not re-settable, even
-      // before the game starts. Without auth there's no way to check the
-      // caller is actually the host, so this is the closest enforceable
-      // proxy for "only the host sets difficulty, and only once."
-      // `difficulty` names the quiz: see isQuizKey.
-      // The quiz's break setting (breakEvery) may ride along, once.
+      // The room's quiz may be (re)picked any number of times until the game
+      // starts, so the host can change a wrong pick from the green room.
+      // Without auth there's no way to check the caller is the host, so
+      // this is the same trust level as setPlayerReady/removePlayer: anyone
+      // holding the room code could already set the quiz first, and can now
+      // also change it, but only before start. The started == false check
+      // is what freezes it (isStartingGame still requires a quiz to exist).
+      // `difficulty` names the quiz: see isQuizKey. The quiz's break setting
+      // (breakEvery) may ride along, or be omitted (an earlier one stays).
       return affected.hasOnly(['difficulty', 'breakEvery']) &&
-             !('difficulty' in existingData) &&
-             !('breakEvery' in existingData) &&
              'difficulty' in data &&
              isQuizKey(data.difficulty) &&
              (!('breakEvery' in data) || isBreakEvery(data.breakEvery)) &&
