@@ -20,6 +20,25 @@ import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import "./quiz/quiz.css";
 
 
+/** Remember the score from before an answer was locked in (see scoreBeforeKey in Quiz). */
+const storeScoreBefore = (key: string | null, index: number, score: number) => {
+  if (!key) return;
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ index, score }));
+  } catch { /* storage unavailable: the badge falls back to the room's score */ }
+};
+
+/** The score kept for question `index`, or null when none is (or it's unreadable). */
+const readScoreBefore = (key: string | null, index: number): number | null => {
+  if (!key) return null;
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(key) ?? "null") as { index?: unknown; score?: unknown } | null;
+    return stored && stored.index === index && typeof stored.score === "number" ? stored.score : null;
+  } catch {
+    return null;
+  }
+};
+
 const Quiz = () => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   // Where the single-player break goes: the quiz's own setting (#72).
@@ -47,12 +66,12 @@ const Quiz = () => {
   const [loadingStatus, setLoadingStatus] = useState<string>("Getting the quiz ready…"); // Used in loading state display
   const [timeLeft, setTimeLeft] = useState(QUESTION_MS / 1000);
   const [timeLeftMs, setTimeLeftMs] = useState(QUESTION_MS); // More precise millisecond timer for scoring
-  const [showFeedback, setShowFeedback] = useState(false);
   // In a room: whether answers are still accepted, from the shared tick. An
   // answer is locked in at once but its verdict waits until this is false
   // (everyone has had the same time), so no one can read it off a
   // neighbour's screen. Alone, the verdict shows straight away.
-  const [answeringOpen, setAnsweringOpen] = useState(true);
+  const answeringOpen = timeLeftMs > 0;
+  const [showFeedback, setShowFeedback] = useState(false);
   // How the current question was settled, once it is: said by QuizStatus.
   const [outcome, setOutcome] = useState<QuizOutcome | null>(null);
   const [currentQuestionPoints, setCurrentQuestionPoints] = useState(0); // Points earned for current question
@@ -325,6 +344,10 @@ const Quiz = () => {
     ? 0
     : 1500 + ([...(playerId ?? "")].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 1000);
 
+  // The score before the answer was locked in, kept with the mark below:
+  // after a refresh the room's copy already holds this answer's points,
+  // which must stay out of the badge until answering closes.
+  const scoreBeforeKey = roomCode ? `scoreBeforeAnswer:${roomCode}` : null;
   // The question this client already answered (or timed out on), kept in
   // sessionStorage so a refresh can't reopen it and score it a second time.
   const answeredKey = roomCode ? `answeredQuestion:${roomCode}` : null;
@@ -340,6 +363,7 @@ const Quiz = () => {
   const forgetAnswered = (index: number, previous: number) => {
     if (!sharedClock || !answeredKey) return;
     if (Number(sessionStorage.getItem(answeredKey) ?? -1) !== index) return;
+    if (scoreBeforeKey && readScoreBefore(scoreBeforeKey, index) !== null) sessionStorage.removeItem(scoreBeforeKey);
     if (previous < 0) sessionStorage.removeItem(answeredKey);
     else sessionStorage.setItem(answeredKey, String(previous));
   };
@@ -374,7 +398,6 @@ const Quiz = () => {
       setCurrentQuestionPoints(0);
       setTimeLeft(QUESTION_MS / 1000);
       setTimeLeftMs(QUESTION_MS);
-      setAnsweringOpen(true); // the new question's tick sets the real value
     }
   }, [sharedClock, room?.phase, room?.currentQuestionIndex, currentQuestionIndex]);
 
@@ -407,7 +430,6 @@ const Quiz = () => {
       const now = Date.now();
       const clock = questionClock(startMs, now);
       setTimeLeftMs(clock.timeLeftMs);
-      setAnsweringOpen(clock.answeringOpen);
 
       if (clock.answeringOpen && !isSubmittedRef.current) {
         setTimeLeft(Math.ceil(clock.timeLeftMs / 1000));
@@ -610,6 +632,7 @@ const Quiz = () => {
     // is in flight can't reopen the question and score it twice: the points
     // come back from the room's copy (storedScore) if the write landed.
     rememberAnswered(answeredQuestion);
+    if (sharedClock) storeScoreBefore(scoreBeforeKey, answeredQuestion, score);
 
     // Check if answer is correct and calculate time-based score
     if (answer === currentQuestion.correctAnswer) {
@@ -692,7 +715,10 @@ const Quiz = () => {
   // The points shown: until the verdict is revealed, without this answer's
   // (`score` already holds them from the moment of the tap).
   const pendingPoints = revealed || pointsLostAt === currentQuestionIndex ? 0 : currentQuestionPoints;
-  const shownScore = Math.max(0, score - pendingPoints);
+  // After a refresh the room's score already holds a locked-in answer's
+  // points, so the score from before the tap (kept in sessionStorage) is shown.
+  const scoreBefore = !revealed && isSubmitted && outcome === "restored" ? readScoreBefore(scoreBeforeKey, currentQuestionIndex) : null;
+  const shownScore = scoreBefore !== null ? Math.min(scoreBefore, score) : Math.max(0, score - pendingPoints);
   // While locked in, the clock keeps counting what is left of answering time
   // (`timeLeft` has moved on to the slot's remaining seconds by then).
   const clockSeconds = isSubmitted && !revealed ? Math.max(1, Math.ceil(timeLeftMs / 1000)) : timeLeft;

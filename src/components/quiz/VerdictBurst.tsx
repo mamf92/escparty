@@ -12,10 +12,10 @@ const wrongLine = (questionNumber: number) => WRONG_LINES[Math.abs(questionNumbe
  * shakes (quiz.css); Calm and reduced motion show it still.
  *
  * The polite status region is always there, empty while the question is
- * open, and holds one plain sentence for screen readers; the big text is
+ * open, saying "Answer locked in." once a room player has tapped, and holds one plain sentence for screen readers; the big text is
  * the picture of the same thing, hidden from them.
  */
-export const VerdictBurst = ({ questionNumber, picked, correctAnswer, points, outcome, counted = true }: {
+export const VerdictBurst = ({ questionNumber, picked, correctAnswer, points, outcome, counted = true, locked = false }: {
   /** 1-based; picks the wrong-answer line. */
   questionNumber: number;
   picked: string | null;
@@ -26,13 +26,15 @@ export const VerdictBurst = ({ questionNumber, picked, correctAnswer, points, ou
   outcome: QuizOutcome | null;
   /** False when the room refused or never got this answer's score. */
   counted?: boolean;
+  /** An answer is locked in but its verdict is not out yet (a room still answering). */
+  locked?: boolean;
 }) => {
   const answer = `The answer was ${correctAnswer}.`;
   let tone: "right" | "wrong" | "still" = "still";
   let lead: string | null = null;
   let big = "";
   let line = "";
-  let said = "";
+  let said = locked && !outcome ? "Answer locked in." : "";
 
   if (outcome === "restored") {
     big = "Already settled";
@@ -63,7 +65,7 @@ export const VerdictBurst = ({ questionNumber, picked, correctAnswer, points, ou
 
   return (
     <>
-      <div role="status" className="quiz-sr">{said}</div>
+      <div role="status" className="esc-visually-hidden">{said}</div>
       {outcome && (
         <div className={`quiz-burst is-${tone}${lead ? " has-number" : ""}`} aria-hidden="true">
           {lead && <span className="quiz-burst-lead">{lead}</span>}

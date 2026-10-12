@@ -312,7 +312,8 @@ describe("Quiz multiplayer score writes (#131)", () => {
       for (const button of screen.getByRole("group", { name: "Answers" }).querySelectorAll("button")) expect(button).toBeDisabled();
       expect(markers()).toHaveLength(0);
       expect(screen.getByText("Answer locked in")).toBeInTheDocument();
-      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      // Screen readers hear it from the status region.
+      expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
       expect(screen.queryByText(/Douze points/)).not.toBeInTheDocument();
       expect(screen.queryByText(/ in \d+s$/)).not.toBeInTheDocument();
       // The countdown carries on, with answering time (not the slot's) left.
@@ -339,7 +340,7 @@ describe("Quiz multiplayer score writes (#131)", () => {
 
       await userEvent.setup().click(await screen.findByRole("button", { name: "Norway" }));
       expect(markers()).toHaveLength(0);
-      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
 
       closeAnswering();
       await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Nope! The answer was Sweden."));
@@ -354,11 +355,26 @@ describe("Quiz multiplayer score writes (#131)", () => {
 
       expect(await screen.findByText("Answer locked in")).toBeInTheDocument();
       expect(markers()).toHaveLength(0);
-      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
 
       closeAnswering();
       await vi.waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("This question was already settled when you came back."));
       expect(markers()).toHaveLength(1);
+    });
+
+    it("keeps the pre-answer score on the badge after a refresh while answering is open, then shows the full score", async () => {
+      const { room, send } = givenRoom(4_000);
+      // The room already holds the locked-in answer's points (500 + 300).
+      room.players = [{ id: "host", name: "Loreen", score: 800 }];
+      sessionStorage.setItem("answeredQuestion:ABCD", "0");
+      sessionStorage.setItem("scoreBeforeAnswer:ABCD", JSON.stringify({ index: 0, score: 500 }));
+      renderQuiz({ multiplayer: true, roomCode: "ABCD", playerId: "host" });
+
+      expect(await screen.findByText("Answer locked in")).toBeInTheDocument();
+      expect(screen.getByText("Points so far: 500")).toBeInTheDocument();
+
+      act(() => send({ ...room, players: [{ id: "host", name: "Loreen", score: 800 }], phaseStartedAt: { toMillis: () => Date.now() - 10_500 } as unknown as Room["phaseStartedAt"] }));
+      await vi.waitFor(() => expect(screen.getByText("Points so far: 800")).toBeInTheDocument());
     });
 
     it("doesn't lend the hidden points to the badge when the room refuses the write", async () => {
@@ -509,8 +525,7 @@ describe("Quiz solo clock (#160)", () => {
     ["an empty history", null],
     ["an unreadable history", "{not json"],
   ])("times out an unanswered question, shows the verdict, then saves the run once, from %s", async (_, stored) => {
-    // Only the clock and intervals: React schedules its own work on setTimeout.
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.useFakeTimers();
     try {
       if (stored === null) localStorage.removeItem("quizScores");
       else localStorage.setItem("quizScores", stored);
@@ -524,16 +539,15 @@ describe("Quiz solo clock (#160)", () => {
       await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Which country won in 1974?" })).toBeInTheDocument());
 
       // Ten seconds with no answer: the question locks with its verdict.
-      await vi.advanceTimersByTimeAsync(10_200);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_200); });
       expect(screen.getByRole("status")).toHaveTextContent("Time's up. The answer was Sweden.");
       expect(screen.queryByText("results")).not.toBeInTheDocument();
 
       // A moment of verdict (SOLO_VERDICT_MS), then the results, saved once.
-      // The verdict's one timer runs in real time (React schedules its own
-      // work on setTimeout, so that stays unfaked) from the deadline fixed
-      // at time's up.
+      await act(async () => { await vi.advanceTimersByTimeAsync(SOLO_VERDICT_MS - 600); });
       expect(screen.queryByText("results")).not.toBeInTheDocument();
-      expect(await screen.findByText("results", {}, { timeout: 4_000 })).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+      expect(screen.getByText("results")).toBeInTheDocument();
       expect(JSON.parse(localStorage.getItem("quizScores") ?? "[]")).toHaveLength(1);
     } finally {
       vi.useRealTimers();

@@ -264,20 +264,19 @@ const MidQuizScoreboard = () => {
   // proud row); the host of a multiplayer game only passes through.
   const showScore = !gameData.multiplayer || !isHost || players.some(p => p.id === gameData.playerId);
 
-  const actions = canContinue ? (
+  const actions = (
     <>
-      <Ground>
-        <Pane>
-          <Control elevation="high" onClick={continueQuiz} disabled={resuming}>
-            {resuming ? "Continuing…" : "Continue the quiz"}
-          </Control>
-        </Pane>
-      </Ground>
-      {resumeError && <CalmNote role="alert">{resumeError}</CalmNote>}
-    </>
-  ) : (
-    <>
-      <CalmNote role="status">Waiting for the host to continue…</CalmNote>
+      {canContinue ? (
+        <Ground>
+          <Pane>
+            <Control elevation="high" onClick={continueQuiz} disabled={resuming}>
+              {resuming ? "Continuing…" : "Continue the quiz"}
+            </Control>
+          </Pane>
+        </Ground>
+      ) : (
+        <CalmNote role="status">Waiting for the host to continue…</CalmNote>
+      )}
       {resumeError && <CalmNote role="alert">{resumeError}</CalmNote>}
     </>
   );

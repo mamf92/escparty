@@ -13,6 +13,6 @@ export const PointsBadge = ({ points }: {
   <p className="quiz-points-badge">
     <span className="quiz-points-label" aria-hidden="true">Points</span>
     <span className="quiz-points-value" aria-hidden="true">{points}</span>
-    <span className="quiz-sr">Points so far: {points}</span>
+    <span className="esc-visually-hidden">Points so far: {points}</span>
   </p>
 );

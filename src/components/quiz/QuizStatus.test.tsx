@@ -61,7 +61,7 @@ describe("QuizStatus", () => {
     renderWithProviders(<QuizStatus {...base} settled revealed={false} picked="Sweden" points={820} outcome="answered" nextIn="Next question in 9s" />);
     expect(screen.getByRole("timer")).toHaveAccessibleName("7 seconds left");
     expect(screen.getByText("Answer locked in")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(screen.getByRole("status")).toHaveTextContent("Answer locked in.");
     expect(screen.queryByText(/Next question in/)).not.toBeInTheDocument();
     expect(document.querySelector(".quiz-burst")).toBeNull();
   });

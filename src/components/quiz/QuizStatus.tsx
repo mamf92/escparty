@@ -64,7 +64,7 @@ export const QuizStatus = ({ questionNumber, questionCount, score, timeLeft, set
             <span aria-hidden="true">{countdownLabel(timeLeft)}</span>
           </div>
         )}
-        {locked && <p className="quiz-locked">Answer locked in</p>}
+        {locked && <p className="quiz-locked" aria-hidden="true">Answer locked in</p>}
         <VerdictBurst
           questionNumber={questionNumber}
           picked={showVerdict ? picked : null}
@@ -72,6 +72,7 @@ export const QuizStatus = ({ questionNumber, questionCount, score, timeLeft, set
           points={points}
           outcome={showVerdict ? outcome : null}
           counted={counted}
+          locked={locked}
         />
         {showVerdict && nextIn && <CalmNote>{nextIn}</CalmNote>}
       </div>
