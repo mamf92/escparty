@@ -325,7 +325,7 @@ const NightJoin = ({ night, guests, error, onRetry, onJoin, footer }: {
             const joined = await joinNight(night.code, attempt.guestId, attempt.name);
             clearPendingNightJoin(night.code);
             if (joined) {
-                onJoin({ guestId: attempt.guestId, name: attempt.name, isHost: false });
+                onJoin({ guestId: attempt.guestId, name: attempt.name });
                 return;
             }
             setPending(null);

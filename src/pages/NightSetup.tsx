@@ -44,7 +44,7 @@ const NightSetup = () => {
         try {
             const hostId = uuidv4();
             const code = await createNight(trimmed, hostId, name);
-            saveNightIdentity(code, { guestId: hostId, name, isHost: true });
+            saveNightIdentity(code, { guestId: hostId, name });
             // Replace: Back from the night's home shouldn't land on a form that would make another.
             navigate(`/n/${code}`, { replace: true });
         } catch (error) {

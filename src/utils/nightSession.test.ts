@@ -9,7 +9,7 @@ import {
     savePendingNightJoin,
 } from "./nightSession";
 
-const me = { guestId: "g1", name: "Jedward", isHost: false };
+const me = { guestId: "g1", name: "Jedward" };
 
 beforeEach(() => {
     localStorage.clear();
@@ -27,7 +27,7 @@ describe("identity", () => {
     });
 
     it("ignores what doesn't look like one", () => {
-        localStorage.setItem("escparty.night.ABBA", JSON.stringify({ guestId: "", name: "x", isHost: false }));
+        localStorage.setItem("escparty.night.ABBA", JSON.stringify({ guestId: "", name: "x" }));
         expect(readNightIdentity("ABBA")).toBeNull();
         localStorage.setItem("escparty.night.ABBA", "{broken");
         expect(readNightIdentity("ABBA")).toBeNull();

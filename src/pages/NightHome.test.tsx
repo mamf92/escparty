@@ -33,7 +33,7 @@ const ui = () => (
 const renderHome = (entry = "/n/abba") => renderWithProviders(ui(), { initialEntries: [entry] });
 
 const host = { id: "host-1", name: "Loreen" };
-const me = { guestId: "g-me", name: "Lordi", isHost: false };
+const me = { guestId: "g-me", name: "Lordi" };
 const roster = [host, { id: "g-me", name: "Lordi" }, { id: "g-3", name: "Netta" }];
 const data = (change: Partial<NightData> = {}): NightData => ({ night: makeNight(), guests: roster, error: null, retry: vi.fn(), ...change });
 
@@ -101,7 +101,7 @@ describe("NightHome", () => {
             const [code, guestId, name] = mocks.joinNight.mock.calls[0];
             expect(code).toBe("ABBA");
             expect(name).toBe("Käärijä");
-            expect(readNightIdentity("ABBA")).toEqual({ guestId, name: "Käärijä", isHost: false });
+            expect(readNightIdentity("ABBA")).toEqual({ guestId, name: "Käärijä" });
             expect(lastNightCode()).toBe("ABBA");
             expect(readPendingNightJoin("ABBA")).toBeNull();
             expect(await screen.findByText("You're Käärijä")).toBeInTheDocument();
@@ -239,7 +239,7 @@ describe("NightHome", () => {
         });
 
         it("marks you as the host when you are, and says so once in the row", async () => {
-            saveNightIdentity("ABBA", { guestId: "host-1", name: "Loreen", isHost: true });
+            saveNightIdentity("ABBA", { guestId: "host-1", name: "Loreen" });
             mocks.fetchNightGuest.mockResolvedValue(host);
             renderHome();
             const rows = within(await screen.findByRole("list", { name: "Who's here" })).getAllByRole("listitem");
@@ -380,7 +380,7 @@ describe("NightHome", () => {
         });
 
         it("tells the host that the guests keep the party and the host controls don't come back", async () => {
-            saveNightIdentity("ABBA", { guestId: "host-1", name: "Loreen", isHost: true });
+            saveNightIdentity("ABBA", { guestId: "host-1", name: "Loreen" });
             mocks.fetchNightGuest.mockResolvedValue(host);
             const user = userEvent.setup();
             renderHome();
@@ -405,7 +405,7 @@ describe("NightHome", () => {
 
     describe("the host", () => {
         it("opens the TV screen in a new tab", async () => {
-            saveNightIdentity("ABBA", { guestId: "host-1", name: "Loreen", isHost: true });
+            saveNightIdentity("ABBA", { guestId: "host-1", name: "Loreen" });
             mocks.fetchNightGuest.mockResolvedValue(host);
             const open = vi.spyOn(window, "open").mockReturnValue(null);
             renderHome();

@@ -53,7 +53,7 @@ describe("Home", () => {
   });
 
   it("offers a white way back to the last party night, and no second black button", async () => {
-    saveNightIdentity("ABBA", { guestId: "g1", name: "Lordi", isHost: false });
+    saveNightIdentity("ABBA", { guestId: "g1", name: "Lordi" });
     const user = userEvent.setup();
     renderWithProviders(
       <Routes>

@@ -9,10 +9,10 @@
  * it, so the quizzes and scoreboards that come later read it from here.
  */
 
+/** Who hosts is the night's hostId, so the identity doesn't store it. */
 export interface NightIdentity {
     guestId: string;
     name: string;
-    isHost: boolean;
 }
 
 const identityKey = (code: string) => `escparty.night.${code}`;
@@ -47,7 +47,7 @@ const remove = (key: string) => {
 const isIdentity = (value: unknown): value is NightIdentity => {
     const identity = value as NightIdentity | null;
     return !!identity && typeof identity.guestId === "string" && identity.guestId.length > 0 &&
-        typeof identity.name === "string" && typeof identity.isHost === "boolean";
+        typeof identity.name === "string";
 };
 
 export const readNightIdentity = (code: string) => read(identityKey(code), isIdentity);

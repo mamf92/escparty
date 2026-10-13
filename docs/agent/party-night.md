@@ -41,9 +41,10 @@ moved says "The party moved to WXYZ." with one black button to `/n/WXYZ`
 
 `src/utils/nightSession.ts` keeps, per night code in localStorage:
 
-- `escparty.night.CODE` = `{ guestId, name, isHost }`, written when a join is
+- `escparty.night.CODE` = `{ guestId, name }`, written when a join is
   confirmed or a night is created. The guest id and name are this device's
   for every activity in the night (later activities read them from here).
+  Who hosts isn't stored: it is whoever the night's `hostId` names.
 - `escparty.night.CODE.joining` = `{ guestId, name }`, a join that was sent
   and not confirmed. A retry reuses the same id and name (also after a
   reload), so a write that landed late is found by `joinNight` instead of

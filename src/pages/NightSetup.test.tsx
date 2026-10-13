@@ -58,7 +58,7 @@ describe("NightSetup", () => {
         expect(title).toBe("Semi night");
         expect(hostId).toMatch(/^[0-9a-f-]{36}$/);
         expect(hostName).toBeTruthy();
-        expect(readNightIdentity("ABBA")).toEqual({ guestId: hostId, name: hostName, isHost: true });
+        expect(readNightIdentity("ABBA")).toEqual({ guestId: hostId, name: hostName });
     });
 
     it("replaces the setup in the history, so Back doesn't make another night", async () => {
