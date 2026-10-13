@@ -354,8 +354,16 @@ it once, with one id and one name, and the evening's quizzes and parties are
 listed on it. Client API: `src/utils/nightsFirestore.ts`; the code is drawn
 by `freeCode()` (`src/utils/freeCode.ts`), which draws `generateRoomCode()`
 until it is free in `rooms`, `parties` and `nights` (up to 5 tries, then a
-friendly error). `createRoom`/`createParty` callers use it too
-(`MultiplayerLobby`, `QuizResults`' play again, `createParty`).
+friendly error). A collection the rules won't let it read counts as free
+(rules from before #232 deny `nights`); any other failed lookup is thrown.
+`createRoom`/`createParty` callers use it too (`MultiplayerLobby`,
+`QuizResults`' play again, `createParty`).
+
+A leave (`leaveNight`, `leaveParty`), `closeNight`, `addNightActivity` and
+`moveNight` that is refused reads the state again and counts as done when it
+is already there (`settleRefusal` in `src/utils/firestoreRefusal.ts`): a retry
+of a write that landed, its answer lost, deletes what's gone or changes
+nothing, which the rules refuse.
 
 ```ts
 nights/{code}                       // 4 uppercase letters

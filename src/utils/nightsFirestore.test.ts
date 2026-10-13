@@ -50,6 +50,7 @@ beforeEach(() => {
     firebaseState.db = {};
     mocks.doc.mockImplementation((_db: unknown, ...path: string[]) => ({ path: path.join("/") }));
     mocks.collection.mockImplementation((_db: unknown, ...path: string[]) => ({ path: path.join("/") }));
+    mocks.updateDoc.mockResolvedValue(undefined);
     mocks.writeBatch.mockReturnValue({ set: mocks.batchSet, delete: mocks.batchDelete, commit: mocks.batchCommit });
 });
 
@@ -256,9 +257,14 @@ describe("host writes", () => {
     it("count a retried add or close that already went through as done", async () => {
         const activity = { kind: "quiz" as const, code: "ABBA", title: "Pub quiz" };
         mocks.updateDoc.mockRejectedValue(denied);
-        mocks.getDoc.mockResolvedValue(snapshot({ activities: [activity], closed: true }));
+        mocks.getDoc.mockResolvedValue(snapshot({ activities: [activity], closed: true, movedTo: "NEXT" }));
         await expect(addNightActivity("NITE", activity)).resolves.toBeUndefined();
         await expect(closeNight("NITE")).resolves.toBeUndefined();
+        await expect(moveNight("NITE", "NEXT")).resolves.toBeUndefined();
+        // Same code, other title: not the add that landed.
+        await expect(addNightActivity("NITE", { ...activity, title: "Other" })).rejects.toBe(denied);
+        // Moved, but elsewhere: not this move.
+        await expect(moveNight("NITE", "ELSE")).rejects.toBe(denied);
         // Not there, or still open: the refusal was real.
         mocks.getDoc.mockResolvedValue(snapshot({ activities: [], closed: false }));
         await expect(addNightActivity("NITE", activity)).rejects.toBe(denied);

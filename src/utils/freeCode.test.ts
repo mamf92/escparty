@@ -52,6 +52,13 @@ describe("freeCode", () => {
         expect(await freeCode()).toBe("ABBA");
     });
 
+    it("fails on any other lookup failure, so an offline host hears about it", async () => {
+        mocks.generateRoomCode.mockReturnValue("ABBA");
+        const offline = Object.assign(new Error("offline"), { code: "unavailable" });
+        mocks.getDoc.mockRejectedValue(offline);
+        await expect(freeCode()).rejects.toBe(offline);
+    });
+
     it("gives up with a friendly error after five taken codes", async () => {
         mocks.generateRoomCode.mockReturnValue("ABBA");
         takenAt("nights/ABBA");

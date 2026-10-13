@@ -17,11 +17,14 @@ import {
     Timestamp,
     updateDoc,
     writeBatch,
+    type DocumentReference,
+    type DocumentSnapshot,
     type FieldValue,
     type WriteBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { freeCode } from "./freeCode";
+import { isDenied, settleRefusal } from "./firestoreRefusal";
 import { nameKey } from "./freeName";
 import { JOIN_TIMEOUT_MS } from "./partyFirestore";
 
@@ -109,7 +112,7 @@ export const createNight = async (title: string, hostId: string, hostName: strin
             // Another host took this code between the check and the write:
             // the write then counts as an update, which the rules refuse. Any
             // other refusal (of the host's claim or guest) is the real error.
-            if ((error as { code?: string }).code === "permission-denied") {
+            if (isDenied(error)) {
                 const taken = await getDoc(ref).then(snapshot => snapshot.exists(), () => false);
                 if (taken) continue;
             }
@@ -128,8 +131,8 @@ export const createNight = async (title: string, hostId: string, hostName: strin
  * claimed it), `false` when someone else has it. Offline, a write waits rather
  * than fails, so after JOIN_TIMEOUT_MS this rejects; the queued write may
  * still land, which a retry with the same `guestId` then finds. A closed
- * night refuses the join like a taken name does, but with no claim to find,
- * so the refusal is rethrown.
+ * night refuses every join: that refusal is rethrown, also when someone else
+ * holds the name, so `false` only ever means taken in an open night.
  */
 export const joinNight = async (code: string, guestId: string, name: string): Promise<boolean> => {
     const firestore = requireDb();
@@ -143,7 +146,7 @@ export const joinNight = async (code: string, guestId: string, name: string): Pr
         await Promise.race([batch.commit(), timeout]);
         return true;
     } catch (error) {
-        if ((error as { code?: string }).code !== "permission-denied") throw error;
+        if (!isDenied(error)) throw error;
         const claim = await getDoc(doc(firestore, "nights", code, "names", nameKey(name)));
         if (!claim.exists()) throw error;
         if (claim.data().guestId === guestId) return true;
@@ -168,23 +171,16 @@ export const leaveNight = async (code: string, guestId: string, name: string): P
     const batch = writeBatch(firestore);
     batch.delete(guest);
     batch.delete(doc(firestore, "nights", code, "names", nameKey(name)));
-    try {
-        await batch.commit();
-    } catch (error) {
-        // A retry after a leave that went through (its answer lost) deletes
-        // documents that are gone, which the rules refuse: done all the same.
-        if (isDenied(error) && !(await getDoc(guest)).exists()) return;
-        throw error;
-    }
+    // A retry after a leave that went through (its answer lost) deletes
+    // documents that are gone, which the rules refuse: done all the same.
+    await batch.commit().catch(error => settleRefusal(error, async () => !(await getDoc(guest)).exists()));
 };
-
-const isDenied = (error: unknown) => (error as { code?: string }).code === "permission-denied";
 
 /** Follow a night. `onNight(null)` when it doesn't exist. Returns the unsubscribe. */
 export const listenToNight = (code: string, onNight: (night: Night | null) => void, onError?: (error: Error) => void) =>
     onSnapshot(
         doc(requireDb(), "nights", code),
-        snapshot => onNight(snapshot.exists() ? toNight(snapshot.data() as Night) : null),
+        snapshot => onNight(fromSnapshot(snapshot)),
         error => onError?.(error),
     );
 
@@ -193,6 +189,9 @@ export const listenToNight = (code: string, onNight: (night: Night | null) => vo
  * is added, but a night's list is still tidied here, so a screen never meets
  * an entry it can't open.
  */
+const fromSnapshot = (snapshot: DocumentSnapshot): Night | null =>
+    snapshot.exists() ? toNight(snapshot.data() as Night) : null;
+
 const toNight = (night: Night): Night => ({
     ...night,
     activities: (Array.isArray(night.activities) ? night.activities : []).filter(isNightActivity),
@@ -244,36 +243,32 @@ export const fetchNightGuest = async (code: string, guestId: string): Promise<Ni
  */
 export const addNightActivity = async (code: string, activity: NightActivity): Promise<void> => {
     const ref = doc(requireDb(), "nights", code);
-    try {
-        await updateDoc(ref, { activities: arrayUnion(activity) });
-    } catch (error) {
-        // A retry of an add that went through changes nothing, which the
-        // rules refuse (the list must grow by one): done all the same.
-        if (isDenied(error) && (await readNight(ref))?.activities.some(listed => listed.code === activity.code)) return;
-        throw error;
-    }
+    // A retry of an add that went through changes nothing (arrayUnion skips
+    // an entry equal in every field), which the rules refuse, since the
+    // list must grow by one: done all the same.
+    await updateDoc(ref, { activities: arrayUnion(activity) }).catch(error => settleRefusal(error, async () =>
+        (await readNight(ref))?.activities.some(listed =>
+            listed.kind === activity.kind && listed.code === activity.code && listed.title === activity.title) === true));
 };
 
 /** End the evening: nobody joins and nothing is added after this. */
 export const closeNight = async (code: string): Promise<void> => {
     const ref = doc(requireDb(), "nights", code);
-    try {
-        await updateDoc(ref, { closed: true });
-    } catch (error) {
-        // Closing a closed night (a retry) is refused, and already done.
-        if (isDenied(error) && (await readNight(ref))?.closed === true) return;
-        throw error;
-    }
-};
-
-const readNight = async (ref: ReturnType<typeof doc>): Promise<Night | null> => {
-    const snapshot = await getDoc(ref);
-    return snapshot.exists() ? toNight(snapshot.data() as Night) : null;
+    // Closing a closed night (a retry) is refused, and already done.
+    await updateDoc(ref, { closed: true }).catch(error => settleRefusal(error, async () =>
+        (await readNight(ref))?.closed === true));
 };
 
 /**
  * Carry the guests on to a fresh night, `toCode` (made by the same host,
  * open, with no activities yet): this one is closed and points at it. Once.
  */
-export const moveNight = (code: string, toCode: string) =>
-    updateDoc(doc(requireDb(), "nights", code), { movedTo: toCode, closed: true });
+export const moveNight = async (code: string, toCode: string): Promise<void> => {
+    const ref = doc(requireDb(), "nights", code);
+    // A retry of a move that went through is refused (movedTo is set once):
+    // done when it points where this one would have.
+    await updateDoc(ref, { movedTo: toCode, closed: true }).catch(error => settleRefusal(error, async () =>
+        (await readNight(ref))?.movedTo === toCode));
+};
+
+const readNight = async (ref: DocumentReference): Promise<Night | null> => fromSnapshot(await getDoc(ref));

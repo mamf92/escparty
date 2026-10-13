@@ -23,6 +23,7 @@ import { sanitiseBonuses, type Ballot, type Bonuses, type RatingTemplate, type R
 import { resultsFor } from "./partyResults";
 import { freeCode } from "./freeCode";
 import { nameKey } from "./freeName";
+import { isDenied, settleRefusal } from "./firestoreRefusal";
 
 export interface PartyResults {
     /** A final's real places, act id -> 1-based place. */
@@ -137,7 +138,7 @@ export const createParty = async (party: NewParty, hostName: string): Promise<st
             // Another host took this code between the check and the write:
             // the write then counts as an update, which the rules refuse. Any
             // other refusal (of the host's claim or ballot) is the real error.
-            if ((error as { code?: string }).code === "permission-denied") {
+            if (isDenied(error)) {
                 const taken = await getDoc(ref).then(snapshot => snapshot.exists(), () => false);
                 if (taken) continue;
             }
@@ -259,7 +260,7 @@ export const joinParty = async (code: string, guestId: string, name: string): Pr
         await Promise.race([batch.commit(), timeout]);
         return true;
     } catch (error) {
-        if ((error as { code?: string }).code !== "permission-denied") throw error;
+        if (!isDenied(error)) throw error;
         const claim = await getDoc(doc(firestore, "parties", code, "names", nameKey(name)));
         if (!claim.exists()) throw error;
         return claim.data().guestId === guestId;
@@ -280,14 +281,9 @@ export const leaveParty = async (code: string, guestId: string, name: string): P
     const batch = writeBatch(firestore);
     batch.delete(ballot);
     batch.delete(doc(firestore, "parties", code, "names", nameKey(name)));
-    try {
-        await batch.commit();
-    } catch (error) {
-        // A retry after a leave that went through (its answer lost) deletes
-        // documents that are gone, which the rules refuse: done all the same.
-        if ((error as { code?: string }).code === "permission-denied" && !(await getDoc(ballot)).exists()) return;
-        throw error;
-    }
+    // A retry after a leave that went through (its answer lost) deletes
+    // documents that are gone, which the rules refuse: done all the same.
+    await batch.commit().catch(error => settleRefusal(error, async () => !(await getDoc(ballot)).exists()));
 };
 
 /** Read one guest's ballot, e.g. to restore it after a reload. */
