@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { createNightRoom, createRoom, joinRoom, joinRoomWithFreeName, getRoom, JoinRejected } from "../utils/roomsFirestore";
 import { nextQuizTitle } from "../utils/nightActivities";
 import { addNightActivity, fetchNight } from "../utils/nightsFirestore";
-import { readNightIdentity, type NightIdentity } from "../utils/nightSession";
+import { readNightLaunch } from "../utils/nightSession";
 import { freeCode } from "../utils/freeCode";
 import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
@@ -74,14 +74,14 @@ const MultiplayerLobby = () => {
   // Hosting from a party night's home (#235): the room is made as the night's
   // guest and listed on the night. Without the night's identity on this
   // device (it left, or cleared its storage) it is an ordinary game.
-  const [night] = useState<{ code: string; identity: NightIdentity } | null>(() => {
-    const code = (location.state as { nightCode?: string } | null)?.nightCode;
-    const identity = typeof code === "string" && /^[A-Z]{4}$/.test(code) ? readNightIdentity(code) : null;
-    return code && identity ? { code, identity } : null;
+  const [night] = useState(() => {
+    const launch = readNightLaunch(location.state);
+    return launch && { code: launch.nightCode, identity: launch.identity };
   });
   // The night's room once made, so a retry after a failed listing lists it
-  // instead of leaving it unlisted and making another.
-  const madeRoom = useRef<string | null>(null);
+  // instead of leaving it unlisted and making another, unless the host has
+  // since chosen the other way to host: that is another room.
+  const madeRoom = useRef<{ code: string; hostIsObserver: boolean } | null>(null);
   const [joinCode, setJoinCode] = useState(arrival.joinCode ?? "");
   // Four letters, A to Z; the field upper-cases what is typed.
   const codeInvalid = !/^[A-Z]{4}$/.test(joinCode);
@@ -160,7 +160,8 @@ const MultiplayerLobby = () => {
       const hostId = night ? night.identity.guestId : uuidv4();
       const hostName = night ? night.identity.name : HOST_NAME;
 
-      let newGameCode = madeRoom.current;
+      if (madeRoom.current?.hostIsObserver !== hostIsObserver) madeRoom.current = null;
+      let newGameCode = madeRoom.current?.code;
       if (!newGameCode) {
         // A code no room, party or night has (#232): one code field serves all three
         newGameCode = await freeCode();
@@ -168,7 +169,7 @@ const MultiplayerLobby = () => {
         // Create the room in Firestore
         if (night) await createNightRoom(newGameCode, hostId, hostName, hostIsObserver, night.code);
         else await createRoom(newGameCode, hostId, hostName, hostIsObserver);
-        if (night) madeRoom.current = newGameCode;
+        if (night) madeRoom.current = { code: newGameCode, hostIsObserver };
         if (quizKey) {
           // Best effort: if it doesn't stick, the lobby still offers the list.
           await setRoomQuiz(newGameCode, quizKey).catch(error =>
@@ -178,7 +179,11 @@ const MultiplayerLobby = () => {
       if (night) {
         // The room exists first: the night's rules only list a room made for it.
         const current = await fetchNight(night.code);
-        await addNightActivity(night.code, { kind: "quiz", code: newGameCode, title: nextQuizTitle(current?.activities ?? []) });
+        const listed = current?.activities ?? [];
+        // A listing that landed before an error on this side is not added twice.
+        if (!listed.some(activity => activity.kind === "quiz" && activity.code === newGameCode)) {
+          await addNightActivity(night.code, { kind: "quiz", code: newGameCode, title: nextQuizTitle(listed) });
+        }
       }
 
       // Left while the room was being made: it stays empty and unused, and

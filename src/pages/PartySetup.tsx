@@ -7,7 +7,7 @@ import { ChoiceCard, ChoiceGrid, Control, Field, Ground, Pane, Row } from "../de
 import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
 import { addNightActivity } from "../utils/nightsFirestore";
-import { readNightIdentity, type NightIdentity } from "../utils/nightSession";
+import { readNightLaunch } from "../utils/nightSession";
 import {
     BONUS_LIMITS,
     CATEGORY_LIMITS,
@@ -77,15 +77,15 @@ const BonusSwitch = ({ label, points, on, onToggle }: { label: string; points?: 
 const PartySetup = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [night] = useState<{ code: string; identity: NightIdentity } | null>(() => {
-        const code = (location.state as { nightCode?: string } | null)?.nightCode;
-        const identity = typeof code === "string" && /^[A-Z]{4}$/.test(code) ? readNightIdentity(code) : null;
-        return code && identity ? { code, identity } : null;
+    const [night] = useState(() => {
+        const launch = readNightLaunch(location.state);
+        return launch && { code: launch.nightCode, identity: launch.identity };
     });
     const steps = night ? NIGHT_STEPS : STEPS;
     const last = steps.length;
     // The party once made, so a retry after a failed listing lists it instead of making another.
-    const made = useRef<string | null>(null);
+    // Only for the inputs that made it: another show, sheet or bonuses make another party.
+    const made = useRef<{ code: string; inputs: string } | null>(null);
     const ids = useId();
     const [params, setParams] = useSearchParams();
     const [contestId, setContestId] = useState<string | null>(null);
@@ -154,9 +154,11 @@ const PartySetup = () => {
             const fetched = await fetchContest(contest.id);
             if (!fetched) throw new Error(`No show ${contest.id}`);
             const hostId = night ? night.identity.guestId : uuidv4();
-            let code = made.current;
+            const withBonuses: RatingTemplate = chosenBonuses.length > 0 ? { ...template, bonuses: chosenBonuses } : template;
+            const inputs = JSON.stringify([fetched.id, withBonuses]);
+            if (made.current?.inputs !== inputs) made.current = null;
+            let code = made.current?.code;
             if (!code) {
-                const withBonuses: RatingTemplate = chosenBonuses.length > 0 ? { ...template, bonuses: chosenBonuses } : template;
                 code = await createParty({
                     hostId,
                     title: fetched.title,
@@ -170,7 +172,7 @@ const PartySetup = () => {
                     ...(night ? { nightCode: night.code } : {}),
                 }, hostName);
                 savePartyIdentity(code, { guestId: hostId, name: hostName, isHost: true });
-                if (night) made.current = code;
+                if (night) made.current = { code, inputs };
             }
             // The party exists first: the night's rules only list a party made for it.
             if (night) await addNightActivity(night.code, { kind: "scoreboard", code, title: fetched.title });

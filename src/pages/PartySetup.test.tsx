@@ -457,6 +457,24 @@ describe("PartySetup", () => {
             expect(mocks.addNightActivity).toHaveBeenCalledTimes(2);
         });
 
+        it("makes another party when the sheet is changed after a failed listing", async () => {
+            mocks.addNightActivity.mockRejectedValueOnce(new Error("offline"));
+            mocks.createParty.mockResolvedValueOnce("ABBA").mockResolvedValueOnce("LORD");
+            const user = userEvent.setup();
+            renderSetup({ nightCode: "NITE" });
+            await reachNightStart(user);
+            await user.click(screen.getByRole("button", { name: "Start the party" }));
+            expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be created");
+            await user.click(screen.getByRole("button", { name: "System back" }));
+            await user.click(screen.getByRole("button", { name: "System back" }));
+            await user.click(screen.getByRole("radio", { name: /Jury/ }));
+            await user.click(screen.getByRole("button", { name: "Continue" }));
+            await user.click(screen.getByRole("button", { name: "Start the party" }));
+            expect(await screen.findByText("at /party/LORD")).toBeInTheDocument();
+            expect(mocks.createParty).toHaveBeenCalledTimes(2);
+            expect(mocks.addNightActivity).toHaveBeenLastCalledWith("NITE", expect.objectContaining({ code: "LORD" }));
+        });
+
         it("is an ordinary party, with its name step, when this device is not in that night", async () => {
             localStorage.clear();
             renderSetup({ nightCode: "NITE" });

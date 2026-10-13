@@ -106,6 +106,12 @@ const expiry = () => Timestamp.fromMillis(Date.now() + PARTY_LIFETIME_DAYS * 24 
 export const partyExists = async (code: string): Promise<boolean> =>
     (await getDoc(doc(requireDb(), "parties", code))).exists();
 
+/** Read a party once, or null when there is none. */
+export const fetchParty = async (code: string): Promise<Party | null> => {
+    const snapshot = await getDoc(doc(requireDb(), "parties", code));
+    return snapshot.exists() ? toParty(snapshot.data() as Party) : null;
+};
+
 /**
  * Create a party under a fresh 4-letter code and return the code. The code
  * is free among rooms, parties and nights (freeCode); it is tried again if

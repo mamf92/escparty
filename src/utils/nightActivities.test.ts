@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     fetchBallot: vi.fn(),
+    fetchParty: vi.fn(),
     leaveParty: vi.fn(),
     getRoom: vi.fn(),
     removePlayerFromRoom: vi.fn(),
 }));
-vi.mock("./partyFirestore", () => ({ fetchBallot: mocks.fetchBallot, leaveParty: mocks.leaveParty }));
+vi.mock("./partyFirestore", () => ({ fetchBallot: mocks.fetchBallot, fetchParty: mocks.fetchParty, leaveParty: mocks.leaveParty }));
 vi.mock("./roomsFirestore", () => ({ getRoom: mocks.getRoom, removePlayerFromRoom: mocks.removePlayerFromRoom }));
 
 import { leaveNightActivities, nextQuizTitle, quizStage } from "./nightActivities";
@@ -17,6 +18,8 @@ const me = { guestId: "g-me", name: "Lordi" };
 const quiz = (code: string) => ({ kind: "quiz" as const, code, title: "Quiz" });
 const board = (code: string) => ({ kind: "scoreboard" as const, code, title: "Semi-final 1" });
 const self = { id: "g-me", name: "Lordi", score: 0 };
+const party = (change: Record<string, unknown> = {}) =>
+    ({ code: "LENA", hostId: "host-1", kind: "final", results: {}, revealed: false, ...change });
 const room = (change: Partial<Room> = {}) => ({ id: "ABBA", hostId: "host-1", started: false, phase: "lobby", players: [self], ...change }) as unknown as Room;
 
 beforeEach(() => {
@@ -24,6 +27,7 @@ beforeEach(() => {
     localStorage.clear();
     vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.leaveParty.mockResolvedValue(undefined);
+    mocks.fetchParty.mockResolvedValue(party());
     mocks.removePlayerFromRoom.mockResolvedValue(undefined);
 });
 
@@ -61,6 +65,36 @@ describe("leaveNightActivities", () => {
     it("has nothing to leave in a scoreboard the guest never rated in, but still forgets it", async () => {
         savePartyIdentity("LENA", { guestId: "g-me", name: "Lordi", isHost: false });
         mocks.fetchBallot.mockResolvedValue(null);
+        await leaveNightActivities([board("LENA")], me);
+        expect(mocks.leaveParty).not.toHaveBeenCalled();
+        expect(readPartyIdentity("LENA")).toBeNull();
+    });
+
+    it("keeps a scoreboard the guest hosts, ballot and stored identity both", async () => {
+        savePartyIdentity("LENA", { guestId: "g-me", name: "Lordi", isHost: true });
+        mocks.fetchParty.mockResolvedValue(party({ hostId: "g-me" }));
+        mocks.fetchBallot.mockResolvedValue({ guestId: "g-me", name: "Lordi", ratings: {}, bonuses: {} });
+        await leaveNightActivities([board("LENA")], me);
+        expect(mocks.leaveParty).not.toHaveBeenCalled();
+        expect(readPartyIdentity("LENA")).not.toBeNull();
+    });
+
+    it.each([
+        ["real places are entered", { results: { places: { a: 1 } } }],
+        ["qualifiers are entered", { kind: "semi", results: { qualifiers: ["a"] } }],
+        ["the awards are open", { revealed: true }],
+    ])("keeps the ballot once %s, and forgets only the stored identity", async (_what, change) => {
+        savePartyIdentity("LENA", { guestId: "g-me", name: "Lordi", isHost: false });
+        mocks.fetchParty.mockResolvedValue(party(change));
+        mocks.fetchBallot.mockResolvedValue({ guestId: "g-me", name: "Lordi", ratings: {}, bonuses: {} });
+        await leaveNightActivities([board("LENA")], me);
+        expect(mocks.leaveParty).not.toHaveBeenCalled();
+        expect(readPartyIdentity("LENA")).toBeNull();
+    });
+
+    it("only forgets the stored identity of a scoreboard that is gone", async () => {
+        savePartyIdentity("LENA", { guestId: "g-me", name: "Lordi", isHost: false });
+        mocks.fetchParty.mockResolvedValue(null);
         await leaveNightActivities([board("LENA")], me);
         expect(mocks.leaveParty).not.toHaveBeenCalled();
         expect(readPartyIdentity("LENA")).toBeNull();

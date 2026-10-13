@@ -31,6 +31,15 @@ describe("Standings", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("shows only the rows a reveal has shown, with the full standings' places", () => {
+    // Steps: Alexander (below the podium), then 3rd, 2nd, 1st.
+    const { unmount } = renderWithProviders(<Standings players={players} label="Standings" empty="Nobody yet." revealStep={0} />);
+    expect(screen.getAllByRole("listitem").map(row => row.textContent)).toEqual(["Nobody yet."]);
+    unmount();
+    renderWithProviders(<Standings players={players} label="Standings" empty="Nobody yet." revealStep={2} />);
+    expect(screen.getAllByRole("listitem").map(row => row.textContent)).toEqual(["2. Jedward700 points", "2. Loreen700 points", "4. Alexander1 point"]);
+  });
+
   it("raises the leader and the viewer's own row, marked (you)", () => {
     renderWithProviders(<Standings players={players} label="Standings" meId="d" empty="Nobody yet." />);
     const rows = screen.getAllByRole("listitem");

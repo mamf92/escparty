@@ -3,14 +3,22 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen, userEvent, waitFor, within } from "../test/test-utils";
 import { NightActivities } from "./NightActivities";
 import { makeParty } from "../test/partyFixtures";
-import type { PartyData } from "../hooks/usePartyData";
-import type { Room } from "../utils/roomsFirestore";
+import type { Party } from "../utils/partyFirestore";
+import { JoinRejected, type Room } from "../utils/roomsFirestore";
 import { readPartyIdentity, savePartyIdentity } from "../utils/partySession";
 
 const mocks = vi.hoisted(() => ({ rooms: {} as Record<string, unknown>, parties: {} as Record<string, unknown>, joinRoom: vi.fn() }));
 vi.mock("../hooks/useRoom", () => ({ useRoom: (code: string) => mocks.rooms[code] }));
-vi.mock("../hooks/usePartyData", () => ({ usePartyData: (code: string) => mocks.parties[code] }));
-vi.mock("../utils/roomsFirestore", () => ({ joinRoom: mocks.joinRoom }));
+vi.mock("../hooks/useParty", () => ({ useParty: (code: string) => mocks.parties[code] }));
+vi.mock("../utils/roomsFirestore", () => ({
+    MAX_PLAYERS: 32,
+    JoinRejected: class JoinRejected extends Error {
+        constructor(public readonly reason: string, message: string) {
+            super(message);
+        }
+    },
+    joinRoom: mocks.joinRoom,
+}));
 
 const Where = () => {
     const location = useLocation();
@@ -31,7 +39,7 @@ const room = (change: Partial<Room> = {}) => ({
 }) as unknown as Room;
 const quiz = [{ kind: "quiz" as const, code: "ABBA", title: "Quiz" }];
 const board = [{ kind: "scoreboard" as const, code: "LENA", title: "Semi-final 1" }];
-const party = (change: Partial<PartyData> = {}): PartyData => ({ party: makeParty({ code: "LENA", hostId: "host-1" }), ballots: [], error: null, retry: vi.fn(), ...change });
+const party = (): Party => makeParty({ code: "LENA", hostId: "host-1" });
 
 describe("NightActivities", () => {
     beforeEach(() => {
@@ -86,12 +94,12 @@ describe("NightActivities", () => {
         });
 
         it("says when it is loading or gone, without a button", () => {
-            mocks.parties = { LENA: party({ party: undefined }) };
+            mocks.parties = { LENA: undefined };
             const first = renderCards(board);
             expect(screen.getByText("Looking for the party…")).toBeInTheDocument();
             expect(screen.queryByRole("button")).not.toBeInTheDocument();
             first.unmount();
-            mocks.parties = { LENA: party({ party: null }) };
+            mocks.parties = { LENA: null };
             renderCards(board);
             expect(screen.getByText("Not available any more")).toBeInTheDocument();
             expect(screen.queryByRole("button")).not.toBeInTheDocument();
@@ -126,14 +134,31 @@ describe("NightActivities", () => {
             expect(localStorage.getItem("isHost")).toBe("true");
         });
 
-        it("says so when the quiz started meanwhile, and the button works again", async () => {
+        it("says so when the quiz is gone meanwhile, and the button works again", async () => {
             mocks.joinRoom.mockResolvedValueOnce(false);
             const user = userEvent.setup();
             renderCards(quiz);
             await user.click(screen.getByRole("button", { name: "Join the quiz" }));
-            expect(await screen.findByRole("alert")).toHaveTextContent("This quiz has already started.");
+            expect(await screen.findByRole("alert")).toHaveTextContent("This quiz isn't available any more.");
             expect(localStorage.getItem("gameCode")).toBeNull();
             expect(screen.getByRole("button", { name: "Join the quiz" })).toBeEnabled();
+        });
+
+        it("says a full room is full, without asking it to join", async () => {
+            const players = Array.from({ length: 32 }, (_, index) => ({ id: `p${index}`, name: `Guest ${index}`, score: 0 }));
+            mocks.rooms = { ABBA: room({ players }) };
+            renderCards(quiz);
+            await userEvent.setup().click(screen.getByRole("button", { name: "Join the quiz" }));
+            expect(await screen.findByRole("alert")).toHaveTextContent("This quiz is full.");
+            expect(mocks.joinRoom).not.toHaveBeenCalled();
+        });
+
+        it("says a room that filled up in the meantime is full, not a connection problem", async () => {
+            mocks.joinRoom.mockRejectedValueOnce(new JoinRejected("full", "The room is full"));
+            renderCards(quiz);
+            await userEvent.setup().click(screen.getByRole("button", { name: "Join the quiz" }));
+            expect(await screen.findByRole("alert")).toHaveTextContent("This quiz is full.");
+            expect(console.error).not.toHaveBeenCalled();
         });
 
         it("says a failed join can be tried again", async () => {

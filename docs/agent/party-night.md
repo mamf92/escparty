@@ -80,8 +80,11 @@ cleared and the join view shows. The host is the guest whose id is
   `leaveNight` deletes the guest and the claim in one batch (the name is free
   again), `leaveNightActivities` tidies up, best effort and per activity: in
   each scoreboard where the guest has a ballot (`fetchBallot`) `leaveParty`
-  deletes the ballot and the claim, and the party's stored identity is cleared;
-  from each quiz room still in its lobby that lists the guest (and isn't theirs)
+  deletes the ballot and the claim, and the party's stored identity is cleared,
+  but only until the host has entered the real results (`hasResults`) or
+  opened the awards (`revealed`): after that the ballots stay, as the standings
+  and awards are worked out from them, and only the stored identity goes. A
+  scoreboard the guest hosts is left alone, as a hosted quiz is; from each quiz room still in its lobby that lists the guest (and isn't theirs)
   `removePlayerFromRoom` takes them out. A failure there is logged and never
   stops the leave. Then the identity is cleared and the guest lands on Home; a
   failure of the leave itself is shown and can be retried. The host's confirm
@@ -127,6 +130,9 @@ button.
 
 `NightScreenActivity` shows the newest activity under the QR code. A quiz in its
 lobby names who is waiting (the quiz's players, not the night's roster); a
-running or finished quiz shows its standings (`Standings`); a scoreboard shows
+running quiz names who is playing, with no scores while questions are open; a
+finished quiz shows its standings (`Standings`) only as far as the host's
+step-by-step reveal on the phones (`room.revealStep`, `revealedPlaces`) has
+got, and in full once it is over; a scoreboard shows
 the room's standings (`RoomStandings`, shared with `PartyScreen`). "Nothing on
 yet" when empty.

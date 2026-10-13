@@ -32,6 +32,14 @@ describe("NightScreenActivity", () => {
         expect(screen.getByText("Nothing on yet. The host will start a quiz or a scoreboard soon.")).toHaveClass("is-static");
     });
 
+    it("hides the kind label a title already says, on a quiz and a scoreboard alike", () => {
+        const { unmount } = render(<NightScreenActivity activities={quiz} />);
+        expect(screen.queryByText("Quiz", { selector: "span" })).not.toBeInTheDocument();
+        unmount();
+        render(<NightScreenActivity activities={[{ kind: "scoreboard", code: "LENA", title: "Scoreboard night" }]} />);
+        expect(screen.queryByText("Scoreboard", { selector: "span" })).not.toBeInTheDocument();
+    });
+
     it("shows only the newest activity", () => {
         render(<NightScreenActivity activities={[...board, ...quiz]} />);
         expect(screen.getByText("Quiz 2")).toBeInTheDocument();
@@ -53,18 +61,51 @@ describe("NightScreenActivity", () => {
             expect(screen.queryByText("Loreen")).not.toBeInTheDocument();
         });
 
-        it("being played, shows the standings", () => {
+        const scored = [
+            { id: "a", name: "Loreen", score: 300 }, { id: "b", name: "Lordi", score: 900 },
+            { id: "c", name: "Jedward", score: 600 }, { id: "d", name: "Alexander", score: 100 },
+        ];
+        const standings = () => within(screen.getByRole("list", { name: "Quiz standings" })).getAllByRole("listitem").map(row => row.textContent);
+
+        it("being played, names who is playing and shows no scores", () => {
             mocks.room = room({ phase: "question", started: true, players: [{ id: "h", name: "Loreen", score: 300 }, { id: "g", name: "Lordi", score: 900 }] });
             render(<NightScreenActivity activities={quiz} />);
-            expect(screen.getByRole("heading", { level: 3, name: "Standings" })).toBeInTheDocument();
-            const rows = within(screen.getByRole("list", { name: "Quiz standings" })).getAllByRole("listitem");
-            expect(rows.map(row => row.textContent)).toEqual(["1. Lordi900 points", "2. Loreen300 points"]);
+            expect(screen.getByRole("heading", { level: 3, name: "Playing now" })).toBeInTheDocument();
+            const names = within(screen.getByRole("list", { name: "Playing now" })).getAllByRole("listitem");
+            expect(names.map(item => item.textContent)).toEqual(["Loreen", "Lordi"]);
+            expect(screen.queryByText(/points?$/)).not.toBeInTheDocument();
+            expect(screen.queryByRole("list", { name: "Quiz standings" })).not.toBeInTheDocument();
         });
 
-        it("finished, shows the final standings", () => {
-            mocks.room = room({ phase: "results", started: true });
+        it("finished but not yet revealed, shows no one and says the host will reveal", () => {
+            mocks.room = room({ phase: "results", started: true, players: scored });
             render(<NightScreenActivity activities={quiz} />);
             expect(screen.getByRole("heading", { level: 3, name: "Final standings" })).toBeInTheDocument();
+            expect(standings()).toEqual(["The host will reveal the results soon."]);
+            expect(screen.queryByText("Lordi")).not.toBeInTheDocument();
+        });
+
+        it("finished, shows only the rows the host's reveal has shown so far", () => {
+            mocks.room = room({ phase: "results", started: true, players: scored, revealStep: 1 });
+            const { unmount } = render(<NightScreenActivity activities={quiz} />);
+            // Below the podium first (Alexander, 4th), with the real places.
+            expect(standings()).toEqual(["4. Alexander100 points"]);
+            unmount();
+            mocks.room = room({ phase: "results", started: true, players: scored, revealStep: 3 });
+            render(<NightScreenActivity activities={quiz} />);
+            expect(standings()).toEqual(["2. Jedward600 points", "3. Loreen300 points", "4. Alexander100 points"]);
+        });
+
+        it("finished and revealed, shows the full standings", () => {
+            mocks.room = room({ phase: "results", started: true, players: scored, revealStep: 4 });
+            render(<NightScreenActivity activities={quiz} />);
+            expect(standings()).toEqual(["1. Lordi900 points", "2. Jedward600 points", "3. Loreen300 points", "4. Alexander100 points"]);
+        });
+
+        it("finished with nobody to reveal, says there are no scores", () => {
+            mocks.room = room({ phase: "results", started: true, players: [] });
+            render(<NightScreenActivity activities={quiz} />);
+            expect(standings()).toEqual(["No scores yet."]);
         });
 
         it("says when it is loading or gone", () => {

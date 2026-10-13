@@ -85,6 +85,14 @@ export const nextRevealLabel = (placed: Placed[], shown: number): string => {
 export const revealedCount = (steps: readonly number[], step: number): number =>
     step <= 0 || steps.length === 0 ? 0 : steps[Math.min(step, steps.length) - 1];
 
+/**
+ * The rows showing after `step` taps of the reveal: the bottom of the
+ * standings, best first, as the phones' results screen has them. Pass
+ * `steps` when the page already holds them.
+ */
+export const revealedPlaces = (placed: Placed[], step: number, steps: readonly number[] = revealSteps(placed)): Placed[] =>
+    placed.slice(placed.length - revealedCount(steps, step));
+
 /** Whether the reveal is over after `step` taps: everyone is showing. */
 export const revealDone = (steps: readonly number[], step: number): boolean =>
     steps.length > 0 && step >= steps.length;

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Ground, Pane, Row } from "../design";
 import type { Player } from "../utils/roomsFirestore";
-import { placePlayers, points, someoneLeads } from "../utils/finale";
+import { placePlayers, points, revealedPlaces, someoneLeads } from "../utils/finale";
 
 /**
  * The room's standings as a list on the surface (docs/design/design-system.md,
@@ -13,7 +13,7 @@ import { placePlayers, points, someoneLeads } from "../utils/finale";
  * proud, everyone else rests; when nobody leads (two or more, all level),
  * only your own row does.
  */
-export const Standings = ({ players, label, meId, detail, empty, live = false }: {
+export const Standings = ({ players, label, meId, detail, empty, live = false, revealStep }: {
   players: readonly Player[];
   /** The list's accessible name, e.g. "Standings at the break". */
   label: string;
@@ -29,9 +29,15 @@ export const Standings = ({ players, label, meId, detail, empty, live = false }:
    * changed (the host's view), or every score write is read out.
    */
   live?: boolean;
+  /**
+   * Show only what the host's step-by-step reveal has shown after this many
+   * steps (the results screen's reveal), places as in the full standings.
+   */
+  revealStep?: number;
 }) => {
-  const ranked = placePlayers(players);
-  const leads = someoneLeads(ranked);
+  const all = placePlayers(players);
+  const leads = someoneLeads(all);
+  const ranked = revealStep === undefined ? all : revealedPlaces(all, revealStep);
   return (
     <Ground>
       <Pane as="ol" aria-label={label} aria-live={live ? "polite" : undefined}>

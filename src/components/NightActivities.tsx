@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { CalmNote } from "./CalmPage";
 import { Control, Ground, Pane, Row } from "../design";
-import { usePartyData } from "../hooks/usePartyData";
+import { useParty } from "../hooks/useParty";
 import { useRoom } from "../hooks/useRoom";
 import { quizStage } from "../utils/nightActivities";
 import type { NightActivity, NightActivityKind } from "../utils/nightsFirestore";
 import type { NightIdentity } from "../utils/nightSession";
 import { readPartyIdentity, savePartyIdentity } from "../utils/partySession";
-import { joinRoom } from "../utils/roomsFirestore";
+import { JoinRejected, MAX_PLAYERS, joinRoom } from "../utils/roomsFirestore";
 
 const KIND_LABELS: Record<NightActivityKind, string> = { quiz: "Quiz", scoreboard: "Scoreboard" };
 
@@ -35,11 +35,7 @@ export const NightActivities = ({ activities, me }: { activities: readonly Night
     <>
         <h2 className="esc-section">Now on</h2>
         {activities.length === 0 ? (
-            <Ground>
-                <Pane>
-                    <Row>Nothing on yet. The host will start a quiz or a scoreboard soon.</Row>
-                </Pane>
-            </Ground>
+            <NothingOnYet />
         ) : (
             <Cards aria-label="Now on">
                 {activities.map((activity, index) => ({ activity, index })).reverse().map(({ activity, index }) => (
@@ -60,17 +56,31 @@ export const NightActivities = ({ activities, me }: { activities: readonly Night
     </>
 );
 
-/** The tile every card starts with: its kind and title, and where it stands. */
-const Heading = ({ activity, status }: { activity: NightActivity; status: string }) => (
+/**
+ * The tile an activity starts with, on a phone's card and on the TV: its kind
+ * and title, and where it stands when that is given.
+ */
+export const NightActivityHeading = ({ activity, status }: { activity: NightActivity; status?: string }) => (
     <Row>
         {/* A quiz is listed as "Quiz", "Quiz 2"…: no need to say "Quiz" twice. */}
         {!activity.title.startsWith(KIND_LABELS[activity.kind]) && <span className="calm-sub">{KIND_LABELS[activity.kind]}</span>}
         <span>{activity.title}</span>
-        <span className="calm-sub">{status}</span>
+        {status && <span className="calm-sub">{status}</span>}
     </Row>
 );
 
+/** What a night's activities say before the host has started one. */
+export const NothingOnYet = () => (
+    <Ground>
+        <Pane>
+            <Row>Nothing on yet. The host will start a quiz or a scoreboard soon.</Row>
+        </Pane>
+    </Ground>
+);
+
 const GONE = "Not available any more";
+const FULL = "This quiz is full.";
+const UNAVAILABLE = "This quiz isn't available any more.";
 
 /** A quiz room: join it in its lobby, go back into it once it runs, see how it ended. */
 const QuizCard = ({ activity, me }: { activity: NightActivity; me: NightIdentity }) => {
@@ -79,8 +89,8 @@ const QuizCard = ({ activity, me }: { activity: NightActivity; me: NightIdentity
     const [joining, setJoining] = useState(false);
     const [note, setNote] = useState<string | null>(null);
 
-    if (room === undefined) return <Heading activity={activity} status="Looking for the room…" />;
-    if (room === null) return <Heading activity={activity} status={GONE} />;
+    if (room === undefined) return <NightActivityHeading activity={activity} status="Looking for the room…" />;
+    if (room === null) return <NightActivityHeading activity={activity} status={GONE} />;
 
     const stage = quizStage(room);
     const player = room.players.some(entry => entry.id === me.guestId);
@@ -96,16 +106,22 @@ const QuizCard = ({ activity, me }: { activity: NightActivity; me: NightIdentity
         setJoining(true);
         setNote(null);
         try {
+            // The button is only there in the lobby, so what the snapshot can
+            // still say is a full room.
+            if (room.players.length >= MAX_PLAYERS) setNote(FULL);
             // Names are unique in the night, so there is no free name to find.
-            if (await joinRoom(activity.code, me.guestId, me.name)) {
+            // False: the room turned the join down, as gone (or started) since the snapshot.
+            else if (await joinRoom(activity.code, me.guestId, me.name)) {
                 takeSeat();
                 navigate("/lobby");
                 return;
-            }
-            setNote("This quiz has already started.");
+            } else setNote(UNAVAILABLE);
         } catch (error) {
-            console.error("Couldn't join the quiz:", error);
-            setNote("Couldn't join the quiz. Check your connection and try again.");
+            if (error instanceof JoinRejected && error.reason === "full") setNote(FULL);
+            else {
+                console.error("Couldn't join the quiz:", error);
+                setNote("Couldn't join the quiz. Check your connection and try again.");
+            }
         }
         setJoining(false);
     };
@@ -124,7 +140,7 @@ const QuizCard = ({ activity, me }: { activity: NightActivity; me: NightIdentity
 
     return (
         <>
-            <Heading activity={activity} status={STAGE_STATUS[stage]} />
+            <NightActivityHeading activity={activity} status={STAGE_STATUS[stage]} />
             {stage === "lobby" && (
                 <Control disabled={joining} onClick={player ? back : () => void join()}>
                     {player ? "Back to the waiting room" : joining ? "Joining…" : "Join the quiz"}
@@ -146,10 +162,10 @@ const STAGE_STATUS: Record<ReturnType<typeof quizStage>, string> = {
 /** A scoreboard party: rate along as the night's guest, with the party remembering who this is. */
 const ScoreboardCard = ({ activity, me }: { activity: NightActivity; me: NightIdentity }) => {
     const navigate = useNavigate();
-    const { party } = usePartyData(activity.code);
+    const party = useParty(activity.code);
 
-    if (party === undefined) return <Heading activity={activity} status="Looking for the party…" />;
-    if (party === null) return <Heading activity={activity} status={GONE} />;
+    if (party === undefined) return <NightActivityHeading activity={activity} status="Looking for the party…" />;
+    if (party === null) return <NightActivityHeading activity={activity} status={GONE} />;
 
     const rate = () => {
         // The party's room page reads who this is from here and joins with
@@ -162,7 +178,7 @@ const ScoreboardCard = ({ activity, me }: { activity: NightActivity; me: NightId
     };
     return (
         <>
-            <Heading activity={activity} status={`${party.acts.length} acts to rate`} />
+            <NightActivityHeading activity={activity} status={`${party.acts.length} acts to rate`} />
             <Control onClick={rate}>Rate</Control>
         </>
     );

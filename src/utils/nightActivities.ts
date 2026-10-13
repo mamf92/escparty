@@ -4,7 +4,8 @@
  */
 import type { NightActivity } from "./nightsFirestore";
 import type { NightIdentity } from "./nightSession";
-import { fetchBallot, leaveParty } from "./partyFirestore";
+import { fetchBallot, fetchParty, leaveParty } from "./partyFirestore";
+import { hasResults } from "./partyResults";
 import { clearPartyIdentity } from "./partySession";
 import { getRoom, removePlayerFromRoom, type Room } from "./roomsFirestore";
 
@@ -27,16 +28,24 @@ export const quizStage = (room: Room): QuizStage =>
 /**
  * Best effort, before a guest leaves the night: out of every scoreboard
  * where they have a ballot (their name is free again, and the party's
- * stored identity goes), and out of every quiz still in its lobby that lists
- * them, unless they are its host. A started quiz keeps its players, as a
- * quiz always has. One failure never blocks the rest, or the leave itself:
+ * stored identity goes) until the host has entered the real results or
+ * opened the awards, which are worked out from the ballots; and out of every
+ * quiz still in its lobby that lists them. A scoreboard or quiz the guest
+ * hosts is left alone, and a started quiz keeps its players, as a quiz always
+ * has. One failure never blocks the rest, or the leave itself:
  * they are logged, since the guest is leaving all the same.
  */
 export const leaveNightActivities = async (activities: readonly NightActivity[], identity: NightIdentity): Promise<void> => {
     await Promise.all(activities.map(async activity => {
         try {
             if (activity.kind === "scoreboard") {
-                const ballot = await fetchBallot(activity.code, identity.guestId);
+                const party = await fetchParty(activity.code);
+                // A scoreboard the leaver hosts stays theirs, as a hosted quiz does.
+                if (party?.hostId === identity.guestId) return;
+                // Once the real results are in or the awards are open, the
+                // ballots are what they are computed from: they stay.
+                const open = !!party && !party.revealed && !hasResults(party);
+                const ballot = open ? await fetchBallot(activity.code, identity.guestId) : null;
                 if (ballot) await leaveParty(activity.code, identity.guestId, ballot.name);
                 clearPartyIdentity(activity.code);
                 return;

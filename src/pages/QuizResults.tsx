@@ -17,7 +17,7 @@ import { RESULTS_GRACE_MS, RESULTS_WAIT_FALLBACK_MS, startedAtMillis } from "../
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
 import { formatRunDate, readScoreHistory } from "../utils/scoreHistory";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, revealAnnouncement, revealDone, revealSteps, revealedCount } from "../utils/finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, revealAnnouncement, revealDone, revealSteps, revealedCount, revealedPlaces } from "../utils/finale";
 
 /**
  * The end of a quiz (#67). Solo: your score and your past ones. In a room:
@@ -210,7 +210,7 @@ const QuizResults = () => {
   // The host never showed: the guest may reveal on their own phone.
   const offerLocalReveal = waitingForHost && resultsAge !== null && resultsAge >= RESULTS_WAIT_FALLBACK_MS;
   const shown = revealedCount(steps, step);
-  const revealed = placed.slice(placed.length - shown);
+  const revealed = revealedPlaces(placed, step, steps);
   const done = revealDone(steps, step);
   // One status line for the whole reveal, always mounted so screen readers
   // announce each change to it: collecting, then how many are on the board,

@@ -459,6 +459,32 @@ describe("MultiplayerLobby", () => {
       expect(addNightActivity).toHaveBeenCalledTimes(2);
     });
 
+    it("makes another room when the host picks the other way to host after a failed listing", async () => {
+      vi.mocked(addNightActivity).mockRejectedValueOnce(new Error("offline"));
+      const user = userEvent.setup();
+      await hostInNight(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't set up the room");
+      await user.click(button(/^Host only/));
+      expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+      expect(createNightRoom).toHaveBeenCalledTimes(2);
+      expect(createNightRoom).toHaveBeenLastCalledWith("ABBA", "g-host", "Loreen", true, "NITE");
+    });
+
+    it("does not list a room twice when its first listing landed although it reported an error", async () => {
+      vi.mocked(addNightActivity).mockRejectedValueOnce(new Error("lost answer"));
+      const user = userEvent.setup();
+      await hostInNight(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't set up the room");
+      vi.mocked(fetchNight).mockResolvedValueOnce({
+        code: "NITE", hostId: "g-host", title: "Party night", closed: false,
+        activities: [{ kind: "quiz", code: "ABBA", title: "Quiz" }],
+      });
+      await user.click(button(/^Host and play/));
+      expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+      expect(createNightRoom).toHaveBeenCalledTimes(1);
+      expect(addNightActivity).toHaveBeenCalledTimes(1);
+    });
+
     it("leads back to the night, not to host or join", async () => {
       const user = userEvent.setup();
       renderLobby({ step: "host", nightCode: "NITE" });
