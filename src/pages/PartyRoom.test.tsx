@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent, waitFor, within } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
 import PartyRoom from "./PartyRoom";
 import { makeBallot, makeParty } from "../test/partyFixtures";
 import type { PartyData } from "../hooks/usePartyData";
 import { PARTY_NAMES } from "../utils/partyNames";
 import { readPartyIdentity, savePartyIdentity } from "../utils/partySession";
 
-const mocks = vi.hoisted(() => ({ data: {} as PartyData, saveBallot: vi.fn() }));
+const mocks = vi.hoisted(() => ({ data: {} as PartyData, saveBallot: vi.fn(), joinParty: vi.fn() }));
 vi.mock("../hooks/usePartyData", () => ({ usePartyData: () => mocks.data }));
 vi.mock("../utils/partyFirestore", () => ({
     saveBallot: mocks.saveBallot,
+    joinParty: mocks.joinParty,
     setPartyResults: vi.fn(),
     setPartyRevealed: vi.fn(),
     updatePartyActs: vi.fn(),
@@ -34,6 +35,7 @@ describe("PartyRoom", () => {
         vi.clearAllMocks();
         localStorage.clear();
         mocks.saveBallot.mockResolvedValue(undefined);
+        mocks.joinParty.mockResolvedValue(true);
         vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
         mocks.data = { party: makeParty(), ballots: [], error: null, retry: vi.fn() };
     });
@@ -73,14 +75,62 @@ describe("PartyRoom", () => {
         await user.click(screen.getByRole("button", { name: "Join the party" }));
         expect(screen.getByText(`Party ABBA · you're ${PARTY_NAMES[0]}`)).toBeInTheDocument();
         expect(readPartyIdentity("ABBA")).toMatchObject({ name: PARTY_NAMES[0], isHost: false });
-        // useOwnBallot writes the empty ballot once the identity is set and none is on the server.
-        await waitFor(() => expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", {
-            guestId: readPartyIdentity("ABBA")!.guestId,
-            name: PARTY_NAMES[0],
-            ratings: {},
-            bonuses: {},
-        }));
-        expect(mocks.saveBallot).toHaveBeenCalledTimes(1);
+        // The name is claimed, with the empty ballot, before the guest is in.
+        expect(mocks.joinParty).toHaveBeenCalledWith("ABBA", readPartyIdentity("ABBA")!.guestId, PARTY_NAMES[0]);
+    });
+
+    it("asks for another spin when someone claimed the name first, and keeps it off the reel", async () => {
+        const user = userEvent.setup();
+        mocks.joinParty.mockResolvedValueOnce(false);
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        await user.click(screen.getByRole("button", { name: "Join the party" }));
+        expect(await screen.findByText(`${PARTY_NAMES[0]} was just taken. Spin again.`)).toHaveAttribute("role", "status");
+        expect(readPartyIdentity("ABBA")).toBeNull();
+        expect(screen.getByRole("button", { name: "Join the party" })).toBeDisabled();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.queryByText(/was just taken/)).not.toBeInTheDocument();
+        // The refused name stays off the reel, even before its ballot arrives.
+        expect(screen.getByRole("spinbutton")).toHaveAttribute("aria-valuemax", String(PARTY_NAMES.length - 1));
+        await user.click(screen.getByRole("button", { name: "Join the party" }));
+        const second = mocks.joinParty.mock.calls[1][2];
+        expect(second).not.toBe(PARTY_NAMES[0]);
+        expect(readPartyIdentity("ABBA")).toMatchObject({ name: second });
+    });
+
+    it("says so when the join can't reach the party, and lets the guest press Join again", async () => {
+        const user = userEvent.setup();
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        mocks.joinParty.mockRejectedValueOnce(Object.assign(new Error("offline"), { code: "deadline-exceeded" }));
+        const { unmount } = renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        await user.click(screen.getByRole("button", { name: "Join the party" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent(`You couldn't join as ${PARTY_NAMES[0]} just now.`);
+        expect(readPartyIdentity("ABBA")).toBeNull();
+        // The name stays locked until the join lands, also after a reload: the first try may still arrive.
+        expect(screen.getByRole("spinbutton")).toHaveAttribute("aria-disabled", "true");
+        unmount();
+        renderRoom();
+        expect(screen.getByText(`You were joining as ${PARTY_NAMES[0]}. Press Join to finish.`)).toHaveAttribute("role", "status");
+        await user.click(screen.getByRole("button", { name: "Join the party" }));
+        expect(readPartyIdentity("ABBA")).toMatchObject({ name: PARTY_NAMES[0] });
+        // The retry uses the same guest id, so it finds a claim the first try made.
+        expect(mocks.joinParty.mock.calls[1][1]).toBe(mocks.joinParty.mock.calls[0][1]);
+        expect(readPartyIdentity("ABBA")!.guestId).toBe(mocks.joinParty.mock.calls[0][1]);
+    });
+
+    it("frees the reel when a join is refused for a reason other than the name", async () => {
+        const user = userEvent.setup();
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        mocks.joinParty.mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }));
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        await user.click(screen.getByRole("button", { name: "Join the party" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("You couldn't join just now. Spin again or try in a moment.");
+        expect(screen.getByRole("spinbutton")).not.toHaveAttribute("aria-disabled");
+        expect(localStorage.getItem("escparty.party.ABBA.joining")).toBeNull();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("keeps Join off, with a note, until the taken names have arrived", async () => {

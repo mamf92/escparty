@@ -3,6 +3,9 @@ import {
     lastPartyCode,
     mergeBallots,
     readPartyIdentity,
+    readPendingJoin,
+    savePendingJoin,
+    clearPendingJoin,
     readStoredBallot,
     savePartyIdentity,
     storeBallot,
@@ -63,5 +66,19 @@ describe("the stored ballot", () => {
             bonuses: { se: [], no: ["pyro"] },
         });
         expect(mergeBallots(null, null)).toEqual({ ratings: {}, bonuses: {} });
+    });
+});
+
+describe("pending join", () => {
+    it("keeps an unconfirmed join per party until it's cleared", () => {
+        localStorage.clear();
+        expect(readPendingJoin("ABBA")).toBeNull();
+        savePendingJoin("ABBA", { guestId: "g1", name: "Loreen" });
+        expect(readPendingJoin("ABBA")).toEqual({ guestId: "g1", name: "Loreen" });
+        expect(readPendingJoin("LORD")).toBeNull();
+        clearPendingJoin("ABBA");
+        expect(readPendingJoin("ABBA")).toBeNull();
+        localStorage.setItem("escparty.party.ABBA.joining", JSON.stringify({ guestId: "", name: "Loreen" }));
+        expect(readPendingJoin("ABBA")).toBeNull();
     });
 });

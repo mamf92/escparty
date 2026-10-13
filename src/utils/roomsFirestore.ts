@@ -100,7 +100,7 @@ export class JoinRejected extends Error {
     }
 }
 
-/** The most players a room holds: firestore.rules' allPlayersValid caps the list at 32. */
+/** The most players a room holds: maxPlayers() in firestore.rules. */
 export const MAX_PLAYERS = 32;
 
 /**
@@ -387,6 +387,8 @@ export const updatePlayerScore = async (roomCode: string, playerId: string, scor
                 return player;
             });
 
+            // One changed entry: firestore.rules shape-checks only changed
+            // players, and a full room runs out of rule expressions past four.
             transaction.update(roomRef, { players: updatedPlayers });
         });
         console.log(`Score updated for player ${playerId} in room ${roomCode}`);

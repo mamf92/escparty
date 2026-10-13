@@ -271,7 +271,8 @@ describe("PartySetup", () => {
         expect(party.template.id).toBe("jury");
         expect(party.template.bonuses).toEqual([{ id: "wind", label: "Wind machine", points: 1 }]);
         expect(readPartyIdentity("ABBA")).toEqual({ guestId: party.hostId, name: PARTY_NAMES[0], isHost: true });
-        // The host's empty ballot is written by the room when it opens, not here.
+        // The host joins under their name in the same write as the party.
+        expect(mocks.createParty.mock.calls[0][1]).toBe(PARTY_NAMES[0]);
         expect(mocks.saveBallot).not.toHaveBeenCalled();
     });
 

@@ -46,13 +46,24 @@ rules only check their outline.
 
 Names are unique in a party, and anonymous Eurovision participant names
 (`partyNames.ts`). The join reel offers `PARTY_NAMES` minus the names of the
-party's ballots (every name again if all are taken). A name is claimed the
-moment a guest joins (and the host's when the party is created): their
-ballot is written at once, empty, so the next guest sees it taken;
-`useOwnBallot` also writes it if the ballots arrive without one. Two guests
-can still take one name at the same instant (separate documents, and the
-rules can't see across them). Nobody is renamed for that: the lists tell
-them apart at display time (`distinctNames`), the bare name going to the
+party's ballots (every name again if all are taken). A guest joins with
+`joinParty` (#229): one batch creates `names/{key}` (the claim, `key` the
+name trimmed and in lower case) and writes their empty ballot, and the host
+joins the same way in the batch that creates the party (`createParty(party,
+hostName)`). The rules want the two together: a claim needs a ballot with its
+name, and a guest's first ballot needs their claim. They only ever create a
+claim, so when two guests land the same name at the same instant the second
+batch is refused, nothing of it is written, and that guest is told "X was
+just taken. Spin again." (the name also stays off their reel). A join keeps
+one guest id across tries, so a retry after a timeout (`JOIN_TIMEOUT_MS`;
+offline, a write waits rather than fails) finds its own earlier claim:
+the unconfirmed join is kept on the device (`savePendingJoin`) with its name
+locked, also across a reload, until it lands or is refused. A guest with no
+ballot on the server (an identity from before #229) joins on their first save
+(`useOwnBallot`).
+Parties from before #229 can hold a
+pair with one name: the lists tell them apart at display time
+(`distinctNames`), the bare name going to the
 guest with the lowest guest ID (stable, so names never swap as people rate) and the other
 getting "Loreen 2", and a guest's own "you're ..." subtitle uses the same
 name (`PartyRoom` computes `withDistinctNames` once for the subtitle and the Room tab). On the join reel a landed name that a ballots
@@ -180,6 +191,11 @@ collection):
 One document per guest, written whole by that guest only, so no two
 clients ever write the same document.
 
+`parties/{code}/names/{key}`: `{ name, guestId, expireAt }`, the name claim
+(`key` = `nameKey(name)`, which the rules check against `name`). Created
+with the guest's first ballot (`joinParty`, or `createParty` for the host),
+never changed or deleted, read one at a time (`get`), never listed.
+
 `template.bonuses` sits inside the template because the rules fix a party's
 top-level keys and check only `template.categories`, so the bonus list
 needs no rules change. Anyone with the code could write it, so
@@ -192,13 +208,20 @@ out (the rules accept 1-60 days, since the phone's clock sets it); after
 that only `acts`, `results` and `revealed` may change. There's
 no sign-in, so like quiz rooms the rules check shape, not who: anyone with
 the code could edit the result. Ballots need the party to exist, a 1-40
-character name and at most 40 acts. `contests/` is read-only to clients.
+character name and at most 40 acts. A first ballot needs its guest's claim
+on its name, and a ballot's name never changes after that. A name claim needs the party to exist,
+exactly `name`, `guestId` and `expireAt`, its id to be the name trimmed
+and in lower case, and the guest's ballot under that name in the same
+write; it can't be overwritten or deleted (verify case 5b). Both use
+`existsAfter`/`getAfter`, since the host's party, claim and ballot are one
+batch.
+`contests/` is read-only to clients.
 
 ## Retention
 
 Every party and every ballot carries `expireAt`, 30 days out
 (`PARTY_LIFETIME_DAYS`; the rules accept 1-60 days, as the phone's clock sets it). Nothing is deleted until
 the project owner enables a Firestore TTL policy on `expireAt` for both
-collection groups, `parties` and `ballots` (Firebase console, Firestore,
-Time-to-live). Deleting a party doesn't delete its ballots on its own,
-which is why each ballot has its own expiry.
+collection groups, `parties`, `ballots` and `names` (Firebase console, Firestore,
+Time-to-live). Deleting a party doesn't delete its ballots or name claims on
+its own, which is why each has its own expiry.

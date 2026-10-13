@@ -13,13 +13,16 @@ import {
     setDoc,
     Timestamp,
     updateDoc,
+    writeBatch,
     type FieldValue,
+    type WriteBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { contestById, type Act, type Contest } from "../data/contests2027";
 import { sanitiseBonuses, type Ballot, type Bonuses, type RatingTemplate, type Ratings } from "./partyModel";
 import { resultsFor } from "./partyResults";
 import { generateRoomCode } from "./roomsFirestore";
+import { nameKey } from "./freeName";
 
 export interface PartyResults {
     /** A final's real places, act id -> 1-based place. */
@@ -102,16 +105,18 @@ export const partyExists = async (code: string): Promise<boolean> =>
 
 /**
  * Create a party under a fresh 4-letter code and return the code. Tries a
- * few codes, since the create rule refuses an existing one.
+ * few codes, since the create rule refuses an existing one. The host joins
+ * in the same batch, under `hostName` (their claim and empty ballot).
  */
-export const createParty = async (party: NewParty): Promise<string> => {
+export const createParty = async (party: NewParty, hostName: string): Promise<string> => {
     const database = requireDb();
     for (let attempt = 0; attempt < 5; attempt++) {
         const code = generateRoomCode();
         const ref = doc(database, "parties", code);
         if ((await getDoc(ref)).exists()) continue;
         try {
-            await setDoc(ref, {
+            const batch = writeBatch(database);
+            batch.set(ref, {
                 ...party,
                 code,
                 results: {},
@@ -119,10 +124,16 @@ export const createParty = async (party: NewParty): Promise<string> => {
                 createdAt: serverTimestamp(),
                 expireAt: expiry(),
             });
+            addJoin(batch, code, party.hostId, hostName);
+            await batch.commit();
         } catch (error) {
             // Another host took this code between the check and the write:
-            // the write then counts as an update, which the rules refuse.
-            if ((error as { code?: string }).code === "permission-denied") continue;
+            // the write then counts as an update, which the rules refuse. Any
+            // other refusal (of the host's claim or ballot) is the real error.
+            if ((error as { code?: string }).code === "permission-denied") {
+                const taken = await getDoc(ref).then(snapshot => snapshot.exists(), () => false);
+                if (taken) continue;
+            }
             throw error;
         }
         return code;
@@ -192,15 +203,62 @@ const isRecord = (value: unknown) => !!value && typeof value === "object" && !Ar
  * can be overwritten.
  */
 export const saveBallot = async (code: string, ballot: Ballot): Promise<void> => {
-    await setDoc(doc(requireDb(), "parties", code, "ballots", ballot.guestId), {
-        name: ballot.name,
-        ratings: ballot.ratings,
-        bonuses: ballot.bonuses,
-        updatedAt: serverTimestamp(),
-        // A ballot is its own document, so it needs its own expiry for the
-        // TTL policy: 30 days after the guest's last change.
-        expireAt: expiry(),
+    await setDoc(doc(requireDb(), "parties", code, "ballots", ballot.guestId), ballotDoc(ballot));
+};
+
+/** A ballot as stored; the rules pin exactly these keys. */
+const ballotDoc = (ballot: Ballot) => ({
+    name: ballot.name,
+    ratings: ballot.ratings,
+    bonuses: ballot.bonuses,
+    updatedAt: serverTimestamp(),
+    // A ballot is its own document, so it needs its own expiry for the
+    // TTL policy: 30 days after the guest's last change.
+    expireAt: expiry(),
+});
+
+/**
+ * Add a guest's name claim, `parties/{code}/names/{key}`, and their empty
+ * first ballot to `batch`. The rules want both in one write (#229).
+ */
+const addJoin = (batch: WriteBatch, code: string, guestId: string, name: string) => {
+    const firestore = requireDb();
+    batch.set(doc(firestore, "parties", code, "names", nameKey(name)), { name, guestId, expireAt: expiry() });
+    batch.set(doc(firestore, "parties", code, "ballots", guestId), ballotDoc({ guestId, name, ratings: {}, bonuses: {} }));
+};
+
+/** How long a join may wait for the server before the guest is told to try again. */
+export const JOIN_TIMEOUT_MS = 10_000;
+
+/**
+ * Join a party under `name` (#229): claim the name and write the guest's
+ * empty ballot in one batch. The rules only ever create a claim, so if
+ * another guest took the name first the batch is refused and nothing is
+ * written. Resolves `true` when the name is this guest's (also when an
+ * earlier try with the same `guestId` already claimed it), `false` when
+ * someone else has it. Offline, a write waits rather than fails, so after
+ * JOIN_TIMEOUT_MS this rejects; the queued write may still land, which a
+ * retry with the same `guestId` then finds.
+ */
+export const joinParty = async (code: string, guestId: string, name: string): Promise<boolean> => {
+    const firestore = requireDb();
+    const batch = writeBatch(firestore);
+    addJoin(batch, code, guestId, name);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(Object.assign(new Error("The join took too long"), { code: "deadline-exceeded" })), JOIN_TIMEOUT_MS);
     });
+    try {
+        await Promise.race([batch.commit(), timeout]);
+        return true;
+    } catch (error) {
+        if ((error as { code?: string }).code !== "permission-denied") throw error;
+        const claim = await getDoc(doc(firestore, "parties", code, "names", nameKey(name)));
+        if (!claim.exists()) throw error;
+        return claim.data().guestId === guestId;
+    } finally {
+        clearTimeout(timer);
+    }
 };
 
 /** Read one guest's ballot, e.g. to restore it after a reload. */

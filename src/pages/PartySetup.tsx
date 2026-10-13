@@ -145,9 +145,8 @@ const PartySetup = () => {
                 template: withBonuses,
                 bonuses: chosenBonuses.length > 0,
                 showNames: true,
-            });
+            }, name);
             savePartyIdentity(code, { guestId: hostId, name, isHost: true });
-            // PartyRoom's useOwnBallot writes the host's empty ballot (the name claim) when it opens.
             navigate(`/party/${code}`);
         } catch (error) {
             console.error("Couldn't create the party:", error);

@@ -12,7 +12,8 @@ Four collections:
 - `quizzes`, saved custom quizzes (#76), keyed by a random 20-character
   Firestore id. See "Saved quizzes" below.
 - `parties`, scoreboard parties keyed by a 4-letter code, each with a
-  `ballots` sub-collection (one document per guest), and `contests`, the
+  `ballots` sub-collection (one document per guest) and a `names`
+  sub-collection (one create-only claim per name, #229), and `contests`, the
   real Burgas 2027 lineups, entered by hand and read-only to clients. Both
   are documented in `docs/agent/scoreboard-party.md`.
 
@@ -307,16 +308,19 @@ rules engine's per-request expression budget) and requires it match exactly
 the field(s) that operation is for, so a legitimate-looking write can no
 longer piggyback an unrelated forged field (e.g. `hostId`) in the same
 request. Player-array shape validation no longer relies on a function
-reference — `allPlayersValid()` unrolls the check up to 32 players (there's
-no loop/recursion in Firestore Rules, so this is the standard workaround;
-32 comfortably covers a realistic party-quiz room, and anything larger is
-rejected by the size check rather than silently accepted). `isAddingPlayer`
-no longer has a second bypass branch, and validates every entry in the
-resulting array via `allPlayersValid()`, not just the newly appended one —
-an earlier version of this fix only checked the last entry, which a review
-pass caught: array-grew-by-one doesn't by itself prove the write came from
-`arrayUnion` appending rather than a full replace with an earlier entry
-corrupted.
+reference. Firestore Rules have no loop or recursion and stop at 1000
+evaluated expressions per write, and checking every player on every write
+(the old `allPlayersValid()`) ran out at the 13th player, so rooms stopped
+at 12 (#229). Now a write is checked only where it changes something:
+`isAddingPlayer` requires every existing entry to stay exactly as it was
+(`players[0:n] == before`) and shape-checks only the appended one, and
+`isUpdatingPlayerScores` uses `changedPlayersValid()`, unrolled up to
+`maxPlayers()` (32, `MAX_PLAYERS`), where an unchanged entry costs one
+comparison and only a changed one gets the full shape check. A score write
+changes one entry; at 32 players a write changing up to four still fits the
+budget, more doesn't (verify case 2d). Raising the cap means raising
+`maxPlayers()` and `MAX_PLAYERS` and unrolling `changedPlayersValid()` that
+far, then measuring a full room in the emulator again.
 
 **Quiz keys (#72).** `isSettingDifficulty` accepts `easy`, `medium`,
 `hard`, or `t-` followed by 1-40 lowercase letters, digits and dashes (a
