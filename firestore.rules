@@ -39,6 +39,11 @@ service cloud.firestore {
              (!('difficulty' in data) || isQuizKey(data.difficulty)) &&
              (!('breakEvery' in data) || isBreakEvery(data.breakEvery)) &&
              (!('hostIsObserver' in data) || data.hostIsObserver is bool) &&
+             // The party night this room belongs to (#232), set here and
+             // never after: no update branch below lists nightCode, so it
+             // can't be moved to another night, and a night only lists an
+             // activity whose own document names that night.
+             (!('nightCode' in data) || isNightRef(data.nightCode)) &&
              !('nextRoomCode' in data) &&
              !('readyPlayers' in data) &&
              !('revealStep' in data) &&
@@ -478,7 +483,12 @@ service cloud.firestore {
         allow create: if isValidBallot(code) && claimsName(code, guestId, request.resource.data.name);
         // The name stays the one claimed: no renaming into someone else's.
         allow update: if isValidBallot(code) && request.resource.data.name == resource.data.name;
-        allow delete: if false;
+        // Only in a party that belongs to a night (#232): a guest leaves the
+        // night, and their ballot goes together with their claim on the name
+        // (leaveParty), so the name is free again. A standalone party's
+        // ballots stay for good.
+        allow delete: if isNightParty(code) &&
+                         !existsAfter(/databases/$(database)/documents/parties/$(code)/names/$(resource.data.name.trim().lower()));
       }
 
       // Who has which name (#229). A guest joins by creating the claim for
@@ -494,7 +504,47 @@ service cloud.firestore {
         allow get: if true;
         allow list: if false;
         allow create: if isValidNameClaim(code, key);
-        allow update, delete: if false;
+        allow update: if false;
+        // The other half of a leave (#232), in a night's party only, and only
+        // together with the guest's ballot.
+        allow delete: if isNightParty(code) &&
+                         !existsAfter(/databases/$(database)/documents/parties/$(code)/ballots/$(resource.data.guestId));
+      }
+    }
+
+    // Party nights (#231, #232): one 4-letter code for a whole evening, above
+    // the quiz rooms and scoreboard parties played in it. Found by code,
+    // never listed, same trust model as parties: with no sign-in the rules
+    // can't tell the host from a guest, so what a night allows is limited by
+    // shape (what may change, and in which direction), not by who writes.
+    match /nights/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isValidNightCreation(code);
+      allow update: if isValidNightUpdate(code);
+      allow delete: if false;
+
+      // Who is here tonight. The roster is listed on the night's home, so
+      // listing within one night is allowed (the collection of nights isn't).
+      match /guests/{guestId} {
+        allow read: if true;
+        // A guest joins with their claim on the name, in one batch (joinNight;
+        // the host's in the batch that creates the night).
+        allow create: if isValidNightGuest(code, guestId);
+        allow update: if false;
+        // Leaving takes the claim with it (leaveNight), so the name is free
+        // again; a guest document can't go while its claim stays.
+        allow delete: if !existsAfter(/databases/$(database)/documents/nights/$(code)/names/$(resource.data.name.trim().lower()));
+      }
+
+      // Who has which name tonight, as in a party (#229): create-only, so two
+      // guests landing one name at the same moment can't both have it.
+      match /names/{key} {
+        allow get: if true;
+        allow list: if false;
+        allow create: if isValidNightClaim(code, key);
+        allow update: if false;
+        allow delete: if !existsAfter(/databases/$(database)/documents/nights/$(code)/guests/$(resource.data.guestId));
       }
     }
 
@@ -509,11 +559,15 @@ service cloud.firestore {
     function isValidPartyCreation(code) {
       let data = request.resource.data;
       return code.matches('[A-Z]{4}') &&
+             // nightCode is the one optional key (#232): the party night this
+             // party is played in. Like a room's, it is only set here.
              data.keys().hasOnly(['code', 'hostId', 'title', 'contestId', 'kind', 'qualifiers', 'acts',
-                                  'template', 'bonuses', 'showNames', 'results', 'revealed', 'createdAt', 'expireAt']) &&
+                                  'template', 'bonuses', 'showNames', 'results', 'revealed', 'createdAt', 'expireAt',
+                                  'nightCode']) &&
              data.keys().hasAll(['code', 'hostId', 'title', 'contestId', 'kind', 'qualifiers', 'acts',
                                  'template', 'bonuses', 'showNames', 'results', 'revealed', 'createdAt', 'expireAt']) &&
              data.code == code &&
+             (!('nightCode' in data) || isNightRef(data.nightCode)) &&
              data.hostId is string && data.hostId.size() > 0 &&
              data.title is string && data.title.size() > 0 && data.title.size() <= 80 &&
              data.contestId is string && data.contestId.size() <= 60 &&
@@ -594,6 +648,151 @@ service cloud.firestore {
              data.expireAt is timestamp &&
              data.expireAt > request.time + duration.value(1, 'd') &&
              data.expireAt < request.time + duration.value(60, 'd');
+    }
+
+    // A party night's code as a room or party names it (#232): four letters,
+    // and a night that exists, so nothing can claim a night that isn't there.
+    function isNightRef(value) {
+      return value is string && value.matches('[A-Z]{4}') &&
+             exists(/databases/$(database)/documents/nights/$(value));
+    }
+
+    // Whether a party was made inside a night (#232). Only those let a
+    // guest's ballot and claim be deleted (a leave).
+    function isNightParty(code) {
+      return get(/databases/$(database)/documents/parties/$(code)).data.get('nightCode', '') != '';
+    }
+
+    // The same wide window parties use for expireAt: it comes from the
+    // phone's own clock, so it is checked to be 1 to 60 days out, and the
+    // client sets 30 for the TTL policy.
+    function isExpiryInWindow(expireAt) {
+      return expireAt is timestamp &&
+             expireAt > request.time + duration.value(1, 'd') &&
+             expireAt < request.time + duration.value(60, 'd');
+    }
+
+    // A night is created whole and open, with no activities yet (#232). The
+    // host joins in the same batch (createNight), as for a party.
+    function isValidNightCreation(code) {
+      let data = request.resource.data;
+      return code.matches('[A-Z]{4}') &&
+             data.keys().hasOnly(['code', 'hostId', 'title', 'activities', 'closed', 'createdAt', 'expireAt']) &&
+             data.keys().hasAll(['code', 'hostId', 'title', 'activities', 'closed', 'createdAt', 'expireAt']) &&
+             data.code == code &&
+             data.hostId is string && data.hostId.size() > 0 && data.hostId.size() <= 64 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 60 &&
+             data.activities == [] &&
+             data.closed == false &&
+             data.createdAt == request.time &&
+             isExpiryInWindow(data.expireAt);
+    }
+
+    // Exactly one of three moves per write, each limited to the keys it
+    // needs: the night grows by one activity, ends, or hands over to a new
+    // night. Nothing else about a night changes, so its host and code stay.
+    function isValidNightUpdate(code) {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return isAppendingActivity(code, affected) ||
+             isClosingNight(affected) ||
+             isMovingNight(code, affected);
+    }
+
+    // addNightActivity (an arrayUnion): the list grows by one entry at the
+    // end and everything before it stays exactly as it was (the prefix
+    // check, so an earlier activity can't be dropped or rewritten), up to 20.
+    // (The first one has no prefix to compare: an empty slice, [0:0], is an
+    // evaluation error in the rules engine, so it is skipped.)
+    // Only into an open night, and only an activity whose own document says
+    // it is in this night, so a night can't list someone else's room.
+    function isAppendingActivity(code, affected) {
+      let data = request.resource.data;
+      let existingData = resource.data;
+      return affected.hasOnly(['activities']) &&
+             existingData.closed == false &&
+             data.activities is list &&
+             existingData.activities is list &&
+             data.activities.size() == existingData.activities.size() + 1 &&
+             data.activities.size() <= 20 &&
+             (existingData.activities.size() == 0 ||
+              data.activities[0:existingData.activities.size()] == existingData.activities) &&
+             isNightActivity(code, data.activities[existingData.activities.size()]);
+    }
+
+    function isNightActivity(code, activity) {
+      return activity is map &&
+             activity.keys().hasOnly(['kind', 'code', 'title']) &&
+             activity.keys().hasAll(['kind', 'code', 'title']) &&
+             activity.kind in ['quiz', 'scoreboard'] &&
+             activity.code is string && activity.code.matches('[A-Z]{4}') &&
+             activity.title is string && activity.title.size() > 0 && activity.title.size() <= 80 &&
+             (activity.kind == 'quiz'
+               ? isInNight(code, /databases/$(database)/documents/rooms/$(activity.code))
+               : isInNight(code, /databases/$(database)/documents/parties/$(activity.code)));
+    }
+
+    // The room or party at `path` exists and was made for night `code`.
+    function isInNight(code, path) {
+      return exists(path) && get(path).data.get('nightCode', '') == code;
+    }
+
+    // closeNight: the host ends the evening. One way: no reopening.
+    function isClosingNight(affected) {
+      return affected.hasOnly(['closed']) &&
+             resource.data.closed == false &&
+             request.resource.data.closed == true;
+    }
+
+    // moveNight: the host carries the guests on to a new night (the next
+    // evening, or a fresh start): the old one is closed and points at it.
+    // Once (no movedTo before), and only to a night that exists, is this
+    // host's, is still open and is fresh (no activities), so a stranger's or
+    // a half-used night can't be named as the way on.
+    function isMovingNight(code, affected) {
+      let data = request.resource.data;
+      let target = get(/databases/$(database)/documents/nights/$(data.movedTo)).data;
+      return affected.hasOnly(['movedTo', 'closed']) &&
+             !('movedTo' in resource.data) &&
+             data.closed == true &&
+             data.movedTo is string &&
+             data.movedTo.matches('[A-Z]{4}') &&
+             data.movedTo != code &&
+             exists(/databases/$(database)/documents/nights/$(data.movedTo)) &&
+             target.hostId == resource.data.hostId &&
+             target.closed == false &&
+             target.activities.size() == 0;
+    }
+
+    // A guest of a night (#232). The night is open (getAfter: the host's
+    // guest comes in the batch that creates it), and the claim on this name
+    // is written together with the guest, as a party's is with a ballot.
+    function isValidNightGuest(code, guestId) {
+      let data = request.resource.data;
+      let night = /databases/$(database)/documents/nights/$(code);
+      return existsAfter(night) &&
+             getAfter(night).data.closed == false &&
+             data.keys().hasOnly(['name', 'joinedAt', 'expireAt']) &&
+             data.keys().hasAll(['name', 'joinedAt', 'expireAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 40 &&
+             data.joinedAt == request.time &&
+             isExpiryInWindow(data.expireAt) &&
+             existsAfter(/databases/$(database)/documents/nights/$(code)/names/$(data.name.trim().lower())) &&
+             getAfter(/databases/$(database)/documents/nights/$(code)/names/$(data.name.trim().lower())).data.guestId == guestId;
+    }
+
+    // A name claim in a night: the mirror of isValidNameClaim for parties,
+    // with the guest document in place of the ballot.
+    function isValidNightClaim(code, key) {
+      let data = request.resource.data;
+      let guest = /databases/$(database)/documents/nights/$(code)/guests/$(data.guestId);
+      return existsAfter(/databases/$(database)/documents/nights/$(code)) &&
+             data.keys().hasOnly(['name', 'guestId', 'expireAt']) &&
+             data.keys().hasAll(['name', 'guestId', 'expireAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 40 &&
+             key == data.name.trim().lower() &&
+             data.guestId is string && data.guestId.size() > 0 && data.guestId.size() <= 64 &&
+             existsAfter(guest) && getAfter(guest).data.name == data.name &&
+             isExpiryInWindow(data.expireAt);
     }
 
     // Default deny all other collections and documents

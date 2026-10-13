@@ -9,8 +9,9 @@ const mocks = vi.hoisted(() => ({
     onSnapshot: vi.fn(),
     serverTimestamp: vi.fn(() => "SERVER_TIMESTAMP"),
     Timestamp: { fromMillis: vi.fn((ms: number) => ({ ms })) },
-    generateRoomCode: vi.fn(),
+    freeCode: vi.fn(),
     batchSet: vi.fn(),
+    batchDelete: vi.fn(),
     batchCommit: vi.fn(),
     writeBatch: vi.fn(),
 }));
@@ -22,7 +23,7 @@ vi.mock("../firebase", () => ({
     },
 }));
 vi.mock("firebase/firestore", () => mocks);
-vi.mock("./roomsFirestore", () => ({ generateRoomCode: mocks.generateRoomCode }));
+vi.mock("./freeCode", () => ({ freeCode: mocks.freeCode }));
 
 import {
     JOIN_TIMEOUT_MS,
@@ -32,6 +33,7 @@ import {
     fetchContest,
     isAct,
     joinParty,
+    leaveParty,
     listenToBallots,
     listenToParty,
     partyExists,
@@ -52,7 +54,7 @@ beforeEach(() => {
     firebaseState.db = {};
     mocks.doc.mockImplementation((_db: unknown, ...path: string[]) => ({ path: path.join("/") }));
     mocks.collection.mockImplementation((_db: unknown, ...path: string[]) => ({ path: path.join("/") }));
-    mocks.writeBatch.mockReturnValue({ set: mocks.batchSet, commit: mocks.batchCommit });
+    mocks.writeBatch.mockReturnValue({ set: mocks.batchSet, delete: mocks.batchDelete, commit: mocks.batchCommit });
 });
 
 describe("fetchContest", () => {
@@ -97,8 +99,7 @@ describe("createParty", () => {
 
     it("takes a free code, with an expiry for the TTL policy, and the host joins in the same batch", async () => {
         vi.spyOn(Date, "now").mockReturnValue(1000);
-        mocks.generateRoomCode.mockReturnValueOnce("ABBA").mockReturnValueOnce("LORD");
-        mocks.getDoc.mockResolvedValueOnce(snapshot({})).mockResolvedValueOnce(snapshot(null));
+        mocks.freeCode.mockResolvedValueOnce("LORD");
         expect(await createParty(party, "Loreen")).toBe("LORD");
         const expireAt = { ms: 1000 + PARTY_LIFETIME_DAYS * 86_400_000 };
         expect(mocks.batchSet.mock.calls).toEqual([
@@ -111,8 +112,7 @@ describe("createParty", () => {
     });
 
     it("writes the chosen bonuses inside the template, leaving the top-level keys as they were", async () => {
-        mocks.generateRoomCode.mockReturnValueOnce("ABBA");
-        mocks.getDoc.mockResolvedValueOnce(snapshot(null));
+        mocks.freeCode.mockResolvedValueOnce("ABBA");
         const bonuses = [{ id: "wind", label: "Wind machine", points: 1 }];
         await createParty({ ...party, template: { ...party.template, bonuses } }, "Loreen");
         const [, written] = mocks.batchSet.mock.calls[0];
@@ -122,13 +122,21 @@ describe("createParty", () => {
         );
     });
 
+    it("carries the night's code when the party is made for a party night (#232)", async () => {
+        mocks.freeCode.mockResolvedValueOnce("ABBA");
+        await createParty({ ...party, nightCode: "NITE" }, "Loreen");
+        expect(mocks.batchSet.mock.calls[0][1]).toMatchObject({ code: "ABBA", nightCode: "NITE" });
+    });
+
     it("tries another code when one is taken between the check and the write", async () => {
-        mocks.generateRoomCode.mockReturnValueOnce("ABBA").mockReturnValueOnce("LORD");
-        // Free when checked, taken when the write was refused, then a free one.
-        mocks.getDoc.mockResolvedValueOnce(snapshot(null)).mockResolvedValueOnce(snapshot({})).mockResolvedValueOnce(snapshot(null));
+        mocks.freeCode.mockResolvedValueOnce("ABBA").mockResolvedValueOnce("LORD");
+        // Taken when the write was refused, then a free one.
+        mocks.getDoc.mockResolvedValueOnce(snapshot({}));
         const denied = Object.assign(new Error("denied"), { code: "permission-denied" });
         mocks.batchCommit.mockRejectedValueOnce(denied);
         expect(await createParty(party, "Loreen")).toBe("LORD");
+        expect(mocks.batchSet.mock.calls.at(-3)?.[0]).toEqual({ path: "parties/LORD" });
+        mocks.freeCode.mockResolvedValue("ABBA");
         mocks.batchCommit.mockRejectedValueOnce(new Error("offline"));
         mocks.getDoc.mockResolvedValue(snapshot(null));
         await expect(createParty(party, "Loreen")).rejects.toThrow("offline");
@@ -137,11 +145,13 @@ describe("createParty", () => {
         await expect(createParty(party, "Loreen")).rejects.toBe(denied);
     });
 
-    it("gives up after five taken codes", async () => {
-        mocks.generateRoomCode.mockReturnValue("ABBA");
+    it("gives up after five codes taken between the check and the write", async () => {
+        mocks.freeCode.mockResolvedValue("ABBA");
         mocks.getDoc.mockResolvedValue(snapshot({}));
+        mocks.batchCommit.mockRejectedValue(Object.assign(new Error("denied"), { code: "permission-denied" }));
         await expect(createParty(party, "Loreen")).rejects.toThrow(/free party code/);
-        expect(mocks.getDoc).toHaveBeenCalledTimes(5);
+        expect(mocks.freeCode).toHaveBeenCalledTimes(5);
+        mocks.batchCommit.mockReset();
     });
 
     it("needs Firebase", async () => {
@@ -251,6 +261,16 @@ describe("ballots and host writes", () => {
         await vi.advanceTimersByTimeAsync(JOIN_TIMEOUT_MS);
         await settled;
         vi.useRealTimers();
+    });
+
+    it("leave: delete the ballot and the name claim in one batch (#232)", async () => {
+        mocks.batchCommit.mockResolvedValueOnce(undefined);
+        await leaveParty("ABBA", "g1", " Loreen ");
+        expect(mocks.batchDelete.mock.calls).toEqual([
+            [{ path: "parties/ABBA/ballots/g1" }],
+            [{ path: "parties/ABBA/names/loreen" }],
+        ]);
+        expect(mocks.batchCommit).toHaveBeenCalledTimes(1);
     });
 
     it("update the running order, the result and the awards", async () => {

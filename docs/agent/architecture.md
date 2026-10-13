@@ -131,6 +131,10 @@ plan that also removes the ad hoc storage it would duplicate.
   `partyResults.ts` (what the party screens show) and `partyNames.ts` —
   the scoreboard party, see `docs/agent/scoreboard-party.md`.
 
+- `nightsFirestore.ts` (party nights, `nights/`: guests, name claims,
+  activities) and `freeCode.ts` (a 4-letter code free among rooms, parties
+  and nights) — see "Party nights" in `docs/agent/firestore-data-model.md`.
+
 - `roomsFirestore.ts` — the quiz rooms' Firestore API: room/player CRUD,
   the `onSnapshot`-based `listenToRoom`, the phase moves
   (`advanceQuestion`, `resumeAfterMidQuiz`) and the mid-quiz ready marks

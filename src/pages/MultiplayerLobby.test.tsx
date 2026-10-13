@@ -16,8 +16,8 @@ vi.mock("../utils/roomsFirestore", () => ({
   joinRoom: vi.fn(async () => true),
   joinRoomWithFreeName: vi.fn(async (_code: string, _id: string, pool: readonly string[]) => pool[0]),
   getRoom: vi.fn(async () => null),
-  generateRoomCode: () => "ABBA",
 }));
+vi.mock("../utils/freeCode", () => ({ freeCode: async () => "ABBA" }));
 
 const ShowLocation = () => {
   const location = useLocation();
