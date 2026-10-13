@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
     serverTimestamp: vi.fn(() => "SERVER_TIMESTAMP"),
     Timestamp: { fromMillis: vi.fn((ms: number) => ({ ms })) },
     generateRoomCode: vi.fn(),
+    batchSet: vi.fn(),
+    batchCommit: vi.fn(),
+    writeBatch: vi.fn(),
 }));
 const firebaseState = vi.hoisted(() => ({ db: {} as unknown }));
 
@@ -27,6 +30,7 @@ import {
     fetchBallot,
     fetchContest,
     isAct,
+    joinParty,
     listenToBallots,
     listenToParty,
     partyExists,
@@ -47,6 +51,7 @@ beforeEach(() => {
     firebaseState.db = {};
     mocks.doc.mockImplementation((_db: unknown, ...path: string[]) => ({ path: path.join("/") }));
     mocks.collection.mockImplementation((_db: unknown, ...path: string[]) => ({ path: path.join("/") }));
+    mocks.writeBatch.mockReturnValue({ set: mocks.batchSet, commit: mocks.batchCommit });
 });
 
 describe("fetchContest", () => {
@@ -198,6 +203,34 @@ describe("ballots and host writes", () => {
         mocks.getDoc.mockResolvedValueOnce(snapshot({ name: "Jedward", ratings: {}, bonuses: {} })).mockResolvedValueOnce(snapshot(null));
         expect(await fetchBallot("ABBA", "g1")).toEqual({ guestId: "g1", name: "Jedward", ratings: {}, bonuses: {} });
         expect(await fetchBallot("ABBA", "g2")).toBeNull();
+    });
+
+    it("join: claim the name and write the empty ballot in one batch", async () => {
+        mocks.batchCommit.mockResolvedValueOnce(undefined);
+        expect(await joinParty("ABBA", "g1", " Loreen ")).toBe(true);
+        expect(mocks.batchSet).toHaveBeenCalledWith({ path: "parties/ABBA/names/loreen" }, {
+            name: " Loreen ", guestId: "g1", expireAt: { ms: expect.any(Number) },
+        });
+        expect(mocks.batchSet).toHaveBeenCalledWith({ path: "parties/ABBA/ballots/g1" }, {
+            name: " Loreen ", ratings: {}, bonuses: {}, updatedAt: "SERVER_TIMESTAMP", expireAt: { ms: expect.any(Number) },
+        });
+        expect(mocks.batchCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it("join: a refused claim is someone else's name, or this guest's from an earlier try", async () => {
+        const refused = Object.assign(new Error("denied"), { code: "permission-denied" });
+        mocks.batchCommit.mockRejectedValue(refused);
+        mocks.getDoc.mockResolvedValueOnce(snapshot({ name: "Loreen", guestId: "g2" }));
+        expect(await joinParty("ABBA", "g1", "Loreen")).toBe(false);
+        mocks.getDoc.mockResolvedValueOnce(snapshot({ name: "Loreen", guestId: "g1" }));
+        expect(await joinParty("ABBA", "g1", "Loreen")).toBe(true);
+        // Refused with no claim there: not about the name, so the error stands.
+        mocks.getDoc.mockResolvedValueOnce(snapshot(null));
+        await expect(joinParty("ABBA", "g1", "Loreen")).rejects.toBe(refused);
+        const offline = Object.assign(new Error("offline"), { code: "unavailable" });
+        mocks.batchCommit.mockRejectedValueOnce(offline);
+        await expect(joinParty("ABBA", "g1", "Loreen")).rejects.toBe(offline);
+        mocks.batchCommit.mockReset();
     });
 
     it("update the running order, the result and the awards", async () => {

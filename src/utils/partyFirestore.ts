@@ -13,6 +13,7 @@ import {
     setDoc,
     Timestamp,
     updateDoc,
+    writeBatch,
     type FieldValue,
 } from "firebase/firestore";
 import { db } from "../firebase";
@@ -20,6 +21,7 @@ import { contestById, type Act, type Contest } from "../data/contests2027";
 import { sanitiseBonuses, type Ballot, type Bonuses, type RatingTemplate, type Ratings } from "./partyModel";
 import { resultsFor } from "./partyResults";
 import { generateRoomCode } from "./roomsFirestore";
+import { nameKey } from "./freeName";
 
 export interface PartyResults {
     /** A final's real places, act id -> 1-based place. */
@@ -201,6 +203,36 @@ export const saveBallot = async (code: string, ballot: Ballot): Promise<void> =>
         // TTL policy: 30 days after the guest's last change.
         expireAt: expiry(),
     });
+};
+
+/**
+ * Join a party under `name` (#229): claim the name, `parties/{code}/names/{key}`,
+ * and write the guest's empty ballot in one batch. The rules only ever create
+ * a claim, so if another guest took the name first the batch is refused and
+ * nothing is written. Resolves `true` when the name is this guest's (also when
+ * an earlier try already claimed it), `false` when someone else has it.
+ */
+export const joinParty = async (code: string, guestId: string, name: string): Promise<boolean> => {
+    const firestore = requireDb();
+    const claimRef = doc(firestore, "parties", code, "names", nameKey(name));
+    const batch = writeBatch(firestore);
+    batch.set(claimRef, { name, guestId, expireAt: expiry() });
+    batch.set(doc(firestore, "parties", code, "ballots", guestId), {
+        name,
+        ratings: {},
+        bonuses: {},
+        updatedAt: serverTimestamp(),
+        expireAt: expiry(),
+    });
+    try {
+        await batch.commit();
+        return true;
+    } catch (error) {
+        if ((error as { code?: string }).code !== "permission-denied") throw error;
+        const claim = await getDoc(claimRef);
+        if (!claim.exists()) throw error;
+        return claim.data().guestId === guestId;
+    }
 };
 
 /** Read one guest's ballot, e.g. to restore it after a reload. */

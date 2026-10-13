@@ -28,6 +28,7 @@ import {
   getDocs,
   deleteDoc,
   runTransaction,
+  writeBatch,
 } from "firebase/firestore";
 
 const app = initializeApp({ projectId: "demo-escparty" });
@@ -148,8 +149,6 @@ report(
 // permission-denied. The client (joinRoomWithFreeName, and this copy of it)
 // reads again and retries when the room's players changed, so every guest
 // must land, each under its own name.
-// (Ten joiners, not more: firestore.rules' allPlayersValid hits the
-// 1000-expression limit at the 13th player, so the room stops at 12.)
 const txJoiners = freshRoom("TXJ");
 await createRoom(txJoiners.roomRef, txJoiners.roomCode);
 const txJoinOnce = (clientDb, id) =>
@@ -186,6 +185,64 @@ report(
   String(txPlayers.length),
   String(new Set(txPlayers.map((p) => p.name)).size),
 );
+
+// 2d. A full room (#229). Rules stop at 1000 evaluated expressions per
+// write; checking every player on every write used to run out at the 13th
+// player. Now a join checks only the new entry and a score write only the
+// changed one, so a room fills to MAX_PLAYERS (32), with realistic entries,
+// and still takes the writes a quiz makes. The 33rd join is refused.
+const full = freshRoom("FULL");
+await createRoom(full.roomRef, full.roomCode);
+await updateDoc(full.roomRef, { difficulty: "easy" });
+let fullCount = 1;
+for (; fullCount < 32; fullCount += 1) {
+  try {
+    await updateDoc(full.roomRef, {
+      players: arrayUnion({ id: `full-${fullCount}`, name: `Céline Dion ${fullCount}`, score: 0, joinedAt: Timestamp.now() }),
+    });
+  } catch {
+    break;
+  }
+}
+report("32 players fit in a room", "32", String(fullCount));
+await expectDenied("a 33rd player joins a full room", () =>
+  updateDoc(full.roomRef, { players: arrayUnion({ id: "full-33", name: "One too many", score: 0, joinedAt: Timestamp.now() }) })
+);
+await expectAllowed("a guest leaves the full lobby (arrayRemove)", async () => {
+  const leaving = (await getDoc(full.roomRef)).data().players[31];
+  await updateDoc(full.roomRef, { players: arrayRemove(leaving) });
+});
+await expectAllowed("a guest joins the room again by transaction", () =>
+  runTransaction(db, async (transaction) => {
+    const room = (await transaction.get(full.roomRef)).data();
+    transaction.update(full.roomRef, {
+      players: [...room.players, { id: "full-31b", name: "Céline Dion 31", score: 0, joinedAt: Timestamp.now() }],
+    });
+  })
+);
+await expectDenied("a join that rewrites an earlier player", async () => {
+  const players = (await getDoc(full.roomRef)).data().players.slice(0, 31);
+  players[3] = { ...players[3], score: 99 };
+  await updateDoc(full.roomRef, { players: [...players, { id: "full-x", name: "X", score: 0 }] });
+});
+await expectAllowed("the full room starts", () =>
+  updateDoc(full.roomRef, { started: true, phase: "question", currentQuestionIndex: 0, phaseStartedAt: serverTimestamp() })
+);
+await expectAllowed("the last of 32 players scores (updatePlayerScore's write)", async () => {
+  const players = (await getDoc(full.roomRef)).data().players;
+  players[31] = { ...players[31], score: 1200 };
+  await updateDoc(full.roomRef, { players });
+});
+await expectAllowed("the host of 32 players scores", async () => {
+  const players = (await getDoc(full.roomRef)).data().players;
+  players[0] = { ...players[0], score: 800 };
+  await updateDoc(full.roomRef, { players });
+});
+await expectDenied("a score write that makes one of 32 scores negative", async () => {
+  const players = (await getDoc(full.roomRef)).data().players;
+  players[20] = { ...players[20], score: -5 };
+  await updateDoc(full.roomRef, { players });
+});
 
 // 3. Malicious: append a new "player" that's missing a required field. Sized
 // to exactly oldCount + 1 so this write actually reaches allPlayersValid via
@@ -445,6 +502,64 @@ for (const [label, overrides] of [
   await expectDenied(`save a ballot with ${label}`, () => setDoc(doc(db, "parties", partyCode, "ballots", "guest-2"), aBallot(overrides)));
 }
 await expectDenied("delete a ballot", () => deleteDoc(ballotRef));
+// 5b. Party name claims (#229, joinParty): a guest joins by creating
+// names/{key} (the name trimmed, lower case) with their first ballot in one
+// batch. A claim is never changed, so the second guest to want a name is
+// refused, ballot and all.
+const aClaim = (overrides = {}) => Object.fromEntries(Object.entries({
+  name: "Céline Dion",
+  guestId: "claim-1",
+  expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  ...overrides,
+}).filter(([, value]) => value !== undefined));
+const joinBatch = (clientDb, key, claim) => {
+  const batch = writeBatch(clientDb);
+  batch.set(doc(clientDb, "parties", partyCode, "names", key), claim);
+  batch.set(doc(clientDb, "parties", partyCode, "ballots", claim.guestId), aBallot({ name: claim.name, ratings: {}, bonuses: {} }));
+  return batch.commit();
+};
+await expectAllowed("claim a name with the first ballot", () => joinBatch(db, "céline dion", aClaim()));
+await expectAllowed("read a name claim", () => getDoc(doc(db, "parties", partyCode, "names", "céline dion")));
+await expectDenied("claim a name someone has", () => joinBatch(db, "céline dion", aClaim({ guestId: "claim-2", name: " CÉLINE DION" })));
+report(
+  "a refused claim writes no ballot",
+  "false",
+  String((await getDoc(doc(db, "parties", partyCode, "ballots", "claim-2"))).exists()),
+);
+await expectDenied("hand a claimed name to someone else", () =>
+  setDoc(doc(db, "parties", partyCode, "names", "céline dion"), aClaim({ guestId: "claim-2" }))
+);
+await expectDenied("give a claimed name up", () => deleteDoc(doc(db, "parties", partyCode, "names", "céline dion")));
+await expectDenied("list a party's names", () => getDocs(collection(db, "parties", partyCode, "names")));
+await expectDenied("claim a name in a party that doesn't exist", () =>
+  setDoc(doc(db, "parties", "NONE", "names", "céline dion"), aClaim())
+);
+for (const [label, key, overrides] of [
+  ["a key that isn't the name", "someone else", {}],
+  ["a key that keeps the case", "Céline Dion", {}],
+  ["no guestId", "céline dion 2", { name: "Céline Dion 2", guestId: undefined }],
+  ["an extra field", "céline dion 2", { name: "Céline Dion 2", isHost: true }],
+  ["a far-off expireAt", "céline dion 2", { name: "Céline Dion 2", expireAt: Timestamp.fromMillis(Date.now() + 400 * 24 * 60 * 60 * 1000) }],
+]) {
+  await expectDenied(`claim a name with ${label}`, () => setDoc(doc(db, "parties", partyCode, "names", key), aClaim(overrides)));
+}
+// Five guests land "Loreen" at the same moment, each on its own client:
+// exactly one gets it.
+const claimClients = Array.from({ length: 5 }, (_, i) => `claim-${i}`).map((name) => {
+  const clientDb = getFirestore(initializeApp({ projectId: "demo-escparty" }, name));
+  connectFirestoreEmulator(clientDb, "127.0.0.1", 8080);
+  return clientDb;
+});
+const claims = await Promise.allSettled(
+  claimClients.map((clientDb, i) => joinBatch(clientDb, "loreen", aClaim({ name: "Loreen", guestId: `race-${i}` })))
+);
+report("one of five simultaneous claims of a name lands", "1", String(claims.filter((c) => c.status === "fulfilled").length));
+report(
+  "the others are refused by the rules",
+  "4",
+  String(claims.filter((c) => c.status === "rejected" && c.reason.code === "permission-denied").length),
+);
+
 await expectAllowed("read a contest lineup", () => getDoc(doc(db, "contests", "burgas-2027-final")));
 await expectDenied("write a contest lineup", () =>
   setDoc(doc(db, "contests", "burgas-2027-final"), { acts: [] })

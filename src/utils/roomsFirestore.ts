@@ -100,7 +100,7 @@ export class JoinRejected extends Error {
     }
 }
 
-/** The most players a room holds: firestore.rules' allPlayersValid caps the list at 32. */
+/** The most players a room holds: maxPlayers() in firestore.rules. */
 export const MAX_PLAYERS = 32;
 
 /**

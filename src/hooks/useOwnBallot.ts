@@ -19,8 +19,8 @@ const same = (a: { ratings: Ratings; bonuses: Bonuses }, b: { ratings: Ratings; 
  * first arrives the two are merged, so ratings from before a reload and
  * ratings that never reached the server both survive. A guest
  * joins only once the ballots have loaded, so there is always a server copy
- * (or its absence) to merge with; the empty ballot, which claims the name, is
- * written once.
+ * (or its absence) to merge with. Joining (joinParty) writes the empty
+ * ballot with the name claim; if the server still has none, it is written here once.
  */
 export const useOwnBallot = (code: string | undefined, identity: PartyIdentity | null, serverBallots: Ballot[] | undefined) => {
     const [ballot, setBallot] = useState<{ ratings: Ratings; bonuses: Bonuses }>(() => {
@@ -79,7 +79,7 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         latest.current = next;
         setBallot(next);
         if (code) storeBallot(code, next);
-        // No ballot yet: write the empty one, which claims the name for the next guest.
+        // No ballot on the server yet (not seen yet, or an identity from before name claims): write it.
         if (!server || !same(server, next)) schedule(0);
     }, [serverBallots, identity, code, schedule]);
 

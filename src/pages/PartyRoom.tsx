@@ -9,7 +9,7 @@ import { Control, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } f
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
 import { useLeaveGuard } from "../hooks/useLeaveGuard";
 import { usePartyData } from "../hooks/usePartyData";
-import type { Party } from "../utils/partyFirestore";
+import { joinParty, type Party } from "../utils/partyFirestore";
 import {
     actScore,
     ballotScores,
@@ -95,7 +95,7 @@ const PartyRoom = () => {
                 error={error}
                 onRetry={retry}
                 onJoin={next => {
-                    // useOwnBallot writes the empty ballot (which claims the name) once it sees none for this guest.
+                    // JoinParty has claimed the name and written the empty ballot.
                     savePartyIdentity(party.code, next);
                     setIdentity(next);
                 }}
@@ -179,32 +179,63 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
 }) => {
     const [name, setName] = useState<string | null>(null);
     const [spinning, setSpinning] = useState(false);
+    const [joining, setJoining] = useState(false);
+    // The name another guest claimed first, at the moment this guest pressed Join.
+    const [refused, setRefused] = useState<string | null>(null);
+    const [failed, setFailed] = useState(false);
     const checking = ballots === undefined && !error;
-    // Any listener error stops joining, even with ballots on screen: they may be stale.
     // The names nobody has yet.
-    const names = useMemo(() => availablePartyNames((ballots ?? []).map(ballot => ballot.name), withDistinctNames(ballots ?? []).map(ballot => ballot.name)), [ballots]);
-    // A landed name that a ballots update takes before this guest joins is let go.
+    const names = useMemo(() => {
+        const taken = (ballots ?? []).map(ballot => ballot.name);
+        return availablePartyNames(refused === null ? taken : [...taken, refused], withDistinctNames(ballots ?? []).map(ballot => ballot.name));
+    }, [ballots, refused]);
+    // Any listener error stops joining, even with ballots on screen: they may be stale.
     const blocked = !!error;
+    // A landed name that a ballots update takes before this guest joins is let go.
     const landed = name !== null && names.includes(name) ? name : null;
-    const justTaken = name !== null && landed === null ? name : null;
+    const justTaken = name !== null && landed === null ? name : refused;
+    const land = (next: string | null) => {
+        setName(next);
+        setRefused(null);
+        setFailed(false);
+    };
+    const join = async () => {
+        if (landed === null) return;
+        const guestId = uuidv4();
+        setJoining(true);
+        setFailed(false);
+        try {
+            if (await joinParty(party.code, guestId, landed)) {
+                onJoin({ guestId, name: landed, isHost: false });
+                return;
+            }
+            setName(null);
+            setRefused(landed);
+        } catch (joinError) {
+            console.error("Couldn't join the party:", joinError);
+            setFailed(true);
+        }
+        setJoining(false);
+    };
     return (
         <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
             {blocked && error !== null ? <PartyError error={error} onRetry={onRetry} /> : (
                 <>
                     <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
-                    <NamePicker value={landed} onChange={setName} onSpinningChange={setSpinning} names={names} disabled={checking} />
+                    <NamePicker value={landed} onChange={land} onSpinningChange={setSpinning} names={names} disabled={checking || joining} />
                 </>
             )}
             {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
             {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
+            {failed && <CalmNote role="alert">You couldn&apos;t join just now. Check your connection and press Join again.</CalmNote>}
             <Ground>
                 <Pane>
                     <Control
                         elevation="high"
-                        disabled={landed === null || spinning || checking || blocked}
-                        onClick={() => landed !== null && onJoin({ guestId: uuidv4(), name: landed, isHost: false })}
+                        disabled={landed === null || spinning || checking || blocked || joining}
+                        onClick={() => void join()}
                     >
-                        Join the party
+                        {joining ? "Joining…" : "Join the party"}
                     </Control>
                 </Pane>
             </Ground>

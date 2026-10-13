@@ -127,15 +127,13 @@ service cloud.firestore {
       let existingData = resource.data;
 
       // Only the players field may change, and it must grow by exactly one
-      // (matching addPlayerToRoom's arrayUnion of a single new player). Every
-      // entry in the resulting array is shape-validated via allPlayersValid,
-      // not just the appended one — a plain updateDoc({players: [...]}) can
-      // rewrite any index, not only append, so "the array grew by one"
-      // doesn't by itself guarantee the earlier entries are untouched. This
-      // doesn't check the new player's id against the caller's identity,
-      // since this app has no auth to check it against (see
-      // docs/agent/firestore-data-model.md) — same limitation as
-      // isUpdatingPlayerScores below.
+      // (addPlayerToRoom's arrayUnion, joinRoomWithFreeName's transaction):
+      // every existing entry stays exactly as it was and one valid player is
+      // appended, up to maxPlayers(). Checking only the new entry keeps a
+      // join cheap at any room size (#229). This doesn't check the new
+      // player's id against the caller's identity, since this app has no
+      // auth to check it against (see docs/agent/firestore-data-model.md),
+      // same limitation as isUpdatingPlayerScores below.
       //
       // Type-checks are ordered deliberately: `is list` must short-circuit
       // before any `.size()`/index access below it, since those throw
@@ -147,7 +145,9 @@ service cloud.firestore {
              data.players is list &&
              existingData.players is list &&
              data.players.size() == existingData.players.size() + 1 &&
-             allPlayersValid(data.players);
+             data.players.size() <= maxPlayers() &&
+             data.players[0:existingData.players.size()] == existingData.players &&
+             isValidPlayerBasic(data.players[existingData.players.size()]);
     }
 
     function isStartingGame(affected) {
@@ -237,7 +237,7 @@ service cloud.firestore {
              data.players is list &&
              existingData.players is list &&
              data.players.size() == existingData.players.size() &&
-             allPlayersValid(data.players);
+             changedPlayersValid(data.players, existingData.players);
     }
 
     // The host starting another round with the same guests (setNextRoom,
@@ -386,35 +386,43 @@ service cloud.firestore {
              player.score >= 0;
     }
 
-    // Firestore Rules has no loop/`.every()` construct and no recursion, so
-    // "validate every element of a list" has to be unrolled by hand up to a
-    // fixed bound. 32 comfortably covers a realistic party-quiz room; a room
-    // that somehow exceeds it is rejected outright by the size check below
-    // rather than silently validated. isValidPlayerAt(i) is trivially true
-    // once i is past the end of the list, so this works for any list from
-    // size 0 up to the bound.
-    function isValidPlayerAt(players, i) {
-      return i >= players.size() || isValidPlayerBasic(players[i]);
+    // The most players a room holds: MAX_PLAYERS in src/utils/roomsFirestore.ts.
+    // Raising it also means unrolling changedPlayersValid below that far.
+    function maxPlayers() {
+      return 32;
     }
 
-    function allPlayersValid(players) {
-      return players.size() <= 32 &&
-        isValidPlayerAt(players, 0) && isValidPlayerAt(players, 1) &&
-        isValidPlayerAt(players, 2) && isValidPlayerAt(players, 3) &&
-        isValidPlayerAt(players, 4) && isValidPlayerAt(players, 5) &&
-        isValidPlayerAt(players, 6) && isValidPlayerAt(players, 7) &&
-        isValidPlayerAt(players, 8) && isValidPlayerAt(players, 9) &&
-        isValidPlayerAt(players, 10) && isValidPlayerAt(players, 11) &&
-        isValidPlayerAt(players, 12) && isValidPlayerAt(players, 13) &&
-        isValidPlayerAt(players, 14) && isValidPlayerAt(players, 15) &&
-        isValidPlayerAt(players, 16) && isValidPlayerAt(players, 17) &&
-        isValidPlayerAt(players, 18) && isValidPlayerAt(players, 19) &&
-        isValidPlayerAt(players, 20) && isValidPlayerAt(players, 21) &&
-        isValidPlayerAt(players, 22) && isValidPlayerAt(players, 23) &&
-        isValidPlayerAt(players, 24) && isValidPlayerAt(players, 25) &&
-        isValidPlayerAt(players, 26) && isValidPlayerAt(players, 27) &&
-        isValidPlayerAt(players, 28) && isValidPlayerAt(players, 29) &&
-        isValidPlayerAt(players, 30) && isValidPlayerAt(players, 31);
+    // Firestore Rules has no loop/`.every()` construct and no recursion, so
+    // "validate every element of a list" has to be unrolled by hand up to
+    // maxPlayers(). Rules also stop at 1000 evaluated expressions per write,
+    // and shape-checking every player (the old allPlayersValid) ran out of
+    // them at the 13th player (#229). So a write is checked only where it
+    // changes something: an entry equal to the one before it costs one
+    // comparison, and only a changed entry gets the full shape check. A
+    // score write (updatePlayerScore) changes one entry. Indexes past the end
+    // of the list are trivially true.
+    function isUnchangedOrValidAt(players, before, i) {
+      return i >= players.size() || players[i] == before[i] || isValidPlayerBasic(players[i]);
+    }
+
+    function changedPlayersValid(players, before) {
+      return players.size() <= maxPlayers() &&
+        isUnchangedOrValidAt(players, before, 0) && isUnchangedOrValidAt(players, before, 1) &&
+        isUnchangedOrValidAt(players, before, 2) && isUnchangedOrValidAt(players, before, 3) &&
+        isUnchangedOrValidAt(players, before, 4) && isUnchangedOrValidAt(players, before, 5) &&
+        isUnchangedOrValidAt(players, before, 6) && isUnchangedOrValidAt(players, before, 7) &&
+        isUnchangedOrValidAt(players, before, 8) && isUnchangedOrValidAt(players, before, 9) &&
+        isUnchangedOrValidAt(players, before, 10) && isUnchangedOrValidAt(players, before, 11) &&
+        isUnchangedOrValidAt(players, before, 12) && isUnchangedOrValidAt(players, before, 13) &&
+        isUnchangedOrValidAt(players, before, 14) && isUnchangedOrValidAt(players, before, 15) &&
+        isUnchangedOrValidAt(players, before, 16) && isUnchangedOrValidAt(players, before, 17) &&
+        isUnchangedOrValidAt(players, before, 18) && isUnchangedOrValidAt(players, before, 19) &&
+        isUnchangedOrValidAt(players, before, 20) && isUnchangedOrValidAt(players, before, 21) &&
+        isUnchangedOrValidAt(players, before, 22) && isUnchangedOrValidAt(players, before, 23) &&
+        isUnchangedOrValidAt(players, before, 24) && isUnchangedOrValidAt(players, before, 25) &&
+        isUnchangedOrValidAt(players, before, 26) && isUnchangedOrValidAt(players, before, 27) &&
+        isUnchangedOrValidAt(players, before, 28) && isUnchangedOrValidAt(players, before, 29) &&
+        isUnchangedOrValidAt(players, before, 30) && isUnchangedOrValidAt(players, before, 31);
     }
 
     // Saved custom quizzes (#76). There is no sign-in, so a quiz's random
@@ -464,6 +472,19 @@ service cloud.firestore {
         allow read: if true;
         allow create, update: if isValidBallot(code);
         allow delete: if false;
+      }
+
+      // Who has which name (#229). A guest joins by creating the claim for
+      // their name together with their first ballot, in one batch
+      // (joinParty). A claim is never changed or removed, so when two
+      // guests land the same name at the same moment, the second create is
+      // refused and that guest spins again. The id is the name trimmed and
+      // in lower case (nameKey in src/utils/freeName.ts).
+      match /names/{key} {
+        allow get: if true;
+        allow list: if false;
+        allow create: if isValidNameClaim(code, key);
+        allow update, delete: if false;
       }
     }
 
@@ -537,6 +558,20 @@ service cloud.firestore {
              // Kept about 30 days after the last change, for a TTL policy on expireAt.
              data.expireAt is timestamp &&
              // A wide window: expireAt comes from the phone's own clock.
+             data.expireAt > request.time + duration.value(1, 'd') &&
+             data.expireAt < request.time + duration.value(60, 'd');
+    }
+
+    function isValidNameClaim(code, key) {
+      let data = request.resource.data;
+      return exists(/databases/$(database)/documents/parties/$(code)) &&
+             data.keys().hasOnly(['name', 'guestId', 'expireAt']) &&
+             data.keys().hasAll(['name', 'guestId', 'expireAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 40 &&
+             key == data.name.trim().lower() &&
+             data.guestId is string && data.guestId.size() > 0 && data.guestId.size() <= 64 &&
+             // Kept about 30 days, like the ballot it comes with.
+             data.expireAt is timestamp &&
              data.expireAt > request.time + duration.value(1, 'd') &&
              data.expireAt < request.time + duration.value(60, 'd');
     }
