@@ -929,6 +929,7 @@ await expectDenied("move on to a lowercase code", () => updateDoc(nightRef(movin
 await expectDenied("move on to itself", () => updateDoc(nightRef(movingFrom), { movedTo: movingFrom, closed: true }));
 await expectDenied("move on to a stranger's night", () => updateDoc(nightRef(movingFrom), { movedTo: strangers, closed: true }));
 await expectDenied("move on to a night that already has activities", () => updateDoc(nightRef(movingFrom), { movedTo: usedTarget, closed: true }));
+await expectDenied("move on from a night that is already closed", () => updateDoc(nightRef(closing), { movedTo: freshTarget, closed: true }));
 await expectDenied("move on to a night that is closed", () => updateDoc(nightRef(movingFrom), { movedTo: closedTarget, closed: true }));
 await expectDenied("move on and change the title", () => updateDoc(nightRef(movingFrom), { movedTo: freshTarget, closed: true, title: "Elsewhere" }));
 await expectAllowed("move on to a fresh night of the same host", () => updateDoc(nightRef(movingFrom), { movedTo: freshTarget, closed: true }));

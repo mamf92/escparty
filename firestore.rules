@@ -745,14 +745,16 @@ service cloud.firestore {
 
     // moveNight: the host carries the guests on to a new night (the next
     // evening, or a fresh start): the old one is closed and points at it.
-    // Once (no movedTo before), and only to a night that exists, is this
-    // host's, is still open and is fresh (no activities), so a stranger's or
-    // a half-used night can't be named as the way on.
+    // Once (no movedTo before), from a night still open, and only to a
+    // night that exists, is this host's, is still open and is fresh (no
+    // activities), so a stranger's or a half-used night can't be named as
+    // the way on.
     function isMovingNight(code, affected) {
       let data = request.resource.data;
       let target = get(/databases/$(database)/documents/nights/$(data.movedTo)).data;
       return affected.hasOnly(['movedTo', 'closed']) &&
              !('movedTo' in resource.data) &&
+             resource.data.closed == false &&
              data.closed == true &&
              data.movedTo is string &&
              data.movedTo.matches('[A-Z]{4}') &&
