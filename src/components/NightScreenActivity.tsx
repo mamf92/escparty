@@ -32,7 +32,8 @@ export const NightScreenActivity = ({ activities }: { activities: readonly Night
                     <Ground>
                         <Pane>
                             <Row>
-                                <span className="calm-sub">{newest.kind === "quiz" ? "Quiz" : "Scoreboard"}</span>
+                                {/* A quiz is listed as "Quiz", "Quiz 2"…: no need to say "Quiz" twice. */}
+                                {!(newest.kind === "quiz" && newest.title.startsWith("Quiz")) && <span className="calm-sub">{newest.kind === "quiz" ? "Quiz" : "Scoreboard"}</span>}
                                 <span>{newest.title}</span>
                             </Row>
                         </Pane>

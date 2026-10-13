@@ -52,11 +52,12 @@ describe("NightActivities", () => {
     });
 
     it("lists a card for each activity, the newest first, with a dark tile and a white button", () => {
+        // A quiz titled "Quiz" doesn't say "Quiz" twice.
         renderCards([...quiz, ...board]);
         const items = within(screen.getByRole("list", { name: "Now on" })).getAllByRole("listitem");
         expect(items.map(item => item.textContent)).toEqual([
             "ScoreboardSemi-final 14 acts to rateRate",
-            "QuizQuizWaiting for playersJoin the quiz",
+            "QuizWaiting for playersJoin the quiz",
         ]);
         const button = screen.getByRole("button", { name: "Rate" });
         expect(button).not.toHaveClass("is-high");

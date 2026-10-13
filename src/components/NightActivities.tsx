@@ -63,7 +63,8 @@ export const NightActivities = ({ activities, me }: { activities: readonly Night
 /** The tile every card starts with: its kind and title, and where it stands. */
 const Heading = ({ activity, status }: { activity: NightActivity; status: string }) => (
     <Row>
-        <span className="calm-sub">{KIND_LABELS[activity.kind]}</span>
+        {/* A quiz is listed as "Quiz", "Quiz 2"…: no need to say "Quiz" twice. */}
+        {!activity.title.startsWith(KIND_LABELS[activity.kind]) && <span className="calm-sub">{KIND_LABELS[activity.kind]}</span>}
         <span>{activity.title}</span>
         <span className="calm-sub">{status}</span>
     </Row>
