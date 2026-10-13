@@ -87,7 +87,7 @@ export const hostNight = async (page: Page, name: string, title = "Party night")
     await landOnName(page, name);
     await page.getByRole("button", { name: "Start the party night" }).click();
     await expect(page).toHaveURL(/#\/n\/[A-Z]{4}$/);
-    await expect(page.getByText(`You're ${name}`)).toBeVisible();
+    await expect(page.getByText(`You're ${name}`, { exact: true })).toBeVisible();
     return page.url().split("/").pop()!;
 };
 
@@ -100,5 +100,6 @@ export const joinNightAs = async (page: Page, name: string) => {
     await expect(page.getByRole("spinbutton", { name: "Your name" })).toBeVisible();
     await landOnName(page, name);
     await page.getByRole("button", { name: "Join the party" }).click();
-    await expect(page.getByText(`You're ${name}`)).toBeVisible();
+    // Exact: the reel's own "You're Netta." would match before the join lands.
+    await expect(page.getByText(`You're ${name}`, { exact: true })).toBeVisible();
 };

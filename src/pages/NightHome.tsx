@@ -12,6 +12,7 @@ import { Badge, Control, Ground, Loader, Pane, Row } from "../design";
 import { useNightData } from "../hooks/useNightData";
 import { nightLink } from "../utils/joinCode";
 import { fetchNightGuest, joinNight, leaveNight, type Night, type NightGuest } from "../utils/nightsFirestore";
+import { JOIN_TIMEOUT_MS } from "../utils/partyFirestore";
 import {
     clearNightIdentity,
     clearPendingNightJoin,
@@ -158,8 +159,17 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
         leaving.current = true;
         setLeavingNow(true);
         setLeaveFailed(false);
+        let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-            await leaveNight(night.code, identity.guestId, identity.name);
+            // Offline, a delete waits rather than fails: give up after a while
+            // and say so, as a join does. If it lands later, the roster no
+            // longer has this guest and the join view shows.
+            await Promise.race([
+                leaveNight(night.code, identity.guestId, identity.name),
+                new Promise<never>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error("The leave took too long")), JOIN_TIMEOUT_MS);
+                }),
+            ]);
             clearNightIdentity(night.code);
             navigate("/");
         } catch (err) {
@@ -167,6 +177,8 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
             leaving.current = false;
             setLeavingNow(false);
             setLeaveFailed(true);
+        } finally {
+            clearTimeout(timer);
         }
     };
 
@@ -185,6 +197,9 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
                             leaveLabel={leavingNow ? "Leaving…" : "Leave the party"}
                             onLeave={() => !leavingNow && void leave()}
                             onStay={() => {
+                                // A leave on its way can't be called back: it
+                                // would still land and send the guest Home.
+                                if (leavingNow) return;
                                 setAskingLeave(false);
                                 setLeaveFailed(false);
                                 setTimeout(() => leaveButton.current?.focus());

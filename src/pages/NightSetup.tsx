@@ -95,6 +95,8 @@ const NightSetup = () => {
             </form>
             <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
             <NamePicker value={name} onChange={setName} onSpinningChange={setSpinning} disabled={creating} />
+            {/* Enter in the title field can try to start before a name is spun. */}
+            {tried && !name && <CalmNote role="alert">Spin the reel for your name first.</CalmNote>}
             {failure && <CalmNote role="alert">{failure}</CalmNote>}
             <CalmNote>The night and its guests are set to be deleted after {NIGHT_LIFETIME_DAYS} days.</CalmNote>
         </CalmPage>

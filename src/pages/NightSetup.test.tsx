@@ -121,6 +121,14 @@ describe("NightSetup", () => {
         expect(screen.getByText("at /host")).toBeInTheDocument();
     });
 
+    it("asks for a name when Enter is pressed before the reel is spun", async () => {
+        const user = userEvent.setup();
+        renderSetup();
+        await user.type(screen.getByLabelText("Name of the night"), "{Enter}");
+        expect(await screen.findByRole("alert")).toHaveTextContent("Spin the reel for your name first.");
+        expect(mocks.createNight).not.toHaveBeenCalled();
+    });
+
     it("the Enter key in the title field starts the night once a name is picked", async () => {
         const user = userEvent.setup();
         renderSetup();

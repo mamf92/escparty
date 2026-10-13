@@ -353,6 +353,32 @@ describe("NightHome", () => {
             expect(mocks.leaveNight).toHaveBeenCalledTimes(2);
         });
 
+        it("can't be called back once the leave is on its way", async () => {
+            let finish: () => void = () => {};
+            mocks.leaveNight.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+            const user = userEvent.setup();
+            renderHome();
+            await user.click(await screen.findByRole("button", { name: "Leave the party" }));
+            await user.click(screen.getByRole("button", { name: "Leave the party" }));
+            await user.click(screen.getByRole("button", { name: "Stay at the party" }));
+            expect(screen.getByRole("button", { name: "Leaving…" })).toBeInTheDocument();
+            finish();
+            expect(await screen.findByText("at /")).toBeInTheDocument();
+        });
+
+        it("gives up waiting on a leave that never answers (offline) and says so", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            mocks.leaveNight.mockImplementationOnce(() => new Promise<void>(() => {}));
+            const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+            renderHome();
+            await user.click(await screen.findByRole("button", { name: "Leave the party" }));
+            await user.click(screen.getByRole("button", { name: "Leave the party" }));
+            await vi.advanceTimersByTimeAsync(10_000);
+            expect(await screen.findByRole("alert")).toHaveTextContent("couldn't leave just now");
+            expect(readNightIdentity("ABBA")).not.toBeNull();
+            vi.useRealTimers();
+        });
+
         it("tells the host that the guests keep the party and the host controls don't come back", async () => {
             saveNightIdentity("ABBA", { guestId: "host-1", name: "Loreen", isHost: true });
             mocks.fetchNightGuest.mockResolvedValue(host);

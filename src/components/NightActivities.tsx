@@ -20,8 +20,10 @@ export const NightActivities = ({ activities }: { activities: readonly NightActi
                 </Pane>
             ) : (
                 <Pane as="ul" aria-label="Now on">
-                    {activities.map(activity => (
-                        <Row as="li" key={`${activity.kind}-${activity.code}`}>
+                    {activities.map((activity, index) => (
+                        // The rules let one room or party be listed twice
+                        // (under another title), so the code alone isn't a key.
+                        <Row as="li" key={`${index}-${activity.kind}-${activity.code}`}>
                             <span className="calm-sub">{KIND_LABELS[activity.kind]}</span>
                             <span>{activity.title}</span>
                         </Row>
