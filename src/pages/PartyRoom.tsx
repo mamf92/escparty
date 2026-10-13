@@ -22,7 +22,7 @@ import {
 import { prefersReducedMotion } from "../utils/motion";
 import { availablePartyNames, withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
-import { readPartyIdentity, savePartyIdentity, type PartyIdentity } from "../utils/partySession";
+import { clearPendingJoin, readPartyIdentity, readPendingJoin, savePartyIdentity, savePendingJoin, type PartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
 
 type Tab = "rate" | "ranking" | "room" | "host";
@@ -180,44 +180,50 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
     const [name, setName] = useState<string | null>(null);
     const [spinning, setSpinning] = useState(false);
     const [joining, setJoining] = useState(false);
-    // One id for every try, so a retry finds a claim an earlier try made.
-    const [guestId] = useState(() => uuidv4());
+    // A join sent but not confirmed: retried with the same id and name, even
+    // after a reload, so a write that landed late is found, not doubled.
+    const [pending, setPending] = useState(() => readPendingJoin(party.code));
+    const [freshId] = useState(() => uuidv4());
+    const guestId = pending?.guestId ?? freshId;
     // Names other guests claimed first when this guest pressed Join, kept off
     // the reel even before their ballots arrive; the last one is said aloud.
     const [refused, setRefused] = useState<string[]>([]);
     const [refusedNow, setRefusedNow] = useState<string | null>(null);
-    const [failed, setFailed] = useState(false);
     const checking = ballots === undefined && !error;
-    // The names nobody has yet.
-    const names = useMemo(
-        () => availablePartyNames([...(ballots ?? []).map(ballot => ballot.name), ...refused], withDistinctNames(ballots ?? []).map(ballot => ballot.name)),
-        [ballots, refused],
-    );
+    // The names nobody has yet (a ballot of this guest's own, from a join that landed late, doesn't count).
+    const names = useMemo(() => {
+        const others = (ballots ?? []).filter(ballot => ballot.guestId !== guestId);
+        return availablePartyNames([...others.map(ballot => ballot.name), ...refused], withDistinctNames(others).map(ballot => ballot.name));
+    }, [ballots, refused, guestId]);
     // Any listener error stops joining, even with ballots on screen: they may be stale.
     const blocked = !!error;
-    // A landed name that a ballots update takes before this guest joins is let go.
-    const landed = name !== null && names.includes(name) ? name : null;
-    const justTaken = name !== null && landed === null ? name : refusedNow;
+    // A pending join keeps its name. Otherwise a landed name that a ballots
+    // update takes before this guest joins is let go.
+    const landed = pending ? pending.name : name !== null && names.includes(name) ? name : null;
+    const justTaken = !pending && name !== null && landed === null ? name : refusedNow;
     const land = (next: string | null) => {
         setName(next);
         setRefusedNow(null);
-        setFailed(false);
     };
     const join = async () => {
         if (landed === null) return;
+        const attempt = { guestId, name: landed };
+        savePendingJoin(party.code, attempt);
         setJoining(true);
-        setFailed(false);
         try {
-            if (await joinParty(party.code, guestId, landed)) {
-                onJoin({ guestId, name: landed, isHost: false });
+            const joined = await joinParty(party.code, attempt.guestId, attempt.name);
+            clearPendingJoin(party.code);
+            if (joined) {
+                onJoin({ guestId: attempt.guestId, name: attempt.name, isHost: false });
                 return;
             }
+            setPending(null);
             setName(null);
-            setRefused(current => [...current, landed]);
-            setRefusedNow(landed);
+            setRefused(current => [...current, attempt.name]);
+            setRefusedNow(attempt.name);
         } catch (joinError) {
             console.error("Couldn't join the party:", joinError);
-            setFailed(true);
+            setPending(attempt);
         }
         setJoining(false);
     };
@@ -226,12 +232,12 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
             {blocked && error !== null ? <PartyError error={error} onRetry={onRetry} /> : (
                 <>
                     <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
-                    <NamePicker value={landed} onChange={land} onSpinningChange={setSpinning} names={names} disabled={checking || joining} />
+                    <NamePicker value={landed} onChange={land} onSpinningChange={setSpinning} names={pending ? [pending.name] : names} disabled={checking || joining || !!pending} />
                 </>
             )}
             {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
             {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
-            {failed && <CalmNote role="alert">You couldn&apos;t join just now. Check your connection and press Join again.</CalmNote>}
+            {pending && !joining && <CalmNote role="alert">You couldn&apos;t join as {pending.name} just now. Check your connection and press Join again.</CalmNote>}
             <Ground>
                 <Pane>
                     <Control

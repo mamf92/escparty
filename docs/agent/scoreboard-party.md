@@ -56,7 +56,11 @@ claim, so when two guests land the same name at the same instant the second
 batch is refused, nothing of it is written, and that guest is told "X was
 just taken. Spin again." (the name also stays off their reel). A join keeps
 one guest id across tries, so a retry after a timeout (`JOIN_TIMEOUT_MS`;
-offline, a write waits rather than fails) finds its own earlier claim.
+offline, a write waits rather than fails) finds its own earlier claim:
+the unconfirmed join is kept on the device (`savePendingJoin`) with its name
+locked, also across a reload, until it lands or is refused. A guest with no
+ballot on the server (an identity from before #229) joins on their first save
+(`useOwnBallot`).
 Parties from before #229 can hold a
 pair with one name: the lists tell them apart at display time
 (`distinctNames`), the bare name going to the
@@ -205,7 +209,7 @@ that only `acts`, `results` and `revealed` may change. There's
 no sign-in, so like quiz rooms the rules check shape, not who: anyone with
 the code could edit the result. Ballots need the party to exist, a 1-40
 character name and at most 40 acts. A first ballot needs its guest's claim
-on its name. A name claim needs the party to exist,
+on its name, and a ballot's name never changes after that. A name claim needs the party to exist,
 exactly `name`, `guestId` and `expireAt`, its id to be the name trimmed
 and in lower case, and the guest's ballot under that name in the same
 write; it can't be overwritten or deleted (verify case 5b). Both use

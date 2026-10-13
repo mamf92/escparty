@@ -4,8 +4,8 @@ import { useOwnBallot } from "./useOwnBallot";
 import type { Ballot } from "../utils/partyModel";
 import { readStoredBallot, storeBallot } from "../utils/partySession";
 
-const mocks = vi.hoisted(() => ({ saveBallot: vi.fn() }));
-vi.mock("../utils/partyFirestore", () => ({ saveBallot: mocks.saveBallot }));
+const mocks = vi.hoisted(() => ({ saveBallot: vi.fn(), joinParty: vi.fn() }));
+vi.mock("../utils/partyFirestore", () => ({ saveBallot: mocks.saveBallot, joinParty: mocks.joinParty }));
 
 const me = { guestId: "g1", name: "Jedward", isHost: false };
 
@@ -16,6 +16,7 @@ describe("useOwnBallot", () => {
         localStorage.clear();
         vi.spyOn(console, "error").mockImplementation(() => {});
         mocks.saveBallot.mockResolvedValue(undefined);
+        mocks.joinParty.mockResolvedValue(true);
     });
     afterEach(() => vi.useRealTimers());
 
@@ -72,12 +73,32 @@ describe("useOwnBallot", () => {
         expect(mocks.saveBallot).not.toHaveBeenCalled();
     });
 
-    it("writes an empty ballot as soon as the party's ballots arrive without one, claiming the name", async () => {
+    it("joins (claiming the name) and saves as soon as the party's ballots arrive without one", async () => {
         const other: Ballot = { guestId: "g2", name: "Lordi", ratings: {}, bonuses: {} };
-        renderHook(() => useOwnBallot("ABBA", me, [other]));
+        const { result } = renderHook(() => useOwnBallot("ABBA", me, [other]));
         await act(() => vi.advanceTimersByTimeAsync(0));
+        expect(mocks.joinParty).toHaveBeenCalledWith("ABBA", "g1", "Jedward");
         expect(mocks.saveBallot).toHaveBeenCalledTimes(1);
         expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", { guestId: "g1", name: "Jedward", ratings: {}, bonuses: {} });
+        // Joined once: later saves are plain ballot writes.
+        act(() => result.current.rate("se", "points", 3));
+        await act(() => vi.advanceTimersByTimeAsync(400));
+        expect(mocks.joinParty).toHaveBeenCalledTimes(1);
+        expect(mocks.saveBallot).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the ratings on the device when the name turns out to be someone else's", async () => {
+        mocks.joinParty.mockResolvedValue(false);
+        const { result } = renderHook(() => useOwnBallot("ABBA", me, []));
+        await act(() => vi.advanceTimersByTimeAsync(0));
+        expect(mocks.saveBallot).not.toHaveBeenCalled();
+        expect(result.current.state).toBe("offline");
+    });
+
+    it("doesn't join when the server already has this guest's ballot", async () => {
+        renderHook(() => useOwnBallot("ABBA", me, [{ ...me, ratings: {}, bonuses: {} }]));
+        await act(() => vi.advanceTimersByTimeAsync(0));
+        expect(mocks.joinParty).not.toHaveBeenCalled();
     });
 
     it("doesn't save before the guest has joined", async () => {

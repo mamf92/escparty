@@ -476,7 +476,8 @@ service cloud.firestore {
         allow read: if true;
         // A first ballot comes with this guest's claim on its name (#229).
         allow create: if isValidBallot(code) && claimsName(code, guestId, request.resource.data.name);
-        allow update: if isValidBallot(code);
+        // The name stays the one claimed: no renaming into someone else's.
+        allow update: if isValidBallot(code) && request.resource.data.name == resource.data.name;
         allow delete: if false;
       }
 

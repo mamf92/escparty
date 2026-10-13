@@ -102,11 +102,16 @@ describe("PartyRoom", () => {
         const user = userEvent.setup();
         vi.spyOn(console, "error").mockImplementation(() => {});
         mocks.joinParty.mockRejectedValueOnce(new Error("offline"));
-        renderRoom();
+        const { unmount } = renderRoom();
         await user.click(screen.getByRole("button", { name: "Next name" }));
         await user.click(screen.getByRole("button", { name: "Join the party" }));
-        expect(await screen.findByRole("alert")).toHaveTextContent("You couldn't join just now.");
+        expect(await screen.findByRole("alert")).toHaveTextContent(`You couldn't join as ${PARTY_NAMES[0]} just now.`);
         expect(readPartyIdentity("ABBA")).toBeNull();
+        // The name stays locked until the join lands, also after a reload: the first try may still arrive.
+        expect(screen.getByRole("spinbutton")).toHaveAttribute("aria-disabled", "true");
+        unmount();
+        renderRoom();
+        expect(screen.getByRole("alert")).toHaveTextContent(`You couldn't join as ${PARTY_NAMES[0]} just now.`);
         await user.click(screen.getByRole("button", { name: "Join the party" }));
         expect(readPartyIdentity("ABBA")).toMatchObject({ name: PARTY_NAMES[0] });
         // The retry uses the same guest id, so it finds a claim the first try made.

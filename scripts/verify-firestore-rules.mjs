@@ -245,8 +245,8 @@ await expectDenied("a score write that makes one of 32 scores negative", async (
 });
 
 // 3. Malicious: append a new "player" that's missing a required field. Sized
-// to exactly oldCount + 1 so this write actually reaches allPlayersValid via
-// isAddingPlayer's exact-size-match branch, rather than getting denied on a
+// to exactly oldCount + 1 so this write actually reaches the new entry's
+// isValidPlayerBasic via isAddingPlayer's exact-size-match branch, rather than getting denied on a
 // size mismatch before shape validation is ever evaluated (which would give
 // false confidence — the write is denied either way, but for the wrong
 // reason, masking a regression that removes the shape check itself).
@@ -557,6 +557,9 @@ await expectDenied("a claim whose ballot has another name", async () => {
   batch.set(doc(db, "parties", partyCode, "ballots", "claim-4"), aBallot({ name: "Lordi" }));
   await batch.commit();
 });
+await expectDenied("rename a ballot to someone else's claimed name", () =>
+  setDoc(doc(db, "parties", partyCode, "ballots", "claim-1"), aBallot({ name: "Loreen" }))
+);
 await expectAllowed("the claimant updates their ballot", () =>
   setDoc(doc(db, "parties", partyCode, "ballots", "claim-1"), aBallot({ name: "Céline Dion" }))
 );
@@ -642,9 +645,9 @@ report(
 );
 
 // 6b. Malicious: same-size players array during an active game, but with a
-// malformed entry (missing name/score) — exercises allPlayersValid via
+// malformed entry (missing name/score) — exercises changedPlayersValid via
 // isUpdatingPlayerScores specifically, the other of the two branches this
-// PR fixed. Without this, a regression that dropped allPlayersValid from
+// PR fixed. Without this, a regression that dropped changedPlayersValid from
 // just this branch would go undetected even though test 3/3b above cover
 // the isAddingPlayer branch.
 const score1b = freshRoom("SCOREB");

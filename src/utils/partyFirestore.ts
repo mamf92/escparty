@@ -128,8 +128,9 @@ export const createParty = async (party: NewParty, hostName: string): Promise<st
             await batch.commit();
         } catch (error) {
             // Another host took this code between the check and the write:
-            // the write then counts as an update, which the rules refuse.
-            if ((error as { code?: string }).code === "permission-denied") continue;
+            // the write then counts as an update, which the rules refuse. Any
+            // other refusal (of the host's claim or ballot) is the real error.
+            if ((error as { code?: string }).code === "permission-denied" && (await getDoc(ref)).exists()) continue;
             throw error;
         }
         return code;

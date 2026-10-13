@@ -26,6 +26,7 @@ export interface StoredBallot {
 
 const identityKey = (code: string) => `escparty.party.${code}`;
 const ballotKey = (code: string) => `escparty.party.${code}.ballot`;
+const joiningKey = (code: string) => `escparty.party.${code}.joining`;
 const LAST_PARTY_KEY = "escparty.lastParty";
 
 const read = <T,>(key: string, valid: (value: unknown) => value is T): T | null => {
@@ -68,6 +69,34 @@ export const readStoredBallot = (code: string) => read(ballotKey(code), isStored
 
 export const storeBallot = (code: string, ballot: Omit<StoredBallot, "savedAt">) =>
     write(ballotKey(code), { ...ballot, savedAt: Date.now() });
+
+/**
+ * A join that was sent but not confirmed (#229): the same guest id and name
+ * are tried again, also after a reload, so a write that landed late is found
+ * rather than left as a second guest.
+ */
+export interface PendingJoin {
+    guestId: string;
+    name: string;
+}
+
+const isPendingJoin = (value: unknown): value is PendingJoin => {
+    const pending = value as PendingJoin | null;
+    return !!pending && typeof pending.guestId === "string" && pending.guestId.length > 0 &&
+        typeof pending.name === "string" && pending.name.length > 0;
+};
+
+export const readPendingJoin = (code: string) => read(joiningKey(code), isPendingJoin);
+
+export const savePendingJoin = (code: string, pending: PendingJoin) => write(joiningKey(code), pending);
+
+export const clearPendingJoin = (code: string) => {
+    try {
+        localStorage.removeItem(joiningKey(code));
+    } catch {
+        // Storage unavailable: nothing was kept.
+    }
+};
 
 /** The party this device was last in, to offer a way back. */
 export const lastPartyCode = (): string | null => {

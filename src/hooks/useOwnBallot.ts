@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { saveBallot } from "../utils/partyFirestore";
+import { joinParty, saveBallot } from "../utils/partyFirestore";
 import type { Ballot, Bonuses, Ratings } from "../utils/partyModel";
 import { mergeBallots, readStoredBallot, storeBallot, type PartyIdentity } from "../utils/partySession";
 
@@ -20,7 +20,8 @@ const same = (a: { ratings: Ratings; bonuses: Bonuses }, b: { ratings: Ratings; 
  * ratings that never reached the server both survive. A guest
  * joins only once the ballots have loaded, so there is always a server copy
  * (or its absence) to merge with. Joining (joinParty) writes the empty
- * ballot with the name claim; if the server still has none, it is written here once.
+ * ballot with the name claim; if the server still has none, the first save
+ * here joins first (a retried join of this guest's own name succeeds).
  */
 export const useOwnBallot = (code: string | undefined, identity: PartyIdentity | null, serverBallots: Ballot[] | undefined) => {
     const [ballot, setBallot] = useState<{ ratings: Ratings; bonuses: Bonuses }>(() => {
@@ -31,6 +32,9 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
     const latest = useRef(ballot);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const merged = useRef(false);
+    // No ballot on the server for this guest: the first save joins (claim and
+    // ballot together), since the rules refuse a first ballot without its claim.
+    const needsJoin = useRef(false);
 
     // The latest `save`, for its own retry and for the unmount below.
     const saveNow = useRef<(last?: boolean) => Promise<void>>(async () => {});
@@ -42,6 +46,10 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         setState("saving");
         const sent = latest.current;
         try {
+            if (needsJoin.current) {
+                if (!(await joinParty(code, identity.guestId, identity.name))) throw new Error(`The name ${identity.name} is someone else's`);
+                needsJoin.current = false;
+            }
             await saveBallot(code, { guestId: identity.guestId, name: identity.name, ...sent });
             // A newer change made while this one was in flight has its own save queued.
             if (latest.current === sent) setState("saved");
@@ -79,7 +87,8 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         latest.current = next;
         setBallot(next);
         if (code) storeBallot(code, next);
-        // No ballot on the server yet (not seen yet, or an identity from before name claims): write it.
+        // No ballot on the server yet (not seen yet, or an identity from before name claims): join, then write it.
+        if (!server) needsJoin.current = true;
         if (!server || !same(server, next)) schedule(0);
     }, [serverBallots, identity, code, schedule]);
 

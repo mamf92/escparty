@@ -12,7 +12,8 @@ Four collections:
 - `quizzes`, saved custom quizzes (#76), keyed by a random 20-character
   Firestore id. See "Saved quizzes" below.
 - `parties`, scoreboard parties keyed by a 4-letter code, each with a
-  `ballots` sub-collection (one document per guest), and `contests`, the
+  `ballots` sub-collection (one document per guest) and a `names`
+  sub-collection (one create-only claim per name, #229), and `contests`, the
   real Burgas 2027 lineups, entered by hand and read-only to clients. Both
   are documented in `docs/agent/scoreboard-party.md`.
 

@@ -124,11 +124,17 @@ describe("createParty", () => {
 
     it("tries another code when one is taken between the check and the write", async () => {
         mocks.generateRoomCode.mockReturnValueOnce("ABBA").mockReturnValueOnce("LORD");
-        mocks.getDoc.mockResolvedValue(snapshot(null));
-        mocks.batchCommit.mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }));
+        // Free when checked, taken when the write was refused, then a free one.
+        mocks.getDoc.mockResolvedValueOnce(snapshot(null)).mockResolvedValueOnce(snapshot({})).mockResolvedValueOnce(snapshot(null));
+        const denied = Object.assign(new Error("denied"), { code: "permission-denied" });
+        mocks.batchCommit.mockRejectedValueOnce(denied);
         expect(await createParty(party, "Loreen")).toBe("LORD");
         mocks.batchCommit.mockRejectedValueOnce(new Error("offline"));
+        mocks.getDoc.mockResolvedValue(snapshot(null));
         await expect(createParty(party, "Loreen")).rejects.toThrow("offline");
+        // Refused although the code is still free: the host's claim or ballot was, so say so.
+        mocks.batchCommit.mockRejectedValueOnce(denied);
+        await expect(createParty(party, "Loreen")).rejects.toBe(denied);
     });
 
     it("gives up after five taken codes", async () => {
