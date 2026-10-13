@@ -6,6 +6,7 @@ import {
     readPendingJoin,
     savePendingJoin,
     clearPendingJoin,
+    clearPartyIdentity,
     readStoredBallot,
     savePartyIdentity,
     storeBallot,
@@ -37,6 +38,28 @@ describe("identity", () => {
         expect(lastPartyCode()).toBeNull();
         localStorage.setItem("escparty.lastParty", JSON.stringify("abba"));
         expect(lastPartyCode()).toBeNull();
+    });
+
+    it("is forgotten with its ballot copy, its pending join and the last-party pointer", () => {
+        savePartyIdentity("ABBA", me);
+        storeBallot("ABBA", { ratings: {}, bonuses: {} });
+        savePendingJoin("ABBA", { guestId: "g1", name: "Jedward" });
+        savePartyIdentity("LORD", me);
+        clearPartyIdentity("ABBA");
+        expect(readPartyIdentity("ABBA")).toBeNull();
+        expect(readStoredBallot("ABBA")).toBeNull();
+        expect(readPendingJoin("ABBA")).toBeNull();
+        // The pointer was at LORD, the later one, and stays.
+        expect(lastPartyCode()).toBe("LORD");
+        clearPartyIdentity("LORD");
+        expect(lastPartyCode()).toBeNull();
+    });
+
+    it("forgets without failing when storage throws", () => {
+        vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+            throw new Error("blocked");
+        });
+        expect(() => clearPartyIdentity("ABBA")).not.toThrow();
     });
 
     it("survives storage that throws", () => {

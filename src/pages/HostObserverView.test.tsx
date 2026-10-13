@@ -155,6 +155,13 @@ describe("HostObserverView", () => {
     expect(await screen.findByText(/at \/multiplayer/)).toBeInTheDocument();
   });
 
+  it("leaves a night's quiz for the night", async () => {
+    renderView();
+    act(() => mocks.onRoom(room({ nightCode: "NITE" })));
+    screen.getByRole("button", { name: "Leave the game, it stops at the next break" }).click();
+    expect(await screen.findByText(/at \/n\/NITE/)).toBeInTheDocument();
+  });
+
   it("goes back to the multiplayer page when the room is gone", async () => {
     vi.useFakeTimers();
     try {

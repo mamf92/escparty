@@ -103,3 +103,21 @@ export const joinNightAs = async (page: Page, name: string) => {
     // Exact: the reel's own "You're Netta." would match before the join lands.
     await expect(page.getByText(`You're ${name}`, { exact: true })).toBeVisible();
 };
+
+/**
+ * Save a one-question quiz called `name` on this device, so a room can play
+ * it through in a single 15-second slot instead of ten of them. The room
+ * lists it in the green room; the question's right answer is the first.
+ */
+export const buildQuickQuiz = async (page: Page, name: string) => {
+    await page.goto("/#/quizzes/new");
+    await page.getByLabel("Name").fill(name);
+    await page.getByRole("button", { name: "Write a question" }).click();
+    await page.getByLabel("Question", { exact: true }).fill("Who sang 'Lipstick' for Ireland in 2011?");
+    await page.getByLabel("Answer 1").fill("Jedward");
+    await page.getByLabel("Answer 2").fill("Bros");
+    await page.getByRole("radio", { name: "Jedward" }).click();
+    await page.getByRole("button", { name: "Add to the quiz" }).click();
+    await page.getByRole("button", { name: "Save quiz" }).click();
+    await expect(page).toHaveURL(/#\/quizzes$/);
+};

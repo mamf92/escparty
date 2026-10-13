@@ -111,7 +111,9 @@ const Lobby = () => {
     // A guest who leaves takes themselves out, so the host's start gate
     // doesn't count them as present (and ready). Leaving goes ahead even if
     // that write fails; the host can still take them out.
-    const leaveRoom = async (to = "/multiplayer") => {
+    // A room made in a party night leads back to it (#235), not to the menu.
+    const home = room?.nightCode ? `/n/${room.nightCode}` : "/multiplayer";
+    const leaveRoom = async (to = home) => {
         const self = room && identity && room.hostId !== identity.playerId && !room.started
             ? room.players.find(p => p.id === identity.playerId)
             : undefined;
@@ -136,7 +138,9 @@ const Lobby = () => {
     } : null);
     const leave = <CalmLink ref={leaveLink} type="button" onClick={() => void leaveRoom()}>Leave the waiting room</CalmLink>;
     /** The footer's way back from a waiting room this tab isn't in. */
-    const backToMultiplayer = <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Back to join or host</CalmLink>;
+    const backToMultiplayer = room?.nightCode
+        ? <CalmLink type="button" onClick={() => navigate(home)}>Back to the party night</CalmLink>
+        : <CalmLink type="button" onClick={() => navigate("/multiplayer")}>Back to join or host</CalmLink>;
     /** The way out of a waiting room that can't go on. */
     const wayOut = (label: string, onClick: () => void) => (
         <Ground>
@@ -183,7 +187,7 @@ const Lobby = () => {
         return (
             <CalmPage title="The green room" footer={backToMultiplayer}>
                 <CalmNote role="alert">The host took you out of this game. You can join again with the code.</CalmNote>
-                {wayOut("Join a game", () => navigate("/multiplayer"))}
+                {room.nightCode ? wayOut("Back to the party night", () => navigate(home)) : wayOut("Join a game", () => navigate("/multiplayer"))}
             </CalmPage>
         );
     }

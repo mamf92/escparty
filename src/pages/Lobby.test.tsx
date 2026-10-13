@@ -310,6 +310,39 @@ describe("Lobby", () => {
     expect(screen.getByText(/at \/multiplayer/)).toBeInTheDocument();
   });
 
+  describe("in a party night", () => {
+    it("takes a guest who leaves out of the room and back to the night", async () => {
+      as("p2", "Loreen");
+      mocks.removePlayerFromRoom.mockResolvedValue(undefined);
+      renderLobby();
+      act(() => mocks.onRoom(room({ nightCode: "NITE" })));
+      await userEvent.setup().click(screen.getByRole("button", { name: "Leave the waiting room" }));
+      expect(mocks.removePlayerFromRoom).toHaveBeenCalledWith("ABBA", loreen);
+      expect(screen.getByText(/at \/n\/NITE/)).toBeInTheDocument();
+    });
+
+    it("takes the host who leaves back to the night", async () => {
+      const user = userEvent.setup();
+      as("host", "Martin");
+      renderLobby();
+      act(() => mocks.onRoom(room({ nightCode: "NITE" })));
+      await user.click(screen.getByRole("button", { name: "Leave the waiting room" }));
+      await user.click(screen.getByRole("button", { name: "Leave the room" }));
+      expect(screen.getByText(/at \/n\/NITE/)).toBeInTheDocument();
+    });
+
+    it("sends a player the host took out back to the night", async () => {
+      as("p3", "Lordi");
+      renderLobby();
+      act(() => mocks.onRoom(room({ nightCode: "NITE", players: [{ id: "host", name: "Martin", score: 0 }, loreen] })));
+      expect(screen.getByRole("alert")).toHaveTextContent("The host took you out of this game");
+      // The way out under the note, and the footer's link.
+      expect(screen.getAllByRole("button", { name: "Back to the party night" })).toHaveLength(2);
+      await userEvent.setup().click(screen.getAllByRole("button", { name: "Back to the party night" })[0]);
+      expect(screen.getByText(/at \/n\/NITE/)).toBeInTheDocument();
+    });
+  });
+
   it("keeps an observer host from starting an empty room", () => {
     as("host", "Martin");
     renderLobby();

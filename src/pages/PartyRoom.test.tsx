@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent, waitFor, within } from "../test/test-utils";
 import PartyRoom from "./PartyRoom";
 import { makeBallot, makeParty } from "../test/partyFixtures";
 import type { PartyData } from "../hooks/usePartyData";
@@ -441,6 +441,44 @@ describe("PartyRoom", () => {
         renderRoom();
         await userEvent.setup().click(screen.getByRole("button", { name: "Leave the party" }));
         expect(screen.getByText("at /party")).toBeInTheDocument();
+    });
+
+    describe("in a party night", () => {
+        beforeEach(() => {
+            mocks.data = { party: makeParty({ nightCode: "NITE" }), ballots: [], error: null, retry: vi.fn() };
+        });
+
+        it("has a way back to the night in place of leaving the party, whoever is here", async () => {
+            const user = userEvent.setup();
+            const { unmount } = renderRoom();
+            // Before joining as well: the night is where a guest is from.
+            expect(screen.queryByRole("button", { name: "Leave the party" })).not.toBeInTheDocument();
+            unmount();
+            savePartyIdentity("ABBA", guest);
+            renderRoom();
+            await user.click(screen.getByRole("button", { name: "Back to the party night" }));
+            expect(screen.getByText("at /n/NITE")).toBeInTheDocument();
+        });
+
+        it("joins with the name from the night card, with no name step, and saves the ballot", async () => {
+            savePartyIdentity("ABBA", guest);
+            renderRoom();
+            expect(screen.getByText("Party ABBA · you're Jedward")).toBeInTheDocument();
+            expect(screen.queryByRole("spinbutton", { name: "Your name" })).not.toBeInTheDocument();
+            await waitFor(() => expect(mocks.saveBallot).toHaveBeenCalled());
+            expect(mocks.joinParty).toHaveBeenCalledWith("ABBA", "g1", "Jedward");
+            expect(mocks.saveBallot).toHaveBeenCalledWith("ABBA", expect.objectContaining({ guestId: "g1", name: "Jedward" }));
+        });
+
+        it("keeps the ratings on the phone when the name turns out to be someone else's", async () => {
+            vi.spyOn(console, "error").mockImplementation(() => {});
+            mocks.joinParty.mockResolvedValue(false);
+            savePartyIdentity("ABBA", guest);
+            renderRoom();
+            await waitFor(() => expect(mocks.joinParty).toHaveBeenCalled());
+            expect(await screen.findByText(/^Offline: your ratings are kept on this phone/)).toBeInTheDocument();
+            expect(mocks.saveBallot).not.toHaveBeenCalled();
+        });
     });
 });
 

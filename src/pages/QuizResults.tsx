@@ -17,7 +17,7 @@ import { RESULTS_GRACE_MS, RESULTS_WAIT_FALLBACK_MS, startedAtMillis } from "../
 import { readMultiplayerGame } from "../utils/multiplayerSession";
 import { bestKnownScore } from "../utils/quizScoring";
 import { formatRunDate, readScoreHistory } from "../utils/scoreHistory";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, revealAnnouncement, revealDone, revealSteps, revealedCount } from "../utils/finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, someoneLeads, revealAnnouncement, revealDone, revealSteps, revealedCount, revealedPlaces } from "../utils/finale";
 
 /**
  * The end of a quiz (#67). Solo: your score and your past ones. In a room:
@@ -192,6 +192,8 @@ const QuizResults = () => {
   const leads = someoneLeads(placed);
   const steps = revealSteps(placed);
   const isHost = isRoomHost(room, gameData.playerId);
+  // The party night this room was played in, if any.
+  const night = room?.nightCode;
   // A room that never arrived (gone or unreachable) leaves nobody to follow,
   // so scores the page already holds can be revealed by anyone on their own
   // phone. Once a room has been seen, its last step keeps ruling: a listener
@@ -208,7 +210,7 @@ const QuizResults = () => {
   // The host never showed: the guest may reveal on their own phone.
   const offerLocalReveal = waitingForHost && resultsAge !== null && resultsAge >= RESULTS_WAIT_FALLBACK_MS;
   const shown = revealedCount(steps, step);
-  const revealed = placed.slice(placed.length - shown);
+  const revealed = revealedPlaces(placed, step, steps);
   const done = revealDone(steps, step);
   // One status line for the whole reveal, always mounted so screen readers
   // announce each change to it: collecting, then how many are on the board,
@@ -349,7 +351,7 @@ const QuizResults = () => {
       {/* A room that's gone can't take a next round: the way out above is all.
           The host starts one only after the reveal, so the guests who follow
           it from here haven't been sent away from their results. */}
-      {room && isHost && !room.nextRoomCode && !error && (done || steps.length === 0) && (
+      {room && isHost && !night && !room.nextRoomCode && !error && (done || steps.length === 0) && (
         <Ground>
           <Pane>
             {/* Once everyone is showing, the next round is the next step (design-system.md, "Page anatomy"). */}
@@ -357,7 +359,7 @@ const QuizResults = () => {
           </Pane>
         </Ground>
       )}
-      {room?.nextRoomCode && !error && (
+      {room?.nextRoomCode && !night && !error && (
         <>
           <CalmNote>{isHost ? "You've started another round." : "The host has started another round."}</CalmNote>
           <Ground>
@@ -371,7 +373,16 @@ const QuizResults = () => {
       )}
       {nextRound !== "idle" && nextRound !== "busy" && <CalmNote role="alert">{nextRound}</CalmNote>}
 
-      {room && !isHost && !room.nextRoomCode && !error && (
+      {/* A quiz played in a party night ends back in it (#235): the next activity is the host's to start there, not another round here (#21). */}
+      {room && night && !error && (
+        <Ground>
+          <Pane>
+            <Control elevation={done || steps.length === 0 ? "high" : "rest"} onClick={() => leave(`/n/${night}`)}>Back to the party night</Control>
+          </Pane>
+        </Ground>
+      )}
+
+      {room && !isHost && !night && !room.nextRoomCode && !error && (
         <Ground>
           <Pane>
             <Control onClick={() => leave("/multiplayer")}>Join or host another game</Control>

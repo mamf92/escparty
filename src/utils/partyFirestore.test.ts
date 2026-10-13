@@ -36,6 +36,7 @@ import {
     leaveParty,
     listenToBallots,
     listenToParty,
+    fetchParty,
     partyExists,
     saveBallot,
     setPartyResults,
@@ -307,5 +308,14 @@ describe("partyExists", () => {
         expect(await partyExists("ABBA")).toBe(true);
         expect(mocks.getDoc).toHaveBeenLastCalledWith({ path: "parties/ABBA" });
         expect(await partyExists("ZZZZ")).toBe(false);
+    });
+});
+
+describe("fetchParty", () => {
+    it("reads a party once, or null when there is none", async () => {
+        mocks.getDoc.mockResolvedValueOnce(snapshot({ title: "Party", hostId: "h" })).mockResolvedValueOnce(snapshot(null));
+        expect(await fetchParty("ABBA")).toEqual(expect.objectContaining({ title: "Party", hostId: "h" }));
+        expect(mocks.getDoc).toHaveBeenLastCalledWith({ path: "parties/ABBA" });
+        expect(await fetchParty("ZZZZ")).toBeNull();
     });
 });

@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { NamePicker } from "../components/NamePicker";
 import { ChoiceCard, ChoiceGrid, Control, Field, Ground, Pane, Row } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
+import { addNightActivity } from "../utils/nightsFirestore";
+import { readNightLaunch } from "../utils/nightSession";
 import {
     BONUS_LIMITS,
     CATEGORY_LIMITS,
@@ -33,7 +35,8 @@ const newCategory = (): RatingCategory => ({ id: `c${Date.now().toString(36)}${(
 
 /** The questions, in order. A step's heading is also the name of its way back. */
 const STEPS = ["Which show?", "How does everyone rate?", "Add bonus points?", "Who are you tonight?", "Ready to start?"] as const;
-const LAST = STEPS.length;
+/** In a party night the host already has a name for the whole evening (#235): no step to pick one. */
+const NIGHT_STEPS = STEPS.filter(step => step !== "Who are you tonight?");
 
 /** A bonus as the summary and the screen say it: "Wind machine +1". */
 const bonusText = (bonus: BonusCategory) => `${bonus.label} +${bonus.points}`;
@@ -64,9 +67,25 @@ const BonusSwitch = ({ label, points, on, onToggle }: { label: string; points?: 
  * step is only shown once the answers before it are in. The show, the sheet
  * and the bonuses are fixed once the party starts, so every guest rates the
  * same way (the summary says so).
+ *
+ * Started from a party night's home (router state `{ nightCode }`, #235) the
+ * party is the night's: the host is the night's guest, with its id and name,
+ * so there is no name step (four steps, not five), and the new party is
+ * listed on the night. Without the night's identity on this device it is an
+ * ordinary party.
  */
 const PartySetup = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const [night] = useState(() => {
+        const launch = readNightLaunch(location.state);
+        return launch && { code: launch.nightCode, identity: launch.identity };
+    });
+    const steps = night ? NIGHT_STEPS : STEPS;
+    const last = steps.length;
+    // The party once made, so a retry after a failed listing lists it instead of making another.
+    // Only for the inputs that made it: another show, sheet or bonuses make another party.
+    const made = useRef<{ code: string; inputs: string } | null>(null);
     const ids = useId();
     const [params, setParams] = useSearchParams();
     const [contestId, setContestId] = useState<string | null>(null);
@@ -100,8 +119,8 @@ const PartySetup = () => {
     const reached = contestId === null ? 1
         : templateId === null || sheetProblems.length > 0 ? 2
         : !bonusesDone || ownProblems.length > 0 ? 3
-        : name === null ? 4
-        : LAST;
+        : !night && name === null ? 4
+        : last;
     const step = Math.min(Math.max(Math.trunc(Number(params.get("step"))) || 1, 1), reached);
 
     // A new question is read out: focus lands on its heading, not on the
@@ -127,26 +146,36 @@ const PartySetup = () => {
     };
 
     const create = async () => {
-        if (!contest || !template || sheetProblems.length > 0 || !bonusesDone || ownProblems.length > 0 || !name || creating) return;
+        const hostName = night ? night.identity.name : name;
+        if (!contest || !template || sheetProblems.length > 0 || !bonusesDone || ownProblems.length > 0 || !hostName || creating) return;
         setCreating(true);
         setFailure(null);
         try {
             const fetched = await fetchContest(contest.id);
             if (!fetched) throw new Error(`No show ${contest.id}`);
-            const hostId = uuidv4();
+            const hostId = night ? night.identity.guestId : uuidv4();
             const withBonuses: RatingTemplate = chosenBonuses.length > 0 ? { ...template, bonuses: chosenBonuses } : template;
-            const code = await createParty({
-                hostId,
-                title: fetched.title,
-                contestId: fetched.id,
-                kind: fetched.kind,
-                qualifiers: fetched.kind === "semi" ? fetched.qualifiers ?? 10 : 0,
-                acts: fetched.acts,
-                template: withBonuses,
-                bonuses: chosenBonuses.length > 0,
-                showNames: true,
-            }, name);
-            savePartyIdentity(code, { guestId: hostId, name, isHost: true });
+            const inputs = JSON.stringify([fetched.id, withBonuses]);
+            if (made.current?.inputs !== inputs) made.current = null;
+            let code = made.current?.code;
+            if (!code) {
+                code = await createParty({
+                    hostId,
+                    title: fetched.title,
+                    contestId: fetched.id,
+                    kind: fetched.kind,
+                    qualifiers: fetched.kind === "semi" ? fetched.qualifiers ?? 10 : 0,
+                    acts: fetched.acts,
+                    template: withBonuses,
+                    bonuses: chosenBonuses.length > 0,
+                    showNames: true,
+                    ...(night ? { nightCode: night.code } : {}),
+                }, hostName);
+                savePartyIdentity(code, { guestId: hostId, name: hostName, isHost: true });
+                if (night) made.current = { code, inputs };
+            }
+            // The party exists first: the night's rules only list a party made for it.
+            if (night) await addNightActivity(night.code, { kind: "scoreboard", code, title: fetched.title });
             navigate(`/party/${code}`);
         } catch (error) {
             console.error("Couldn't create the party:", error);
@@ -350,7 +379,7 @@ const PartySetup = () => {
             <NamePicker value={name} onChange={setName} onSpinningChange={setSpinning} />
             <Ground>
                 <Pane>
-                    <Control elevation="high" disabled={name === null || spinning} onClick={() => go(5)}>Continue</Control>
+                    <Control elevation="high" disabled={name === null || spinning} onClick={() => go(last)}>Continue</Control>
                 </Pane>
             </Ground>
         </>
@@ -369,7 +398,8 @@ const PartySetup = () => {
                         <span className="calm-sub">Party bonuses</span>
                         <span>{chosenBonuses.length > 0 ? chosenBonuses.map(bonusText).join(" · ") : "None"}</span>
                     </Row>
-                    <Row as="li"><span className="calm-sub">You are</span><span>{name}</span></Row>
+                    <Row as="li"><span className="calm-sub">You are</span><span>{night ? night.identity.name : name}</span></Row>
+                    {night && <Row as="li"><span className="calm-sub">Played in</span><span>Party night {night.code}</span></Row>}
                 </Pane>
             </Ground>
             <Ground>
@@ -390,11 +420,13 @@ const PartySetup = () => {
             title="Host a party"
             subtitle="Everyone rates each act on their phone, and the big screen shows the room's scoreboard."
             footer={step === 1
-                ? <CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>
-                : <CalmLink onClick={() => navigate(-1)}>Back to {STEPS[step - 2]}</CalmLink>}
+                ? night
+                    ? <CalmLink onClick={() => navigate(`/n/${night.code}`)}>Back to the party night</CalmLink>
+                    : <CalmLink onClick={() => navigate("/party")}>Back to the scoreboard party</CalmLink>
+                : <CalmLink onClick={() => navigate(-1)}>Back to {steps[step - 2]}</CalmLink>}
         >
-            <p className="esc-note">Step {step} of {LAST}</p>
-            <h2 className="esc-heading esc-question" id={`${ids}-q`} ref={heading} tabIndex={-1}>{STEPS[step - 1]}</h2>
+            <p className="esc-note">Step {step} of {last}</p>
+            <h2 className="esc-heading esc-question" id={`${ids}-q`} ref={heading} tabIndex={-1}>{steps[step - 1]}</h2>
             {step === 1 && (
                 <>
                     {showChoices}
@@ -403,8 +435,8 @@ const PartySetup = () => {
             )}
             {step === 2 && sheetChoices}
             {step === 3 && extras}
-            {step === 4 && namePicker}
-            {step === 5 && summary}
+            {step === 4 && !night && namePicker}
+            {step === last && summary}
         </CalmPage>
     );
 };

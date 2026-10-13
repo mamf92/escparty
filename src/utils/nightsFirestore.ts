@@ -236,6 +236,10 @@ export const fetchNightGuest = async (code: string, guestId: string): Promise<Ni
     return snapshot.exists() ? toGuest(guestId, snapshot.data()) : null;
 };
 
+/** Read a night once, e.g. to number its next quiz from what is listed now. */
+export const fetchNight = async (code: string): Promise<Night | null> =>
+    readNight(doc(requireDb(), "nights", code));
+
 /**
  * List an activity in the night (an arrayUnion). The rules accept it only
  * when the room or party it names exists and was made for this night

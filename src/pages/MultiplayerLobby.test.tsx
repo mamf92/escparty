@@ -3,7 +3,9 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import { act, fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, userEvent, waitFor } from "../test/test-utils";
 import MultiplayerLobby from "./MultiplayerLobby";
-import { createRoom, getRoom, joinRoom, joinRoomWithFreeName, JoinRejected, setRoomDifficulty } from "../utils/roomsFirestore";
+import { createNightRoom, createRoom, getRoom, joinRoom, joinRoomWithFreeName, JoinRejected, setRoomDifficulty } from "../utils/roomsFirestore";
+import { addNightActivity, fetchNight } from "../utils/nightsFirestore";
+import { saveNightIdentity } from "../utils/nightSession";
 
 vi.mock("../utils/roomsFirestore", () => ({
   JoinRejected: class JoinRejected extends Error {
@@ -12,10 +14,15 @@ vi.mock("../utils/roomsFirestore", () => ({
     }
   },
   createRoom: vi.fn(async () => undefined),
+  createNightRoom: vi.fn(async () => undefined),
   setRoomDifficulty: vi.fn(async () => undefined),
   joinRoom: vi.fn(async () => true),
   joinRoomWithFreeName: vi.fn(async (_code: string, _id: string, pool: readonly string[]) => pool[0]),
   getRoom: vi.fn(async () => null),
+}));
+vi.mock("../utils/nightsFirestore", () => ({
+  addNightActivity: vi.fn(async () => undefined),
+  fetchNight: vi.fn(async () => ({ code: "NITE", activities: [] })),
 }));
 vi.mock("../utils/freeCode", () => ({ freeCode: async () => "ABBA" }));
 
@@ -23,6 +30,7 @@ const ShowLocation = () => {
   const location = useLocation();
   return <p>at {location.pathname}</p>;
 };
+
 
 const renderLobby = (state?: unknown) =>
   renderWithProviders(
@@ -392,5 +400,112 @@ describe("MultiplayerLobby", () => {
     renderLobby({ joinCode: "nope!" });
     expect(button(/^Join a game/)).toBeInTheDocument();
     expect(joinRoomWithFreeName).not.toHaveBeenCalled();
+  });
+
+  describe("hosting from a party night", () => {
+    const host = { guestId: "g-host", name: "Loreen", isHost: true };
+    const hostInNight = async (user: ReturnType<typeof userEvent.setup>, state: Record<string, unknown> = {}) => {
+      renderLobby({ step: "host", nightCode: "NITE", ...state });
+      await user.click(button(/^Host and play/));
+    };
+
+    beforeEach(() => saveNightIdentity("NITE", host));
+
+    it("makes the room as the night's guest, lists it on the night as Quiz, and goes to the waiting room", async () => {
+      const user = userEvent.setup();
+      await hostInNight(user);
+      expect(createNightRoom).toHaveBeenCalledWith("ABBA", "g-host", "Loreen", false, "NITE");
+      expect(createRoom).not.toHaveBeenCalled();
+      expect(addNightActivity).toHaveBeenCalledWith("NITE", { kind: "quiz", code: "ABBA", title: "Quiz" });
+      expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+      expect(localStorage.getItem("playerId")).toBe("g-host");
+      expect(localStorage.getItem("playerName")).toBe("Loreen");
+      expect(localStorage.getItem("gameCode")).toBe("ABBA");
+      expect(localStorage.getItem("isHost")).toBe("true");
+    });
+
+    it("can host without playing", async () => {
+      const user = userEvent.setup();
+      renderLobby({ step: "host", nightCode: "NITE" });
+      await user.click(button(/^Host only/));
+      expect(createNightRoom).toHaveBeenCalledWith("ABBA", "g-host", "Loreen", true, "NITE");
+    });
+
+    it("numbers the night's later quizzes", async () => {
+      vi.mocked(fetchNight).mockResolvedValueOnce({
+        code: "NITE", hostId: "g-host", title: "Party night", closed: false,
+        activities: [{ kind: "quiz", code: "AAAA", title: "Quiz" }, { kind: "scoreboard", code: "BBBB", title: "Semi" }],
+      });
+      await hostInNight(userEvent.setup());
+      expect(addNightActivity).toHaveBeenCalledWith("NITE", { kind: "quiz", code: "ABBA", title: "Quiz 2" });
+    });
+
+    it("keeps the quiz picked in the library, and still lists the room", async () => {
+      await hostInNight(userEvent.setup(), { quizKey: "t-nordic-nights" });
+      expect(setRoomDifficulty).toHaveBeenCalledWith("ABBA", "t-nordic-nights", 5);
+      expect(addNightActivity).toHaveBeenCalled();
+    });
+
+    it("says so when the room can't be listed, and lists the same room on a retry instead of making another", async () => {
+      vi.mocked(addNightActivity).mockRejectedValueOnce(new Error("offline"));
+      const user = userEvent.setup();
+      await hostInNight(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't set up the room");
+      expect(screen.queryByText("at /lobby")).not.toBeInTheDocument();
+      expect(localStorage.getItem("gameCode")).toBeNull();
+      await user.click(button(/^Host and play/));
+      expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+      expect(createNightRoom).toHaveBeenCalledTimes(1);
+      expect(addNightActivity).toHaveBeenCalledTimes(2);
+    });
+
+    it("makes another room when the host picks the other way to host after a failed listing", async () => {
+      vi.mocked(addNightActivity).mockRejectedValueOnce(new Error("offline"));
+      const user = userEvent.setup();
+      await hostInNight(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't set up the room");
+      await user.click(button(/^Host only/));
+      expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+      expect(createNightRoom).toHaveBeenCalledTimes(2);
+      expect(createNightRoom).toHaveBeenLastCalledWith("ABBA", "g-host", "Loreen", true, "NITE");
+    });
+
+    it("does not list a room twice when its first listing landed although it reported an error", async () => {
+      vi.mocked(addNightActivity).mockRejectedValueOnce(new Error("lost answer"));
+      const user = userEvent.setup();
+      await hostInNight(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't set up the room");
+      vi.mocked(fetchNight).mockResolvedValueOnce({
+        code: "NITE", hostId: "g-host", title: "Party night", closed: false,
+        activities: [{ kind: "quiz", code: "ABBA", title: "Quiz" }],
+      });
+      await user.click(button(/^Host and play/));
+      expect(await screen.findByText("at /lobby")).toBeInTheDocument();
+      expect(createNightRoom).toHaveBeenCalledTimes(1);
+      expect(addNightActivity).toHaveBeenCalledTimes(1);
+    });
+
+    it("leads back to the night, not to host or join", async () => {
+      const user = userEvent.setup();
+      renderLobby({ step: "host", nightCode: "NITE" });
+      expect(screen.getByText("Start a quiz for the party night: the guests join it from the night's home.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Back to host or join" })).not.toBeInTheDocument();
+      await user.click(button("Back to the party night"));
+      expect(screen.getByText("at /n/NITE")).toBeInTheDocument();
+    });
+
+    it("hosts an ordinary game when this device is not in that night", async () => {
+      localStorage.clear();
+      const user = userEvent.setup();
+      await hostInNight(user);
+      expect(createRoom).toHaveBeenCalledWith("ABBA", expect.any(String), "The host", false);
+      expect(createNightRoom).not.toHaveBeenCalled();
+      expect(addNightActivity).not.toHaveBeenCalled();
+    });
+
+    it("ignores a night code that is not four letters", async () => {
+      await hostInNight(userEvent.setup(), { nightCode: "nite" });
+      expect(createRoom).toHaveBeenCalled();
+    });
   });
 });

@@ -4,6 +4,7 @@ import {
     clearPendingNightJoin,
     lastNightCode,
     readNightIdentity,
+    readNightLaunch,
     readPendingNightJoin,
     saveNightIdentity,
     savePendingNightJoin,
@@ -87,5 +88,22 @@ describe("pending join", () => {
     it("ignores what doesn't look like one", () => {
         localStorage.setItem("escparty.night.ABBA.joining", JSON.stringify({ guestId: "g", name: "" }));
         expect(readPendingNightJoin("ABBA")).toBeNull();
+    });
+});
+
+describe("readNightLaunch", () => {
+    it("names the night and this device's identity in it", () => {
+        saveNightIdentity("ABBA", me);
+        expect(readNightLaunch({ nightCode: "ABBA" })).toEqual({ nightCode: "ABBA", identity: me });
+    });
+
+    it("is null for an ordinary visit, a bad code, or a night this device isn't in", () => {
+        saveNightIdentity("ABBA", me);
+        expect(readNightLaunch(null)).toBeNull();
+        expect(readNightLaunch(undefined)).toBeNull();
+        expect(readNightLaunch({})).toBeNull();
+        expect(readNightLaunch({ nightCode: "abba" })).toBeNull();
+        expect(readNightLaunch({ nightCode: 42 })).toBeNull();
+        expect(readNightLaunch({ nightCode: "LORD" })).toBeNull();
     });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealAnnouncement, revealDone, revealSteps, revealedCount, someoneLeads, winnerLine } from "./finale";
+import { PODIUM_POINTS, nextRevealLabel, placePlayers, points, revealAnnouncement, revealDone, revealSteps, revealedCount, revealedPlaces, someoneLeads, winnerLine } from "./finale";
 
 const p = (name: string, score: number) => ({ id: name.toLowerCase(), name, score });
 
@@ -64,6 +64,12 @@ describe("finale", () => {
         expect(revealedCount([], 2)).toBe(0);
         expect([2, 3, 9].map(step => revealDone(steps, step))).toEqual([false, true, true]);
         expect(revealDone([], 0)).toBe(false);
+    });
+
+    it("keeps the bottom of the standings showing after each tap", () => {
+        const placed = placePlayers([p("A", 9), p("B", 7), p("C", 5), p("D", 3)]);
+        const names = (step: number) => revealedPlaces(placed, step).map(entry => entry.player.name);
+        expect([0, 1, 2, 3, 4, 9].map(names)).toEqual([[], ["D"], ["C", "D"], ["B", "C", "D"], ["A", "B", "C", "D"], ["A", "B", "C", "D"]]);
     });
 
     it("says whether anyone leads", () => {

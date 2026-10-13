@@ -97,3 +97,16 @@ export const lastNightCode = (): string | null => {
     const code = read(LAST_NIGHT_KEY, isCode);
     return code && readNightIdentity(code) ? code : null;
 };
+
+/**
+ * Whether a screen was opened from a party night's home (router state
+ * `{ nightCode }`, #235): the night's code and this device's identity in it,
+ * or null for an ordinary visit, also when the identity is gone (it left, or
+ * cleared its storage).
+ */
+export const readNightLaunch = (state: unknown): { nightCode: string; identity: NightIdentity } | null => {
+    const code = (state as { nightCode?: unknown } | null)?.nightCode;
+    if (!isCode(code)) return null;
+    const identity = readNightIdentity(code);
+    return identity ? { nightCode: code, identity } : null;
+};

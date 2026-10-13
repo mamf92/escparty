@@ -152,7 +152,7 @@ const HostObserverView = () => {
             subtitle={roomCode ? <>Game code <strong className="esc-selectable">{roomCode}</strong></> : undefined}
             footer={
                 // Saying what leaving does: nobody else can continue the quiz.
-                <CalmLink type="button" onClick={() => navigate("/multiplayer")}>
+                <CalmLink type="button" onClick={() => navigate(room?.nightCode ? `/n/${room.nightCode}` : "/multiplayer")}>
                     Leave the game, it stops at the next break
                 </CalmLink>
             }

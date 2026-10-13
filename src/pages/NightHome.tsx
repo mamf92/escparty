@@ -11,7 +11,8 @@ import { QrFullScreen } from "../components/QrFullScreen";
 import { Badge, Control, Ground, Loader, Pane, Row } from "../design";
 import { useNightData } from "../hooks/useNightData";
 import { nightLink } from "../utils/joinCode";
-import { fetchNightGuest, joinNight, leaveNight, type Night, type NightGuest } from "../utils/nightsFirestore";
+import { leaveNightActivities } from "../utils/nightActivities";
+import { closeNight, createNight, fetchNightGuest, joinNight, leaveNight, moveNight, type Night, type NightGuest } from "../utils/nightsFirestore";
 import { JOIN_TIMEOUT_MS } from "../utils/partyFirestore";
 import {
     clearNightIdentity,
@@ -24,7 +25,11 @@ import {
 } from "../utils/nightSession";
 import { availablePartyNames } from "../utils/partyNames";
 
-const HOST_LEAVE_PROMPT = "Leave the party night? The guests keep the party, but you can't get the host controls back. Your name is freed and you'd join again as a guest.";
+// The host closes the night on the way out (#237): nobody is left in a night
+// with no host tools, and the guests are told it is over rather than waiting.
+const HOST_LEAVE_PROMPT = "Leave the party night? It ends for everyone, and you can't get the host controls back. Your name is freed.";
+const END_PROMPT = "End the party night? Nobody can join or add a quiz or scoreboard after this. What is already on stays open to the guests in it.";
+const START_OVER_PROMPT = "Start over with a new code? The guests are carried on to a fresh party night and pick their names again. What was played stays with this code.";
 const GUEST_LEAVE_PROMPT = "Leave the party night? Your name is freed and you'd join again as someone new.";
 
 /** The big screen's address in a new tab, from the page's own address. */
@@ -56,6 +61,13 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
     const [leaveFailed, setLeaveFailed] = useState(false);
     const [leavingNow, setLeavingNow] = useState(false);
     const [showingQr, setShowingQr] = useState(false);
+    // The host's own tools (#237): which one is being confirmed, and how it went.
+    const [hostAction, setHostAction] = useState<"end" | "restart" | null>(null);
+    const [hostBusy, setHostBusy] = useState(false);
+    const [hostFailed, setHostFailed] = useState<string | null>(null);
+    const hostButton = useRef<HTMLButtonElement>(null);
+    // The fresh night a start over made, so a retry after a failed move carries the guests there rather than making a third.
+    const freshNight = useRef<string | null>(null);
     const qrButton = useRef<HTMLButtonElement>(null);
     const leaveButton = useRef<HTMLButtonElement>(null);
     const stored = useRef(identity);
@@ -161,11 +173,15 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
         setLeaveFailed(false);
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-            // Offline, a delete waits rather than fails: give up after a while
+            // Offline, a write waits rather than fails: give up after a while
             // and say so, as a join does. If it lands later, the roster no
             // longer has this guest and the join view shows.
             await Promise.race([
-                leaveNight(night.code, identity.guestId, identity.name),
+                (async () => {
+                    await leaveNightActivities(night.activities, identity);
+                    if (isHost && !night.closed) await closeNight(night.code);
+                    await leaveNight(night.code, identity.guestId, identity.name);
+                })(),
                 new Promise<never>((_, reject) => {
                     timer = setTimeout(() => reject(new Error("The leave took too long")), JOIN_TIMEOUT_MS);
                 }),
@@ -180,6 +196,36 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
         } finally {
             clearTimeout(timer);
         }
+    };
+
+    /** One host tool at a time; a failure is said and can be tried again. */
+    const hostDo = async (what: string, run: () => Promise<void>) => {
+        if (hostBusy) return;
+        setHostBusy(true);
+        setHostFailed(null);
+        try {
+            await run();
+        } catch (err) {
+            console.error(`Couldn't ${what}:`, err);
+            setHostFailed(`Couldn't ${what} just now. Check your connection and try again.`);
+        }
+        setHostBusy(false);
+    };
+    const endNight = () => hostDo("end the party night", async () => {
+        await closeNight(night.code);
+        setHostAction(null);
+    });
+    const startOver = () => hostDo("start over", async () => {
+        freshNight.current ??= await createNight(night.title, identity.guestId, identity.name);
+        const next = freshNight.current;
+        await moveNight(night.code, next);
+        saveNightIdentity(next, { guestId: identity.guestId, name: identity.name });
+        navigate(`/n/${next}`);
+    });
+    const cancelHostAction = () => {
+        setHostAction(null);
+        setHostFailed(null);
+        setTimeout(() => hostButton.current?.focus());
     };
 
     return (
@@ -208,7 +254,7 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
                     ) : (
                         <Ground>
                             <Pane>
-                                <Control ref={leaveButton} onClick={() => setAskingLeave(true)}>Leave the party</Control>
+                                <Control ref={leaveButton} onClick={() => { setHostAction(null); setAskingLeave(true); }}>Leave the party</Control>
                             </Pane>
                         </Ground>
                     )}
@@ -229,7 +275,19 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
             {error && <NightError error={error} onRetry={retry} />}
             {night.closed && <CalmNote role="status">This party night is over.</CalmNote>}
 
-            <NightActivities activities={night.activities} />
+            {isHost && !night.closed && (
+                <>
+                    <h2 className="esc-section">Start something</h2>
+                    <Ground>
+                        <Pane>
+                            <Control onClick={() => navigate("/multiplayer", { state: { step: "host", nightCode: night.code } })}>Start a quiz</Control>
+                            <Control onClick={() => navigate("/party/new", { state: { nightCode: night.code } })}>Start a scoreboard</Control>
+                        </Pane>
+                    </Ground>
+                </>
+            )}
+
+            <NightActivities activities={night.activities} me={identity} />
 
             <h2 className="esc-section">Who&apos;s here</h2>
             <Ground>
@@ -243,6 +301,29 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
                     </Pane>
                 )}
             </Ground>
+
+            {isHost && !night.closed && (
+                <>
+                    <h2 className="esc-section">Host</h2>
+                    {hostAction ? (
+                        <ConfirmLeave
+                            prompt={hostAction === "end" ? END_PROMPT : START_OVER_PROMPT}
+                            stayLabel="Keep the party going"
+                            leaveLabel={hostAction === "end" ? (hostBusy ? "Ending…" : "End the party night") : (hostBusy ? "Starting over…" : "Start over")}
+                            onLeave={() => void (hostAction === "end" ? endNight() : startOver())}
+                            onStay={cancelHostAction}
+                        />
+                    ) : (
+                        <Ground>
+                            <Pane>
+                                <Control ref={hostButton} onClick={() => { setAskingLeave(false); setHostAction("end"); }}>End the party night</Control>
+                                <Control onClick={() => { setAskingLeave(false); setHostAction("restart"); }}>Start over with a new code</Control>
+                            </Pane>
+                        </Ground>
+                    )}
+                    {hostFailed && <CalmNote role="alert">{hostFailed}</CalmNote>}
+                </>
+            )}
         </CalmPage>
     );
 };
