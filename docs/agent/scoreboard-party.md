@@ -182,6 +182,7 @@ collection):
   showNames: boolean,             // true for new parties; older ones may be false
   results: { places?: { [actId]: place }, qualifiers?: actId[] },
   revealed: boolean,
+  nightCode?: string,             // the party night it was made in (#232), only set at creation
   createdAt: serverTimestamp, expireAt: Timestamp  // createdAt + 30 days
 }
 ```
@@ -194,7 +195,9 @@ clients ever write the same document.
 `parties/{code}/names/{key}`: `{ name, guestId, expireAt }`, the name claim
 (`key` = `nameKey(name)`, which the rules check against `name`). Created
 with the guest's first ballot (`joinParty`, or `createParty` for the host),
-never changed or deleted, read one at a time (`get`), never listed.
+never changed, read one at a time (`get`), never listed. Deleted only
+together with the guest's ballot, and only in a party with a `nightCode`
+(below).
 
 `template.bonuses` sits inside the template because the rules fix a party's
 top-level keys and check only `template.categories`, so the bonus list
@@ -212,9 +215,21 @@ character name and at most 40 acts. A first ballot needs its guest's claim
 on its name, and a ballot's name never changes after that. A name claim needs the party to exist,
 exactly `name`, `guestId` and `expireAt`, its id to be the name trimmed
 and in lower case, and the guest's ballot under that name in the same
-write; it can't be overwritten or deleted (verify case 5b). Both use
+write; it can't be overwritten (verify case 5b). Both use
 `existsAfter`/`getAfter`, since the host's party, claim and ballot are one
 batch.
+
+A party can be made inside a party night (#231, #232): `nightCode` is an
+optional key at creation (a 4-letter code of a night that exists, never
+changed afterwards; `NewParty`/`Party` in `partyFirestore.ts` carry it). Only
+in such a party may a ballot and its name claim be deleted, and only together,
+in one batch (`leaveParty(code, guestId, name)`, a guest leaving the night): the
+ballot's delete needs the claim on its name gone after the write and the
+claim's delete needs its ballot gone, so neither goes alone. A standalone
+party keeps `delete: false` on both (verify case 5j). A night lists the
+party as a `scoreboard` activity once the party exists with the night's code.
+The code of a new party is drawn by `freeCode()`, free among rooms, parties
+and nights. Party nights: `docs/agent/firestore-data-model.md`.
 `contests/` is read-only to clients.
 
 ## Retention

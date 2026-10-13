@@ -61,6 +61,9 @@ export interface Room {
     // reveal taps (src/utils/finale.ts), only ever raised, only in the
     // results. Missing means nothing is revealed yet.
     revealStep?: number;
+    // The party night this room was made in (#232): its 4-letter code, set
+    // when the room is created (createNightRoom) and never changed.
+    nightCode?: string;
 }
 
 /**
@@ -117,7 +120,19 @@ export const checkFirebaseInitialization = () => {
 /**
  * Create a new room with the given host
  */
-export const createRoom = async (roomCode: string, hostId: string, hostName: string, hostIsObserver: boolean = false): Promise<void> => {
+export const createRoom = (roomCode: string, hostId: string, hostName: string, hostIsObserver: boolean = false): Promise<void> =>
+    writeNewRoom(roomCode, hostId, hostName, hostIsObserver);
+
+/**
+ * Create a room as one of a party night's activities (#232): the same room
+ * as createRoom, with the night's code on it. The rules only take the night
+ * code at creation, so it can't be added later, which is why this is its own
+ * function and not a write after createRoom.
+ */
+export const createNightRoom = (roomCode: string, hostId: string, hostName: string, hostIsObserver: boolean, nightCode: string): Promise<void> =>
+    writeNewRoom(roomCode, hostId, hostName, hostIsObserver, nightCode);
+
+const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, hostIsObserver: boolean, nightCode?: string): Promise<void> => {
     console.log(`Creating room ${roomCode} with host ${hostName} (${hostId}), hostIsObserver: ${hostIsObserver}`);
     console.log("Environment:", import.meta.env.MODE, "BASE_URL:", import.meta.env.BASE_URL);
 
@@ -150,7 +165,10 @@ export const createRoom = async (roomCode: string, hostId: string, hostName: str
                 name: hostName,
                 score: 0,
                 joinedAt: currentTime // Use Timestamp.now() instead of serverTimestamp()
-            }]
+            }],
+            // Left out, not undefined, for a room outside a night: Firestore
+            // refuses undefined fields.
+            ...(nightCode ? { nightCode } : {})
         };
 
         console.log("About to create room with data:", JSON.stringify({

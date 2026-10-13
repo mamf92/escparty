@@ -597,6 +597,344 @@ report(
   String(claims.filter((c) => c.status === "rejected" && c.reason.code === "permission-denied").length),
 );
 
+// 5j. Party nights (#231, #232): one code for an evening, above the quiz
+// rooms and scoreboard parties played in it. Created whole and open; guests
+// join with a create-only name claim in one batch (and leave by deleting both);
+// the activity list only grows by one valid entry at a time; a night closes
+// once and may hand over to a fresh night of the same host.
+const nightLetters = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join("");
+const nightExpiry = (days = 30) => Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
+const nightRef = (code) => doc(db, "nights", code);
+const guestRef = (code, id) => doc(db, "nights", code, "guests", id);
+const claimRef = (code, key) => doc(db, "nights", code, "names", key);
+const aNight = (code, overrides = {}) => Object.fromEntries(Object.entries({
+  code,
+  hostId: "night-host",
+  title: "Saturday at Ola's",
+  activities: [],
+  closed: false,
+  createdAt: serverTimestamp(),
+  expireAt: nightExpiry(),
+  ...overrides,
+}).filter(([, value]) => value !== undefined));
+const aNightGuest = (overrides = {}) => Object.fromEntries(Object.entries({
+  name: "Loreen",
+  joinedAt: serverTimestamp(),
+  expireAt: nightExpiry(),
+  ...overrides,
+}).filter(([, value]) => value !== undefined));
+const aNightClaim = (name, guestId, overrides = {}) => Object.fromEntries(Object.entries({
+  name,
+  guestId,
+  expireAt: nightExpiry(),
+  ...overrides,
+}).filter(([, value]) => value !== undefined));
+// joinNight's write: the guest and their claim on the name, in one batch.
+const joinNightBatch = (clientDb, code, guestId, name) => {
+  const batch = writeBatch(clientDb);
+  batch.set(doc(clientDb, "nights", code, "names", name.trim().toLowerCase()), aNightClaim(name, guestId));
+  batch.set(doc(clientDb, "nights", code, "guests", guestId), aNightGuest({ name }));
+  return batch.commit();
+};
+// leaveNight's write: both documents deleted together.
+const leaveNightBatch = (clientDb, code, guestId, name) => {
+  const batch = writeBatch(clientDb);
+  batch.delete(doc(clientDb, "nights", code, "guests", guestId));
+  batch.delete(doc(clientDb, "nights", code, "names", name.trim().toLowerCase()));
+  return batch.commit();
+};
+// A night made on its own (no host guest), for cases that are about the night.
+const newNight = async (overrides = {}) => {
+  const code = nightLetters();
+  await setDoc(nightRef(code), aNight(code, overrides));
+  return code;
+};
+const roomIn = async (nightCode, overrides = {}) => {
+  const code = nightLetters();
+  await setDoc(doc(db, "rooms", code), {
+    id: code,
+    hostId: "host-1",
+    started: false,
+    createdAt: serverTimestamp(),
+    players: [{ id: "host-1", name: "Host", score: 0 }],
+    ...(nightCode ? { nightCode } : {}),
+    ...overrides,
+  });
+  return code;
+};
+const partyIn = async (nightCode) => {
+  const code = nightLetters();
+  await setDoc(doc(db, "parties", code), aParty({ code, ...(nightCode ? { nightCode } : {}) }));
+  return code;
+};
+const anActivity = (kind, code, overrides = {}) => ({ kind, code, title: kind === "quiz" ? "Pub quiz" : "Grand final", ...overrides });
+
+// Creation
+const badNightCode = nightLetters();
+for (const [label, overrides] of [
+  ["a code that doesn't match its document", { code: "ZZZZ" }],
+  ["an activity already listed", { activities: [anActivity("quiz", "ABBA")] }],
+  ["the night already closed", { closed: true }],
+  ["a client-chosen createdAt", { createdAt: Timestamp.fromMillis(0) }],
+  ["a far-off expireAt", { expireAt: nightExpiry(400) }],
+  ["an expireAt that is already near", { expireAt: nightExpiry(0) }],
+  ["no expireAt", { expireAt: undefined }],
+  ["no title", { title: "" }],
+  ["a 61-character title", { title: "x".repeat(61) }],
+  ["no host", { hostId: "" }],
+  ["a 65-character host id", { hostId: "h".repeat(65) }],
+  ["a host id that isn't a string", { hostId: 7 }],
+  ["a moved-to code", { movedTo: "ABBA" }],
+  ["an extra field", { adminOf: "everything" }],
+]) {
+  await expectDenied(`create a night with ${label}`, () => setDoc(nightRef(badNightCode), aNight(badNightCode, overrides)));
+}
+await expectDenied("create a night under a lowercase code", () => setDoc(nightRef("abcd"), aNight("abcd")));
+const nightCode = nightLetters();
+await expectAllowed("create a night with the host's guest and claim in one batch", async () => {
+  const batch = writeBatch(db);
+  batch.set(nightRef(nightCode), aNight(nightCode));
+  batch.set(claimRef(nightCode, "ola"), aNightClaim("Ola", "night-host"));
+  batch.set(guestRef(nightCode, "night-host"), aNightGuest({ name: "Ola" }));
+  await batch.commit();
+});
+await expectAllowed("read a night by code", () => getDoc(nightRef(nightCode)));
+await expectDenied("list the nights collection", async () => {
+  const snap = await getDocs(collection(db, "nights"));
+  if (snap.size > 0) throw { code: "unexpectedly-succeeded", size: snap.size };
+});
+await expectDenied("create over an existing night", () => setDoc(nightRef(nightCode), aNight(nightCode)));
+await expectDenied("delete a night", () => deleteDoc(nightRef(nightCode)));
+await expectDenied("change a night's title", () => updateDoc(nightRef(nightCode), { title: "Elsewhere" }));
+await expectDenied("change a night's host", () => updateDoc(nightRef(nightCode), { hostId: "attacker" }));
+
+// Guests and name claims
+const guestClients = claimClients;
+await expectAllowed("join a night with a claim on the name, in one batch", () => joinNightBatch(guestClients[0], nightCode, "ng-1", "Loreen"));
+await expectAllowed("read the roster of a night", async () => {
+  const snap = await getDocs(collection(db, "nights", nightCode, "guests"));
+  if (snap.size !== 2) throw { code: "wrong-roster", size: snap.size };
+});
+await expectAllowed("read a name claim in a night", () => getDoc(claimRef(nightCode, "loreen")));
+await expectDenied("list a night's names", () => getDocs(collection(db, "nights", nightCode, "names")));
+await expectDenied("claim a name someone has in a night", () => joinNightBatch(guestClients[1], nightCode, "ng-2", " LOREEN "));
+report(
+  "a refused night claim writes no guest",
+  "false",
+  String((await getDoc(guestRef(nightCode, "ng-2"))).exists()),
+);
+await expectDenied("a guest without a claim on their name", () => setDoc(guestRef(nightCode, "ng-3"), aNightGuest({ name: "Lordi" })));
+await expectDenied("a claim without a guest", () => setDoc(claimRef(nightCode, "lordi"), aNightClaim("Lordi", "ng-3")));
+await expectDenied("a guest under someone else's claimed name", () => setDoc(guestRef(nightCode, "ng-3"), aNightGuest({ name: "Loreen" })));
+await expectDenied("a claim whose guest has another name", async () => {
+  const batch = writeBatch(db);
+  batch.set(claimRef(nightCode, "lordi"), aNightClaim("Lordi", "ng-4"));
+  batch.set(guestRef(nightCode, "ng-4"), aNightGuest({ name: "Hatari" }));
+  await batch.commit();
+});
+await expectDenied("a claim for another guest's id", async () => {
+  const batch = writeBatch(db);
+  batch.set(claimRef(nightCode, "lordi"), aNightClaim("Lordi", "ng-5"));
+  batch.set(guestRef(nightCode, "ng-4"), aNightGuest({ name: "Lordi" }));
+  await batch.commit();
+});
+for (const [label, key, guestOverrides, claimOverrides] of [
+  ["a key that isn't the name", "someone else", {}, {}],
+  ["a key that keeps the case", "Lordi", {}, {}],
+  ["a 41-character name", "x".repeat(41), { name: "x".repeat(41) }, { name: "x".repeat(41) }],
+  ["a client-chosen joinedAt", "lordi", { joinedAt: Timestamp.fromMillis(0) }, {}],
+  ["an extra field on the guest", "lordi", { isHost: true }, {}],
+  ["a far-off expireAt on the guest", "lordi", { expireAt: nightExpiry(400) }, {}],
+  ["a far-off expireAt on the claim", "lordi", {}, { expireAt: nightExpiry(400) }],
+  ["an extra field on the claim", "lordi", {}, { isHost: true }],
+  ["a 65-character guest id", "lordi", {}, { guestId: "g".repeat(65) }],
+]) {
+  await expectDenied(`join a night with ${label}`, async () => {
+    const guestName = guestOverrides.name ?? "Lordi";
+    const guestId = claimOverrides.guestId ?? "ng-6";
+    const batch = writeBatch(db);
+    batch.set(claimRef(nightCode, key), aNightClaim(guestName, guestId, claimOverrides));
+    batch.set(guestRef(nightCode, guestId), aNightGuest({ name: guestName, ...guestOverrides }));
+    await batch.commit();
+  });
+}
+await expectDenied("join a night that doesn't exist", () => joinNightBatch(db, "NONE", "ng-1", "Loreen"));
+await expectDenied("rename a guest", () => setDoc(guestRef(nightCode, "ng-1"), aNightGuest({ name: "Netta" })));
+await expectDenied("hand a claimed name to someone else", () => setDoc(claimRef(nightCode, "loreen"), aNightClaim("Loreen", "ng-2")));
+
+// Five guests land "Käärijä" at the same moment, each on its own client:
+// exactly one gets it.
+const nightClaims = await Promise.allSettled(
+  claimClients.map((clientDb, i) => joinNightBatch(clientDb, nightCode, `nrace-${i}`, "Käärijä"))
+);
+report("one of five simultaneous night claims of a name lands", "1", String(nightClaims.filter((c) => c.status === "fulfilled").length));
+report(
+  "the others are refused by the rules",
+  "4",
+  String(nightClaims.filter((c) => c.status === "rejected" && c.reason.code === "permission-denied").length),
+);
+const raceGuests = (await getDocs(collection(db, "nights", nightCode, "guests"))).docs.filter((d) => d.id.startsWith("nrace-"));
+report("only the winner is on the roster", "1", String(raceGuests.length));
+
+// Leaving: guest and claim go together, so the name is free again.
+await expectDenied("leave a night, deleting the guest but not the claim", () => deleteDoc(guestRef(nightCode, "ng-1")));
+await expectDenied("leave a night, deleting the claim but not the guest", () => deleteDoc(claimRef(nightCode, "loreen")));
+await expectDenied("delete a guest and another guest's claim", async () => {
+  const batch = writeBatch(db);
+  batch.delete(guestRef(nightCode, "ng-1"));
+  batch.delete(claimRef(nightCode, "ola"));
+  await batch.commit();
+});
+await expectAllowed("leave a night (guest and claim in one batch)", () => leaveNightBatch(db, nightCode, "ng-1", "Loreen"));
+report("the name is free after a leave", "false", String((await getDoc(claimRef(nightCode, "loreen"))).exists()));
+await expectAllowed("another guest takes the freed name", () => joinNightBatch(guestClients[2], nightCode, "ng-7", "Loreen"));
+
+// Rooms and parties made in a night
+const roomInNight = await roomIn(nightCode);
+await expectDenied("create a room for a night that doesn't exist", () => roomIn("NONE"));
+await expectDenied("create a room with a lowercase night code", () => roomIn("abcd"));
+await expectDenied("create a room with a night code that isn't a string", () => roomIn(7));
+await expectDenied("point a room outside a night at a night afterwards", async () => {
+  const code = await roomIn(null);
+  await updateDoc(doc(db, "rooms", code), { nightCode });
+});
+await expectDenied("move a room to another night", async () => {
+  const other = await newNight();
+  await updateDoc(doc(db, "rooms", roomInNight), { nightCode: other });
+});
+await expectDenied("create a party for a night that doesn't exist", () => partyIn("NONE"));
+const partyInNight = await partyIn(nightCode);
+await expectDenied("move a party to another night", async () => {
+  const other = await newNight();
+  await updateDoc(doc(db, "parties", partyInNight), { nightCode: other });
+});
+
+// Party ballots: deletable (with their claim) only in a night's party
+const nightGuestBallot = (guestId, name) => {
+  const batch = writeBatch(db);
+  batch.set(doc(db, "parties", partyInNight, "names", name.trim().toLowerCase()), aClaim({ name, guestId }));
+  batch.set(doc(db, "parties", partyInNight, "ballots", guestId), aBallot({ name, ratings: {}, bonuses: {} }));
+  return batch.commit();
+};
+await nightGuestBallot("npg-1", "Netta");
+await expectDenied("delete a ballot in a night's party, leaving its claim", () =>
+  deleteDoc(doc(db, "parties", partyInNight, "ballots", "npg-1"))
+);
+await expectDenied("delete a claim in a night's party, leaving its ballot", () =>
+  deleteDoc(doc(db, "parties", partyInNight, "names", "netta"))
+);
+await expectAllowed("delete a ballot and its claim in a night's party (a leave)", async () => {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "parties", partyInNight, "ballots", "npg-1"));
+  batch.delete(doc(db, "parties", partyInNight, "names", "netta"));
+  await batch.commit();
+});
+await expectAllowed("the freed name can be claimed again in the party", () => nightGuestBallot("npg-2", "Netta"));
+await expectDenied("delete a ballot and its claim in a standalone party", async () => {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "parties", partyCode, "ballots", "claim-1"));
+  batch.delete(doc(db, "parties", partyCode, "names", "céline dion"));
+  await batch.commit();
+});
+
+// Listing activities
+const listed = await newNight();
+const roomA = await roomIn(listed);
+const roomOutside = await roomIn(null);
+const roomElsewhere = await roomIn(nightCode);
+const partyA = await partyIn(listed);
+await expectAllowed("list a quiz room made in the night", () =>
+  updateDoc(nightRef(listed), { activities: arrayUnion(anActivity("quiz", roomA)) })
+);
+await expectAllowed("list a scoreboard party made in the night", () =>
+  updateDoc(nightRef(listed), { activities: arrayUnion(anActivity("scoreboard", partyA)) })
+);
+for (const [label, activity] of [
+  ["a room made outside any night", anActivity("quiz", roomOutside)],
+  ["a room made in another night", anActivity("quiz", roomElsewhere)],
+  ["a room that doesn't exist", anActivity("quiz", "NONE")],
+  ["a party that is really a room's code", anActivity("scoreboard", roomA)],
+  ["a room listed as a party", anActivity("quiz", partyA)],
+  ["a lowercase code", anActivity("quiz", roomA.toLowerCase())],
+  ["an unknown kind", anActivity("karaoke", roomA)],
+  ["no title", anActivity("quiz", roomA, { title: "" })],
+  ["an 81-character title", anActivity("quiz", roomA, { title: "x".repeat(81) })],
+  ["an extra key", anActivity("quiz", roomA, { winner: "me" })],
+  ["something that isn't a map", "quiz:" + roomA],
+]) {
+  // arrayUnion skips an entry the list already has, so a repeat of roomA's
+  // quiz can't be what is refused here: each of these differs from it.
+  await expectDenied(`list ${label}`, () => updateDoc(nightRef(listed), { activities: arrayUnion(activity) }));
+}
+const listedNow = (await getDoc(nightRef(listed))).data().activities;
+await expectDenied("list two activities in one write", async () => {
+  const [r1, r2] = [await roomIn(listed), await roomIn(listed)];
+  await updateDoc(nightRef(listed), { activities: [...listedNow, anActivity("quiz", r1), anActivity("quiz", r2)] });
+});
+await expectDenied("rewrite an earlier activity while adding one", async () => {
+  const r = await roomIn(listed);
+  await updateDoc(nightRef(listed), {
+    activities: [anActivity("quiz", roomA, { title: "Renamed" }), listedNow[1], anActivity("quiz", r)],
+  });
+});
+await expectDenied("drop an earlier activity while adding one", async () => {
+  const r = await roomIn(listed);
+  await updateDoc(nightRef(listed), { activities: [listedNow[1], anActivity("quiz", r)] });
+});
+await expectDenied("reorder the activities", () =>
+  updateDoc(nightRef(listed), { activities: [listedNow[1], listedNow[0]] })
+);
+await expectDenied("clear the activities", () => updateDoc(nightRef(listed), { activities: [] }));
+await expectDenied("list an activity and close the night in one write", async () => {
+  const r = await roomIn(listed);
+  await updateDoc(nightRef(listed), { activities: arrayUnion(anActivity("quiz", r)), closed: true });
+});
+const capped = await newNight();
+for (let i = 0; i < 20; i += 1) {
+  const r = await roomIn(capped);
+  await updateDoc(nightRef(capped), { activities: arrayUnion(anActivity("quiz", r, { title: `Round ${i + 1}` })) });
+}
+await expectDenied("list a 21st activity", async () => {
+  const r = await roomIn(capped);
+  await updateDoc(nightRef(capped), { activities: arrayUnion(anActivity("quiz", r)) });
+});
+
+// Closing
+const closing = await newNight();
+const closingRoom = await roomIn(closing);
+await expectDenied("close a night and change its title", () => updateDoc(nightRef(closing), { closed: true, title: "Elsewhere" }));
+await expectAllowed("close a night", () => updateDoc(nightRef(closing), { closed: true }));
+await expectDenied("reopen a closed night", () => updateDoc(nightRef(closing), { closed: false }));
+await expectDenied("list an activity in a closed night", () =>
+  updateDoc(nightRef(closing), { activities: arrayUnion(anActivity("quiz", closingRoom)) })
+);
+await expectDenied("join a closed night", async () => {
+  const batch = writeBatch(db);
+  batch.set(claimRef(closing, "late"), aNightClaim("Late", "late-1"));
+  batch.set(guestRef(closing, "late-1"), aNightGuest({ name: "Late" }));
+  await batch.commit();
+});
+
+// Moving on to a fresh night
+const movingFrom = await newNight();
+const freshTarget = await newNight();
+const strangers = await newNight({ hostId: "someone-else" });
+const usedTarget = await newNight();
+await updateDoc(nightRef(usedTarget), { activities: arrayUnion(anActivity("quiz", await roomIn(usedTarget))) });
+const closedTarget = await newNight();
+await updateDoc(nightRef(closedTarget), { closed: true });
+await expectDenied("move on without closing", () => updateDoc(nightRef(movingFrom), { movedTo: freshTarget }));
+await expectDenied("move on to a night that doesn't exist", () => updateDoc(nightRef(movingFrom), { movedTo: "NONE", closed: true }));
+await expectDenied("move on to a lowercase code", () => updateDoc(nightRef(movingFrom), { movedTo: "abcd", closed: true }));
+await expectDenied("move on to itself", () => updateDoc(nightRef(movingFrom), { movedTo: movingFrom, closed: true }));
+await expectDenied("move on to a stranger's night", () => updateDoc(nightRef(movingFrom), { movedTo: strangers, closed: true }));
+await expectDenied("move on to a night that already has activities", () => updateDoc(nightRef(movingFrom), { movedTo: usedTarget, closed: true }));
+await expectDenied("move on from a night that is already closed", () => updateDoc(nightRef(closing), { movedTo: freshTarget, closed: true }));
+await expectDenied("move on to a night that is closed", () => updateDoc(nightRef(movingFrom), { movedTo: closedTarget, closed: true }));
+await expectDenied("move on and change the title", () => updateDoc(nightRef(movingFrom), { movedTo: freshTarget, closed: true, title: "Elsewhere" }));
+await expectAllowed("move on to a fresh night of the same host", () => updateDoc(nightRef(movingFrom), { movedTo: freshTarget, closed: true }));
+await expectDenied("move on a second time", () => newNight().then((other) => updateDoc(nightRef(movingFrom), { movedTo: other })));
+
 await expectAllowed("read a contest lineup", () => getDoc(doc(db, "contests", "burgas-2027-final")));
 await expectDenied("write a contest lineup", () =>
   setDoc(doc(db, "contests", "burgas-2027-final"), { acts: [] })

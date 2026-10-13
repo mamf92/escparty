@@ -4,7 +4,7 @@ Read this before touching `roomsFirestore.ts` or any Firestore-backed page.
 
 ## Collections
 
-Four collections:
+Five collections:
 
 - `rooms`, keyed by a 4-letter uppercase room code (`generateRoomCode()`).
   No sub-collections; players live as an array on the room document, not
@@ -16,6 +16,11 @@ Four collections:
   sub-collection (one create-only claim per name, #229), and `contests`, the
   real Burgas 2027 lineups, entered by hand and read-only to clients. Both
   are documented in `docs/agent/scoreboard-party.md`.
+- `nights`, party nights (#231): one 4-letter code for a whole evening, above
+  the rooms and parties played in it, with a `guests` sub-collection and a
+  `names` sub-collection (one create-only claim per name). See "Party
+  nights" below. A code is unique across `rooms`, `parties` and `nights`
+  (`freeCode`), because the Join screen has one code field.
 
 ## `Room` shape (as defined in `roomsFirestore.ts`)
 
@@ -341,6 +346,85 @@ first, and can now also change it before the start. And
 (`isBreakBefore`, the same arithmetic as `phaseAfterQuestion`). Covered by
 cases 5d-5g and the break-setting walks in case 12 of
 `scripts/verify-firestore-rules.mjs`.
+
+## Party nights (#231, #232)
+
+A night is a thin layer above quiz rooms and scoreboard parties: guests join
+it once, with one id and one name, and the evening's quizzes and parties are
+listed on it. Client API: `src/utils/nightsFirestore.ts`; the code is drawn
+by `freeCode()` (`src/utils/freeCode.ts`), which draws `generateRoomCode()`
+until it is free in `rooms`, `parties` and `nights` (up to 5 tries, then a
+friendly error). A collection the rules won't let it read counts as free
+(rules from before #232 deny `nights`); any other failed lookup is thrown.
+`createRoom`/`createParty` callers use it too (`MultiplayerLobby`,
+`QuizResults`' play again, `createParty`).
+
+A leave (`leaveNight`, `leaveParty`), `closeNight`, `addNightActivity` and
+`moveNight` that is refused reads the state again and counts as done when it
+is already there (`settleRefusal` in `src/utils/firestoreRefusal.ts`): a retry
+of a write that landed, its answer lost, deletes what's gone or changes
+nothing, which the rules refuse.
+
+```ts
+nights/{code}                       // 4 uppercase letters
+{
+  code, hostId, title,              // title 1-60 characters
+  activities: { kind: "quiz" | "scoreboard", code, title }[],  // up to 20, in order
+  closed: boolean,
+  movedTo?: string,                 // set once, by moveNight
+  createdAt: serverTimestamp, expireAt: Timestamp               // createdAt + 30 days
+}
+nights/{code}/guests/{guestId}      // { name, joinedAt, expireAt }
+nights/{code}/names/{key}           // { name, guestId, expireAt }; key = nameKey(name)
+```
+
+Rooms and parties made in a night carry its code as `nightCode` (optional,
+`createNightRoom`, `createParty` with `nightCode`).
+
+Rules (`firestore.rules`, verify case 5j):
+
+- **Night:** `get` by code, never `list`, never deleted. Created with exactly
+  the keys above, an empty `activities`, `closed == false`, `createdAt ==
+  request.time` and an `expireAt` 1-60 days out (the same window as parties).
+  After that, exactly one of three updates per write:
+  - *Append an activity* (`addNightActivity`, an `arrayUnion`): only
+    `activities` changes, the night is open, the list grows by exactly one
+    (at most 20), everything before the new entry is unchanged (the prefix
+    check; the first entry has none, as an empty slice is an evaluation error
+    in the rules engine), and the entry is `{ kind, code, title }` with kind
+    `quiz` or `scoreboard`, a 4-letter code and a 1-80 character title. The
+    entry's own document must exist and name this night: `rooms/{code}` (quiz)
+    or `parties/{code}` (scoreboard) with `nightCode == this night`. So
+    create the room or party first, then list it.
+  - *Close* (`closeNight`): only `closed`, false to true. One way.
+  - *Move* (`moveNight`): only `movedTo` and `closed`; no `movedTo` before;
+    `closed` ends true; `movedTo` is another 4-letter code whose night exists,
+    has the same `hostId`, is open and has no activities yet.
+- **Guest:** readable (get and list: the roster is shown on the night's home).
+  Created only into an open night (`getAfter(night).closed == false`) with
+  exactly `name` (1-40), `joinedAt == request.time` and `expireAt`, and only
+  together with the claim on its name. Never updated.
+- **Name claim:** `get` only. Created with exactly `name`, `guestId`,
+  `expireAt`, the id being `name.trim().lower()`, and the guest document in
+  the same write under that name. Never updated. Create-only is what makes a
+  duplicate name in a night impossible: of two guests landing the same name
+  at once, the second batch is refused (verify case 5j runs five clients at
+  once; one wins).
+- **Leaving:** `leaveNight` deletes the guest and the claim in one batch. A
+  guest can be deleted only if the claim on their name doesn't exist after the
+  write, and a claim only if its guest doesn't, so deleting just one is
+  refused (and the name is free again for anyone, including the leaver).
+- **`nightCode` on rooms and parties:** optional at creation, a 4-letter code
+  of a night that exists (`isNightRef`), and in no update branch, so it is
+  never added or changed later. Party ballots and claims may be deleted
+  together only in a party that has a `nightCode` (`leaveParty`); a standalone
+  party's stay for good (see `scoreboard-party.md`).
+
+Like every write in this app it checks shape, not who: with no sign-in the
+rules can't tell the host from a guest, so "only the host closes the night"
+is the page's job. A night's data expires with a TTL policy on `expireAt`
+for the `nights`, `guests` and `names` collection groups (the project owner
+enables it, as for parties).
 
 ## Saved quizzes (`quizzes/{quizId}`, #76)
 

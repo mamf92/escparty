@@ -19,8 +19,8 @@ vi.mock("../utils/roomsFirestore", () => ({
   setNextRoom: mocks.setNextRoom,
   setRevealStep: mocks.setRevealStep,
   joinRoom: mocks.joinRoom,
-  generateRoomCode: () => "NEXT",
 }));
+vi.mock("../utils/freeCode", () => ({ freeCode: async () => "NEXT" }));
 
 const ShowLocation = () => <p>at {useLocation().pathname}</p>;
 const renderResults = (state?: unknown) =>

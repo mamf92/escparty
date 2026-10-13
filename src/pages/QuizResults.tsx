@@ -4,7 +4,6 @@ import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { Control, Ground, Loader, Pane, Row } from "../design";
 import {
   createRoom,
-  generateRoomCode,
   joinRoom,
   listenToRoom,
   setNextRoom,
@@ -12,6 +11,7 @@ import {
   type Player,
   type Room,
 } from "../utils/roomsFirestore";
+import { freeCode } from "../utils/freeCode";
 import { isObserverHost, isRoomHost, playingPlayers } from "../utils/roomRoles";
 import { RESULTS_GRACE_MS, RESULTS_WAIT_FALLBACK_MS, startedAtMillis } from "../utils/quizTiming";
 import { readMultiplayerGame } from "../utils/multiplayerSession";
@@ -264,7 +264,7 @@ const QuizResults = () => {
   const playAgain = () => nextRoundStep("start the next round", async (playerId) => {
     if (!room) return;
     if (!createdRoom.current) {
-      const code = generateRoomCode();
+      const code = await freeCode();
       await createRoom(code, playerId, myName, room.hostIsObserver === true);
       createdRoom.current = code;
     }

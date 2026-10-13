@@ -21,8 +21,9 @@ import { db } from "../firebase";
 import { contestById, type Act, type Contest } from "../data/contests2027";
 import { sanitiseBonuses, type Ballot, type Bonuses, type RatingTemplate, type Ratings } from "./partyModel";
 import { resultsFor } from "./partyResults";
-import { generateRoomCode } from "./roomsFirestore";
+import { freeCode } from "./freeCode";
 import { nameKey } from "./freeName";
+import { isDenied, settleRefusal } from "./firestoreRefusal";
 
 export interface PartyResults {
     /** A final's real places, act id -> 1-based place. */
@@ -34,6 +35,8 @@ export interface PartyResults {
 export interface Party {
     code: string;
     hostId: string;
+    /** The party night this party was made in (#232), set at creation. */
+    nightCode?: string;
     title: string;
     contestId: string;
     kind: Contest["kind"];
@@ -104,20 +107,25 @@ export const partyExists = async (code: string): Promise<boolean> =>
     (await getDoc(doc(requireDb(), "parties", code))).exists();
 
 /**
- * Create a party under a fresh 4-letter code and return the code. Tries a
- * few codes, since the create rule refuses an existing one. The host joins
- * in the same batch, under `hostName` (their claim and empty ballot).
+ * Create a party under a fresh 4-letter code and return the code. The code
+ * is free among rooms, parties and nights (freeCode); it is tried again if
+ * the create rule refuses an existing one. The host joins in the same batch,
+ * under `hostName` (their claim and empty ballot). A party made for a party
+ * night carries its `nightCode`.
  */
 export const createParty = async (party: NewParty, hostName: string): Promise<string> => {
     const database = requireDb();
     for (let attempt = 0; attempt < 5; attempt++) {
-        const code = generateRoomCode();
+        const code = await freeCode();
         const ref = doc(database, "parties", code);
-        if ((await getDoc(ref)).exists()) continue;
         try {
             const batch = writeBatch(database);
+            // nightCode left out, not undefined, outside a night: Firestore
+            // refuses undefined fields.
+            const { nightCode, ...rest } = party;
             batch.set(ref, {
-                ...party,
+                ...rest,
+                ...(nightCode ? { nightCode } : {}),
                 code,
                 results: {},
                 revealed: false,
@@ -130,7 +138,7 @@ export const createParty = async (party: NewParty, hostName: string): Promise<st
             // Another host took this code between the check and the write:
             // the write then counts as an update, which the rules refuse. Any
             // other refusal (of the host's claim or ballot) is the real error.
-            if ((error as { code?: string }).code === "permission-denied") {
+            if (isDenied(error)) {
                 const taken = await getDoc(ref).then(snapshot => snapshot.exists(), () => false);
                 if (taken) continue;
             }
@@ -252,13 +260,30 @@ export const joinParty = async (code: string, guestId: string, name: string): Pr
         await Promise.race([batch.commit(), timeout]);
         return true;
     } catch (error) {
-        if ((error as { code?: string }).code !== "permission-denied") throw error;
+        if (!isDenied(error)) throw error;
         const claim = await getDoc(doc(firestore, "parties", code, "names", nameKey(name)));
         if (!claim.exists()) throw error;
         return claim.data().guestId === guestId;
     } finally {
         clearTimeout(timer);
     }
+};
+
+/**
+ * Leave a party made in a party night (#232): the guest's ballot and their
+ * claim on the name are deleted in one batch, so the name is free again. The
+ * rules allow it only in a night's party and only for both together; a
+ * standalone party's ballots stay. `name` is the one the guest joined with.
+ */
+export const leaveParty = async (code: string, guestId: string, name: string): Promise<void> => {
+    const firestore = requireDb();
+    const ballot = doc(firestore, "parties", code, "ballots", guestId);
+    const batch = writeBatch(firestore);
+    batch.delete(ballot);
+    batch.delete(doc(firestore, "parties", code, "names", nameKey(name)));
+    // A retry after a leave that went through (its answer lost) deletes
+    // documents that are gone, which the rules refuse: done all the same.
+    await batch.commit().catch(error => settleRefusal(error, async () => !(await getDoc(ballot)).exists()));
 };
 
 /** Read one guest's ballot, e.g. to restore it after a reload. */

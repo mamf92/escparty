@@ -3,6 +3,7 @@ import type { Player, Room } from "./roomsFirestore";
 import {
     addPlayerToRoom,
     advanceQuestion,
+    createNightRoom,
     createRoom,
     generateRoomCode,
     getRoom,
@@ -184,6 +185,29 @@ describe("createRoom", () => {
         const written = mocks.setDoc.mock.calls[0][1] as Room;
         expect(written.players[0].joinedAt).toBe(NOW);
         expect(written.players[0].joinedAt).not.toBe(SERVER_TIMESTAMP);
+    });
+
+    it("leaves nightCode off a room made outside a night", async () => {
+        await createRoom("ABCD", "host-1", "Martin");
+
+        expect(mocks.setDoc.mock.calls[0][1]).not.toHaveProperty("nightCode");
+    });
+
+    it("createNightRoom writes the same room with the night's code on it (#232)", async () => {
+        await createNightRoom("ABCD", "host-1", "Martin", true, "NITE");
+
+        expect(mocks.setDoc).toHaveBeenCalledWith(refFor("ABCD"), {
+            id: "ABCD",
+            hostId: "host-1",
+            started: false,
+            hostIsObserver: true,
+            createdAt: SERVER_TIMESTAMP,
+            phase: "lobby",
+            currentQuestionIndex: 0,
+            phaseStartedAt: SERVER_TIMESTAMP,
+            players: [{ id: "host-1", name: "Martin", score: 0, joinedAt: NOW }],
+            nightCode: "NITE",
+        });
     });
 
     it("wraps a write failure with the room-creation context", async () => {

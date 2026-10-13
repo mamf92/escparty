@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, joinRoomWithFreeName, generateRoomCode, getRoom, JoinRejected } from "../utils/roomsFirestore";
+import { createRoom, joinRoom, joinRoomWithFreeName, getRoom, JoinRejected } from "../utils/roomsFirestore";
+import { freeCode } from "../utils/freeCode";
 import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -143,8 +144,8 @@ const MultiplayerLobby = () => {
       const hostId = uuidv4();
       const hostName = HOST_NAME;
 
-      // Generate a room code
-      const newGameCode = generateRoomCode();
+      // A code no room, party or night has (#232): one code field serves all three
+      const newGameCode = await freeCode();
 
       // Create the room in Firestore
       await createRoom(newGameCode, hostId, hostName, hostIsObserver);
