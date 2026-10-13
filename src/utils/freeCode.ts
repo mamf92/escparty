@@ -17,9 +17,16 @@ const ATTEMPTS = 5;
 
 /**
  * Draw codes until one is free in every collection. The check is a read, so
- * another host can still take the code before the caller writes it; the
- * create rules refuse that write, and callers that can retry do (createParty,
- * createNight).
+ * another host can still take the code before the caller writes it. In the
+ * same collection the create rule refuses that write and the caller can
+ * retry (createParty, createNight); across collections nothing refuses it,
+ * but two hosts drawing one code in the same instant out of 457,000 is rare
+ * enough that findGame's order (joinCode.ts) settles it.
+ *
+ * A lookup that fails counts as free rather than failing the whole draw: a
+ * code can't be checked against a collection the client may not read (a
+ * build running against rules from before #232, which deny `nights`), and
+ * creating a room shouldn't depend on reading the other two.
  */
 export const freeCode = async (): Promise<string> => {
     if (!db) throw new Error("Firebase not initialized");
@@ -27,7 +34,10 @@ export const freeCode = async (): Promise<string> => {
     for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
         const code = generateRoomCode();
         const taken = await Promise.all(
-            CODE_COLLECTIONS.map(async name => (await getDoc(doc(database, name, code))).exists()),
+            CODE_COLLECTIONS.map(name => getDoc(doc(database, name, code)).then(
+                snapshot => snapshot.exists(),
+                () => false,
+            )),
         );
         if (!taken.some(Boolean)) return code;
     }

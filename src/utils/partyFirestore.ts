@@ -119,8 +119,12 @@ export const createParty = async (party: NewParty, hostName: string): Promise<st
         const ref = doc(database, "parties", code);
         try {
             const batch = writeBatch(database);
+            // nightCode left out, not undefined, outside a night: Firestore
+            // refuses undefined fields.
+            const { nightCode, ...rest } = party;
             batch.set(ref, {
-                ...party,
+                ...rest,
+                ...(nightCode ? { nightCode } : {}),
                 code,
                 results: {},
                 revealed: false,
@@ -272,10 +276,18 @@ export const joinParty = async (code: string, guestId: string, name: string): Pr
  */
 export const leaveParty = async (code: string, guestId: string, name: string): Promise<void> => {
     const firestore = requireDb();
+    const ballot = doc(firestore, "parties", code, "ballots", guestId);
     const batch = writeBatch(firestore);
-    batch.delete(doc(firestore, "parties", code, "ballots", guestId));
+    batch.delete(ballot);
     batch.delete(doc(firestore, "parties", code, "names", nameKey(name)));
-    await batch.commit();
+    try {
+        await batch.commit();
+    } catch (error) {
+        // A retry after a leave that went through (its answer lost) deletes
+        // documents that are gone, which the rules refuse: done all the same.
+        if ((error as { code?: string }).code === "permission-denied" && !(await getDoc(ballot)).exists()) return;
+        throw error;
+    }
 };
 
 /** Read one guest's ballot, e.g. to restore it after a reload. */

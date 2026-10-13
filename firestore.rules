@@ -496,9 +496,10 @@ service cloud.firestore {
       // (joinParty; the host's with the party, createParty). Each needs the
       // other, so a name is never taken without a guest on the reel's list
       // of ballots, nor a guest added without a name of their own. A claim
-      // is never changed or removed, so when two guests land the same name
-      // at the same moment, the second batch is refused and that guest
-      // spins again. The id is the name trimmed and in lower case (nameKey
+      // is never changed, so when two guests land the same name at the same
+      // moment, the second batch is refused and that guest spins again. It
+      // is only removed with its ballot, and only in a night's party (a
+      // guest leaving the night, #232). The id is the name trimmed and in lower case (nameKey
       // in src/utils/freeName.ts).
       match /names/{key} {
         allow get: if true;
@@ -584,10 +585,7 @@ service cloud.firestore {
              data.revealed == false &&
              data.createdAt == request.time &&
              // Kept about 30 days (PARTY_LIFETIME_DAYS), for a TTL policy on expireAt.
-             data.expireAt is timestamp &&
-             // A wide window: expireAt comes from the phone's own clock.
-             data.expireAt > request.time + duration.value(1, 'd') &&
-             data.expireAt < request.time + duration.value(60, 'd');
+             isExpiryInWindow(data.expireAt);
     }
 
     // The host's edits: the running order, the real results, opening the
@@ -621,10 +619,7 @@ service cloud.firestore {
              data.bonuses is map && data.bonuses.size() <= 40 &&
              data.updatedAt == request.time &&
              // Kept about 30 days after the last change, for a TTL policy on expireAt.
-             data.expireAt is timestamp &&
-             // A wide window: expireAt comes from the phone's own clock.
-             data.expireAt > request.time + duration.value(1, 'd') &&
-             data.expireAt < request.time + duration.value(60, 'd');
+             isExpiryInWindow(data.expireAt);
     }
 
     // existsAfter/getAfter: the claim, the first ballot and (for the host)
@@ -645,9 +640,7 @@ service cloud.firestore {
              data.guestId is string && data.guestId.size() > 0 && data.guestId.size() <= 64 &&
              existsAfter(ballot) && getAfter(ballot).data.name == data.name &&
              // Kept about 30 days, like the ballot it comes with.
-             data.expireAt is timestamp &&
-             data.expireAt > request.time + duration.value(1, 'd') &&
-             data.expireAt < request.time + duration.value(60, 'd');
+             isExpiryInWindow(data.expireAt);
     }
 
     // A party night's code as a room or party names it (#232): four letters,
@@ -746,9 +739,11 @@ service cloud.firestore {
     // moveNight: the host carries the guests on to a new night (the next
     // evening, or a fresh start): the old one is closed and points at it.
     // Once (no movedTo before), from a night still open, and only to a
-    // night that exists, is this host's, is still open and is fresh (no
-    // activities), so a stranger's or a half-used night can't be named as
-    // the way on.
+    // night that exists, is still open, is fresh (no activities) and names
+    // the same hostId. With no sign-in (#115) that hostId is readable by
+    // anyone with the code, so this guards against a slip (pointing guests
+    // at the wrong or a used night), not against someone set on hijacking
+    // the move: the same trust model as every other write here.
     function isMovingNight(code, affected) {
       let data = request.resource.data;
       let target = get(/databases/$(database)/documents/nights/$(data.movedTo)).data;

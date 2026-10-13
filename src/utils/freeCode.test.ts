@@ -43,6 +43,15 @@ describe("freeCode", () => {
         expect(mocks.generateRoomCode).toHaveBeenCalledTimes(4);
     });
 
+    it("counts a collection it can't read as free, rather than failing", async () => {
+        mocks.generateRoomCode.mockReturnValue("ABBA");
+        mocks.getDoc.mockImplementation(async (ref: { path: string }) => {
+            if (ref.path === "nights/ABBA") throw Object.assign(new Error("denied"), { code: "permission-denied" });
+            return snapshot(false);
+        });
+        expect(await freeCode()).toBe("ABBA");
+    });
+
     it("gives up with a friendly error after five taken codes", async () => {
         mocks.generateRoomCode.mockReturnValue("ABBA");
         takenAt("nights/ABBA");

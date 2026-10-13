@@ -128,6 +128,12 @@ describe("createParty", () => {
         expect(mocks.batchSet.mock.calls[0][1]).toMatchObject({ code: "ABBA", nightCode: "NITE" });
     });
 
+    it("leaves nightCode out, not undefined, outside a night (Firestore refuses undefined)", async () => {
+        mocks.freeCode.mockResolvedValueOnce("ABBA");
+        await createParty({ ...party, nightCode: undefined }, "Loreen");
+        expect("nightCode" in mocks.batchSet.mock.calls[0][1]).toBe(false);
+    });
+
     it("tries another code when one is taken between the check and the write", async () => {
         mocks.freeCode.mockResolvedValueOnce("ABBA").mockResolvedValueOnce("LORD");
         // Taken when the write was refused, then a free one.
@@ -271,6 +277,14 @@ describe("ballots and host writes", () => {
             [{ path: "parties/ABBA/names/loreen" }],
         ]);
         expect(mocks.batchCommit).toHaveBeenCalledTimes(1);
+        // A retry of a leave that went through: the ballot is gone, so it's done.
+        const denied = Object.assign(new Error("denied"), { code: "permission-denied" });
+        mocks.batchCommit.mockRejectedValueOnce(denied);
+        mocks.getDoc.mockResolvedValueOnce(snapshot(null));
+        await expect(leaveParty("ABBA", "g1", "Loreen")).resolves.toBeUndefined();
+        mocks.batchCommit.mockRejectedValueOnce(denied);
+        mocks.getDoc.mockResolvedValueOnce(snapshot({ name: "Loreen" }));
+        await expect(leaveParty("ABBA", "g1", "Loreen")).rejects.toBe(denied);
     });
 
     it("update the running order, the result and the awards", async () => {

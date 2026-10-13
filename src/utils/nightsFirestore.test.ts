@@ -122,8 +122,15 @@ describe("joinNight", () => {
 
     it("a refused claim is someone else's name, or this guest's from an earlier try", async () => {
         mocks.batchCommit.mockRejectedValue(denied);
-        mocks.getDoc.mockResolvedValueOnce(snapshot({ name: "Loreen", guestId: "g2" }));
+        mocks.getDoc
+            .mockResolvedValueOnce(snapshot({ name: "Loreen", guestId: "g2" }))
+            .mockResolvedValueOnce(snapshot({ closed: false }));
         expect(await joinNight("NITE", "g1", "Loreen")).toBe(false);
+        // Someone else's name in a closed night: the night refused it, not the name.
+        mocks.getDoc
+            .mockResolvedValueOnce(snapshot({ name: "Loreen", guestId: "g2" }))
+            .mockResolvedValueOnce(snapshot({ closed: true }));
+        await expect(joinNight("NITE", "g1", "Loreen")).rejects.toBe(denied);
         mocks.getDoc.mockResolvedValueOnce(snapshot({ name: "Loreen", guestId: "g1" }));
         expect(await joinNight("NITE", "g1", "Loreen")).toBe(true);
         // Refused with no claim there (a closed night): not about the name, so the error stands.
@@ -155,6 +162,19 @@ describe("leaveNight", () => {
             [{ path: "nights/NITE/names/loreen" }],
         ]);
         expect(mocks.batchCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts a retry of a leave that already went through as done", async () => {
+        mocks.batchCommit.mockRejectedValueOnce(denied);
+        mocks.getDoc.mockResolvedValueOnce(snapshot(null));
+        await expect(leaveNight("NITE", "g1", "Loreen")).resolves.toBeUndefined();
+        // Still there: the refusal was real.
+        mocks.batchCommit.mockRejectedValueOnce(denied);
+        mocks.getDoc.mockResolvedValueOnce(snapshot({ name: "Loreen" }));
+        await expect(leaveNight("NITE", "g1", "Loreen")).rejects.toBe(denied);
+        const offline = Object.assign(new Error("offline"), { code: "unavailable" });
+        mocks.batchCommit.mockRejectedValueOnce(offline);
+        await expect(leaveNight("NITE", "g1", "Loreen")).rejects.toBe(offline);
     });
 });
 
@@ -231,5 +251,26 @@ describe("host writes", () => {
             [{ path: "nights/NITE" }, { closed: true }],
             [{ path: "nights/NITE" }, { movedTo: "NEXT", closed: true }],
         ]);
+    });
+
+    it("count a retried add or close that already went through as done", async () => {
+        const activity = { kind: "quiz" as const, code: "ABBA", title: "Pub quiz" };
+        mocks.updateDoc.mockRejectedValue(denied);
+        mocks.getDoc.mockResolvedValue(snapshot({ activities: [activity], closed: true }));
+        await expect(addNightActivity("NITE", activity)).resolves.toBeUndefined();
+        await expect(closeNight("NITE")).resolves.toBeUndefined();
+        // Not there, or still open: the refusal was real.
+        mocks.getDoc.mockResolvedValue(snapshot({ activities: [], closed: false }));
+        await expect(addNightActivity("NITE", activity)).rejects.toBe(denied);
+        await expect(closeNight("NITE")).rejects.toBe(denied);
+        mocks.getDoc.mockResolvedValue(snapshot(null));
+        await expect(addNightActivity("NITE", activity)).rejects.toBe(denied);
+        await expect(closeNight("NITE")).rejects.toBe(denied);
+        const offline = Object.assign(new Error("offline"), { code: "unavailable" });
+        mocks.updateDoc.mockRejectedValue(offline);
+        await expect(addNightActivity("NITE", activity)).rejects.toBe(offline);
+        await expect(closeNight("NITE")).rejects.toBe(offline);
+        mocks.updateDoc.mockReset();
+        mocks.getDoc.mockReset();
     });
 });
