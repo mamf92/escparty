@@ -213,6 +213,9 @@ minute or two; there is one worker and no retries (a flaky spec is a bug).
 - `party.spec.ts` — a scoreboard party: a host and two guests rate four
   acts of a semi, the host ticks a qualifier and opens the awards, and the
   guests see the Jedward Twins go to the two who rated alike (#91).
+- `night.spec.ts` — a party night: a host starts one, a guest joins by typing
+  its code and another by its link, both show in "Who's here" and on the TV,
+  one leaves and comes back with the code (#233).
 - `theme.spec.ts` — every scoreboard party screen and each migrated screen
   (Home, #169; the scoreboard break and the host's view, #173; single-player
   entry, #170; the solo scoreboard, #174; multiplayer create and join,

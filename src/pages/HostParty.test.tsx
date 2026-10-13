@@ -18,14 +18,15 @@ const renderHost = () =>
   );
 
 describe("HostParty", () => {
-  it("offers a quiz and a scoreboard, as two cards", () => {
+  it("offers a quiz, a scoreboard and a party night, as three cards", () => {
     renderHost();
     expect(screen.getByRole("heading", { level: 1, name: "Host a party" })).toBeInTheDocument();
     const group = screen.getByRole("group", { name: "What to host" });
     const buttons = within(group).getAllByRole("button");
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(3);
     expect(buttons[0]).toHaveAccessibleName(/^Host a quiz/);
     expect(buttons[1]).toHaveAccessibleName(/^Host a scoreboard/);
+    expect(buttons[2]).toHaveAccessibleName(/^Host a party night/);
     for (const button of buttons) expect(button).toHaveClass("lycra", "is-block");
   });
 
@@ -39,6 +40,12 @@ describe("HostParty", () => {
     renderHost();
     await userEvent.setup().click(screen.getByRole("button", { name: /^Host a scoreboard/ }));
     expect(screen.getByText(/at \/party\/new/)).toBeInTheDocument();
+  });
+
+  it("goes to setting up a party night", async () => {
+    renderHost();
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Host a party night/ }));
+    expect(screen.getByText(/at \/n\/new/)).toBeInTheDocument();
   });
 
   it.each([

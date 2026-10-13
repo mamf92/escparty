@@ -65,3 +65,40 @@ export const rateActs = async (page: Page, values: readonly number[]) => {
         if (index < values.length - 1) await page.getByRole("button", { name: "Next act" }).click();
     }
 };
+
+/** Step the name reel to `name` (a free participant name), as the setup and join screens show it. */
+const landOnName = async (page: Page, name: string) => {
+    for (let tries = 0; tries < 60; tries++) {
+        await page.getByRole("button", { name: "Next name" }).click();
+        if (await page.getByText(`You're ${name}.`).isVisible()) break;
+    }
+    await expect(page.getByText(`You're ${name}.`)).toBeVisible();
+};
+
+/**
+ * Host a party night from the Host screen, titled `title`, as `name` from
+ * the reel; returns its code. The night's home is where it lands.
+ */
+export const hostNight = async (page: Page, name: string, title = "Party night") => {
+    await page.goto("/#/host");
+    await page.getByRole("button", { name: /^Host a party night/ }).click();
+    await expect(page).toHaveURL(/#\/n\/new$/);
+    await page.getByLabel("Name of the night").fill(title);
+    await landOnName(page, name);
+    await page.getByRole("button", { name: "Start the party night" }).click();
+    await expect(page).toHaveURL(/#\/n\/[A-Z]{4}$/);
+    await expect(page.getByText(`You're ${name}`)).toBeVisible();
+    return page.url().split("/").pop()!;
+};
+
+/**
+ * Join a party night as `name` from the reel, from wherever the page is
+ * (the night's link, or the Join screen with the code typed): the join view
+ * is what it finds at `/n/CODE`.
+ */
+export const joinNightAs = async (page: Page, name: string) => {
+    await expect(page.getByRole("spinbutton", { name: "Your name" })).toBeVisible();
+    await landOnName(page, name);
+    await page.getByRole("button", { name: "Join the party" }).click();
+    await expect(page.getByText(`You're ${name}`)).toBeVisible();
+};

@@ -15,7 +15,7 @@ generously and so on, each named after a moment in Eurovision history.
 
 | Route | Page | What |
 | --- | --- | --- |
-| `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a quiz" and "Host a scoreboard" are `ChoiceCard`s in a two-column `ChoiceGrid` (the same dark tiles as the setup picks and quiz cards); "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
+| `/host`, `/join` | `HostParty.tsx`, `JoinParty.tsx` | Home's ways in: "Host a quiz", "Host a scoreboard" and "Host a party night" (`/n/new`, see `party-night.md`) are `ChoiceCard`s in a two-column `ChoiceGrid` (the same dark tiles as the setup picks and quiz cards); "Host a scoreboard" opens `/party/new`; a party code typed or scanned on Join opens `/party/:code` |
 | `/party` | `PartyHome.tsx` | Host, join with a code, open a big screen, or go back to the last party |
 | `/party/new` | `PartySetup.tsx` | Five steps, one big question each, nothing preselected (local step state, no routes): the show (one `ChoiceCard` per show in a one-column radio `ChoiceGrid`: date, name, acts and how many go through); the rating sheet (`ChoiceCard`s, two to a row: category count, the categories, blurb; premade, or your own categories with a Continue); bonus points (a list of switches for the premade bonuses, all off to begin with, plus one of the host's own with a name and 1 to 5 points, and a Continue); your name, spun on the `NamePicker` reel from `partyNames.ts` (no free text); a summary and the black "Start the party". Back keeps the answers |
 | `/join/:code` | `JoinParty.tsx` | A join link, what the green room's "Show QR code" encodes (`joinLink` in `src/utils/joinCode.ts`): fills the code in and looks it up once, like typing it |

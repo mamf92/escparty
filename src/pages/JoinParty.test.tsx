@@ -85,6 +85,13 @@ describe("JoinParty", () => {
     expect(await screen.findByText(/at \/party\/LENA/)).toBeInTheDocument();
   });
 
+  it("opens a party night's code at the night's home", async () => {
+    vi.mocked(findGame).mockResolvedValue("night");
+    renderJoin();
+    await userEvent.setup().type(field(), "LENA");
+    expect(await screen.findByText(/at \/n\/LENA/)).toBeInTheDocument();
+  });
+
   it("says when nothing has the code, and tries again once it's changed", async () => {
     vi.mocked(findGame).mockResolvedValue(null);
     const user = userEvent.setup();

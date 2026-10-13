@@ -20,6 +20,9 @@ import PartySetup from "./pages/PartySetup";
 import PartyRoom from "./pages/PartyRoom";
 import PartyScreen from "./pages/PartyScreen";
 import PartyAwards from "./pages/PartyAwards";
+import NightSetup from "./pages/NightSetup";
+import NightHome from "./pages/NightHome";
+import NightScreen from "./pages/NightScreen";
 import MobileFrame from "./components/MobileFrame";
 import { DesignThemeProvider, Stage, ThemeSwitch } from "./design";
 
@@ -98,6 +101,7 @@ const App = () => {
             }
           />
           <Route path="/party/:code/screen" element={<TvLayout><PartyScreen /></TvLayout>} />
+          <Route path="/n/:code/screen" element={<TvLayout><NightScreen /></TvLayout>} />
           <Route element={<FramedLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/host" element={<HostParty />} />
@@ -119,6 +123,8 @@ const App = () => {
             <Route path="/party/new" element={<PartySetup />} />
             <Route path="/party/:code" element={<PartyRoom />} />
             <Route path="/party/:code/awards" element={<PartyAwards />} />
+            <Route path="/n/new" element={<NightSetup />} />
+            <Route path="/n/:code" element={<NightHome />} />
           </Route>
         </Routes>
       </Router>

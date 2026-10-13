@@ -46,7 +46,8 @@ bank and premade quizzes; `quizModel.ts` and `quizCatalog.ts` in
 `customQuizzes.ts` saves custom quizzes to Firestore's `quizzes`
 collection. The scoreboard party (`/party`, rating Burgas 2027 with the
 room) is its own set of `party*` files and Firestore `parties`/`contests`:
-`docs/agent/scoreboard-party.md`. `src/fabric-ui/` is a self-contained WebGL rendering module for
+`docs/agent/scoreboard-party.md`; a party night (`/n/CODE`, one code for the
+whole evening) is `night*` files and `nights`: `docs/agent/party-night.md`. `src/fabric-ui/` is a self-contained WebGL rendering module for
 the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one
 file, `useGameStore.ts`, which is dead code (see Landmines). `src/utils/`
 has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz
@@ -144,6 +145,8 @@ end-to-end should use the `steward` skill
 - `docs/agent/scoreboard-party.md` — the scoreboard party: screens, the
   fictive 2027 lineups and how to enter the real ones, scoring, awards,
   privacy, data and retention.
+- `docs/agent/party-night.md` — the party night: one code for the evening,
+  its screens, the device's identity, joining, leaving and moving.
 - `docs/agent/testing.md` — how to run and write tests, and what isn't
   covered yet.
 

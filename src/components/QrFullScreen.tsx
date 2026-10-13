@@ -13,7 +13,12 @@ const CONTENT = ".esc-content";
  * (or the window where there is none): the page beneath is inert, focus
  * lands on Close, Escape closes it, and whoever opened it gets focus back.
  */
-export const QrFullScreen = ({ code, onClose }: { code: string; onClose: () => void }) => {
+export const QrFullScreen = ({ code, link, onClose }: {
+  code: string;
+  /** What the QR code carries; the join link (`#/join/CODE`) unless the caller has a better one, e.g. a party night's home. */
+  link?: string;
+  onClose: () => void;
+}) => {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const [qr, setQr] = useState<string | null>(null);
@@ -28,11 +33,11 @@ export const QrFullScreen = ({ code, onClose }: { code: string; onClose: () => v
   useEffect(() => {
     // Drawn large and scaled down by CSS, so it stays sharp at any width.
     let current = true;
-    toDataURL(joinLink(code), { margin: 1, width: 600 })
+    toDataURL(link ?? joinLink(code), { margin: 1, width: 600 })
       .then(url => { if (current) setQr(url); })
       .catch(err => console.error("Couldn't draw the QR code:", err));
     return () => { current = false; };
-  }, [code]);
+  }, [code, link]);
 
   useEffect(() => {
     closeRef.current?.focus();

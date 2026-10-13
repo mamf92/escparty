@@ -13,8 +13,8 @@ const OFFLINE = "We couldn't check that code. Check your connection and try agai
  * Home's "Join a party": one card to get in, whatever the host is running.
  * Type the four-letter code and it goes as soon as the fourth letter is in,
  * or scan the QR code on the host's screen. The code opens a quiz room
- * (the multiplayer page joins it, with its rejoin offer) or a scoreboard
- * party, whichever has it. A device that was in a party gets a way back.
+ * (the multiplayer page joins it, with its rejoin offer), a party night (its
+ * home, #233) or a scoreboard party, whichever has it. A device that was in a party gets a way back.
  */
 const JoinParty = () => {
   const navigate = useNavigate();
@@ -41,6 +41,7 @@ const JoinParty = () => {
       const kind = await findGame(value);
       if (mine !== lookup.current) return;
       if (kind === "quiz") navigate("/multiplayer", { state: { joinCode: value } });
+      else if (kind === "night") navigate(`/n/${value}`);
       else if (kind === "party") navigate(`/party/${value}`);
       else setProblem(NOT_FOUND);
     } catch (error) {
