@@ -484,7 +484,15 @@ const aBallot = (overrides = {}) => Object.fromEntries(Object.entries({
   expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
   ...overrides,
 }).filter(([, value]) => value !== undefined));
-await expectAllowed("save a ballot", () => setDoc(ballotRef, aBallot()));
+// A first ballot comes with its name claim (#229, case 5b).
+await expectAllowed("save a first ballot with its name claim", async () => {
+  const batch = writeBatch(db);
+  batch.set(doc(db, "parties", partyCode, "names", "loreen"), {
+    name: "Loreen", guestId: "guest-1", expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
+  batch.set(ballotRef, aBallot());
+  await batch.commit();
+});
 await expectAllowed("update a ballot", () => setDoc(ballotRef, aBallot({ ratings: { se: { points: 10 } } })));
 await expectAllowed("read every ballot in a party", () => getDocs(collection(db, "parties", partyCode, "ballots")));
 await expectDenied("save a ballot in a party that doesn't exist", () =>
@@ -499,7 +507,7 @@ for (const [label, overrides] of [
   ["a far-off expireAt", { expireAt: Timestamp.fromMillis(Date.now() + 400 * 24 * 60 * 60 * 1000) }],
   ["no expireAt", { expireAt: undefined }],
 ]) {
-  await expectDenied(`save a ballot with ${label}`, () => setDoc(doc(db, "parties", partyCode, "ballots", "guest-2"), aBallot(overrides)));
+  await expectDenied(`save a ballot with ${label}`, () => setDoc(ballotRef, aBallot(overrides)));
 }
 await expectDenied("delete a ballot", () => deleteDoc(ballotRef));
 // 5b. Party name claims (#229, joinParty): a guest joins by creating
@@ -534,6 +542,32 @@ await expectDenied("list a party's names", () => getDocs(collection(db, "parties
 await expectDenied("claim a name in a party that doesn't exist", () =>
   setDoc(doc(db, "parties", "NONE", "names", "céline dion"), aClaim())
 );
+await expectDenied("claim a name without a ballot", () =>
+  setDoc(doc(db, "parties", partyCode, "names", "abba"), aClaim({ name: "ABBA", guestId: "squatter" }))
+);
+await expectDenied("a first ballot without a claim on its name", () =>
+  setDoc(doc(db, "parties", partyCode, "ballots", "no-claim"), aBallot({ name: "Abba" }))
+);
+await expectDenied("a first ballot under someone else's claimed name", () =>
+  setDoc(doc(db, "parties", partyCode, "ballots", "claim-3"), aBallot({ name: "Céline Dion" }))
+);
+await expectDenied("a claim whose ballot has another name", async () => {
+  const batch = writeBatch(db);
+  batch.set(doc(db, "parties", partyCode, "names", "abba"), aClaim({ name: "ABBA", guestId: "claim-4" }));
+  batch.set(doc(db, "parties", partyCode, "ballots", "claim-4"), aBallot({ name: "Lordi" }));
+  await batch.commit();
+});
+await expectAllowed("the claimant updates their ballot", () =>
+  setDoc(doc(db, "parties", partyCode, "ballots", "claim-1"), aBallot({ name: "Céline Dion" }))
+);
+const hostPartyCode = Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join("");
+await expectAllowed("create a party with the host's claim and ballot in one batch", async () => {
+  const batch = writeBatch(db);
+  batch.set(doc(db, "parties", hostPartyCode), aParty({ code: hostPartyCode }));
+  batch.set(doc(db, "parties", hostPartyCode, "names", "loreen"), aClaim({ name: "Loreen", guestId: "host-p" }));
+  batch.set(doc(db, "parties", hostPartyCode, "ballots", "host-p"), aBallot({ name: "Loreen", ratings: {}, bonuses: {} }));
+  await batch.commit();
+});
 for (const [label, key, overrides] of [
   ["a key that isn't the name", "someone else", {}],
   ["a key that keeps the case", "Céline Dion", {}],
@@ -543,7 +577,7 @@ for (const [label, key, overrides] of [
 ]) {
   await expectDenied(`claim a name with ${label}`, () => setDoc(doc(db, "parties", partyCode, "names", key), aClaim(overrides)));
 }
-// Five guests land "Loreen" at the same moment, each on its own client:
+// Five guests land "Käärijä" at the same moment, each on its own client:
 // exactly one gets it.
 const claimClients = Array.from({ length: 5 }, (_, i) => `claim-${i}`).map((name) => {
   const clientDb = getFirestore(initializeApp({ projectId: "demo-escparty" }, name));
@@ -551,7 +585,7 @@ const claimClients = Array.from({ length: 5 }, (_, i) => `claim-${i}`).map((name
   return clientDb;
 });
 const claims = await Promise.allSettled(
-  claimClients.map((clientDb, i) => joinBatch(clientDb, "loreen", aClaim({ name: "Loreen", guestId: `race-${i}` })))
+  claimClients.map((clientDb, i) => joinBatch(clientDb, "käärijä", aClaim({ name: "Käärijä", guestId: `race-${i}` })))
 );
 report("one of five simultaneous claims of a name lands", "1", String(claims.filter((c) => c.status === "fulfilled").length));
 report(

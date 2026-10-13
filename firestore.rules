@@ -282,7 +282,7 @@ service cloud.firestore {
       return affected.hasOnly(['readyPlayers']) &&
              resource.data.started == false &&
              after is list &&
-             after.size() <= 32 &&
+             after.size() <= maxPlayers() &&
              ((after.size() == before.size() + 1 && after.hasAll(before) &&
                after[after.size() - 1] is string && after[after.size() - 1].size() <= 64) ||
               (after.size() == before.size() - 1 && before.hasAll(after)) ||
@@ -387,7 +387,8 @@ service cloud.firestore {
     }
 
     // The most players a room holds: MAX_PLAYERS in src/utils/roomsFirestore.ts.
-    // Raising it also means unrolling changedPlayersValid below that far.
+    // Also caps readyPlayers. Raising it also means unrolling
+    // changedPlayersValid below that far, and measuring a full room again.
     function maxPlayers() {
       return 32;
     }
@@ -399,7 +400,10 @@ service cloud.firestore {
     // them at the 13th player (#229). So a write is checked only where it
     // changes something: an entry equal to the one before it costs one
     // comparison, and only a changed entry gets the full shape check. A
-    // score write (updatePlayerScore) changes one entry. Indexes past the end
+    // score write (updatePlayerScore) changes one entry; in a full room of
+    // 32 a write that changes more than four runs out of expressions and is
+    // refused (verify case 2d), so a future write that changes many players
+    // at once (a rematch's reset) has to be measured first. Indexes past the end
     // of the list are trivially true.
     function isUnchangedOrValidAt(players, before, i) {
       return i >= players.size() || players[i] == before[i] || isValidPlayerBasic(players[i]);
@@ -470,16 +474,21 @@ service cloud.firestore {
       // listing them within a party is allowed.
       match /ballots/{guestId} {
         allow read: if true;
-        allow create, update: if isValidBallot(code);
+        // A first ballot comes with this guest's claim on its name (#229).
+        allow create: if isValidBallot(code) && claimsName(code, guestId, request.resource.data.name);
+        allow update: if isValidBallot(code);
         allow delete: if false;
       }
 
       // Who has which name (#229). A guest joins by creating the claim for
       // their name together with their first ballot, in one batch
-      // (joinParty). A claim is never changed or removed, so when two
-      // guests land the same name at the same moment, the second create is
-      // refused and that guest spins again. The id is the name trimmed and
-      // in lower case (nameKey in src/utils/freeName.ts).
+      // (joinParty; the host's with the party, createParty). Each needs the
+      // other, so a name is never taken without a guest on the reel's list
+      // of ballots, nor a guest added without a name of their own. A claim
+      // is never changed or removed, so when two guests land the same name
+      // at the same moment, the second batch is refused and that guest
+      // spins again. The id is the name trimmed and in lower case (nameKey
+      // in src/utils/freeName.ts).
       match /names/{key} {
         allow get: if true;
         allow list: if false;
@@ -545,10 +554,11 @@ service cloud.firestore {
     }
 
     // A guest's ratings. Written whole on every change (saveBallot), always
-    // stamped with the server's clock, and only inside a party that exists.
+    // stamped with the server's clock, and only inside a party that exists
+    // (or is created in the same batch: the host's first ballot).
     function isValidBallot(code) {
       let data = request.resource.data;
-      return exists(/databases/$(database)/documents/parties/$(code)) &&
+      return existsAfter(/databases/$(database)/documents/parties/$(code)) &&
              data.keys().hasOnly(['name', 'ratings', 'bonuses', 'updatedAt', 'expireAt']) &&
              data.keys().hasAll(['name', 'ratings', 'bonuses', 'updatedAt', 'expireAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 40 &&
@@ -562,14 +572,23 @@ service cloud.firestore {
              data.expireAt < request.time + duration.value(60, 'd');
     }
 
+    // existsAfter/getAfter: the claim, the first ballot and (for the host)
+    // the party itself are written in one batch.
+    function claimsName(code, guestId, name) {
+      let claim = /databases/$(database)/documents/parties/$(code)/names/$(name.trim().lower());
+      return existsAfter(claim) && getAfter(claim).data.guestId == guestId;
+    }
+
     function isValidNameClaim(code, key) {
       let data = request.resource.data;
-      return exists(/databases/$(database)/documents/parties/$(code)) &&
+      let ballot = /databases/$(database)/documents/parties/$(code)/ballots/$(data.guestId);
+      return existsAfter(/databases/$(database)/documents/parties/$(code)) &&
              data.keys().hasOnly(['name', 'guestId', 'expireAt']) &&
              data.keys().hasAll(['name', 'guestId', 'expireAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 40 &&
              key == data.name.trim().lower() &&
              data.guestId is string && data.guestId.size() > 0 && data.guestId.size() <= 64 &&
+             existsAfter(ballot) && getAfter(ballot).data.name == data.name &&
              // Kept about 30 days, like the ballot it comes with.
              data.expireAt is timestamp &&
              data.expireAt > request.time + duration.value(1, 'd') &&

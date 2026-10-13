@@ -5,7 +5,7 @@ import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { NamePicker } from "../components/NamePicker";
 import { ChoiceCard, ChoiceGrid, Control, Field, Ground, Pane, Row } from "../design";
 import { CONTESTS_2027 } from "../data/contests2027";
-import { PARTY_LIFETIME_DAYS, createParty, fetchContest, joinParty } from "../utils/partyFirestore";
+import { PARTY_LIFETIME_DAYS, createParty, fetchContest } from "../utils/partyFirestore";
 import {
     BONUS_LIMITS,
     CATEGORY_LIMITS,
@@ -145,10 +145,7 @@ const PartySetup = () => {
                 template: withBonuses,
                 bonuses: chosenBonuses.length > 0,
                 showNames: true,
-            });
-            // Nobody else is in the new party yet, so the name is the host's. If the
-            // claim doesn't land, the party still opens and useOwnBallot writes the ballot.
-            await joinParty(code, hostId, name).catch(error => console.error("Couldn't claim the host's name:", error));
+            }, name);
             savePartyIdentity(code, { guestId: hostId, name, isHost: true });
             navigate(`/party/${code}`);
         } catch (error) {

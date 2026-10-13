@@ -25,6 +25,7 @@ vi.mock("firebase/firestore", () => mocks);
 vi.mock("./roomsFirestore", () => ({ generateRoomCode: mocks.generateRoomCode }));
 
 import {
+    JOIN_TIMEOUT_MS,
     PARTY_LIFETIME_DAYS,
     createParty,
     fetchBallot,
@@ -94,15 +95,18 @@ describe("createParty", () => {
         bonuses: true, showNames: false,
     };
 
-    it("takes a free code, with an expiry for the TTL policy", async () => {
+    it("takes a free code, with an expiry for the TTL policy, and the host joins in the same batch", async () => {
         vi.spyOn(Date, "now").mockReturnValue(1000);
         mocks.generateRoomCode.mockReturnValueOnce("ABBA").mockReturnValueOnce("LORD");
         mocks.getDoc.mockResolvedValueOnce(snapshot({})).mockResolvedValueOnce(snapshot(null));
-        expect(await createParty(party)).toBe("LORD");
-        expect(mocks.setDoc).toHaveBeenCalledWith({ path: "parties/LORD" }, {
-            ...party, code: "LORD", results: {}, revealed: false, createdAt: "SERVER_TIMESTAMP",
-            expireAt: { ms: 1000 + PARTY_LIFETIME_DAYS * 86_400_000 },
-        });
+        expect(await createParty(party, "Loreen")).toBe("LORD");
+        const expireAt = { ms: 1000 + PARTY_LIFETIME_DAYS * 86_400_000 };
+        expect(mocks.batchSet.mock.calls).toEqual([
+            [{ path: "parties/LORD" }, { ...party, code: "LORD", results: {}, revealed: false, createdAt: "SERVER_TIMESTAMP", expireAt }],
+            [{ path: "parties/LORD/names/loreen" }, { name: "Loreen", guestId: "h", expireAt }],
+            [{ path: "parties/LORD/ballots/h" }, { name: "Loreen", ratings: {}, bonuses: {}, updatedAt: "SERVER_TIMESTAMP", expireAt }],
+        ]);
+        expect(mocks.batchCommit).toHaveBeenCalledTimes(1);
         vi.mocked(Date.now).mockRestore();
     });
 
@@ -110,8 +114,8 @@ describe("createParty", () => {
         mocks.generateRoomCode.mockReturnValueOnce("ABBA");
         mocks.getDoc.mockResolvedValueOnce(snapshot(null));
         const bonuses = [{ id: "wind", label: "Wind machine", points: 1 }];
-        await createParty({ ...party, template: { ...party.template, bonuses } });
-        const [, written] = mocks.setDoc.mock.calls[0];
+        await createParty({ ...party, template: { ...party.template, bonuses } }, "Loreen");
+        const [, written] = mocks.batchSet.mock.calls[0];
         expect(written.template.bonuses).toEqual(bonuses);
         expect(Object.keys(written).sort()).toEqual(
             ["acts", "bonuses", "code", "contestId", "createdAt", "expireAt", "hostId", "kind", "qualifiers", "results", "revealed", "showNames", "template", "title"],
@@ -121,22 +125,22 @@ describe("createParty", () => {
     it("tries another code when one is taken between the check and the write", async () => {
         mocks.generateRoomCode.mockReturnValueOnce("ABBA").mockReturnValueOnce("LORD");
         mocks.getDoc.mockResolvedValue(snapshot(null));
-        mocks.setDoc.mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }));
-        expect(await createParty(party)).toBe("LORD");
-        mocks.setDoc.mockRejectedValueOnce(new Error("offline"));
-        await expect(createParty(party)).rejects.toThrow("offline");
+        mocks.batchCommit.mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }));
+        expect(await createParty(party, "Loreen")).toBe("LORD");
+        mocks.batchCommit.mockRejectedValueOnce(new Error("offline"));
+        await expect(createParty(party, "Loreen")).rejects.toThrow("offline");
     });
 
     it("gives up after five taken codes", async () => {
         mocks.generateRoomCode.mockReturnValue("ABBA");
         mocks.getDoc.mockResolvedValue(snapshot({}));
-        await expect(createParty(party)).rejects.toThrow(/free party code/);
+        await expect(createParty(party, "Loreen")).rejects.toThrow(/free party code/);
         expect(mocks.getDoc).toHaveBeenCalledTimes(5);
     });
 
     it("needs Firebase", async () => {
         firebaseState.db = null;
-        await expect(createParty(party)).rejects.toThrow("Firebase not initialized");
+        await expect(createParty(party, "Loreen")).rejects.toThrow("Firebase not initialized");
     });
 });
 
@@ -231,6 +235,16 @@ describe("ballots and host writes", () => {
         mocks.batchCommit.mockRejectedValueOnce(offline);
         await expect(joinParty("ABBA", "g1", "Loreen")).rejects.toBe(offline);
         mocks.batchCommit.mockReset();
+    });
+
+    it("join: gives up waiting after a while, since an offline write never fails", async () => {
+        vi.useFakeTimers();
+        mocks.batchCommit.mockReturnValueOnce(new Promise(() => {}));
+        const joined = joinParty("ABBA", "g1", "Loreen");
+        const settled = expect(joined).rejects.toMatchObject({ code: "deadline-exceeded" });
+        await vi.advanceTimersByTimeAsync(JOIN_TIMEOUT_MS);
+        await settled;
+        vi.useRealTimers();
     });
 
     it("update the running order, the result and the awards", async () => {

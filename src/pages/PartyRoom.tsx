@@ -180,28 +180,31 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
     const [name, setName] = useState<string | null>(null);
     const [spinning, setSpinning] = useState(false);
     const [joining, setJoining] = useState(false);
-    // The name another guest claimed first, at the moment this guest pressed Join.
-    const [refused, setRefused] = useState<string | null>(null);
+    // One id for every try, so a retry finds a claim an earlier try made.
+    const [guestId] = useState(() => uuidv4());
+    // Names other guests claimed first when this guest pressed Join, kept off
+    // the reel even before their ballots arrive; the last one is said aloud.
+    const [refused, setRefused] = useState<string[]>([]);
+    const [refusedNow, setRefusedNow] = useState<string | null>(null);
     const [failed, setFailed] = useState(false);
     const checking = ballots === undefined && !error;
     // The names nobody has yet.
-    const names = useMemo(() => {
-        const taken = (ballots ?? []).map(ballot => ballot.name);
-        return availablePartyNames(refused === null ? taken : [...taken, refused], withDistinctNames(ballots ?? []).map(ballot => ballot.name));
-    }, [ballots, refused]);
+    const names = useMemo(
+        () => availablePartyNames([...(ballots ?? []).map(ballot => ballot.name), ...refused], withDistinctNames(ballots ?? []).map(ballot => ballot.name)),
+        [ballots, refused],
+    );
     // Any listener error stops joining, even with ballots on screen: they may be stale.
     const blocked = !!error;
     // A landed name that a ballots update takes before this guest joins is let go.
     const landed = name !== null && names.includes(name) ? name : null;
-    const justTaken = name !== null && landed === null ? name : refused;
+    const justTaken = name !== null && landed === null ? name : refusedNow;
     const land = (next: string | null) => {
         setName(next);
-        setRefused(null);
+        setRefusedNow(null);
         setFailed(false);
     };
     const join = async () => {
         if (landed === null) return;
-        const guestId = uuidv4();
         setJoining(true);
         setFailed(false);
         try {
@@ -210,7 +213,8 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
                 return;
             }
             setName(null);
-            setRefused(landed);
+            setRefused(current => [...current, landed]);
+            setRefusedNow(landed);
         } catch (joinError) {
             console.error("Couldn't join the party:", joinError);
             setFailed(true);

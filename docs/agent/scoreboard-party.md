@@ -48,13 +48,16 @@ Names are unique in a party, and anonymous Eurovision participant names
 (`partyNames.ts`). The join reel offers `PARTY_NAMES` minus the names of the
 party's ballots (every name again if all are taken). A guest joins with
 `joinParty` (#229): one batch creates `names/{key}` (the claim, `key` the
-name trimmed and in lower case) and writes their empty ballot, and the host's
-name is claimed the same way when the party is created. The rules only ever
-create a claim, so when two guests land the same name at the same instant
-the second batch is refused, nothing of it is written, and that guest is
-told "X was just taken. Spin again." (the name also leaves their reel).
-`useOwnBallot` still writes an empty ballot if the ballots arrive without
-one (an identity from before claims). Parties from before #229 can hold a
+name trimmed and in lower case) and writes their empty ballot, and the host
+joins the same way in the batch that creates the party (`createParty(party,
+hostName)`). The rules want the two together: a claim needs a ballot with its
+name, and a guest's first ballot needs their claim. They only ever create a
+claim, so when two guests land the same name at the same instant the second
+batch is refused, nothing of it is written, and that guest is told "X was
+just taken. Spin again." (the name also stays off their reel). A join keeps
+one guest id across tries, so a retry after a timeout (`JOIN_TIMEOUT_MS`;
+offline, a write waits rather than fails) finds its own earlier claim.
+Parties from before #229 can hold a
 pair with one name: the lists tell them apart at display time
 (`distinctNames`), the bare name going to the
 guest with the lowest guest ID (stable, so names never swap as people rate) and the other
@@ -186,8 +189,8 @@ clients ever write the same document.
 
 `parties/{code}/names/{key}`: `{ name, guestId, expireAt }`, the name claim
 (`key` = `nameKey(name)`, which the rules check against `name`). Created
-with the guest's first ballot (`joinParty`), never changed or deleted, read
-one at a time (`get`), never listed.
+with the guest's first ballot (`joinParty`, or `createParty` for the host),
+never changed or deleted, read one at a time (`get`), never listed.
 
 `template.bonuses` sits inside the template because the rules fix a party's
 top-level keys and check only `template.categories`, so the bonus list
@@ -201,9 +204,13 @@ out (the rules accept 1-60 days, since the phone's clock sets it); after
 that only `acts`, `results` and `revealed` may change. There's
 no sign-in, so like quiz rooms the rules check shape, not who: anyone with
 the code could edit the result. Ballots need the party to exist, a 1-40
-character name and at most 40 acts. A name claim needs the party to exist,
-exactly `name`, `guestId` and `expireAt`, and its id to be the name trimmed
-and in lower case; it can't be overwritten or deleted (verify case 5b).
+character name and at most 40 acts. A first ballot needs its guest's claim
+on its name. A name claim needs the party to exist,
+exactly `name`, `guestId` and `expireAt`, its id to be the name trimmed
+and in lower case, and the guest's ballot under that name in the same
+write; it can't be overwritten or deleted (verify case 5b). Both use
+`existsAfter`/`getAfter`, since the host's party, claim and ballot are one
+batch.
 `contests/` is read-only to clients.
 
 ## Retention

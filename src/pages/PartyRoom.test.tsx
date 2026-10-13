@@ -90,6 +90,8 @@ describe("PartyRoom", () => {
         expect(screen.getByRole("button", { name: "Join the party" })).toBeDisabled();
         await user.click(screen.getByRole("button", { name: "Next name" }));
         expect(screen.queryByText(/was just taken/)).not.toBeInTheDocument();
+        // The refused name stays off the reel, even before its ballot arrives.
+        expect(screen.getByRole("spinbutton")).toHaveAttribute("aria-valuemax", String(PARTY_NAMES.length - 1));
         await user.click(screen.getByRole("button", { name: "Join the party" }));
         const second = mocks.joinParty.mock.calls[1][2];
         expect(second).not.toBe(PARTY_NAMES[0]);
@@ -107,6 +109,9 @@ describe("PartyRoom", () => {
         expect(readPartyIdentity("ABBA")).toBeNull();
         await user.click(screen.getByRole("button", { name: "Join the party" }));
         expect(readPartyIdentity("ABBA")).toMatchObject({ name: PARTY_NAMES[0] });
+        // The retry uses the same guest id, so it finds a claim the first try made.
+        expect(mocks.joinParty.mock.calls[1][1]).toBe(mocks.joinParty.mock.calls[0][1]);
+        expect(readPartyIdentity("ABBA")!.guestId).toBe(mocks.joinParty.mock.calls[0][1]);
     });
 
     it("keeps Join off, with a note, until the taken names have arrived", async () => {

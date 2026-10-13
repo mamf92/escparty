@@ -7,13 +7,12 @@ import { PARTY_BONUSES } from "../utils/partyModel";
 import { PARTY_NAMES } from "../utils/partyNames";
 import { readPartyIdentity } from "../utils/partySession";
 
-const mocks = vi.hoisted(() => ({ createParty: vi.fn(), fetchContest: vi.fn(), saveBallot: vi.fn(), joinParty: vi.fn() }));
+const mocks = vi.hoisted(() => ({ createParty: vi.fn(), fetchContest: vi.fn(), saveBallot: vi.fn() }));
 vi.mock("../utils/partyFirestore", async (importOriginal) => ({
     ...(await importOriginal<typeof import("../utils/partyFirestore")>()),
     createParty: mocks.createParty,
     fetchContest: mocks.fetchContest,
     saveBallot: mocks.saveBallot,
-    joinParty: mocks.joinParty,
 }));
 
 const ShowLocation = () => <p>at {useLocation().pathname}</p>;
@@ -58,7 +57,6 @@ const reachStart = async (user: User, sheet: RegExp = /Jury/) => {
 describe("PartySetup", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.joinParty.mockResolvedValue(true);
         localStorage.clear();
         vi.spyOn(console, "error").mockImplementation(() => {});
         vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
@@ -273,8 +271,8 @@ describe("PartySetup", () => {
         expect(party.template.id).toBe("jury");
         expect(party.template.bonuses).toEqual([{ id: "wind", label: "Wind machine", points: 1 }]);
         expect(readPartyIdentity("ABBA")).toEqual({ guestId: party.hostId, name: PARTY_NAMES[0], isHost: true });
-        // The host claims their name with their empty ballot, like every guest.
-        expect(mocks.joinParty).toHaveBeenCalledWith("ABBA", party.hostId, PARTY_NAMES[0]);
+        // The host joins under their name in the same write as the party.
+        expect(mocks.createParty.mock.calls[0][1]).toBe(PARTY_NAMES[0]);
         expect(mocks.saveBallot).not.toHaveBeenCalled();
     });
 
