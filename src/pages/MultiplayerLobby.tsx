@@ -1,7 +1,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
-import { createRoom, joinRoom, joinRoomWithFreeName, getRoom, JoinRejected } from "../utils/roomsFirestore";
+import { createNightRoom, createRoom, joinRoom, joinRoomWithFreeName, getRoom, JoinRejected } from "../utils/roomsFirestore";
+import { nextQuizTitle } from "../utils/nightActivities";
+import { addNightActivity, fetchNight } from "../utils/nightsFirestore";
+import { readNightIdentity, type NightIdentity } from "../utils/nightSession";
 import { freeCode } from "../utils/freeCode";
 import { isKnownQuizKey, setRoomQuiz } from "../utils/quizCatalog";
 import { useQuizTitle } from "../hooks/useQuizTitle";
@@ -68,6 +71,17 @@ const MultiplayerLobby = () => {
     return { joinCode, step: (joinCode ? "join" : state?.step === "host" ? "host" : "choose") as Step };
   });
   const [step, setStep] = useState<Step>(arrival.step);
+  // Hosting from a party night's home (#235): the room is made as the night's
+  // guest and listed on the night. Without the night's identity on this
+  // device (it left, or cleared its storage) it is an ordinary game.
+  const [night] = useState<{ code: string; identity: NightIdentity } | null>(() => {
+    const code = (location.state as { nightCode?: string } | null)?.nightCode;
+    const identity = typeof code === "string" && /^[A-Z]{4}$/.test(code) ? readNightIdentity(code) : null;
+    return code && identity ? { code, identity } : null;
+  });
+  // The night's room once made, so a retry after a failed listing lists it
+  // instead of leaving it unlisted and making another.
+  const madeRoom = useRef<string | null>(null);
   const [joinCode, setJoinCode] = useState(arrival.joinCode ?? "");
   // Four letters, A to Z; the field upper-cases what is typed.
   const codeInvalid = !/^[A-Z]{4}$/.test(joinCode);
@@ -117,7 +131,8 @@ const MultiplayerLobby = () => {
   // coming Back here later doesn't preset the next room with it.
   const forgetPickedQuiz = () => {
     setQuizKey(null);
-    if (location.state) navigate(location.pathname, { replace: true, state: null });
+    // The night stays in the entry: hosting here again is still in the night.
+    if (location.state) navigate(location.pathname, { replace: true, state: night ? { nightCode: night.code } : null });
   };
 
   const goTo = (next: Step) => {
@@ -140,19 +155,30 @@ const MultiplayerLobby = () => {
     setLoading(true);
     setError(null);
     try {
-      // Generate a unique ID for the host
-      const hostId = uuidv4();
-      const hostName = HOST_NAME;
+      // In a night the host is the night's guest, with its id and name;
+      // otherwise a unique ID and the generic name.
+      const hostId = night ? night.identity.guestId : uuidv4();
+      const hostName = night ? night.identity.name : HOST_NAME;
 
-      // A code no room, party or night has (#232): one code field serves all three
-      const newGameCode = await freeCode();
+      let newGameCode = madeRoom.current;
+      if (!newGameCode) {
+        // A code no room, party or night has (#232): one code field serves all three
+        newGameCode = await freeCode();
 
-      // Create the room in Firestore
-      await createRoom(newGameCode, hostId, hostName, hostIsObserver);
-      if (quizKey) {
-        // Best effort: if it doesn't stick, the lobby still offers the list.
-        await setRoomQuiz(newGameCode, quizKey).catch(error =>
-          console.error("Couldn't preselect the quiz:", error));
+        // Create the room in Firestore
+        if (night) await createNightRoom(newGameCode, hostId, hostName, hostIsObserver, night.code);
+        else await createRoom(newGameCode, hostId, hostName, hostIsObserver);
+        if (night) madeRoom.current = newGameCode;
+        if (quizKey) {
+          // Best effort: if it doesn't stick, the lobby still offers the list.
+          await setRoomQuiz(newGameCode, quizKey).catch(error =>
+            console.error("Couldn't preselect the quiz:", error));
+        }
+      }
+      if (night) {
+        // The room exists first: the night's rules only list a room made for it.
+        const current = await fetchNight(night.code);
+        await addNightActivity(night.code, { kind: "quiz", code: newGameCode, title: nextQuizTitle(current?.activities ?? []) });
       }
 
       // Left while the room was being made: it stays empty and unused, and
@@ -280,7 +306,9 @@ const MultiplayerLobby = () => {
   // Always open, even mid-way: a write on a bad connection can wait for
   // ever, and leaving or going back drops what is still running.
   const backHome = <CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>;
-  const footer = step === "choose" ? backHome : (
+  const footer = night ? (
+    <CalmLink onClick={() => navigate(`/n/${night.code}`)}>Back to the party night</CalmLink>
+  ) : step === "choose" ? backHome : (
     <>
       <CalmLink onClick={() => goTo("choose")}>Back to host or join</CalmLink>
       {backHome}
@@ -293,7 +321,9 @@ const MultiplayerLobby = () => {
       title="Multiplayer quiz"
       subtitle={step === "join"
         ? "Type the four-letter code from the host's screen."
-        : "Play the quiz together: one of you hosts, everyone else joins with the code."}
+        : night
+          ? "Start a quiz for the party night: the guests join it from the night's home."
+          : "Play the quiz together: one of you hosts, everyone else joins with the code."}
       footer={footer}
       actions={(
         <>

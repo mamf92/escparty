@@ -126,7 +126,10 @@ Why this runs on Firestore listeners and not WebSockets:
    accept an existing lobby with the same `hostId`); guests still on the
    results see "Join the next round", which joins them under the same
    player ID and name and takes everyone to the new lobby, where the host
-   picks the next quiz (#21). Leaving the results any other way (Back, a
+   picks the next quiz (#21). In a room made in a party night (`room.nightCode`,
+   #235) there is no next round: the results show "Back to the party night"
+   (`/n/CODE`) in its place, and the lobby's and the observer screen's leaves
+   go back to the night too. Leaving the results any other way (Back, a
    typed URL) also forgets the stored game, a tick after the page closes.
    Single-player scores are separately persisted to `localStorage`
    (`quizScores`) and read by `Scoreboard.tsx` — that path doesn't touch
@@ -159,3 +162,22 @@ which one wins depends on the page:
 Landed in #62, with the mid-quiz return following it since #63; see steps
 3 and 4 above and `docs/agent/firestore-data-model.md`. A multiplayer room
 without a phase (created before #61) can't be played any more.
+
+## A quiz started from a party night (#235)
+
+A host starts a quiz from the night's home with "Start a quiz", which opens
+`/multiplayer` straight on its host step with router state `{ step: "host",
+nightCode }` (`MultiplayerLobby`; a code whose identity isn't on this device
+makes an ordinary game). The room is made as the night's guest: host id and
+name come from `nightSession`, the code from `freeCode`, and
+`createNightRoom(code, guestId, name, hostIsObserver, nightCode)` sets the
+`nightCode`. Then `addNightActivity` lists it as `{ kind: "quiz", code, title }`,
+titled "Quiz" and then "Quiz 2", "Quiz 3" (`nextQuizTitle`, counting the quizzes
+already on the night). If listing fails the page says so, and a retry lists the
+room it already made rather than making another. Guests join from the night's
+card (`NightActivities`): in the lobby `joinRoom(code, guestId, name)` (no free
+name: night names are unique) sets `playerId`/`playerName`/`gameCode` as the
+green room expects and opens `/lobby`; a started room's player goes through
+`/lobby` again (the #65 rejoin path); a finished room's player opens `/results`.
+Leaving the night first takes the guest out of every night quiz still in its
+lobby (`leaveNightActivities`).

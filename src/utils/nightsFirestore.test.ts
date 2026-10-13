@@ -32,6 +32,7 @@ import {
     addNightActivity,
     closeNight,
     createNight,
+    fetchNight,
     fetchNightGuest,
     joinNight,
     leaveNight,
@@ -238,6 +239,15 @@ describe("reads", () => {
         expect(await fetchNightGuest("NITE", "g1")).toEqual({ id: "g1", name: "Loreen" });
         expect(mocks.getDoc).toHaveBeenLastCalledWith({ path: "nights/NITE/guests/g1" });
         expect(await fetchNightGuest("NITE", "g2")).toBeNull();
+    });
+});
+
+describe("fetchNight", () => {
+    it("reads one night, tidied, or none", async () => {
+        mocks.getDoc.mockResolvedValueOnce(snapshot({ code: "NITE", activities: [{ kind: "quiz", code: "ABBA", title: "Quiz" }, { kind: "x" }] })).mockResolvedValueOnce(snapshot(null));
+        expect((await fetchNight("NITE"))?.activities).toEqual([{ kind: "quiz", code: "ABBA", title: "Quiz" }]);
+        expect(mocks.getDoc).toHaveBeenLastCalledWith({ path: "nights/NITE" });
+        expect(await fetchNight("NITE")).toBeNull();
     });
 });
 

@@ -6,8 +6,13 @@ import { CONTESTS_2027 } from "../data/contests2027";
 import { PARTY_BONUSES } from "../utils/partyModel";
 import { PARTY_NAMES } from "../utils/partyNames";
 import { readPartyIdentity } from "../utils/partySession";
+import { saveNightIdentity } from "../utils/nightSession";
 
-const mocks = vi.hoisted(() => ({ createParty: vi.fn(), fetchContest: vi.fn(), saveBallot: vi.fn() }));
+const mocks = vi.hoisted(() => ({ createParty: vi.fn(), fetchContest: vi.fn(), saveBallot: vi.fn(), addNightActivity: vi.fn() }));
+vi.mock("../utils/nightsFirestore", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../utils/nightsFirestore")>()),
+    addNightActivity: mocks.addNightActivity,
+}));
 vi.mock("../utils/partyFirestore", async (importOriginal) => ({
     ...(await importOriginal<typeof import("../utils/partyFirestore")>()),
     createParty: mocks.createParty,
@@ -25,7 +30,7 @@ const SystemBack = () => {
         </>
     );
 };
-const renderSetup = () =>
+const renderSetup = (state?: unknown) =>
     renderWithProviders(
         <>
         <SystemBack />
@@ -34,7 +39,7 @@ const renderSetup = () =>
             <Route path="*" element={<ShowLocation />} />
         </Routes>
         </>,
-        { initialEntries: ["/party", "/party/new"] },
+        { initialEntries: ["/party", { pathname: "/party/new", state }] },
     );
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -63,6 +68,7 @@ describe("PartySetup", () => {
         mocks.fetchContest.mockImplementation(async (id: string) => CONTESTS_2027.find(contest => contest.id === id));
         mocks.createParty.mockResolvedValue("ABBA");
         mocks.saveBallot.mockResolvedValue(undefined);
+        mocks.addNightActivity.mockResolvedValue(undefined);
     });
 
     it("asks one big question at a time, with nothing picked", () => {
@@ -389,5 +395,77 @@ describe("PartySetup", () => {
         renderSetup();
         await userEvent.setup().click(screen.getByRole("button", { name: "Back to the scoreboard party" }));
         expect(screen.getByText("at /party")).toBeInTheDocument();
+    });
+
+    describe("in a party night", () => {
+        const host = { guestId: "g-host", name: "Loreen", isHost: true };
+        beforeEach(() => saveNightIdentity("NITE", host));
+
+        /** Walk the three questions there are in a night: the show, the sheet and the bonuses. */
+        const reachNightStart = async (user: User) => {
+            await user.click(screen.getByRole("radio", { name: /Grand final/ }));
+            await user.click(screen.getByRole("radio", { name: /Douze Points/ }));
+            await windOn(user);
+            await user.click(screen.getByRole("button", { name: "Continue" }));
+        };
+
+        it("has no name step: four questions, the last of them the start", async () => {
+            const user = userEvent.setup();
+            renderSetup({ nightCode: "NITE" });
+            expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
+            await reachNightStart(user);
+            expect(screen.getByText("Step 4 of 4")).toBeInTheDocument();
+            question("Ready to start?");
+            expect(screen.queryByRole("spinbutton", { name: "Your name" })).not.toBeInTheDocument();
+            const summary = screen.getByRole("list", { name: "Your party" });
+            expect(summary).toHaveTextContent("You areLoreen");
+            expect(summary).toHaveTextContent("Played inParty night NITE");
+        });
+
+        it("makes the party as the night's guest, lists it on the night and opens it", async () => {
+            const user = userEvent.setup();
+            renderSetup({ nightCode: "NITE" });
+            await reachNightStart(user);
+            await user.click(screen.getByRole("button", { name: "Start the party" }));
+            expect(mocks.createParty).toHaveBeenCalledWith(expect.objectContaining({ hostId: "g-host", nightCode: "NITE" }), "Loreen");
+            const title = mocks.createParty.mock.calls[0][0].title;
+            expect(mocks.addNightActivity).toHaveBeenCalledWith("NITE", { kind: "scoreboard", code: "ABBA", title });
+            expect(readPartyIdentity("ABBA")).toEqual({ guestId: "g-host", name: "Loreen", isHost: true });
+            expect(await screen.findByText("at /party/ABBA")).toBeInTheDocument();
+        });
+
+        it("goes back to the night from the first question, and to the questions before from the others", async () => {
+            const user = userEvent.setup();
+            renderSetup({ nightCode: "NITE" });
+            await user.click(screen.getByRole("radio", { name: /Grand final/ }));
+            expect(screen.getByRole("button", { name: "Back to Which show?" })).toBeInTheDocument();
+            await user.click(screen.getByRole("button", { name: "Back to Which show?" }));
+            await user.click(screen.getByRole("button", { name: "Back to the party night" }));
+            expect(screen.getByText("at /n/NITE")).toBeInTheDocument();
+        });
+
+        it("says so when the party can't be listed, and lists the same party on a retry instead of making another", async () => {
+            mocks.addNightActivity.mockRejectedValueOnce(new Error("offline"));
+            const user = userEvent.setup();
+            renderSetup({ nightCode: "NITE" });
+            await reachNightStart(user);
+            await user.click(screen.getByRole("button", { name: "Start the party" }));
+            expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be created");
+            await user.click(screen.getByRole("button", { name: "Start the party" }));
+            expect(await screen.findByText("at /party/ABBA")).toBeInTheDocument();
+            expect(mocks.createParty).toHaveBeenCalledTimes(1);
+            expect(mocks.addNightActivity).toHaveBeenCalledTimes(2);
+        });
+
+        it("is an ordinary party, with its name step, when this device is not in that night", async () => {
+            localStorage.clear();
+            renderSetup({ nightCode: "NITE" });
+            expect(screen.getByText("Step 1 of 5")).toBeInTheDocument();
+        });
+
+        it("ignores a night code that is not four letters", () => {
+            renderSetup({ nightCode: "nite" });
+            expect(screen.getByText("Step 1 of 5")).toBeInTheDocument();
+        });
     });
 });

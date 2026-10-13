@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toDataURL } from "qrcode";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { NightActivities } from "../components/NightActivities";
+import { NightScreenActivity } from "../components/NightScreenActivity";
 import { NightError, NightNotFound } from "../components/NightStates";
 import { Control, Ground, Pane, Row } from "../design";
 import { useNightData } from "../hooks/useNightData";
@@ -11,8 +11,9 @@ import "./party-calm.css";
 
 /**
  * A party night's big screen for the TV (#233): a QR code and the code to
- * join, the night's title, how many are here, and what's on. It shows no
- * guest names, like the scoreboard party's screen, so it is safe on a wall.
+ * join, the night's title, how many are here, and the newest activity in
+ * full (#238). It shows no guest names of the night, like the scoreboard
+ * party's screen, so it is safe on a wall; a quiz names its own players.
  * A night that has moved on points at its new screen; one that is over says
  * so.
  */
@@ -97,7 +98,7 @@ const NightScreen = () => {
             {guests !== undefined && (
                 <CalmNote aria-live="polite">{guests.length === 1 ? "1 guest at the party." : `${guests.length} guests at the party.`}</CalmNote>
             )}
-            <NightActivities activities={night.activities} />
+            <NightScreenActivity activities={night.activities} />
         </CalmPage>
     );
 };

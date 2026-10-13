@@ -3,11 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toDataURL } from "qrcode";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { PartyError, PartyNotFound } from "../components/PartyStates";
+import { RoomStandings } from "../components/RoomStandings";
 import { Ground, Pane, Row } from "../design";
 import { usePartyData } from "../hooks/usePartyData";
-import { predictionLeaderboard, roomStandings } from "../utils/partyModel";
+import { predictionLeaderboard } from "../utils/partyModel";
 import { withDistinctNames } from "../utils/partyNames";
-import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, partyLink, predictionsFor } from "../utils/partyResults";
+import { hasResults, ordinal, partyLink, predictionsFor } from "../utils/partyResults";
 import "./party-calm.css";
 
 /** How many acts the TV lists: the top of the table, readable from the sofa. */
@@ -58,8 +59,6 @@ const PartyScreen = () => {
         );
     }
 
-    const standings = roomStandings(all, actIdsOf(party), party.template.categories, partyBonusList(party));
-    const byId = new Map(party.acts.map(act => [act.id, act]));
     const leaderboard = party.showNames && hasResults(party) ? predictionLeaderboard(all, predictionsFor(party, all)).slice(0, 3) : [];
 
     return (
@@ -85,30 +84,7 @@ const PartyScreen = () => {
                     <CalmNote aria-live="polite">{all.length === 1 ? "1 guest at the party." : `${all.length} guests at the party.`}</CalmNote>
 
                     <h2 className="esc-section">The room's standings</h2>
-                    <Ground>
-                        {standings.length === 0 ? (
-                            <Pane>
-                                <Row>No ratings yet. The table fills up as soon as someone rates an act.</Row>
-                            </Pane>
-                        ) : (
-                            <Pane as="ol" aria-label="The room's standings">
-                                {standings.slice(0, SCREEN_ROWS).map((standing, index) => {
-                                    const act = byId.get(standing.actId)!;
-                                    const real = party.results.places?.[act.id];
-                                    const through = party.results.qualifiers?.includes(act.id);
-                                    return (
-                                        <Row as="li" key={act.id}>
-                                            <span className="calm-row">
-                                                <span>{ordinal(index + 1)} {act.flag} {act.country}</span>
-                                                <span>{formatScore(standing.average)}</span>
-                                            </span>
-                                            {(real || through) && <span className="calm-sub">{real ? `Really ${ordinal(real)}` : "Through"}</span>}
-                                        </Row>
-                                    );
-                                })}
-                            </Pane>
-                        )}
-                    </Ground>
+                    <RoomStandings party={party} ballots={all} limit={SCREEN_ROWS} />
                 </>
             )}
 

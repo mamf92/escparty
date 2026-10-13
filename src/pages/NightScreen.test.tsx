@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
+import { renderWithProviders, screen, userEvent } from "../test/test-utils";
 import NightScreen from "./NightScreen";
 import { makeNight } from "../test/nightFixtures";
 import type { NightData } from "../hooks/useNightData";
@@ -8,6 +8,12 @@ import type { NightData } from "../hooks/useNightData";
 const mocks = vi.hoisted(() => ({ data: {} as NightData, toDataURL: vi.fn() }));
 vi.mock("../hooks/useNightData", () => ({ useNightData: () => mocks.data }));
 vi.mock("qrcode", () => ({ toDataURL: mocks.toDataURL }));
+// The newest activity is its own component, with its own tests; here it only has to be asked for the right one.
+vi.mock("../components/NightScreenActivity", () => ({
+    NightScreenActivity: ({ activities }: { activities: { title: string }[] }) => (
+        <p>{activities.length === 0 ? "Nothing on yet" : `On: ${activities.map(activity => activity.title).join(", ")}`}</p>
+    ),
+}));
 
 const ShowLocation = () => <p>at {useLocation().pathname}</p>;
 const renderScreen = (entry = "/n/abba/screen") =>
@@ -49,7 +55,7 @@ describe("NightScreen", () => {
         unmount();
         mocks.data = { ...mocks.data, night: makeNight({ activities: [{ kind: "scoreboard", code: "LENA", title: "Semi-final 1" }] }) };
         renderScreen();
-        expect(within(screen.getByRole("list", { name: "Now on" })).getByRole("listitem")).toHaveTextContent("ScoreboardSemi-final 1");
+        expect(screen.getByText("On: Semi-final 1")).toBeInTheDocument();
         await screen.findByRole("img");
     });
 

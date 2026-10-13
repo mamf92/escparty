@@ -535,6 +535,46 @@ describe("QuizResults", () => {
     expect(screen.getByText("at /lobby")).toBeInTheDocument();
   });
 
+  describe("in a party night", () => {
+    it("takes the host back to the night instead of offering another round", async () => {
+      const user = userEvent.setup();
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "host" });
+      act(() => mocks.onRoom(room({ nightCode: "NITE" })));
+      await user.click(screen.getByRole("button", { name: "Show everything" }));
+      expect(screen.queryByRole("button", { name: "Play again with everyone" })).not.toBeInTheDocument();
+      const back = screen.getByRole("button", { name: "Back to the party night" });
+      // Everyone is showing: the way back is the next step.
+      expect(back).toHaveClass("is-high");
+      await user.click(back);
+      expect(screen.getByText("at /n/NITE")).toBeInTheDocument();
+      expect(sessionStorage.getItem("multiplayerGame")).toBeNull();
+    });
+
+    it("takes a guest back to the night, not to host or join another game", async () => {
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+      act(() => mocks.onRoom(room({ nightCode: "NITE" })));
+      expect(screen.queryByRole("button", { name: "Join or host another game" })).not.toBeInTheDocument();
+      const back = screen.getByRole("button", { name: "Back to the party night" });
+      // The reveal is still to come: a white button, not the next step yet.
+      expect(back).not.toHaveClass("is-high");
+      await userEvent.setup().click(back);
+      expect(screen.getByText("at /n/NITE")).toBeInTheDocument();
+    });
+
+    it("offers no next round even if the room somehow has one", () => {
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+      act(() => mocks.onRoom(room({ nightCode: "NITE", nextRoomCode: "NEXT" })));
+      expect(screen.queryByRole("button", { name: "Join the next round" })).not.toBeInTheDocument();
+    });
+
+    it("keeps the way out of a room that is gone", () => {
+      renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
+      act(() => mocks.onRoom(room({ nightCode: "NITE" })));
+      act(() => mocks.onRoom(null));
+      expect(screen.getByRole("button", { name: "Join or host another game" })).toBeInTheDocument();
+    });
+  });
+
   it("goes home", async () => {
     renderResults({ multiplayer: true, roomCode: "ABBA", playerId: "p2" });
     await userEvent.setup().click(screen.getByRole("button", { name: "Back to ESCParty" }));

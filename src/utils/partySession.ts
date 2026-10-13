@@ -65,6 +65,20 @@ export const savePartyIdentity = (code: string, identity: PartyIdentity) => {
     write(LAST_PARTY_KEY, code);
 };
 
+/**
+ * Forget this device's place in a party (it left a night's party, #235): the
+ * identity, the ballot copy and any pending join go, and the last-party
+ * pointer too when it points here, so Home stops offering a way back.
+ */
+export const clearPartyIdentity = (code: string) => {
+    try {
+        for (const key of [identityKey(code), ballotKey(code), joiningKey(code)]) localStorage.removeItem(key);
+        if (localStorage.getItem(LAST_PARTY_KEY) === JSON.stringify(code)) localStorage.removeItem(LAST_PARTY_KEY);
+    } catch {
+        // Storage unavailable: nothing was kept.
+    }
+};
+
 export const readStoredBallot = (code: string) => read(ballotKey(code), isStoredBallot);
 
 export const storeBallot = (code: string, ballot: Omit<StoredBallot, "savedAt">) =>

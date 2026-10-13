@@ -71,7 +71,10 @@ const PartyRoom = () => {
         onLeave: () => navigate("/"),
     } : null);
 
-    const back = <CalmLink onClick={() => navigate("/party")}>Leave the party</CalmLink>;
+    // A party played in a night leads back to it (#235): leaving is done there, for the whole evening.
+    const back = party?.nightCode
+        ? <CalmLink onClick={() => navigate(`/n/${party.nightCode}`)}>Back to the party night</CalmLink>
+        : <CalmLink onClick={() => navigate("/party")}>Leave the party</CalmLink>;
 
     if (party === undefined) {
         return (

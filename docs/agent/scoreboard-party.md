@@ -232,6 +232,22 @@ The code of a new party is drawn by `freeCode()`, free among rooms, parties
 and nights. Party nights: `docs/agent/firestore-data-model.md`.
 `contests/` is read-only to clients.
 
+**Started from a night (#235).** "Start a scoreboard" on the night's home opens
+`/party/new` with router state `{ nightCode }`. `PartySetup` then has four
+steps, not five: no name step, the host is the night's guest (its guest id as
+`hostId` and its name), and the summary says "Played in Party night CODE".
+`createParty({ ..., nightCode }, name)` makes the party, the identity is saved,
+and `addNightActivity` lists it (title: the show's title; a retry after a failed
+listing lists the same party). Guests rate from the night's card: "Rate" saves
+the party identity `{ guestId, name, isHost }` from the night's (keeping the
+place in the lineup of one already there) and opens `/party/CODE`. There is no
+name step: with no ballot on the server yet, `useOwnBallot` joins with that
+name on the first save, and a refusal (the name is someone else's) leaves the
+ratings on the phone, as for any stored identity. The room shows "Back to the
+party night" in place of "Leave the party". The party night's TV shows the
+newest scoreboard's room standings with the same `RoomStandings` component as
+`PartyScreen`.
+
 ## Retention
 
 Every party and every ballot carries `expireAt`, 30 days out
