@@ -47,7 +47,13 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         const sent = latest.current;
         try {
             if (needsJoin.current) {
-                if (!(await joinParty(code, identity.guestId, identity.name))) throw new Error(`The name ${identity.name} is someone else's`);
+                if (!(await joinParty(code, identity.guestId, identity.name))) {
+                    // Another guest holds this name (an identity from before name
+                    // claims): retrying can't help, so the ratings stay on the device.
+                    console.error(`Couldn't save the ratings: the name ${identity.name} is someone else's.`);
+                    setState("offline");
+                    return;
+                }
                 needsJoin.current = false;
             }
             await saveBallot(code, { guestId: identity.guestId, name: identity.name, ...sent });
@@ -91,6 +97,11 @@ export const useOwnBallot = (code: string | undefined, identity: PartyIdentity |
         if (!server) needsJoin.current = true;
         if (!server || !same(server, next)) schedule(0);
     }, [serverBallots, identity, code, schedule]);
+
+    // This guest's ballot showing up later (a join's own write) means there's nothing to join.
+    useEffect(() => {
+        if (needsJoin.current && identity && serverBallots?.some(entry => entry.guestId === identity.guestId)) needsJoin.current = false;
+    }, [serverBallots, identity]);
 
     const change = useCallback((update: (current: { ratings: Ratings; bonuses: Bonuses }) => { ratings: Ratings; bonuses: Bonuses }) => {
         const next = update(latest.current);

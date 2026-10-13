@@ -93,6 +93,19 @@ describe("useOwnBallot", () => {
         await act(() => vi.advanceTimersByTimeAsync(0));
         expect(mocks.saveBallot).not.toHaveBeenCalled();
         expect(result.current.state).toBe("offline");
+        // No retry loop: another try can't change whose name it is.
+        await act(() => vi.advanceTimersByTimeAsync(20_000));
+        expect(mocks.joinParty).toHaveBeenCalledTimes(1);
+    });
+
+    it("doesn't join again once this guest's ballot shows up", async () => {
+        const { result, rerender } = renderHook(({ ballots }) => useOwnBallot("ABBA", me, ballots), { initialProps: { ballots: [] as Ballot[] } });
+        rerender({ ballots: [{ ...me, ratings: {}, bonuses: {} }] });
+        await act(() => vi.advanceTimersByTimeAsync(0));
+        act(() => result.current.rate("se", "points", 3));
+        await act(() => vi.advanceTimersByTimeAsync(400));
+        expect(mocks.joinParty).not.toHaveBeenCalled();
+        expect(mocks.saveBallot).toHaveBeenCalled();
     });
 
     it("doesn't join when the server already has this guest's ballot", async () => {

@@ -130,7 +130,10 @@ export const createParty = async (party: NewParty, hostName: string): Promise<st
             // Another host took this code between the check and the write:
             // the write then counts as an update, which the rules refuse. Any
             // other refusal (of the host's claim or ballot) is the real error.
-            if ((error as { code?: string }).code === "permission-denied" && (await getDoc(ref)).exists()) continue;
+            if ((error as { code?: string }).code === "permission-denied") {
+                const taken = await getDoc(ref).then(snapshot => snapshot.exists(), () => false);
+                if (taken) continue;
+            }
             throw error;
         }
         return code;

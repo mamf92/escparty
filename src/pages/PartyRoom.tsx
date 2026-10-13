@@ -183,6 +183,9 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
     // A join sent but not confirmed: retried with the same id and name, even
     // after a reload, so a write that landed late is found, not doubled.
     const [pending, setPending] = useState(() => readPendingJoin(party.code));
+    // Whether the pending join failed on this visit, or was only found from an earlier one.
+    const [pendingFailed, setPendingFailed] = useState(false);
+    const [failed, setFailed] = useState(false);
     const [freshId] = useState(() => uuidv4());
     const guestId = pending?.guestId ?? freshId;
     // Names other guests claimed first when this guest pressed Join, kept off
@@ -204,12 +207,14 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
     const land = (next: string | null) => {
         setName(next);
         setRefusedNow(null);
+        setFailed(false);
     };
     const join = async () => {
         if (landed === null) return;
         const attempt = { guestId, name: landed };
         savePendingJoin(party.code, attempt);
         setJoining(true);
+        setFailed(false);
         try {
             const joined = await joinParty(party.code, attempt.guestId, attempt.name);
             clearPendingJoin(party.code);
@@ -223,7 +228,17 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
             setRefusedNow(attempt.name);
         } catch (joinError) {
             console.error("Couldn't join the party:", joinError);
-            setPending(attempt);
+            const code = (joinError as { code?: string }).code;
+            if (code === "deadline-exceeded" || code === "unavailable") {
+                // It may still land: keep the name and id for the retry.
+                setPending(attempt);
+                setPendingFailed(true);
+            } else {
+                // Refused for another reason: nothing landed, so any name may be tried.
+                clearPendingJoin(party.code);
+                setPending(null);
+                setFailed(true);
+            }
         }
         setJoining(false);
     };
@@ -237,7 +252,10 @@ const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
             )}
             {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
             {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
-            {pending && !joining && <CalmNote role="alert">You couldn&apos;t join as {pending.name} just now. Check your connection and press Join again.</CalmNote>}
+            {pending && !joining && (pendingFailed
+                ? <CalmNote role="alert">You couldn&apos;t join as {pending.name} just now. Check your connection and press Join again.</CalmNote>
+                : <CalmNote role="status">You were joining as {pending.name}. Press Join to finish.</CalmNote>)}
+            {failed && <CalmNote role="alert">You couldn&apos;t join just now. Spin again or try in a moment.</CalmNote>}
             <Ground>
                 <Pane>
                     <Control

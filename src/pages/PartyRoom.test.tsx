@@ -101,7 +101,7 @@ describe("PartyRoom", () => {
     it("says so when the join can't reach the party, and lets the guest press Join again", async () => {
         const user = userEvent.setup();
         vi.spyOn(console, "error").mockImplementation(() => {});
-        mocks.joinParty.mockRejectedValueOnce(new Error("offline"));
+        mocks.joinParty.mockRejectedValueOnce(Object.assign(new Error("offline"), { code: "deadline-exceeded" }));
         const { unmount } = renderRoom();
         await user.click(screen.getByRole("button", { name: "Next name" }));
         await user.click(screen.getByRole("button", { name: "Join the party" }));
@@ -111,12 +111,26 @@ describe("PartyRoom", () => {
         expect(screen.getByRole("spinbutton")).toHaveAttribute("aria-disabled", "true");
         unmount();
         renderRoom();
-        expect(screen.getByRole("alert")).toHaveTextContent(`You couldn't join as ${PARTY_NAMES[0]} just now.`);
+        expect(screen.getByText(`You were joining as ${PARTY_NAMES[0]}. Press Join to finish.`)).toHaveAttribute("role", "status");
         await user.click(screen.getByRole("button", { name: "Join the party" }));
         expect(readPartyIdentity("ABBA")).toMatchObject({ name: PARTY_NAMES[0] });
         // The retry uses the same guest id, so it finds a claim the first try made.
         expect(mocks.joinParty.mock.calls[1][1]).toBe(mocks.joinParty.mock.calls[0][1]);
         expect(readPartyIdentity("ABBA")!.guestId).toBe(mocks.joinParty.mock.calls[0][1]);
+    });
+
+    it("frees the reel when a join is refused for a reason other than the name", async () => {
+        const user = userEvent.setup();
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        mocks.joinParty.mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }));
+        renderRoom();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        await user.click(screen.getByRole("button", { name: "Join the party" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("You couldn't join just now. Spin again or try in a moment.");
+        expect(screen.getByRole("spinbutton")).not.toHaveAttribute("aria-disabled");
+        expect(localStorage.getItem("escparty.party.ABBA.joining")).toBeNull();
+        await user.click(screen.getByRole("button", { name: "Next name" }));
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("keeps Join off, with a note, until the taken names have arrived", async () => {
