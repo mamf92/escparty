@@ -8,10 +8,10 @@ moving files between folders.
 Most screens live here: `Home.tsx` (`/`: the big disco ball, "Host a
 party", "Join a party" and a quiet "Play a quiz solo" link),
 `HostParty.tsx` (`/host`: host a quiz, which opens `/multiplayer` straight
-on hosting, or a scoreboard party, `/party/new`), `JoinParty.tsx` (`/join`:
+on hosting, a scoreboard party, `/party/new`, or a party night, `/n/new`), `JoinParty.tsx` (`/join`:
 one code field that goes at the fourth letter, plus a QR scanner,
 `components/QrScanner.tsx`; `utils/joinCode.ts` looks the code up as a quiz
-room and as a party and opens whichever has it), `SelectDifficulty.tsx`,
+room, a party night and a party and opens whichever has it), `SelectDifficulty.tsx`,
 `QuizLibrary.tsx` (`/quizzes`, your saved quizzes and every premade one,
 to play solo, host, or take into the builder), `QuizBuilder.tsx`
 (`/quizzes/new`, `/quizzes/edit/:quizId`: bank picker, question editor,
@@ -23,9 +23,11 @@ and opens the quiz library), and the scoreboard party's `PartyHome.tsx`
 (`/party`), `PartySetup.tsx` (`/party/new`), `PartyRoom.tsx`
 (`/party/:code`), `PartyScreen.tsx` (`/party/:code/screen`) and
 `PartyAwards.tsx` (`/party/:code/awards`); see
-`docs/agent/scoreboard-party.md`. `/join/:code` (also `JoinParty.tsx`) is the link the green room's QR code carries. Routed from `src/App.tsx`, wrapped in
+`docs/agent/scoreboard-party.md`. The party night's `NightSetup.tsx`
+(`/n/new`), `NightHome.tsx` (`/n/:code`) and `NightScreen.tsx`
+(`/n/:code/screen`, the TV) are in `docs/agent/party-night.md`. `/join/:code` (also `JoinParty.tsx`) is the link the green room's QR code carries. Routed from `src/App.tsx`, wrapped in
 `MobileFrame` (see below) except the standalone `/fabric-ui` demo route and
-the party's big screen, which fills the window for a TV.
+the party's and the night's big screens, which fill the window for a TV.
 
 ## `src/components/`
 
@@ -42,6 +44,9 @@ Mostly not small reusable pieces, despite the folder name:
 
 - `PartyHostTools.tsx` — the host's tab in a scoreboard party: share the
   link, enter the real result, edit the running order, open the awards.
+- `NightStates.tsx` and `NightActivities.tsx` — the party night's shared
+  states (no night with that code, couldn't be reached) and its "Now on"
+  list (`docs/agent/party-night.md`).
 - `PartyStates.tsx` — the error states every party screen shares: no
   party with that code ("Try another code") and a party that couldn't be
   reached ("Try again"). Party page layout lives in `src/pages/party-calm.css`.
@@ -131,7 +136,8 @@ plan that also removes the ad hoc storage it would duplicate.
   `partyResults.ts` (what the party screens show) and `partyNames.ts` —
   the scoreboard party, see `docs/agent/scoreboard-party.md`.
 
-- `nightsFirestore.ts` (party nights, `nights/`: guests, name claims,
+- `nightSession.ts` (this device's guest id and name per night, the last
+  night, a pending join) and `nightsFirestore.ts` (party nights, `nights/`: guests, name claims,
   activities) and `freeCode.ts` (a 4-letter code free among rooms, parties
   and nights) — see "Party nights" in `docs/agent/firestore-data-model.md`.
 
@@ -201,7 +207,8 @@ plan that also removes the ad hoc storage it would duplicate.
 - `useQuizTitle.ts` — a quiz key's title, reading a saved quiz someone
   else made from Firestore (the lobby and the multiplayer lobby).
 
-- `usePartyData.ts` — a party and all its ballots, live;
+- `useNightData.ts` — a party night and its roster, live (with a retry);
+  `usePartyData.ts` — a party and all its ballots, live;
   `useOwnBallot.ts` — this guest's ratings, kept on the device and saved
   (with retries) to Firestore.
 

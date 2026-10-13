@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanCode, codeFromScan, findGame, joinLink } from "./joinCode";
+import { cleanCode, codeFromScan, findGame, joinLink, nightLink } from "./joinCode";
 import { getRoom, type Room } from "./roomsFirestore";
 import { partyExists } from "./partyFirestore";
+import { nightExists } from "./nightsFirestore";
 
 vi.mock("./roomsFirestore", () => ({ getRoom: vi.fn() }));
 vi.mock("./partyFirestore", () => ({ partyExists: vi.fn() }));
+vi.mock("./nightsFirestore", () => ({ nightExists: vi.fn() }));
 
 const room = (phase: Room["phase"]) => ({ id: "ABBA", phase } as Room);
 
@@ -20,6 +22,8 @@ describe("codeFromScan", () => {
     ["https://escparty-murex.vercel.app/#/party/ABBA", "ABBA"],
     ["https://escparty-murex.vercel.app/#/party/lena/screen", "LENA"],
     ["https://escparty-murex.vercel.app/#/join/Dana", "DANA"],
+    ["https://escparty-murex.vercel.app/#/n/Dana", "DANA"],
+    ["https://escparty-murex.vercel.app/#/n/lena/screen", "LENA"],
     ["  abba ", "ABBA"],
   ])("reads %s as %s", (text, code) => {
     expect(codeFromScan(text)).toBe(code);
@@ -34,6 +38,7 @@ describe("findGame", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    vi.mocked(nightExists).mockResolvedValue(false);
   });
 
   it("finds a quiz room", async () => {
@@ -54,6 +59,31 @@ describe("findGame", () => {
     expect(await findGame("ABBA")).toBeNull();
   });
 
+  it("finds a party night", async () => {
+    vi.mocked(getRoom).mockResolvedValue(null);
+    vi.mocked(partyExists).mockResolvedValue(false);
+    vi.mocked(nightExists).mockResolvedValue(true);
+    expect(await findGame("ABBA")).toBe("night");
+  });
+
+  it("prefers a night to a party or a running quiz room, but not to a lobby or this device's room", async () => {
+    vi.mocked(nightExists).mockResolvedValue(true);
+    vi.mocked(partyExists).mockResolvedValue(true);
+    vi.mocked(getRoom).mockResolvedValue(room("question"));
+    expect(await findGame("ABBA")).toBe("night");
+    vi.mocked(getRoom).mockResolvedValue(room("lobby"));
+    expect(await findGame("ABBA")).toBe("quiz");
+    vi.mocked(getRoom).mockResolvedValue(room("question"));
+    localStorage.setItem("gameCode", "ABBA");
+    expect(await findGame("ABBA")).toBe("quiz");
+  });
+
+  it("keeps a running quiz room that nothing else shares", async () => {
+    vi.mocked(getRoom).mockResolvedValue(room("question"));
+    vi.mocked(partyExists).mockResolvedValue(false);
+    expect(await findGame("ABBA")).toBe("quiz");
+  });
+
   it("prefers a room still taking players when both share the code", async () => {
     vi.mocked(partyExists).mockResolvedValue(true);
     vi.mocked(getRoom).mockResolvedValue(room("lobby"));
@@ -62,6 +92,14 @@ describe("findGame", () => {
     expect(await findGame("ABBA")).toBe("party");
     localStorage.setItem("gameCode", "ABBA");
     expect(await findGame("ABBA")).toBe("quiz");
+  });
+});
+
+describe("nightLink", () => {
+  it("is this site's hash route for the night, and scans back to it", () => {
+    const link = nightLink("ABBA");
+    expect(link).toBe(`${window.location.origin}${window.location.pathname}#/n/ABBA`);
+    expect(codeFromScan(link)).toBe("ABBA");
   });
 });
 

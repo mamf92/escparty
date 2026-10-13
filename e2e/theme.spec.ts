@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { answerOptions, hostParty, joinParty, rateActs } from "./helpers";
+import { answerOptions, hostNight, hostParty, joinNightAs, joinParty, rateActs } from "./helpers";
 
 /*
  * Theme compliance for the scoreboard party screens (#90), Home (#169),
@@ -299,6 +299,28 @@ test("the home screen follows the surface rules, and re-skins in Sparkle", async
     expect(ball && title && ball.width).toBeGreaterThan(140);
     expect(ball && title && title.y).toBeGreaterThanOrEqual((ball?.y ?? 0) + (ball?.width ?? 0));
     await page.context().close();
+});
+
+test("the party night screens follow the surface rules", async ({ browser }) => {
+    const host = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+    const guest = await (await browser.newContext({ reducedMotion: "reduce" })).newPage();
+
+    await host.goto("/#/n/new");
+    await expect(host.getByRole("button", { name: "Start the party night" })).toBeVisible();
+    await judge(host, "night-setup");
+    const code = await hostNight(host, "Loreen", "Semi night");
+    await judge(host, "night-home");
+
+    await guest.goto(`/#/n/${code}`);
+    await expect(guest.getByRole("button", { name: "Join the party" })).toBeVisible();
+    await judge(guest, "night-join");
+    await joinNightAs(guest, "Netta");
+
+    await guest.goto(`/#/n/${code}/screen`);
+    await expect(guest.getByText("Scan the code with your phone to join the party")).toBeVisible();
+    await judge(guest, "night-big-screen");
+
+    await Promise.all([host, guest].map(page => page.context().close()));
 });
 
 test("the host and join screens follow the surface rules", async ({ browser }) => {

@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { renderWithProviders, screen, userEvent, within } from "../test/test-utils";
 import Home from "./Home";
+import { saveNightIdentity } from "../utils/nightSession";
 
 const DESTINATIONS = [
   ["Host a party", "/host"],
@@ -12,6 +13,8 @@ const DESTINATIONS = [
 // Also a smoke test for the harness: a real page renders under the
 // providers and a router, and user-event can drive it.
 describe("Home", () => {
+  beforeEach(() => localStorage.clear());
+
   it("is the hero page: the welcome title and two ways in, on the design system", () => {
     renderWithProviders(<Home />);
 
@@ -47,5 +50,21 @@ describe("Home", () => {
     await user.click(screen.getByRole("button", { name: label }));
 
     expect(screen.getByText(`Arrived at ${path}`)).toBeInTheDocument();
+  });
+
+  it("offers a white way back to the last party night, and no second black button", async () => {
+    saveNightIdentity("ABBA", { guestId: "g1", name: "Lordi" });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/n/ABBA" element={<p>Arrived at the night</p>} />
+      </Routes>,
+    );
+    const buttons = within(screen.getByRole("group", { name: "Where to start" })).getAllByRole("button");
+    expect(buttons.map(button => button.textContent)).toEqual(["Host a party", "Join a party", "Back to your party night"]);
+    expect(buttons.filter(button => button.classList.contains("is-high"))).toHaveLength(1);
+    await user.click(buttons[2]);
+    expect(screen.getByText("Arrived at the night")).toBeInTheDocument();
   });
 });

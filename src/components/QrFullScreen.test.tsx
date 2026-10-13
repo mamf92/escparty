@@ -18,6 +18,13 @@ describe("QrFullScreen", () => {
     expect(qr.toDataURL).toHaveBeenCalledWith(expect.stringMatching(/#\/join\/ABBA$/), expect.objectContaining({ width: 600 }));
   });
 
+  it("carries the link it is given instead of the join link", async () => {
+    qr.toDataURL.mockResolvedValue("x");
+    render(<QrFullScreen code="ABBA" link="https://escparty.app/#/n/ABBA" onClose={() => {}} />);
+    await screen.findByRole("img", { name: /ABBA/ });
+    expect(qr.toDataURL).toHaveBeenCalledWith("https://escparty.app/#/n/ABBA", expect.anything());
+  });
+
   it("closes on the button and on Escape", async () => {
     qr.toDataURL.mockResolvedValue("data:image/png;base64,AAAA");
     const onClose = vi.fn();

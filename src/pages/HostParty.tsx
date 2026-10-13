@@ -4,8 +4,8 @@ import { ChoiceCard, ChoiceGrid, Ground } from "../design";
 
 /**
  * What a host can start (Home's "Host a party"): a multiplayer quiz,
- * straight to hosting it, or a scoreboard party, straight to setting it
- * up. The quiz library, where a host can pick or build a quiz first, is
+ * straight to hosting it, a scoreboard party, straight to setting it
+ * up, or a party night (#233), one code for the whole evening. The quiz library, where a host can pick or build a quiz first, is
  * the footer's other way.
  */
 const HostParty = () => {
@@ -33,6 +33,11 @@ const HostParty = () => {
               title="Host a scoreboard"
               sub="Rate every act together, see who called the winner"
               onClick={() => navigate("/party/new")}
+            />
+            <ChoiceCard
+              title="Host a party night"
+              sub="One code all evening for quizzes and scoreboards"
+              onClick={() => navigate("/n/new")}
             />
           </ChoiceGrid>
         </Ground>
