@@ -58,16 +58,17 @@ export const ReelJoin = ({
     // the reel even before the list shows them; the last one is said aloud.
     const [refused, setRefused] = useState<string[]>([]);
     const [refusedNow, setRefusedNow] = useState<string | null>(null);
-    const checking = others === undefined && !error;
-    // The names nobody has yet. Only offered with no pending join (that one
-    // keeps its name), so this guest is never among `others` here.
+    // Any listener error stops joining, even with names on screen: they may be stale.
+    const blocked = error !== null;
+    const checking = others === undefined && !blocked;
+    // The names nobody has yet. This guest's own entry doesn't count: Firestore
+    // shows a join in the listener before the write returns, and the name
+    // being joined must not read as taken meanwhile.
     const names = useMemo(() => {
-        const taken = others ?? [];
+        const taken = (others ?? []).filter(other => other.guestId !== guestId);
         const shown = distinct ? withDistinctNames(taken).map(other => other.name) : [];
         return availablePartyNames([...taken.map(other => other.name), ...refused], shown);
-    }, [others, refused, distinct]);
-    // Any listener error stops joining, even with names on screen: they may be stale.
-    const blocked = !!error;
+    }, [others, refused, guestId, distinct]);
     // A pending join keeps its name. Otherwise a landed name that an update
     // takes before this guest joins is let go.
     const landed = pending ? pending.name : name !== null && names.includes(name) ? name : null;

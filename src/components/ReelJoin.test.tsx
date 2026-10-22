@@ -28,8 +28,9 @@ const setup = (change: Partial<ComponentProps<typeof ReelJoin>> = {}) => {
         pendingFailedNote: name => <>Couldn&apos;t reach it as {name}.</>,
         ...change,
     };
-    renderWithProviders(<ReelJoin {...props} />);
-    return { props, kept: () => kept };
+    const view = renderWithProviders(<ReelJoin {...props} />);
+    const rerender = (more: Partial<ComponentProps<typeof ReelJoin>>) => view.rerender(<ReelJoin {...props} {...more} />);
+    return { props, kept: () => kept, rerender };
 };
 
 describe("ReelJoin", () => {
@@ -54,6 +55,21 @@ describe("ReelJoin", () => {
         expect(props.savePending).toHaveBeenCalledWith({ guestId, name: "Käärijä" });
         expect(props.clearPending).toHaveBeenCalled();
         expect(props.onJoin).toHaveBeenCalledWith({ guestId, name: "Käärijä" });
+    });
+
+    it("doesn't call its own name taken when the join shows in the list before the write returns", async () => {
+        let land: (joined: boolean) => void = () => {};
+        const send = vi.fn(() => new Promise<boolean>(resolve => { land = resolve; }));
+        const user = userEvent.setup();
+        const { props, rerender } = setup({ send });
+        await spin(user);
+        await user.click(joinButton());
+        const [guestId] = send.mock.calls[0] as unknown as [string];
+        // Firestore's listener sees the local write first.
+        rerender({ others: [...(props.others ?? []), { guestId, name: "Käärijä" }] });
+        expect(screen.queryByText(/was just taken/)).not.toBeInTheDocument();
+        expect(reel()).toHaveAttribute("aria-valuetext", "Käärijä");
+        land(true);
     });
 
     it("says a name was just taken and keeps it off the reel", async () => {
