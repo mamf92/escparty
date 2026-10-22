@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
@@ -49,6 +49,8 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
     const navigate = useNavigate();
     const { night, guests, error, retry } = useNightData(code);
     const [identity, setIdentity] = useState<NightIdentity | null>(() => (code ? readNightIdentity(code) : null));
+    // The roster as the reel reads it, kept between renders so the reel's names aren't redone each time.
+    const joinedGuests = useMemo(() => guests?.map(guest => ({ guestId: guest.id, name: guest.name })), [guests]);
     // A stored identity is only good while the roster still has this guest
     // (they may have left from another tab, or the night may be a new one under
     // an old code): checked once on load, then watched in the roster.
@@ -149,9 +151,9 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
                 title={night.title}
                 subtitle={`Join party night ${night.code} and play along all evening.`}
                 footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
-                others={guests?.map(guest => ({ guestId: guest.id, name: guest.name }))}
+                others={joinedGuests}
                 error={error}
-                errorView={error !== null && <NightError error={error} onRetry={retry} />}
+                errorView={message => <NightError error={message} onRetry={retry} />}
                 readPending={() => readPendingNightJoin(night.code)}
                 savePending={attempt => savePendingNightJoin(night.code, attempt)}
                 clearPending={() => clearPendingNightJoin(night.code)}

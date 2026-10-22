@@ -2,14 +2,12 @@ import { useMemo, useState, type ReactNode } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Control, Ground, Pane } from "../design";
 import { availablePartyNames, withDistinctNames } from "../utils/partyNames";
+import type { PendingJoin } from "../utils/partySession";
 import { CalmNote, CalmPage } from "./CalmPage";
 import { NamePicker } from "./NamePicker";
 
-/** A join that was sent but not confirmed, kept so it is retried as the same guest. */
-export interface ReelJoinAttempt {
-    guestId: string;
-    name: string;
-}
+/** A join: the guest id and the name it claims (a party's and a night's are the same shape). */
+export type ReelJoinAttempt = PendingJoin;
 
 /**
  * Join a scoreboard party or a party night (#249): the name reel (names
@@ -33,7 +31,7 @@ export const ReelJoin = ({
     /** A listener errored: nobody joins until the taken names can be read. */
     error: string | null;
     /** Shown in place of the reel while `error` is set. */
-    errorView: ReactNode;
+    errorView: (error: string) => ReactNode;
     readPending: () => ReelJoinAttempt | null;
     savePending: (attempt: ReelJoinAttempt) => void;
     clearPending: () => void;
@@ -61,12 +59,13 @@ export const ReelJoin = ({
     const [refused, setRefused] = useState<string[]>([]);
     const [refusedNow, setRefusedNow] = useState<string | null>(null);
     const checking = others === undefined && !error;
-    // The names nobody has yet (an entry of this guest's own, from a join that landed late, doesn't count).
+    // The names nobody has yet. Only offered with no pending join (that one
+    // keeps its name), so this guest is never among `others` here.
     const names = useMemo(() => {
-        const rest = (others ?? []).filter(other => other.guestId !== guestId);
-        const shown = distinct ? withDistinctNames(rest).map(other => other.name) : [];
-        return availablePartyNames([...rest.map(other => other.name), ...refused], shown);
-    }, [others, refused, guestId, distinct]);
+        const taken = others ?? [];
+        const shown = distinct ? withDistinctNames(taken).map(other => other.name) : [];
+        return availablePartyNames([...taken.map(other => other.name), ...refused], shown);
+    }, [others, refused, distinct]);
     // Any listener error stops joining, even with names on screen: they may be stale.
     const blocked = !!error;
     // A pending join keeps its name. Otherwise a landed name that an update
@@ -97,7 +96,7 @@ export const ReelJoin = ({
             setRefusedNow(attempt.name);
         } catch (joinError) {
             console.error(`Couldn't join ${what}:`, joinError);
-            const code = (joinError as { code?: string }).code;
+            const code = (joinError as { code?: string } | null | undefined)?.code;
             if (code === "deadline-exceeded" || code === "unavailable") {
                 // It may still land: keep the name and id for the retry.
                 setPending(attempt);
@@ -113,7 +112,7 @@ export const ReelJoin = ({
     };
     return (
         <CalmPage title={title} subtitle={subtitle} footer={footer}>
-            {blocked ? errorView : (
+            {error !== null ? errorView(error) : (
                 <>
                     <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
                     <NamePicker value={landed} onChange={land} onSpinningChange={setSpinning} names={pending ? [pending.name] : names} disabled={checking || joining || !!pending} />

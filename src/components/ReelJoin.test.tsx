@@ -18,7 +18,7 @@ const setup = (change: Partial<ComponentProps<typeof ReelJoin>> = {}) => {
         footer: <span>Back</span>,
         others: [{ guestId: "g-1", name: "Loreen" }, { guestId: "g-2", name: "Netta" }],
         error: null,
-        errorView: <p role="alert">Lost the party</p>,
+        errorView: message => <p role="alert">Lost the party: {message}</p>,
         readPending: () => kept,
         savePending: vi.fn(attempt => { kept = attempt; }),
         clearPending: vi.fn(() => { kept = null; }),
@@ -100,7 +100,7 @@ describe("ReelJoin", () => {
         expect(props.send).toHaveBeenCalledWith("g-late", "Hatari");
     });
 
-    it("offers numbered names a full party shows, only when distinct", async () => {
+    it("keeps the numbered names a full party shows off the reel, only when distinct", async () => {
         // Two guests share every name: the second of each is shown as "<name> 2".
         const { PARTY_NAMES } = await import("../utils/partyNames");
         const others = PARTY_NAMES.flatMap((name, i) => [
@@ -113,6 +113,36 @@ describe("ReelJoin", () => {
         expect(reel()).toHaveAttribute("aria-valuetext", "Loreen 3");
     });
 
+    it("offers the first numbered name when not distinct", async () => {
+        const { PARTY_NAMES } = await import("../utils/partyNames");
+        const user = userEvent.setup();
+        setup({ others: PARTY_NAMES.map((name, i) => ({ guestId: `a-${i}`, name })) });
+        await spin(user);
+        expect(reel()).toHaveAttribute("aria-valuetext", "Loreen 2");
+    });
+
+    it("sends one join, however often Join is pressed while it is on its way", async () => {
+        let land: (joined: boolean) => void = () => {};
+        const send = vi.fn(() => new Promise<boolean>(resolve => { land = resolve; }));
+        const user = userEvent.setup();
+        setup({ send });
+        await spin(user);
+        await user.click(joinButton());
+        expect(joinButton()).toHaveTextContent("Joining…");
+        await user.click(joinButton());
+        expect(send).toHaveBeenCalledTimes(1);
+        land(true);
+    });
+
+    it("lets the guest try again when a join fails with no error code at all", async () => {
+        const user = userEvent.setup();
+        setup({ send: vi.fn().mockRejectedValue(undefined) });
+        await spin(user);
+        await user.click(joinButton());
+        expect(await screen.findByRole("alert")).toHaveTextContent("You couldn't join just now");
+        expect(joinButton()).toHaveTextContent("Join the party");
+    });
+
     it("waits for the taken names before anyone can spin", () => {
         setup({ others: undefined });
         expect(screen.getByText("Checking which names are taken…")).toBeInTheDocument();
@@ -121,7 +151,7 @@ describe("ReelJoin", () => {
 
     it("shows the error view instead of the reel, and no join", () => {
         setup({ error: "gone" });
-        expect(screen.getByRole("alert")).toHaveTextContent("Lost the party");
+        expect(screen.getByRole("alert")).toHaveTextContent("Lost the party: gone");
         expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
         expect(joinButton()).toBeDisabled();
     });

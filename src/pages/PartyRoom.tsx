@@ -92,13 +92,14 @@ const PartyRoom = () => {
     if (!identity) {
         return (
             <ReelJoin
+                key={party.code}
                 title={party.title}
                 subtitle={`Join party ${party.code} and rate every act.`}
                 footer={back}
                 others={ballots}
                 distinct
                 error={error}
-                errorView={error !== null && <PartyError error={error} onRetry={retry} />}
+                errorView={message => <PartyError error={message} onRetry={retry} />}
                 readPending={() => readPendingJoin(party.code)}
                 savePending={attempt => savePendingJoin(party.code, attempt)}
                 clearPending={() => clearPendingJoin(party.code)}
