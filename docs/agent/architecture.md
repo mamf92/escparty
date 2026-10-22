@@ -85,15 +85,6 @@ colours are its own (`palette.ts`, the app's pre-design-system colours), so
 it is exempt from the design guard. Design details belong in
 `.claude/skills/escparty-sparkle/`, not here.
 
-## `src/store/useGameStore.ts`
-
-A Zustand store. **Dead code** — not imported anywhere outside itself. Real
-session state (`playerId`, `playerName`, `isHost`, room code, etc.) is
-instead threaded through `localStorage`, `sessionStorage`, and router
-`location.state` directly inside the pages listed in `CLAUDE.md`'s Known
-Landmines section. Don't wire new code to this store without a migration
-plan that also removes the ad hoc storage it would duplicate.
-
 ## `src/data/`
 
 - `escBeginnerQuiz.json` / `escIntermediateQuiz.json` /
