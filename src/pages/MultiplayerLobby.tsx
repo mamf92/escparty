@@ -232,8 +232,20 @@ const MultiplayerLobby = () => {
       const storedId = localStorage.getItem("playerId");
       const storedName = localStorage.getItem("playerName");
       if (localStorage.getItem("gameCode") === code && storedId && storedName) {
-        setRejoinAs({ id: storedId, name: storedName });
-        return;
+        // Only when this device's player is really in that room: rooms
+        // expire (#248), so the code may since have been drawn for someone
+        // else's. If the room can't be read, offer it as before.
+        let stillIn = true;
+        try {
+          const room = await getRoom(code);
+          stillIn = !!room?.players.some(player => player.id === storedId);
+        } catch {
+          // Offline or refused: the join below says what went wrong.
+        }
+        if (stillIn) {
+          setRejoinAs({ id: storedId, name: storedName });
+          return;
+        }
       }
     }
 

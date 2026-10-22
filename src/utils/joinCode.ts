@@ -56,7 +56,11 @@ export type GameKind = "quiz" | "party" | "night";
  */
 export const findGame = async (code: string): Promise<GameKind | null> => {
     const [room, night, party] = await Promise.all([getRoom(code), nightExists(code), partyExists(code)]);
-    const mine = room && localStorage.getItem("gameCode") === code;
+    // This device's room: the stored code and its player in it. The code alone
+    // isn't enough since rooms expire (#248): a deleted room's code may be
+    // drawn again for someone else's.
+    const playerId = localStorage.getItem("playerId");
+    const mine = room && localStorage.getItem("gameCode") === code && room.players?.some(player => player.id === playerId);
     if (room && (mine || (room.phase ?? "lobby") === "lobby")) return "quiz";
     if (night) return "night";
     if (party) return "party";

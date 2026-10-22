@@ -44,6 +44,11 @@ service cloud.firestore {
              // can't be moved to another night, and a night only lists an
              // activity whose own document names that night.
              (!('nightCode' in data) || isNightRef(data.nightCode)) &&
+             // Kept about 30 days (ROOM_LIFETIME_DAYS), for the TTL policy on
+             // expireAt (#248). Optional so a client from before it can still
+             // create a room (kept for good); no update branch lists it, so
+             // it is never moved after creation.
+             (!('expireAt' in data) || isExpiryInWindow(data.expireAt)) &&
              !('nextRoomCode' in data) &&
              !('readyPlayers' in data) &&
              !('revealStep' in data) &&

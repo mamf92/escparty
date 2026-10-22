@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { MID_QUIZ_EVERY, RESULTS_GRACE_MS, phaseAfterQuestion, startedAtMillis } from "./quizTiming";
+import { expiryFromNow } from "./expiry";
 import { pickFreeName } from "./freeName";
 
 // Define room and player interfaces
@@ -40,6 +41,9 @@ export interface Room {
     // without it break every MID_QUIZ_EVERY questions.
     breakEvery?: number;
     createdAt: Timestamp | FieldValue;
+    // When the room can be deleted, by the Firestore TTL policy on expireAt
+    // (#248). Rooms made before it have none and are kept.
+    expireAt?: Timestamp;
     players: Player[];
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
     continueReady?: boolean; // Unused since #63 (players follow `phase`); old rooms may still carry it
@@ -103,6 +107,9 @@ export class JoinRejected extends Error {
     }
 }
 
+/** How long a room is kept. The expireAt field, for a TTL policy (#248). */
+export const ROOM_LIFETIME_DAYS = 30;
+
 /** The most players a room holds: maxPlayers() in firestore.rules. */
 export const MAX_PLAYERS = 32;
 
@@ -150,6 +157,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
 
         const roomRef = doc(db, "rooms", roomCode);
         console.log("Room reference created:", roomRef);
+        const expireAt = expiryFromNow(ROOM_LIFETIME_DAYS);
 
         const roomData: Room = {
             id: roomCode,
@@ -157,6 +165,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
             started: false,
             hostIsObserver,
             createdAt: serverTimestamp(), // This is fine outside of the array
+            expireAt,
             phase: "lobby",
             currentQuestionIndex: 0,
             phaseStartedAt: serverTimestamp(),
@@ -174,6 +183,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
         console.log("About to create room with data:", JSON.stringify({
             ...roomData,
             createdAt: "SERVER_TIMESTAMP", // Cannot stringify the timestamp
+            expireAt: expireAt.toDate().toISOString(),
             phaseStartedAt: "SERVER_TIMESTAMP",
             players: [{
                 ...roomData.players[0],
@@ -181,7 +191,18 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
             }]
         }));
 
-        await setDoc(roomRef, roomData);
+        try {
+            await setDoc(roomRef, roomData);
+        } catch (error) {
+            if ((error as { code?: string } | null)?.code !== "permission-denied") throw error;
+            // The rules take expireAt only 1-60 days out by the server's clock,
+            // so a device clock about a month off is refused (#248). Hosting
+            // matters more than the expiry: try once more without it, which
+            // the rules still allow (that room is kept, like one from before).
+            console.warn("Room refused with an expiry; retrying without one (is this device's clock right?)");
+            const { expireAt: _refused, ...withoutExpiry } = roomData;
+            await setDoc(roomRef, withoutExpiry);
+        }
         console.log(`Room ${roomCode} created successfully`);
     } catch (error) {
         console.error("Error creating room:", error);

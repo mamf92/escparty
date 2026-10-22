@@ -22,6 +22,21 @@ Five collections:
   nights" below. A code is unique across `rooms`, `parties` and `nights`
   (`freeCode`), because the Join screen has one code field.
 
+**Retention.** This is the one home for what is deleted and when. The
+project is on the Blaze plan and a Firestore TTL policy on `expireAt` is on
+(set by the owner, 2026-10-22), so a document in a collection group the
+policy lists is deleted some time after its `expireAt` passes (within about
+a day, not at the second). Parties, ballots, party names, nights, guests
+and night names carry `expireAt` about 30 days out; so do rooms since #248,
+which expire once the owner adds the `rooms` collection group to the policy.
+Rooms made before #248 have no `expireAt` and are kept. `quizzes` has none:
+the rules forbid deleting a saved quiz, so it is kept for good. A
+collection that should expire needs its group added to the policy (Firebase
+console, Firestore, Time-to-live), which only the owner can do. Each
+`expireAt` comes from `expiryFromNow` (`src/utils/expiry.ts`) on the
+writer's clock, and the rules take it only 1-60 days out
+(`isExpiryInWindow`).
+
 ## `Room` shape (as defined in `roomsFirestore.ts`)
 
 ```ts
@@ -32,6 +47,7 @@ interface Room {
   difficulty?: string;               // the quiz key: "easy" | "medium" | "hard" | "t-<templateId>" | "c-<quizId>"
   breakEvery?: number;               // mid-quiz break every N questions, 0 = never; absent = 5
   createdAt: Timestamp | FieldValue;
+  expireAt?: Timestamp;              // the writer's clock + 30 days (ROOM_LIFETIME_DAYS), for TTL (#248); set only at creation, left off if the rules refuse it
   players: Player[];
   hostIsObserver?: boolean;
   continueReady?: boolean;
@@ -422,9 +438,9 @@ Rules (`firestore.rules`, verify case 5j):
 
 Like every write in this app it checks shape, not who: with no sign-in the
 rules can't tell the host from a guest, so "only the host closes the night"
-is the page's job. A night's data expires with a TTL policy on `expireAt`
-for the `nights`, `guests` and `names` collection groups (the project owner
-enables it, as for parties).
+is the page's job. A night's data expires with the TTL policy on `expireAt`
+for the `nights`, `guests` and `names` collection groups (see "Retention"
+above).
 
 ## Saved quizzes (`quizzes/{quizId}`, #76)
 
