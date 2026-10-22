@@ -66,7 +66,8 @@ cleared and the join view shows. The host is the guest whose id is
 
 - **Joining.** The code typed or scanned on Join goes through
   `findGame` (`src/utils/joinCode.ts`) and a night opens `/n/CODE`; so does
-  the QR code's link (`codeFromScan` reads `#/n/CODE`). The reel offers only
+  the QR code's link (`codeFromScan` reads `#/n/CODE`). The join is the
+  shared `ReelJoin` (`src/components/`, the same as a party's). The reel offers only
   free names (`availablePartyNames`). `joinNight` writes the guest and the
   claim on their name in one batch: `true` saves the identity; `false` means
   someone claimed the name first ("Lordi was just taken. Spin again.", and it

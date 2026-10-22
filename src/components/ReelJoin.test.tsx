@@ -1,0 +1,128 @@
+import type { ComponentProps } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithProviders, screen, userEvent } from "../test/test-utils";
+import { ReelJoin, type ReelJoinAttempt } from "./ReelJoin";
+
+const reducedMotion = () =>
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
+
+const joinButton = () => screen.getByRole("button", { name: /^(Join the party|Joining…)$/ });
+const spin = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Next name" }));
+const reel = () => screen.getByRole("spinbutton", { name: "Your name" });
+
+const setup = (change: Partial<ComponentProps<typeof ReelJoin>> = {}) => {
+    let kept: ReelJoinAttempt | null = null;
+    const props: ComponentProps<typeof ReelJoin> = {
+        title: "Grand final",
+        subtitle: "Join party ABBA.",
+        footer: <span>Back</span>,
+        others: [{ guestId: "g-1", name: "Loreen" }, { guestId: "g-2", name: "Netta" }],
+        error: null,
+        errorView: <p role="alert">Lost the party</p>,
+        readPending: () => kept,
+        savePending: vi.fn(attempt => { kept = attempt; }),
+        clearPending: vi.fn(() => { kept = null; }),
+        send: vi.fn(async () => true),
+        onJoin: vi.fn(),
+        what: "the party",
+        pendingFailedNote: name => <>Couldn&apos;t reach it as {name}.</>,
+        ...change,
+    };
+    renderWithProviders(<ReelJoin {...props} />);
+    return { props, kept: () => kept };
+};
+
+describe("ReelJoin", () => {
+    beforeEach(reducedMotion);
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it("leaves the taken names off the reel, and joins as the landed name", async () => {
+        const user = userEvent.setup();
+        const { props } = setup({ children: <p>Below the button</p> });
+        expect(screen.getByRole("heading", { level: 1, name: "Grand final" })).toBeInTheDocument();
+        expect(screen.getByText("Below the button")).toBeInTheDocument();
+        expect(joinButton()).toBeDisabled();
+        await spin(user);
+        // Loreen is taken, so the first name left on the reel is Käärijä.
+        expect(reel()).toHaveAttribute("aria-valuetext", "Käärijä");
+        await user.click(joinButton());
+        const [guestId, name] = vi.mocked(props.send).mock.calls[0];
+        expect(name).toBe("Käärijä");
+        expect(props.savePending).toHaveBeenCalledWith({ guestId, name: "Käärijä" });
+        expect(props.clearPending).toHaveBeenCalled();
+        expect(props.onJoin).toHaveBeenCalledWith({ guestId, name: "Käärijä" });
+    });
+
+    it("says a name was just taken and keeps it off the reel", async () => {
+        const user = userEvent.setup();
+        const { props } = setup({ send: vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true) });
+        await spin(user);
+        await user.click(joinButton());
+        expect(await screen.findByText("Käärijä was just taken. Spin again.")).toBeInTheDocument();
+        expect(props.onJoin).not.toHaveBeenCalled();
+        await spin(user);
+        expect(reel()).not.toHaveAttribute("aria-valuetext", "Käärijä");
+    });
+
+    it("keeps a join that timed out, and retries it with the same id and name", async () => {
+        const user = userEvent.setup();
+        const send = vi.fn()
+            .mockRejectedValueOnce(Object.assign(new Error("slow"), { code: "deadline-exceeded" }))
+            .mockResolvedValue(true);
+        const { props, kept } = setup({ send });
+        await spin(user);
+        await user.click(joinButton());
+        expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't reach it as Käärijä.");
+        const [guestId, name] = send.mock.calls[0];
+        expect(kept()).toEqual({ guestId, name });
+        await user.click(joinButton());
+        expect(send).toHaveBeenLastCalledWith(guestId, name);
+        expect(props.onJoin).toHaveBeenCalledWith({ guestId, name });
+    });
+
+    it("lets any name be tried after a join refused for another reason", async () => {
+        const user = userEvent.setup();
+        const { kept } = setup({ send: vi.fn().mockRejectedValue(Object.assign(new Error("no"), { code: "permission-denied" })) });
+        await spin(user);
+        await user.click(joinButton());
+        expect(await screen.findByRole("alert")).toHaveTextContent("You couldn't join just now");
+        expect(kept()).toBeNull();
+    });
+
+    it("picks up a join kept from an earlier visit", async () => {
+        const user = userEvent.setup();
+        const { props } = setup({ readPending: () => ({ guestId: "g-late", name: "Hatari" }) });
+        expect(screen.getByText("You were joining as Hatari. Press Join to finish.")).toBeInTheDocument();
+        await user.click(joinButton());
+        expect(props.send).toHaveBeenCalledWith("g-late", "Hatari");
+    });
+
+    it("offers numbered names a full party shows, only when distinct", async () => {
+        // Two guests share every name: the second of each is shown as "<name> 2".
+        const { PARTY_NAMES } = await import("../utils/partyNames");
+        const others = PARTY_NAMES.flatMap((name, i) => [
+            { guestId: `a-${i}`, name },
+            { guestId: `b-${i}`, name },
+        ]);
+        const user = userEvent.setup();
+        setup({ others, distinct: true });
+        await spin(user);
+        expect(reel()).toHaveAttribute("aria-valuetext", "Loreen 3");
+    });
+
+    it("waits for the taken names before anyone can spin", () => {
+        setup({ others: undefined });
+        expect(screen.getByText("Checking which names are taken…")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Next name" })).toBeDisabled();
+    });
+
+    it("shows the error view instead of the reel, and no join", () => {
+        setup({ error: "gone" });
+        expect(screen.getByRole("alert")).toHaveTextContent("Lost the party");
+        expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+        expect(joinButton()).toBeDisabled();
+    });
+});

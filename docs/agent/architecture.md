@@ -50,6 +50,11 @@ Mostly not small reusable pieces, despite the folder name:
 - `PartyStates.tsx` — the error states every party screen shares: no
   party with that code ("Try another code") and a party that couldn't be
   reached ("Try again"). Party page layout lives in `src/pages/party-calm.css`.
+- `ReelJoin.tsx` — joining a scoreboard party (`PartyRoom.tsx`) or a party
+  night (`NightHome.tsx`) on the `NamePicker` reel (#249): taken names off
+  the reel, "X was just taken. Spin again.", and a timed-out join kept and
+  retried with the same guest id and name. Each page passes its own write,
+  its pending-join storage and its error view.
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui` and the big screen), with the app bar: the brand
