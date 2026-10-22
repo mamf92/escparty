@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
-import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
 import { ConfirmLeave } from "../components/ConfirmLeave";
-import { NamePicker } from "../components/NamePicker";
+import { ReelJoin } from "../components/ReelJoin";
 import { NightActivities } from "../components/NightActivities";
 import { NightError, NightNotFound } from "../components/NightStates";
 import { QrFullScreen } from "../components/QrFullScreen";
@@ -23,7 +22,6 @@ import {
     savePendingNightJoin,
     type NightIdentity,
 } from "../utils/nightSession";
-import { availablePartyNames } from "../utils/partyNames";
 
 // The host closes the night on the way out (#237): nobody is left in a night
 // with no host tools, and the guests are told it is over rather than waiting.
@@ -51,6 +49,8 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
     const navigate = useNavigate();
     const { night, guests, error, retry } = useNightData(code);
     const [identity, setIdentity] = useState<NightIdentity | null>(() => (code ? readNightIdentity(code) : null));
+    // The roster as the reel reads it, kept between renders so the reel's names aren't redone each time.
+    const joinedGuests = useMemo(() => guests?.map(guest => ({ guestId: guest.id, name: guest.name })), [guests]);
     // A stored identity is only good while the roster still has this guest
     // (they may have left from another tab, or the night may be a new one under
     // an old code): checked once on load, then watched in the roster.
@@ -147,17 +147,24 @@ const NightHomeFor = ({ code }: { code: string | undefined }) => {
     }
     if (!identity) {
         return (
-            <NightJoin
-                night={night}
-                guests={guests}
+            <ReelJoin
+                title={night.title}
+                subtitle={`Join party night ${night.code} and play along all evening.`}
+                footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
+                others={joinedGuests}
                 error={error}
-                onRetry={retry}
+                errorView={message => <NightError error={message} onRetry={retry} />}
+                readPending={() => readPendingNightJoin(night.code)}
+                savePending={attempt => savePendingNightJoin(night.code, attempt)}
+                clearPending={() => clearPendingNightJoin(night.code)}
+                send={(guestId, name) => joinNight(night.code, guestId, name)}
                 onJoin={next => {
                     // The guest and their name are written; remember them on this device.
                     saveNightIdentity(night.code, next);
                     setIdentity(next);
                 }}
-                footer={<CalmLink onClick={() => navigate("/")}>Back to ESCParty</CalmLink>}
+                what="the party night"
+                pendingFailedNote={name => <>Couldn&apos;t reach the party, try again. You&apos;re joining as {name}.</>}
             />
         );
     }
@@ -347,114 +354,6 @@ const GuestRow = ({ guest, night, me }: { guest: NightGuest; night: Night; me: s
                 {marks && <span className="calm-sub">{marks}</span>}
             </span>
         </Row>
-    );
-};
-
-/**
- * Join a night: the name reel (names already on the roster are off it) and
- * the black Join button. The join is retried with the same guest id and name
- * while it is unconfirmed, even after a reload, so a write that landed late
- * is found rather than left as a second guest (as at a scoreboard party).
- */
-const NightJoin = ({ night, guests, error, onRetry, onJoin, footer }: {
-    night: Night;
-    /** Everyone already in the night, whose names are taken; undefined until they arrive. */
-    guests: NightGuest[] | undefined;
-    /** A listener errored: nobody joins until the taken names can be read. */
-    error: string | null;
-    onRetry: () => void;
-    onJoin: (identity: NightIdentity) => void;
-    footer: ReactNode;
-}) => {
-    const [name, setName] = useState<string | null>(null);
-    const [spinning, setSpinning] = useState(false);
-    const [joining, setJoining] = useState(false);
-    const [pending, setPending] = useState(() => readPendingNightJoin(night.code));
-    // Whether the pending join failed on this visit, or was only found from an earlier one.
-    const [pendingFailed, setPendingFailed] = useState(false);
-    const [failed, setFailed] = useState(false);
-    const [freshId] = useState(() => uuidv4());
-    const guestId = pending?.guestId ?? freshId;
-    // Names other guests claimed first when this guest pressed Join, kept off
-    // the reel even before the roster shows them; the last one is said aloud.
-    const [refused, setRefused] = useState<string[]>([]);
-    const [refusedNow, setRefusedNow] = useState<string | null>(null);
-    const checking = guests === undefined && !error;
-    // The names nobody has yet (a guest of this device's own, from a join that landed late, doesn't count).
-    const names = useMemo(() => {
-        const others = (guests ?? []).filter(guest => guest.id !== guestId);
-        return availablePartyNames([...others.map(guest => guest.name), ...refused]);
-    }, [guests, refused, guestId]);
-    // Any listener error stops joining, even with a roster on screen: it may be stale.
-    const blocked = !!error;
-    // A pending join keeps its name. Otherwise a landed name that the roster
-    // takes before this guest joins is let go.
-    const landed = pending ? pending.name : name !== null && names.includes(name) ? name : null;
-    const justTaken = !pending && name !== null && landed === null ? name : refusedNow;
-    const land = (next: string | null) => {
-        setName(next);
-        setRefusedNow(null);
-        setFailed(false);
-    };
-    const join = async () => {
-        if (landed === null || joining) return;
-        const attempt = { guestId, name: landed };
-        savePendingNightJoin(night.code, attempt);
-        setJoining(true);
-        setFailed(false);
-        try {
-            const joined = await joinNight(night.code, attempt.guestId, attempt.name);
-            clearPendingNightJoin(night.code);
-            if (joined) {
-                onJoin({ guestId: attempt.guestId, name: attempt.name });
-                return;
-            }
-            setPending(null);
-            setName(null);
-            setRefused(current => [...current, attempt.name]);
-            setRefusedNow(attempt.name);
-        } catch (joinError) {
-            console.error("Couldn't join the party night:", joinError);
-            const code = (joinError as { code?: string }).code;
-            if (code === "deadline-exceeded" || code === "unavailable") {
-                // It may still land: keep the name and id for the retry.
-                setPending(attempt);
-                setPendingFailed(true);
-            } else {
-                // Refused for another reason: nothing landed, so any name may be tried.
-                clearPendingNightJoin(night.code);
-                setPending(null);
-                setFailed(true);
-            }
-        }
-        setJoining(false);
-    };
-    return (
-        <CalmPage title={night.title} subtitle={`Join party night ${night.code} and play along all evening.`} footer={footer}>
-            {blocked && error !== null ? <NightError error={error} onRetry={onRetry} /> : (
-                <>
-                    <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
-                    <NamePicker value={landed} onChange={land} onSpinningChange={setSpinning} names={pending ? [pending.name] : names} disabled={checking || joining || !!pending} />
-                </>
-            )}
-            {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
-            {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
-            {pending && !joining && (pendingFailed
-                ? <CalmNote role="alert">Couldn&apos;t reach the party, try again. You&apos;re joining as {pending.name}.</CalmNote>
-                : <CalmNote role="status">You were joining as {pending.name}. Press Join to finish.</CalmNote>)}
-            {failed && <CalmNote role="alert">You couldn&apos;t join just now. Spin again or try in a moment.</CalmNote>}
-            <Ground>
-                <Pane>
-                    <Control
-                        elevation="high"
-                        disabled={landed === null || spinning || checking || blocked || joining}
-                        onClick={() => void join()}
-                    >
-                        {joining ? "Joining…" : "Join the party"}
-                    </Control>
-                </Pane>
-            </Ground>
-        </CalmPage>
     );
 };
 

@@ -1,9 +1,8 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { v4 as uuidv4 } from "uuid";
 import { CalmLink, CalmNote, CalmPage } from "../components/CalmPage";
-import { NamePicker } from "../components/NamePicker";
 import PartyHostTools from "../components/PartyHostTools";
+import { ReelJoin } from "../components/ReelJoin";
 import { PartyError, PartyNotFound } from "../components/PartyStates";
 import { Control, Ground, Pane, Row, Sheet, SheetRow, Stepper, useRovingTabs } from "../design";
 import { useOwnBallot, type SaveState } from "../hooks/useOwnBallot";
@@ -20,7 +19,7 @@ import {
     type Ratings,
 } from "../utils/partyModel";
 import { prefersReducedMotion } from "../utils/motion";
-import { availablePartyNames, withDistinctNames } from "../utils/partyNames";
+import { withDistinctNames } from "../utils/partyNames";
 import { actIdsOf, formatScore, hasResults, ordinal, partyBonusList, predictionFor, predictionsFor } from "../utils/partyResults";
 import { clearPendingJoin, readPartyIdentity, readPendingJoin, savePartyIdentity, savePendingJoin, type PartyIdentity } from "../utils/partySession";
 import "./party-calm.css";
@@ -92,18 +91,34 @@ const PartyRoom = () => {
     }
     if (!identity) {
         return (
-            <JoinParty
-                party={party}
-                ballots={ballots}
+            <ReelJoin
+                key={party.code}
+                title={party.title}
+                subtitle={`Join party ${party.code} and rate every act.`}
+                footer={back}
+                others={ballots}
+                distinct
                 error={error}
-                onRetry={retry}
-                onJoin={next => {
-                    // JoinParty has claimed the name and written the empty ballot.
+                errorView={message => <PartyError error={message} onRetry={retry} />}
+                readPending={() => readPendingJoin(party.code)}
+                savePending={attempt => savePendingJoin(party.code, attempt)}
+                clearPending={() => clearPendingJoin(party.code)}
+                send={(guestId, name) => joinParty(party.code, guestId, name)}
+                onJoin={attempt => {
+                    // ReelJoin has claimed the name and written the empty ballot.
+                    const next = { ...attempt, isHost: false };
                     savePartyIdentity(party.code, next);
                     setIdentity(next);
                 }}
-                footer={back}
-            />
+                what="the party"
+                pendingFailedNote={name => <>You couldn&apos;t join as {name} just now. Check your connection and press Join again.</>}
+            >
+                <CalmNote role="status">
+                    {party.showNames
+                        ? "At the end, the awards name who rated most alike and most differently."
+                        : "The awards at the end don't name names: you're only told which ones are yours."}
+                </CalmNote>
+            </ReelJoin>
         );
     }
 
@@ -166,115 +181,6 @@ const PartyRoom = () => {
                 )}
                 {tab === "rate" && <CalmNote role="status">{SAVE_NOTES[own.state]}</CalmNote>}
             </div>
-        </CalmPage>
-    );
-};
-
-const JoinParty = ({ party, ballots, error, onRetry, onJoin, footer }: {
-    party: Party;
-    /** Everyone already in the party, whose names are taken; undefined until they arrive. */
-    ballots: Ballot[] | undefined;
-    /** A listener errored: nobody joins until the taken names can be read. */
-    error: string | null;
-    onRetry: () => void;
-    onJoin: (identity: PartyIdentity) => void;
-    footer: ReactNode;
-}) => {
-    const [name, setName] = useState<string | null>(null);
-    const [spinning, setSpinning] = useState(false);
-    const [joining, setJoining] = useState(false);
-    // A join sent but not confirmed: retried with the same id and name, even
-    // after a reload, so a write that landed late is found, not doubled.
-    const [pending, setPending] = useState(() => readPendingJoin(party.code));
-    // Whether the pending join failed on this visit, or was only found from an earlier one.
-    const [pendingFailed, setPendingFailed] = useState(false);
-    const [failed, setFailed] = useState(false);
-    const [freshId] = useState(() => uuidv4());
-    const guestId = pending?.guestId ?? freshId;
-    // Names other guests claimed first when this guest pressed Join, kept off
-    // the reel even before their ballots arrive; the last one is said aloud.
-    const [refused, setRefused] = useState<string[]>([]);
-    const [refusedNow, setRefusedNow] = useState<string | null>(null);
-    const checking = ballots === undefined && !error;
-    // The names nobody has yet (a ballot of this guest's own, from a join that landed late, doesn't count).
-    const names = useMemo(() => {
-        const others = (ballots ?? []).filter(ballot => ballot.guestId !== guestId);
-        return availablePartyNames([...others.map(ballot => ballot.name), ...refused], withDistinctNames(others).map(ballot => ballot.name));
-    }, [ballots, refused, guestId]);
-    // Any listener error stops joining, even with ballots on screen: they may be stale.
-    const blocked = !!error;
-    // A pending join keeps its name. Otherwise a landed name that a ballots
-    // update takes before this guest joins is let go.
-    const landed = pending ? pending.name : name !== null && names.includes(name) ? name : null;
-    const justTaken = !pending && name !== null && landed === null ? name : refusedNow;
-    const land = (next: string | null) => {
-        setName(next);
-        setRefusedNow(null);
-        setFailed(false);
-    };
-    const join = async () => {
-        if (landed === null) return;
-        const attempt = { guestId, name: landed };
-        savePendingJoin(party.code, attempt);
-        setJoining(true);
-        setFailed(false);
-        try {
-            const joined = await joinParty(party.code, attempt.guestId, attempt.name);
-            clearPendingJoin(party.code);
-            if (joined) {
-                onJoin({ guestId: attempt.guestId, name: attempt.name, isHost: false });
-                return;
-            }
-            setPending(null);
-            setName(null);
-            setRefused(current => [...current, attempt.name]);
-            setRefusedNow(attempt.name);
-        } catch (joinError) {
-            console.error("Couldn't join the party:", joinError);
-            const code = (joinError as { code?: string }).code;
-            if (code === "deadline-exceeded" || code === "unavailable") {
-                // It may still land: keep the name and id for the retry.
-                setPending(attempt);
-                setPendingFailed(true);
-            } else {
-                // Refused for another reason: nothing landed, so any name may be tried.
-                clearPendingJoin(party.code);
-                setPending(null);
-                setFailed(true);
-            }
-        }
-        setJoining(false);
-    };
-    return (
-        <CalmPage title={party.title} subtitle={`Join party ${party.code} and rate every act.`} footer={footer}>
-            {blocked && error !== null ? <PartyError error={error} onRetry={onRetry} /> : (
-                <>
-                    <CalmNote>Spin the reel for a Eurovision legend to be tonight. You can&apos;t type your own.</CalmNote>
-                    <NamePicker value={landed} onChange={land} onSpinningChange={setSpinning} names={pending ? [pending.name] : names} disabled={checking || joining || !!pending} />
-                </>
-            )}
-            {checking && <CalmNote role="status">Checking which names are taken…</CalmNote>}
-            {justTaken !== null && <CalmNote role="status">{justTaken} was just taken. Spin again.</CalmNote>}
-            {pending && !joining && (pendingFailed
-                ? <CalmNote role="alert">You couldn&apos;t join as {pending.name} just now. Check your connection and press Join again.</CalmNote>
-                : <CalmNote role="status">You were joining as {pending.name}. Press Join to finish.</CalmNote>)}
-            {failed && <CalmNote role="alert">You couldn&apos;t join just now. Spin again or try in a moment.</CalmNote>}
-            <Ground>
-                <Pane>
-                    <Control
-                        elevation="high"
-                        disabled={landed === null || spinning || checking || blocked || joining}
-                        onClick={() => void join()}
-                    >
-                        {joining ? "Joining…" : "Join the party"}
-                    </Control>
-                </Pane>
-            </Ground>
-            <CalmNote role="status">
-                {party.showNames
-                    ? "At the end, the awards name who rated most alike and most differently."
-                    : "The awards at the end don't name names: you're only told which ones are yours."}
-            </CalmNote>
         </CalmPage>
     );
 };
