@@ -156,8 +156,8 @@ open at the time of writing:
   `src/utils/multiplayerSession.ts` (#63); `src/hooks/useResumeRoom.ts` has hook tests (#63), without a
   floor. Every page, component and hook now has a test file except the
   ones listed in `UNTESTED` in `src/test/testFiles.test.ts`
-  (the WebGL components in `src/fabric-ui/` and its `leva` debug-panel hook,
-  plus the dead `useGameStore`), which is #59; a test file doesn't mean
+  (the WebGL components in `src/fabric-ui/` and its `leva` debug-panel hook),
+  which is #59; a test file doesn't mean
   every flow in it is covered.
 - **`Quiz.tsx` is mostly covered where it was extracted.** The scoring
   formula moved to `src/utils/quizScoring.ts` and the multiplayer timing to
@@ -177,7 +177,7 @@ open at the time of writing:
 - **New pages, components and hooks need a test file.**
   `src/test/testFiles.test.ts` fails `npm test` when a module under
   `src/pages`, `src/components` or `src/hooks`, or a component (`.tsx`)
-  or hook (`use*.ts`) under `src/fabric-ui` or `src/store`, has no sibling
+  or hook (`use*.ts`) under `src/design` or `src/fabric-ui`, has no sibling
   `*.test.ts(x)`/`*.spec.ts(x)`, except the pre-existing debt it lists (#140, #59). The
   steward treats missing tests as blocking (#58).
 - **Colours come from tokens.** `src/test/designGuard.test.ts` fails
