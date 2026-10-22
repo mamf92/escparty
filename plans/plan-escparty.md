@@ -15,6 +15,7 @@ TL;DR - Create robust Copilot instructions, add CI/CD and test coverage, introdu
    5. Branch protection: enforce status checks (CI and tests) before merge to main and require PR review.
 
 3. Zustand plan (design and incremental rollout, parallelizable with testing setup)
+   > **Dropped (#251, 2026-10-22).** The store was never wired in and was removed with the `zustand` dependency; session state lives in per-feature helpers (`multiplayerSession.ts`, `partySession.ts`, `nightSession.ts`). See CLAUDE.md's Known landmines. Kept below only as history.
    1. Decision: introduce Zustand as lightweight global state to track active multiplayer session (room, playerId, playerName, isHost, gameState, local UI flags) and transient UI state (current question index, timer). Keep persistence in sessionStorage but move canonical client state into the store.
    2. Implementation steps:
       - Create src/store/useGameStore.ts using zustand with TypeScript types for Player, RoomState, GameState.
@@ -51,9 +52,9 @@ TL;DR - Create robust Copilot instructions, add CI/CD and test coverage, introdu
 ## Decisions and assumptions
 - Host choice: recommend Vercel for ease; GitHub Pages is fine for static hosting but lacks previews and serverless functions if later needed.
 - Use Firebase emulator in CI to avoid requiring production secrets in CI.
-- Zustand will be used as client-side single source of truth for multiplayer session state; Firestore remains the authoritative backend.
+- ~~Zustand will be used as client-side single source of truth for multiplayer session state~~ (dropped, #251); Firestore remains the authoritative backend.
 
 ## Further considerations
 1. Env vars: compile a list of required VITE_ env keys from src/firebase.ts and document in Copilot instructions and repo README with .env.example.
 2. Firestore rules: ensure production rules match dev assumptions - include a step to export/import rules in repo and test them with the emulator.
-3. Rollout plan for Zustand: migrate incrementally per component to minimize risk; keep old storage persistence until fully verified.
+3. ~~Rollout plan for Zustand~~ (dropped, #251): migrate incrementally per component to minimize risk; keep old storage persistence until fully verified.
