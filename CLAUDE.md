@@ -48,8 +48,7 @@ collection. The scoreboard party (`/party`, rating Burgas 2027 with the
 room) is its own set of `party*` files and Firestore `parties`/`contests`:
 `docs/agent/scoreboard-party.md`; a party night (`/n/CODE`, one code for the
 whole evening) is `night*` files and `nights`: `docs/agent/party-night.md`. `src/fabric-ui/` is a self-contained WebGL rendering module for
-the Sparkle theme, lazy-loaded behind its own route. `src/store/` has one
-file, `useGameStore.ts`, which is dead code (see Landmines). `src/utils/`
+the Sparkle theme, lazy-loaded behind its own route. `src/utils/`
 has `roomsFirestore.ts` (the Firestore API), `QuizDataProvider.ts` (quiz
 question loading), `quizScoring.ts` (the answer-scoring math, extracted from
 `Quiz.tsx` so it can be tested directly), `quizTiming.ts` (multiplayer
@@ -103,12 +102,14 @@ rules, ask before making it rather than guessing.
 
 ## Known landmines
 
-- `useGameStore.ts` (Zustand) is **not imported anywhere** outside itself —
-  it's dead code. Session state is instead duplicated ad hoc via
-  `localStorage`/`sessionStorage`/router `location.state` across
-  `MultiplayerLobby.tsx`, `Lobby.tsx`, `Quiz.tsx`, `MidQuizScoreboard.tsx`,
-  `HostObserverView.tsx`, and `QuizResults.tsx`. Don't assume the store is
-  wired in; don't add to it without a migration plan.
+- There is no global store (the unused Zustand one was removed, #251).
+  The party and the party night keep their session state in their helpers
+  (`partySession.ts`, `nightSession.ts`), but the quiz's is still
+  duplicated ad hoc across pages in raw `localStorage`/`sessionStorage`
+  keys and router `location.state`; which page reads and writes what is
+  "State plumbing, summarized" in `docs/agent/multiplayer-sync.md`. Don't
+  add another raw key, and don't add a store without a migration plan
+  that also removes the storage it would duplicate.
 - In multiplayer, `Room.phase`/`currentQuestionIndex`/`phaseStartedAt` are
   **the** source of truth for which question is showing (#62). Don't
   reintroduce a locally incremented index or a local countdown there, or a

@@ -50,6 +50,11 @@ Mostly not small reusable pieces, despite the folder name:
 - `PartyStates.tsx` — the error states every party screen shares: no
   party with that code ("Try another code") and a party that couldn't be
   reached ("Try again"). Party page layout lives in `src/pages/party-calm.css`.
+- `ReelJoin.tsx` — joining a scoreboard party (`PartyRoom.tsx`) or a party
+  night (`NightHome.tsx`) on the `NamePicker` reel (#249): taken names off
+  the reel, "X was just taken. Spin again.", and a timed-out join kept and
+  retried with the same guest id and name. Each page passes its own write,
+  its pending-join storage and its error view.
 
 - `MobileFrame.tsx` — the phone-frame chrome every routed page renders inside
   (except `/fabric-ui` and the big screen), with the app bar: the brand
@@ -79,15 +84,6 @@ check current usage before assuming it renders the real quiz flow. Its
 colours are its own (`palette.ts`, the app's pre-design-system colours), so
 it is exempt from the design guard. Design details belong in
 `.claude/skills/escparty-sparkle/`, not here.
-
-## `src/store/useGameStore.ts`
-
-A Zustand store. **Dead code** — not imported anywhere outside itself. Real
-session state (`playerId`, `playerName`, `isHost`, room code, etc.) is
-instead threaded through `localStorage`, `sessionStorage`, and router
-`location.state` directly inside the pages listed in `CLAUDE.md`'s Known
-Landmines section. Don't wire new code to this store without a migration
-plan that also removes the ad hoc storage it would duplicate.
 
 ## `src/data/`
 
