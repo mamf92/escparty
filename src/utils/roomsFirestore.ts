@@ -40,6 +40,9 @@ export interface Room {
     // without it break every MID_QUIZ_EVERY questions.
     breakEvery?: number;
     createdAt: Timestamp | FieldValue;
+    // When the room can be deleted, by the Firestore TTL policy on expireAt
+    // (#248). Rooms made before it have none and are kept.
+    expireAt?: Timestamp;
     players: Player[];
     hostIsObserver?: boolean; // Flag to indicate if host is in observer mode
     continueReady?: boolean; // Unused since #63 (players follow `phase`); old rooms may still carry it
@@ -103,6 +106,9 @@ export class JoinRejected extends Error {
     }
 }
 
+/** How long a room is kept. The expireAt field, for a TTL policy (#248). */
+export const ROOM_LIFETIME_DAYS = 30;
+
 /** The most players a room holds: maxPlayers() in firestore.rules. */
 export const MAX_PLAYERS = 32;
 
@@ -157,6 +163,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
             started: false,
             hostIsObserver,
             createdAt: serverTimestamp(), // This is fine outside of the array
+            expireAt: Timestamp.fromMillis(Date.now() + ROOM_LIFETIME_DAYS * 24 * 60 * 60 * 1000),
             phase: "lobby",
             currentQuestionIndex: 0,
             phaseStartedAt: serverTimestamp(),
@@ -174,6 +181,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
         console.log("About to create room with data:", JSON.stringify({
             ...roomData,
             createdAt: "SERVER_TIMESTAMP", // Cannot stringify the timestamp
+            expireAt: roomData.expireAt?.toDate().toISOString(),
             phaseStartedAt: "SERVER_TIMESTAMP",
             players: [{
                 ...roomData.players[0],

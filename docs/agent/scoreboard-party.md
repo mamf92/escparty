@@ -251,8 +251,7 @@ newest scoreboard's room standings with the same `RoomStandings` component as
 ## Retention
 
 Every party and every ballot carries `expireAt`, 30 days out
-(`PARTY_LIFETIME_DAYS`; the rules accept 1-60 days, as the phone's clock sets it). Nothing is deleted until
-the project owner enables a Firestore TTL policy on `expireAt` for both
-collection groups, `parties`, `ballots` and `names` (Firebase console, Firestore,
-Time-to-live). Deleting a party doesn't delete its ballots or name claims on
+(`PARTY_LIFETIME_DAYS`; the rules accept 1-60 days, as the phone's clock sets it). The Firestore TTL policy on
+`expireAt` (on since 2026-10-22) deletes them for the collection groups
+`parties`, `ballots` and `names`; see "Retention" in `firestore-data-model.md`. Deleting a party doesn't delete its ballots or name claims on
 its own, which is why each has its own expiry.

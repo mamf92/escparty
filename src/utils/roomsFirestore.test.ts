@@ -5,6 +5,7 @@ import {
     advanceQuestion,
     createNightRoom,
     createRoom,
+    ROOM_LIFETIME_DAYS,
     generateRoomCode,
     getRoom,
     joinRoom,
@@ -46,6 +47,7 @@ const mocks = vi.hoisted(() => ({
     runTransaction: vi.fn(),
     serverTimestamp: vi.fn(),
     timestampNow: vi.fn(),
+    timestampFromMillis: vi.fn((ms: number) => ({ ms, toDate: () => new Date(ms) })),
 }));
 
 // A getter, not a fixed value, so a test can simulate the app booting without
@@ -68,7 +70,7 @@ vi.mock("firebase/firestore", () => ({
     onSnapshot: mocks.onSnapshot,
     runTransaction: mocks.runTransaction,
     serverTimestamp: mocks.serverTimestamp,
-    Timestamp: { now: mocks.timestampNow },
+    Timestamp: { now: mocks.timestampNow, fromMillis: mocks.timestampFromMillis },
     FieldValue: class FieldValue { },
 }));
 
@@ -145,6 +147,7 @@ describe("createRoom", () => {
             started: false,
             hostIsObserver: false,
             createdAt: SERVER_TIMESTAMP,
+            expireAt: { ms: expect.any(Number), toDate: expect.any(Function) },
             phase: "lobby",
             currentQuestionIndex: 0,
             phaseStartedAt: SERVER_TIMESTAMP,
@@ -187,6 +190,14 @@ describe("createRoom", () => {
         expect(written.players[0].joinedAt).not.toBe(SERVER_TIMESTAMP);
     });
 
+    it("sets the room to expire ROOM_LIFETIME_DAYS from now, for the TTL policy (#248)", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(1000);
+        await createRoom("ABCD", "host-1", "Martin");
+
+        const written = mocks.setDoc.mock.calls[0][1] as unknown as { expireAt: { ms: number } };
+        expect(written.expireAt.ms).toBe(1000 + ROOM_LIFETIME_DAYS * 86_400_000);
+    });
+
     it("leaves nightCode off a room made outside a night", async () => {
         await createRoom("ABCD", "host-1", "Martin");
 
@@ -202,6 +213,7 @@ describe("createRoom", () => {
             started: false,
             hostIsObserver: true,
             createdAt: SERVER_TIMESTAMP,
+            expireAt: { ms: expect.any(Number), toDate: expect.any(Function) },
             phase: "lobby",
             currentQuestionIndex: 0,
             phaseStartedAt: SERVER_TIMESTAMP,

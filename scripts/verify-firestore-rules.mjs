@@ -95,6 +95,35 @@ async function createRoom(roomRef, id) {
 const { roomCode, roomRef } = freshRoom("TEST");
 await expectAllowed("create room (host)", () => createRoom(roomRef, roomCode));
 
+// 1b. Rooms expire (#248): createRoom stamps expireAt about 30 days out for
+// the TTL policy. The rules take it only in parties' 1-60 day window, and
+// no later write may move it (no update branch lists it).
+const roomExpiry = (days) => Timestamp.fromMillis(Date.now() + days * 24 * 60 * 60 * 1000);
+const expiring = freshRoom("EXPR");
+await expectAllowed("create a room with expireAt 30 days out", () =>
+  setDoc(expiring.roomRef, {
+    id: expiring.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
+    expireAt: roomExpiry(30),
+    players: [{ id: "host-1", name: "Host", score: 0 }],
+  })
+);
+for (const [label, days] of [["a far-off expireAt", 400], ["an expireAt that is already near", 0]]) {
+  const bad = freshRoom("EXPB");
+  await expectDenied(`create a room with ${label}`, () =>
+    setDoc(bad.roomRef, {
+      id: bad.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
+      expireAt: roomExpiry(days),
+      players: [{ id: "host-1", name: "Host", score: 0 }],
+    })
+  );
+}
+await expectDenied("move a room's expireAt after creation", () =>
+  updateDoc(expiring.roomRef, { expireAt: roomExpiry(50) })
+);
+await expectDenied("add an expireAt to a room made without one", () =>
+  updateDoc(roomRef, { expireAt: roomExpiry(30) })
+);
+
 // 2. Legitimate player join via arrayUnion (real addPlayerToRoom shape)
 await expectAllowed("join room (arrayUnion, valid player)", () =>
   updateDoc(roomRef, {
