@@ -27,7 +27,7 @@
     "react": "~19.3.0",
     "react-dom": "~19.3.0",
     "react-router-dom": "^7.18.4",
-    "styled-components": "^6.5.3",
+    "styled-components": "^6.6.0",
     "three": "^0.186.1",
     "uuid": "^14.0.2"
   },
