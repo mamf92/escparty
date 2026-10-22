@@ -8,7 +8,11 @@ vi.mock("./roomsFirestore", () => ({ getRoom: vi.fn() }));
 vi.mock("./partyFirestore", () => ({ partyExists: vi.fn() }));
 vi.mock("./nightsFirestore", () => ({ nightExists: vi.fn() }));
 
-const room = (phase: Room["phase"]) => ({ id: "ABBA", phase } as Room);
+const room = (phase: Room["phase"]) => ({ id: "ABBA", phase, players: [{ id: "p-me", name: "Lordi", score: 0 }] } as Room);
+const playIn = (code: string) => {
+  localStorage.setItem("gameCode", code);
+  localStorage.setItem("playerId", "p-me");
+};
 
 describe("cleanCode", () => {
   it("keeps four letters, upper case", () => {
@@ -74,8 +78,15 @@ describe("findGame", () => {
     vi.mocked(getRoom).mockResolvedValue(room("lobby"));
     expect(await findGame("ABBA")).toBe("quiz");
     vi.mocked(getRoom).mockResolvedValue(room("question"));
-    localStorage.setItem("gameCode", "ABBA");
+    playIn("ABBA");
     expect(await findGame("ABBA")).toBe("quiz");
+  });
+
+  it("doesn't take a reused code's room for this device's, when its player isn't in it (#248)", async () => {
+    vi.mocked(nightExists).mockResolvedValue(true);
+    vi.mocked(getRoom).mockResolvedValue({ ...room("question"), players: [{ id: "someone-else", name: "Nemo", score: 0 }] });
+    playIn("ABBA");
+    expect(await findGame("ABBA")).toBe("night");
   });
 
   it("keeps a running quiz room that nothing else shares", async () => {
@@ -90,7 +101,7 @@ describe("findGame", () => {
     expect(await findGame("ABBA")).toBe("quiz");
     vi.mocked(getRoom).mockResolvedValue(room("question"));
     expect(await findGame("ABBA")).toBe("party");
-    localStorage.setItem("gameCode", "ABBA");
+    playIn("ABBA");
     expect(await findGame("ABBA")).toBe("quiz");
   });
 });

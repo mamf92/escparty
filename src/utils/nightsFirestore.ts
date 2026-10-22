@@ -23,6 +23,7 @@ import {
     type WriteBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { expiryFromNow } from "./expiry";
 import { freeCode } from "./freeCode";
 import { isDenied, settleRefusal } from "./firestoreRefusal";
 import { nameKey } from "./freeName";
@@ -67,7 +68,7 @@ const requireDb = () => {
 };
 
 /** When a document written now can be deleted: NIGHT_LIFETIME_DAYS from now. */
-const expiry = () => Timestamp.fromMillis(Date.now() + NIGHT_LIFETIME_DAYS * 24 * 60 * 60 * 1000);
+const expiry = () => expiryFromNow(NIGHT_LIFETIME_DAYS);
 
 /** Whether a night has this code. */
 export const nightExists = async (code: string): Promise<boolean> =>

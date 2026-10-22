@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { MID_QUIZ_EVERY, RESULTS_GRACE_MS, phaseAfterQuestion, startedAtMillis } from "./quizTiming";
+import { expiryFromNow } from "./expiry";
 import { pickFreeName } from "./freeName";
 
 // Define room and player interfaces
@@ -156,6 +157,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
 
         const roomRef = doc(db, "rooms", roomCode);
         console.log("Room reference created:", roomRef);
+        const expireAt = expiryFromNow(ROOM_LIFETIME_DAYS);
 
         const roomData: Room = {
             id: roomCode,
@@ -163,7 +165,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
             started: false,
             hostIsObserver,
             createdAt: serverTimestamp(), // This is fine outside of the array
-            expireAt: Timestamp.fromMillis(Date.now() + ROOM_LIFETIME_DAYS * 24 * 60 * 60 * 1000),
+            expireAt,
             phase: "lobby",
             currentQuestionIndex: 0,
             phaseStartedAt: serverTimestamp(),
@@ -181,7 +183,7 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
         console.log("About to create room with data:", JSON.stringify({
             ...roomData,
             createdAt: "SERVER_TIMESTAMP", // Cannot stringify the timestamp
-            expireAt: roomData.expireAt?.toDate().toISOString(),
+            expireAt: expireAt.toDate().toISOString(),
             phaseStartedAt: "SERVER_TIMESTAMP",
             players: [{
                 ...roomData.players[0],

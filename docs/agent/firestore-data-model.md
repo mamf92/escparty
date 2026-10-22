@@ -22,15 +22,20 @@ Five collections:
   nights" below. A code is unique across `rooms`, `parties` and `nights`
   (`freeCode`), because the Join screen has one code field.
 
-**Retention.** The project is on the Blaze plan and a Firestore TTL policy on
-`expireAt` is on (set by the owner, 2026-10-22), so a document is deleted
-some time after its `expireAt` passes (Firestore deletes within about a day,
-not at the second). Rooms (#248), parties, ballots, party names, nights,
-guests and night names all carry one, about 30 days out. Rooms made before
-#248 have no `expireAt` and are kept. `quizzes` has none on purpose: a
-saved quiz is kept until its maker deletes it. A new collection that should
-expire needs its collection group added to the TTL policy (Firebase console,
-Firestore, Time-to-live), which only the owner can do.
+**Retention.** This is the one home for what is deleted and when. The
+project is on the Blaze plan and a Firestore TTL policy on `expireAt` is on
+(set by the owner, 2026-10-22), so a document in a collection group the
+policy lists is deleted some time after its `expireAt` passes (within about
+a day, not at the second). Parties, ballots, party names, nights, guests
+and night names carry `expireAt` about 30 days out; so do rooms since #248,
+which expire once the owner adds the `rooms` collection group to the policy.
+Rooms made before #248 have no `expireAt` and are kept. `quizzes` has none:
+the rules forbid deleting a saved quiz, so it is kept for good. A
+collection that should expire needs its group added to the policy (Firebase
+console, Firestore, Time-to-live), which only the owner can do. Each
+`expireAt` comes from `expiryFromNow` (`src/utils/expiry.ts`) on the
+writer's clock, and the rules take it only 1-60 days out
+(`isExpiryInWindow`).
 
 ## `Room` shape (as defined in `roomsFirestore.ts`)
 

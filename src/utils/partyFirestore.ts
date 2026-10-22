@@ -21,6 +21,7 @@ import { db } from "../firebase";
 import { contestById, type Act, type Contest } from "../data/contests2027";
 import { sanitiseBonuses, type Ballot, type Bonuses, type RatingTemplate, type Ratings } from "./partyModel";
 import { resultsFor } from "./partyResults";
+import { expiryFromNow } from "./expiry";
 import { freeCode } from "./freeCode";
 import { nameKey } from "./freeName";
 import { isDenied, settleRefusal } from "./firestoreRefusal";
@@ -100,7 +101,7 @@ export const isAct = (value: unknown): value is Act => {
 };
 
 /** When a document written now can be deleted: PARTY_LIFETIME_DAYS from now. */
-const expiry = () => Timestamp.fromMillis(Date.now() + PARTY_LIFETIME_DAYS * 24 * 60 * 60 * 1000);
+const expiry = () => expiryFromNow(PARTY_LIFETIME_DAYS);
 
 /** Whether a party has this code: the Join screen tells a party from a quiz room by it. */
 export const partyExists = async (code: string): Promise<boolean> =>
