@@ -154,9 +154,6 @@ which one wins depends on the page:
 - `location.state` — the primary hand-off between pages on normal
   navigation; several pages fall back to `sessionStorage` when it's absent.
 
-`useGameStore.ts` (Zustand) is not part of this — it's dead code, see
-`CLAUDE.md`.
-
 ## Server-authoritative progression
 
 Landed in #62, with the mid-quiz return following it since #63; see steps
