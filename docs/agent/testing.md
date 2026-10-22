@@ -177,7 +177,7 @@ open at the time of writing:
 - **New pages, components and hooks need a test file.**
   `src/test/testFiles.test.ts` fails `npm test` when a module under
   `src/pages`, `src/components` or `src/hooks`, or a component (`.tsx`)
-  or hook (`use*.ts`) under `src/design`, `src/fabric-ui` or `src/store`, has no sibling
+  or hook (`use*.ts`) under `src/design` or `src/fabric-ui`, has no sibling
   `*.test.ts(x)`/`*.spec.ts(x)`, except the pre-existing debt it lists (#140, #59). The
   steward treats missing tests as blocking (#58).
 - **Colours come from tokens.** `src/test/designGuard.test.ts` fails

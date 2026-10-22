@@ -74,7 +74,7 @@
 - Added initial Zustand client store sketch for session and multiplayer state management (2026-05-16)
 - Added GitHub Actions CI workflow to run build and lint on PRs (2026-05-16)
 ### Removed
-- The unused Zustand game store, `src/store/useGameStore.ts`, and the `zustand` dependency (#251, replacing #26): nothing imported it, and session state lives in the per-feature session helpers (2026-10-22)
+- The unused Zustand game store, `src/store/useGameStore.ts`, and the `zustand` dependency (#251, replacing #26): nothing imported it (2026-10-22)
 - Removed the GitHub Pages deploy path (`predeploy`/`deploy` scripts and the `gh-pages` devDependency) and `.github/workflows/deploy-vercel.yml`, which had failed on all 12 of its runs for want of the `VERCEL_*` secrets; Vercel's GitHub integration is the one deploy path that actually runs (2026-09-22)
 
 ### Changed

@@ -105,14 +105,11 @@ rules, ask before making it rather than guessing.
 - There is no global store (the unused Zustand one was removed, #251).
   The party and the party night keep their session state in their helpers
   (`partySession.ts`, `nightSession.ts`), but the quiz's is still
-  duplicated ad hoc: `MultiplayerLobby.tsx` and `Lobby.tsx` read and write
-  raw `localStorage` keys (`playerId`, `playerName`, `gameCode`, `isHost`),
-  `Lobby.tsx` writes `sessionStorage` `multiplayerGame` itself
-  (`multiplayerSession.ts` only reads it), and router `location.state`
-  carries the rest across `Quiz.tsx`, `MidQuizScoreboard.tsx`,
-  `HostObserverView.tsx` and `QuizResults.tsx`. Don't add another raw key;
-  don't add a store without a migration plan that also removes the storage
-  it would duplicate.
+  duplicated ad hoc across pages in raw `localStorage`/`sessionStorage`
+  keys and router `location.state`; which page reads and writes what is
+  "State plumbing, summarized" in `docs/agent/multiplayer-sync.md`. Don't
+  add another raw key, and don't add a store without a migration plan
+  that also removes the storage it would duplicate.
 - In multiplayer, `Room.phase`/`currentQuestionIndex`/`phaseStartedAt` are
   **the** source of truth for which question is showing (#62). Don't
   reintroduce a locally incremented index or a local countdown there, or a

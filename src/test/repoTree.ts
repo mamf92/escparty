@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { posix } from "node:path";
 
 /**
@@ -12,8 +12,8 @@ import { posix } from "node:path";
 // directory.
 export const repoRoot = posix.join(__dirname.replace(/\\/g, "/"), "..", "..");
 
-/** Every file under `folder` (repo-relative), recursively; none for a folder that doesn't exist (yet). */
+/** Every file under `folder` (repo-relative), recursively. */
 export const walk = (folder: string): string[] =>
-  !existsSync(posix.join(repoRoot, folder)) ? [] : readdirSync(posix.join(repoRoot, folder), { withFileTypes: true }).flatMap((entry) =>
+  readdirSync(posix.join(repoRoot, folder), { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory() ? walk(posix.join(folder, entry.name)) : [posix.join(folder, entry.name)],
   );

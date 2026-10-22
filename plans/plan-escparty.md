@@ -15,7 +15,7 @@ TL;DR - Create robust Copilot instructions, add CI/CD and test coverage, introdu
    5. Branch protection: enforce status checks (CI and tests) before merge to main and require PR review.
 
 3. Zustand plan (design and incremental rollout, parallelizable with testing setup)
-   > **Dropped (#251, 2026-10-22).** The store was never wired in and was removed with the `zustand` dependency; session state lives in per-feature helpers (`multiplayerSession.ts`, `partySession.ts`, `nightSession.ts`). See CLAUDE.md's Known landmines. Kept below only as history.
+   > **Dropped (#251, 2026-10-22).** The store was never wired in and was removed with the `zustand` dependency. Parties and nights keep session state in their helpers; the quiz's is still raw storage across pages (see CLAUDE.md's Known landmines). Kept below only as history.
    1. Decision: introduce Zustand as lightweight global state to track active multiplayer session (room, playerId, playerName, isHost, gameState, local UI flags) and transient UI state (current question index, timer). Keep persistence in sessionStorage but move canonical client state into the store.
    2. Implementation steps:
       - Create src/store/useGameStore.ts using zustand with TypeScript types for Player, RoomState, GameState.
