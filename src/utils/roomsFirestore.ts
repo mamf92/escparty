@@ -191,7 +191,18 @@ const writeNewRoom = async (roomCode: string, hostId: string, hostName: string, 
             }]
         }));
 
-        await setDoc(roomRef, roomData);
+        try {
+            await setDoc(roomRef, roomData);
+        } catch (error) {
+            if ((error as { code?: string } | null)?.code !== "permission-denied") throw error;
+            // The rules take expireAt only 1-60 days out by the server's clock,
+            // so a device clock about a month off is refused (#248). Hosting
+            // matters more than the expiry: try once more without it, which
+            // the rules still allow (that room is kept, like one from before).
+            console.warn("Room refused with an expiry; retrying without one (is this device's clock right?)");
+            const { expireAt: _refused, ...withoutExpiry } = roomData;
+            await setDoc(roomRef, withoutExpiry);
+        }
         console.log(`Room ${roomCode} created successfully`);
     } catch (error) {
         console.error("Error creating room:", error);

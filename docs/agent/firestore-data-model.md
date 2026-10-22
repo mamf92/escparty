@@ -47,7 +47,7 @@ interface Room {
   difficulty?: string;               // the quiz key: "easy" | "medium" | "hard" | "t-<templateId>" | "c-<quizId>"
   breakEvery?: number;               // mid-quiz break every N questions, 0 = never; absent = 5
   createdAt: Timestamp | FieldValue;
-  expireAt?: Timestamp;              // createdAt + 30 days (ROOM_LIFETIME_DAYS), for TTL (#248); set only at creation
+  expireAt?: Timestamp;              // the writer's clock + 30 days (ROOM_LIFETIME_DAYS), for TTL (#248); set only at creation, left off if the rules refuse it
   players: Player[];
   hostIsObserver?: boolean;
   continueReady?: boolean;

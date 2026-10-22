@@ -49,6 +49,9 @@ const typeCode = async (user: ReturnType<typeof userEvent.setup>, code: string) 
 };
 
 describe("MultiplayerLobby", () => {
+  // The room this device's stored player is in, for a rejoin offer.
+  const roomWith = (playerId: string) => ({ id: "ABBA", players: [{ id: playerId, name: "", score: 0 }] } as never);
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getRoom).mockResolvedValue(null);
@@ -237,6 +240,7 @@ describe("MultiplayerLobby", () => {
     localStorage.setItem("gameCode", "ABBA");
     localStorage.setItem("playerId", "p-host");
     localStorage.setItem("playerName", "The host");
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-host"));
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
@@ -249,6 +253,7 @@ describe("MultiplayerLobby", () => {
     localStorage.setItem("gameCode", "ABBA");
     localStorage.setItem("playerId", "p-loreen");
     localStorage.setItem("playerName", "Loreen");
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-loreen"));
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
@@ -268,11 +273,39 @@ describe("MultiplayerLobby", () => {
     expect(screen.getByText("at /lobby")).toBeInTheDocument();
   });
 
+  it("joins fresh, with no rejoin offer, when the stored player isn't in that room any more (#248)", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-loreen");
+    localStorage.setItem("playerName", "Loreen");
+    // The old room expired and its code was drawn again for someone else's.
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-stranger"));
+    renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    expect(screen.queryByRole("button", { name: "Rejoin as Loreen" })).not.toBeInTheDocument();
+    expect(joinRoom).not.toHaveBeenCalled();
+    expect(joinRoomWithFreeName).toHaveBeenCalledWith("ABBA", expect.not.stringMatching(/^p-loreen$/), expect.any(Array));
+  });
+
+  it("still offers the rejoin when the room can't be read", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("gameCode", "ABBA");
+    localStorage.setItem("playerId", "p-loreen");
+    localStorage.setItem("playerName", "Loreen");
+    vi.mocked(getRoom).mockRejectedValue(new Error("offline"));
+    renderLobby();
+    await typeCode(user, "ABBA");
+    await user.click(button("Join the game"));
+    expect(button("Rejoin as Loreen")).toBeInTheDocument();
+  });
+
   it("keeps the emoji out of the rejoin button", async () => {
     const user = userEvent.setup();
     localStorage.setItem("gameCode", "ABBA");
     localStorage.setItem("playerId", "p-dana");
     localStorage.setItem("playerName", "Dana International 🏳️‍🌈");
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-dana"));
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
@@ -286,6 +319,7 @@ describe("MultiplayerLobby", () => {
     localStorage.setItem("gameCode", "ABBA");
     localStorage.setItem("playerId", "p-x");
     localStorage.setItem("playerName", "Sam 👋🏽 Ryder 1️⃣ 🏴󠁧󠁢󠁥󠁮󠁧󠁿");
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-x"));
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
@@ -350,6 +384,7 @@ describe("MultiplayerLobby", () => {
     localStorage.setItem("gameCode", "ABBA");
     localStorage.setItem("playerId", "p-loreen");
     localStorage.setItem("playerName", "Loreen");
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-loreen"));
     renderLobby();
     await typeCode(user, "ABBA");
     await user.click(button("Join the game"));
@@ -363,6 +398,7 @@ describe("MultiplayerLobby", () => {
     localStorage.setItem("gameCode", "ABBA");
     localStorage.setItem("playerId", "p-loreen");
     localStorage.setItem("playerName", "Loreen");
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-loreen"));
     renderLobby();
     await typeCode(user, "EFGH");
     await user.click(button("Join the game"));
@@ -391,6 +427,7 @@ describe("MultiplayerLobby", () => {
     localStorage.setItem("gameCode", "ABBA");
     localStorage.setItem("playerId", "p-loreen");
     localStorage.setItem("playerName", "Loreen");
+    vi.mocked(getRoom).mockResolvedValue(roomWith("p-loreen"));
     renderLobby({ joinCode: "ABBA" });
     expect(await screen.findByRole("button", { name: "Rejoin as Loreen" })).toBeInTheDocument();
     expect(joinRoomWithFreeName).not.toHaveBeenCalled();

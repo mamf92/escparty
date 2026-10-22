@@ -104,15 +104,25 @@ await expectAllowed("create room (host)", () => createRoom(roomRef, roomCode));
 // the TTL policy (case 1 above). The rules take it only in parties' 1-60 day
 // window, and no later write may move it (no update branch lists it). A
 // client from before #248 may still create a room without one.
-for (const [label, days] of [["a far-off expireAt", 400], ["an expireAt that is already near", 0]]) {
-  const bad = freshRoom("EXPB");
-  await expectDenied(`create a room with ${label}`, () =>
-    setDoc(bad.roomRef, {
-      id: bad.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
-      expireAt: daysFromNow(days),
-      players: [{ id: "host-1", name: "Host", score: 0 }],
-    })
-  );
+const roomExpiring = (expireAt) => {
+  const room = freshRoom("EXPB");
+  return () => setDoc(room.roomRef, {
+    id: room.roomCode, hostId: "host-1", started: false, createdAt: serverTimestamp(),
+    expireAt,
+    players: [{ id: "host-1", name: "Host", score: 0 }],
+  });
+};
+await expectAllowed("create a room with expireAt just over a day out", roomExpiring(daysFromNow(1.1)));
+await expectAllowed("create a room with expireAt just under 60 days out", roomExpiring(daysFromNow(59.9)));
+for (const [label, expireAt] of [
+  ["a far-off expireAt", daysFromNow(400)],
+  ["an expireAt just over 60 days out", daysFromNow(60.1)],
+  ["an expireAt under a day out", daysFromNow(0.9)],
+  ["an expireAt that has passed", daysFromNow(-1)],
+  ["an expireAt in millis, not a timestamp", Date.now() + 30 * 24 * 60 * 60 * 1000],
+  ["an expireAt as a string", new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()],
+]) {
+  await expectDenied(`create a room with ${label}`, roomExpiring(expireAt));
 }
 await expectDenied("move a room's expireAt after creation", () =>
   updateDoc(roomRef, { expireAt: daysFromNow(50) })
@@ -472,7 +482,7 @@ const aParty = (overrides = {}) => ({
   results: {},
   revealed: false,
   createdAt: serverTimestamp(),
-  expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  expireAt: daysFromNow(30),
   ...overrides,
 });
 for (const [label, overrides] of [
@@ -482,7 +492,7 @@ for (const [label, overrides] of [
   ["seven categories", { template: { categories: Array.from({ length: 7 }, (_, i) => ({ id: `c${i}`, label: `C${i}`, max: 10 }) ) } }],
   ["a code that doesn't match its document", { code: "ZZZZ" }],
   ["a client-chosen createdAt", { createdAt: Timestamp.fromMillis(0) }],
-  ["a far-off expireAt", { expireAt: Timestamp.fromMillis(Date.now() + 400 * 24 * 60 * 60 * 1000) }],
+  ["a far-off expireAt", { expireAt: daysFromNow(400) }],
   ["an extra field", { adminOf: "everything" }],
 ]) {
   await expectDenied(`create a party with ${label}`, () => setDoc(partyRef, aParty(overrides)));
@@ -514,14 +524,14 @@ const aBallot = (overrides = {}) => Object.fromEntries(Object.entries({
   ratings: { se: { points: 12 } },
   bonuses: { se: ["wind"] },
   updatedAt: serverTimestamp(),
-  expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  expireAt: daysFromNow(30),
   ...overrides,
 }).filter(([, value]) => value !== undefined));
 // A first ballot comes with its name claim (#229, case 5b).
 await expectAllowed("save a first ballot with its name claim", async () => {
   const batch = writeBatch(db);
   batch.set(doc(db, "parties", partyCode, "names", "loreen"), {
-    name: "Loreen", guestId: "guest-1", expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    name: "Loreen", guestId: "guest-1", expireAt: daysFromNow(30),
   });
   batch.set(ballotRef, aBallot());
   await batch.commit();
@@ -537,7 +547,7 @@ for (const [label, overrides] of [
   ["a client-chosen updatedAt", { updatedAt: Timestamp.fromMillis(0) }],
   ["an extra field", { isHost: true }],
   ["ratings that aren't a map", { ratings: [12] }],
-  ["a far-off expireAt", { expireAt: Timestamp.fromMillis(Date.now() + 400 * 24 * 60 * 60 * 1000) }],
+  ["a far-off expireAt", { expireAt: daysFromNow(400) }],
   ["no expireAt", { expireAt: undefined }],
 ]) {
   await expectDenied(`save a ballot with ${label}`, () => setDoc(ballotRef, aBallot(overrides)));
@@ -550,7 +560,7 @@ await expectDenied("delete a ballot", () => deleteDoc(ballotRef));
 const aClaim = (overrides = {}) => Object.fromEntries(Object.entries({
   name: "Céline Dion",
   guestId: "claim-1",
-  expireAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  expireAt: daysFromNow(30),
   ...overrides,
 }).filter(([, value]) => value !== undefined));
 const joinBatch = (clientDb, key, claim) => {
@@ -609,7 +619,7 @@ for (const [label, key, overrides] of [
   ["a key that keeps the case", "Céline Dion", {}],
   ["no guestId", "céline dion 2", { name: "Céline Dion 2", guestId: undefined }],
   ["an extra field", "céline dion 2", { name: "Céline Dion 2", isHost: true }],
-  ["a far-off expireAt", "céline dion 2", { name: "Céline Dion 2", expireAt: Timestamp.fromMillis(Date.now() + 400 * 24 * 60 * 60 * 1000) }],
+  ["a far-off expireAt", "céline dion 2", { name: "Céline Dion 2", expireAt: daysFromNow(400) }],
 ]) {
   await expectDenied(`claim a name with ${label}`, () => setDoc(doc(db, "parties", partyCode, "names", key), aClaim(overrides)));
 }
@@ -636,7 +646,6 @@ report(
 // the activity list only grows by one valid entry at a time; a night closes
 // once and may hand over to a fresh night of the same host.
 const nightLetters = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join("");
-const nightExpiry = (days = 30) => daysFromNow(days);
 const nightRef = (code) => doc(db, "nights", code);
 const guestRef = (code, id) => doc(db, "nights", code, "guests", id);
 const claimRef = (code, key) => doc(db, "nights", code, "names", key);
@@ -647,19 +656,19 @@ const aNight = (code, overrides = {}) => Object.fromEntries(Object.entries({
   activities: [],
   closed: false,
   createdAt: serverTimestamp(),
-  expireAt: nightExpiry(),
+  expireAt: daysFromNow(30),
   ...overrides,
 }).filter(([, value]) => value !== undefined));
 const aNightGuest = (overrides = {}) => Object.fromEntries(Object.entries({
   name: "Loreen",
   joinedAt: serverTimestamp(),
-  expireAt: nightExpiry(),
+  expireAt: daysFromNow(30),
   ...overrides,
 }).filter(([, value]) => value !== undefined));
 const aNightClaim = (name, guestId, overrides = {}) => Object.fromEntries(Object.entries({
   name,
   guestId,
-  expireAt: nightExpiry(),
+  expireAt: daysFromNow(30),
   ...overrides,
 }).filter(([, value]) => value !== undefined));
 // joinNight's write: the guest and their claim on the name, in one batch.
@@ -709,8 +718,8 @@ for (const [label, overrides] of [
   ["an activity already listed", { activities: [anActivity("quiz", "ABBA")] }],
   ["the night already closed", { closed: true }],
   ["a client-chosen createdAt", { createdAt: Timestamp.fromMillis(0) }],
-  ["a far-off expireAt", { expireAt: nightExpiry(400) }],
-  ["an expireAt that is already near", { expireAt: nightExpiry(0) }],
+  ["a far-off expireAt", { expireAt: daysFromNow(400) }],
+  ["an expireAt that is already near", { expireAt: daysFromNow(0) }],
   ["no expireAt", { expireAt: undefined }],
   ["no title", { title: "" }],
   ["a 61-character title", { title: "x".repeat(61) }],
@@ -777,8 +786,8 @@ for (const [label, key, guestOverrides, claimOverrides] of [
   ["a 41-character name", "x".repeat(41), { name: "x".repeat(41) }, { name: "x".repeat(41) }],
   ["a client-chosen joinedAt", "lordi", { joinedAt: Timestamp.fromMillis(0) }, {}],
   ["an extra field on the guest", "lordi", { isHost: true }, {}],
-  ["a far-off expireAt on the guest", "lordi", { expireAt: nightExpiry(400) }, {}],
-  ["a far-off expireAt on the claim", "lordi", {}, { expireAt: nightExpiry(400) }],
+  ["a far-off expireAt on the guest", "lordi", { expireAt: daysFromNow(400) }, {}],
+  ["a far-off expireAt on the claim", "lordi", {}, { expireAt: daysFromNow(400) }],
   ["an extra field on the claim", "lordi", {}, { isHost: true }],
   ["a 65-character guest id", "lordi", {}, { guestId: "g".repeat(65) }],
 ]) {

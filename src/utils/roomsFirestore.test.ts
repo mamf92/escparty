@@ -222,6 +222,26 @@ describe("createRoom", () => {
         });
     });
 
+    it("retries once without expireAt when the rules refuse it, as for a device clock far off (#248)", async () => {
+        mocks.setDoc
+            .mockRejectedValueOnce(Object.assign(new Error("denied"), { code: "permission-denied" }))
+            .mockResolvedValueOnce(undefined);
+
+        await createRoom("ABCD", "host-1", "Martin");
+
+        expect(mocks.setDoc).toHaveBeenCalledTimes(2);
+        expect(mocks.setDoc.mock.calls[0][1]).toHaveProperty("expireAt");
+        expect(mocks.setDoc.mock.calls[1][1]).not.toHaveProperty("expireAt");
+        expect(mocks.setDoc.mock.calls[1][1]).toMatchObject({ id: "ABCD", hostId: "host-1" });
+    });
+
+    it("doesn't retry a write that failed for another reason", async () => {
+        mocks.setDoc.mockRejectedValue(Object.assign(new Error("offline"), { code: "unavailable" }));
+
+        await expect(createRoom("ABCD", "host-1", "Martin")).rejects.toThrow("Failed to create room: offline");
+        expect(mocks.setDoc).toHaveBeenCalledTimes(1);
+    });
+
     it("wraps a write failure with the room-creation context", async () => {
         mocks.setDoc.mockRejectedValue(new Error("network down"));
 
