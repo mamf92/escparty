@@ -19,7 +19,7 @@
     "test:e2e": "npx -y firebase-tools@15.31.0 emulators:exec --only firestore --project demo-escparty \"playwright test\""
   },
   "dependencies": {
-    "@react-three/fiber": "^9.8.1",
+    "@react-three/fiber": "^9.8.2",
     "firebase": "^12.19.0",
     "jsqr": "^1.4.0",
     "leva": "^0.10.1",
